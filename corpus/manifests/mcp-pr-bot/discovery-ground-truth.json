@@ -1,0 +1,10 @@
+{
+  "agent_repo": "mcp-pr-bot",
+  "target_system": "mcp",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["open_pr", "read_repo"],
+  "risk_rank": 2,
+  "policy_generated": true,
+  "notes": "MCP dependency PR bot declared in .agentrail/manifest.json: reads repos and opens PRs (bounded write). Scanner should detect one agent, surface read_repo + open_pr, rank it above the reporter, and emit a policy."
+}

@@ -1,0 +1,10 @@
+{
+  "agent_repo": "mcp-readonly-reporter",
+  "target_system": "mcp",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_ci", "read_repo"],
+  "risk_rank": 1,
+  "policy_generated": false,
+  "notes": "MCP status reporter declared in .agentrail/manifest.json: read-only. Scanner should detect one agent, surface read_repo + read_ci, rank it lowest, and emit no policy."
+}

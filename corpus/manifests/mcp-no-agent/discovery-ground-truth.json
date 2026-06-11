@@ -1,0 +1,10 @@
+{
+  "agent_repo": "mcp-no-agent",
+  "target_system": "mcp",
+  "detected": false,
+  "agent_count": 0,
+  "action_patterns": [],
+  "risk_rank": 0,
+  "policy_generated": false,
+  "notes": "Plain MCP server (arithmetic tools) with no AgentRail manifest and no target-system capability. True negative: the scanner must not flag it (false-positive guard)."
+}
