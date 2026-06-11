@@ -57,17 +57,18 @@ class HttpSourceScanAdapter:
         self._client = client or self._default_client()
 
     def _default_client(self) -> Any:
-        try:
-            import httpx  # type: ignore
-        except ImportError as exc:  # pragma: no cover - optional dep
-            raise RuntimeError(
-                "HttpSourceScanAdapter needs httpx (pip install 'railgun-recette[real]') "
-                "or pass an explicit client="
-            ) from exc
         headers = {"X-Tenant-Id": self.tenant}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        return httpx.Client(base_url=self.base_url, headers=headers, timeout=30.0)
+        try:
+            import httpx  # type: ignore
+
+            return httpx.Client(base_url=self.base_url, headers=headers, timeout=30.0)
+        except ImportError:
+            # Fall back to the zero-dependency stdlib client (used in the Docker lab).
+            from ._http_client import StdlibHttpClient
+
+            return StdlibHttpClient(self.base_url, headers=headers)
 
     def _post(self, path: str, json_body: dict) -> Any:
         resp = self._client.post(path, json=json_body)

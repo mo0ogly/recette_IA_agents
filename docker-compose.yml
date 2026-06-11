@@ -1,0 +1,49 @@
+# AgentRail recette discovery lab.
+#
+#   docker compose up discovery-mock        # start the mock Discovery :8081
+#   docker compose run --rm recette         # run the discovery recette over HTTP
+#   docker compose run --rm gates           # run the strict Python gates
+#   docker compose run --rm tests           # run the full test suite
+#
+# The mock is a lab double of the colleague's Discovery/Enrichment Plane, backed by
+# the reference oracle. Swap AGENTRAIL_DISCOVERY_URL to point at the real service.
+
+services:
+  discovery-mock:
+    build: .
+    image: railgun-recette:latest
+    command: python -m recette.discovery_mock
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  recette:
+    image: railgun-recette:latest
+    build: .
+    depends_on:
+      discovery-mock:
+        condition: service_healthy
+    environment:
+      AGENTRAIL_DISCOVERY_URL: http://discovery-mock:8081
+      AGENTRAIL_TENANT: dev
+    command: python -m recette discovery --adapter http
+
+  gates:
+    image: railgun-recette:latest
+    build: .
+    command: >
+      sh -c "ruff check recette tests scripts &&
+             ruff format --check recette tests scripts &&
+             mypy recette &&
+             bandit -q -r recette --severity-level medium &&
+             echo 'gates: PASS'"
+
+  tests:
+    image: railgun-recette:latest
+    build: .
+    command: python -m unittest discover -s tests

@@ -1,0 +1,13 @@
+.git
+.githooks
+.claude
+.venv-pyaudit
+**/__pycache__
+**/*.pyc
+cmd
+docs
+target
+**/target
+node_modules
+*.md
+!corpus/**/*.md
