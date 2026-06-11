@@ -86,7 +86,7 @@ Legend: DONE / PARTIAL / TODO.
 | Docker lab (runtime/audit, non-root) | DONE |
 | One-shot installer + smoke tests | DONE |
 | Strict gates (ruff/mypy/bandit) green | DONE |
-| Ed25519 bundle contract recette | TODO (in scope, M5) |
+| Ed25519 bundle contract recette | DONE (M5) -- recette bundle-verify + fixtures |
 | CI pipeline (gates + recette on push) | BLOCKED (M7 workflow written; needs gh token `workflow` scope to push) |
 | Aggregate report (`recette report`) | DONE (M9) |
 | Real API wiring confirmed with colleague | TODO (blocked on his routes) |
@@ -221,9 +221,9 @@ M0 GitHub                         DONE
   -> M1 Manifest/MCP                DONE 2026-06-11
   -> M9 aggregate report            DONE 2026-06-11 (brought forward)
   -> M7 CI                          BLOCKED (needs gh token `workflow` scope)
-  -> M8 orthogonality audit (all surfaces)   <- next
+  -> M5 Ed25519 bundle contract     DONE 2026-06-11 (brought forward)
+  -> M8 orthogonality audit (all surfaces)   <- next (light)
   -> M4 GitLab parity
-  -> M5 Ed25519 bundle contract
   -> M6 real API wiring (when colleague unblocks)
 
 Track U (UX console) runs in parallel once M3 lands -- it needs at least one
