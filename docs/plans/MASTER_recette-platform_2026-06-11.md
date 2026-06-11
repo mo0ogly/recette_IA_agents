@@ -64,10 +64,10 @@ Legend: DONE / PARTIAL / TODO.
 
 | Surface | GitHub | GitLab | OpenAPI | Temporal | Manifest/MCP |
 |---------|--------|--------|---------|----------|--------------|
-| corpus subjects | DONE (4) | TODO | TODO | TODO | TODO |
-| reference oracle | DONE | TODO | TODO | TODO | TODO |
-| ground-truth schema | DONE | reuse | TODO | TODO | TODO |
-| http adapter wiring | PARTIAL (assumed routes) | -- | -- | -- | -- |
+| corpus subjects | DONE (4) | TODO | TODO | DONE (4) | TODO |
+| reference oracle | DONE | TODO | TODO | DONE (AST) | TODO |
+| ground-truth schema | DONE | reuse | reuse | DONE (reuse) | TODO |
+| http adapter wiring | PARTIAL (assumed routes) | -- | -- | DONE (same oracle/mock) | -- |
 | publisher | DONE (GitHub) | TODO | n/a | n/a | n/a |
 
 ### Identification recette (corpus/agents -> IdentificationAdapter -> 4-dim scorecard)
@@ -121,7 +121,10 @@ DoD: `recette discovery --adapter reference --surface mcp` -> VERDICT PASS; gate
 - Adapter + harness + scorecard + tests.
 DoD: `recette discovery --surface openapi` -> VERDICT PASS.
 
-### M3 -- Temporal surface  [TODO]  (FIRST of the remaining surfaces, per decision #1)
+### M3 -- Temporal surface  [DONE 2026-06-11]  (FIRST of the remaining surfaces, per decision #1)
+Shipped: 4 real temporalio subjects + AST oracle + `--surface temporal` + 8 tests; gates
+green; docker http github+temporal VERDICT PASS. Deviation: the `temporal-dev` compose
+service is DEFERRED to Lane B (discovery uses static AST analysis, needs no running server).
 Real Temporal SDK definitions (decision #3). Heavier than the other surfaces, done first.
 - `[temporal]` optional extra (`temporalio` SDK); `temporal-dev` service in docker-compose
   (Temporal dev server) so the lab can run real workflows; lab stays the default and
@@ -212,8 +215,8 @@ Manifest/MCP.
 
 ```
 M0 GitHub (done)
-  -> M3 Temporal (real SDK)         <- first remaining surface
-  -> M2 OpenAPI
+  -> M3 Temporal (real SDK)         DONE 2026-06-11
+  -> M2 OpenAPI                     <- next
   -> M1 Manifest/MCP
   -> M8 orthogonality audit (all surfaces)
   -> M4 GitLab parity
