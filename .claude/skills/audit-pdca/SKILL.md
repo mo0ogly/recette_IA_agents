@@ -346,18 +346,18 @@ grep -rn "symbol_name" src/ --include='*.rs' | grep -v "fn symbol_name" | wc -l 
 Classify: ACTIF / PROTOTYPE / DEAD.
 Only ACTIF code participates in scoring. DEAD code excluded, proposed for .disabled.
 
-### C.1 : STATIC -- Rust cargo gate + /react-recette (BLOCKING)
+### C.1 : STATIC -- /rust-recette + /react-recette (BLOCKING)
 
-**This is NOT a passive reference. It is a mandatory static gate.**
+**This is NOT a passive reference. It is a mandatory delegation via Skill tool.**
 
 For each file modified in the cycle:
 
-**If `*.rs` (backend)**: run the Rust static gate from `build-pipeline-rust.md` (there is no
-`/rust-recette` skill -- the gate is the cargo toolchain + the rust-best-practices skill):
-  - `cargo build` (exit 0), `cargo fmt --all -- --check` (0 diff), `cargo clippy --all-targets --all-features -- -D warnings` (0 warnings), `cargo test` (green)
-  - `cargo audit` (RUSTSEC advisories) + `cargo deny check` + `cargo geiger` (unsafe surface) -- real SAST / supply-chain tools, superior to any manual grep
-  - Invoke `Skill({skill: "rust-best-practices"})` as an adversarial review over the touched `.rs` (borrow/clone abuse, error handling, clippy-allow without reason, perf)
-  - **SECURITY SCORE /20 = the build-pipeline-rust.md security scoring** (start 20, subtract per RUSTSEC HIGH/clippy lint/unjustified unsafe/deny violation)
+**If `*.rs` (backend)**: invoke `Skill({skill: "rust-recette", args: "{file or crate}"})`
+  - Blocs A-F / score /44 (A conventions, B OWASP Rust, C arch/perf, D static = clippy+cargo-audit+cargo-deny+cargo-geiger, E R17 Contract Gate, F invariants I1-I6)
+  - **BLOC D SCORE = security domain score in SCORING_CONFIG (converted /20, see build-pipeline-rust.md)**
+  - clippy + cargo-audit + cargo-deny + cargo-geiger: real SAST / supply-chain tools, superior to any manual grep
+  - Helper: `.claude/scripts/rust-recette-deep-scan.sh` runs Bloc D end-to-end. Tools installed via `scripts/install_rust_audit.sh`. A missing tool marks its bloc N/A (R18, never invent a result).
+  - Reference: `.claude/commands/rust-recette.md`
 
 **If `*.tsx`/`*.ts` (frontend)**: invoke `Skill({skill: "react-recette", args: "{file or directory}"})`
   - 6 blocs / 48 checks (A conventions, B OWASP, C Vercel perf, D react-doctor, E R17 Contract Gate, F legacy health)
@@ -372,12 +372,13 @@ security domain score = Rust security score /20 (build-pipeline-rust.md)
 ```
 
 **Cycle FAILURE and return to Phase D if:**
-- Rust static gate not all-green (build / fmt / clippy -D warnings / cargo test) OR rust-best-practices review with a HIGH finding
+- `/rust-recette` < 39/44 (or < 35 with E+F N/A)
 - OR `/react-recette` < 36/40
-- OR a single Bloc E (R17) check FAIL for a React component calling an API
+- OR a single Bloc E (R17) check FAIL for a component/handler calling an API
+- OR a single Bloc F (invariant I1-I6) violated
 - OR a CRITICAL check FAIL:
   - React: A1 (Grid v7), A2 (URL hardcode), A3 (Logger), B1 (XSS), B2 (Secrets), C1 (barrel imports), C2 (Promise.all)
-  - Rust: cargo build fail, clippy `-D warnings` fail, cargo test red, `.unwrap()`/`.expect()`/`panic!` on a fallible path, RUSTSEC HIGH/CRITICAL unpatched advisory, `unsafe` block without `// SAFETY:` justification
+  - Rust: A1 (tracing), A2 (no panic fallible), A3 (secrets), B1 (SQLi), B2 (CmdInj), B3 (Secrets), B4 (Auth/identity), D1 (clippy -D warnings), D2 (cargo-audit HIGH/CRITICAL)
 
 No exception, no "we will do it in the next wave".
 
@@ -393,7 +394,7 @@ Out-of-scope errors are flagged (decision_log + RETEX) under R28
 flag-not-sweep, NOT fixed, NOT swept, NOT a cycle FAILURE. Only errors
 in files this cycle touched count.
 
-**Context-budget equivalence (A4)**: the Rust cargo static gate (build/fmt/clippy/test/audit) /
+**Context-budget equivalence (A4)**: the `/rust-recette` /
 `/react-recette` delegation is the default and is MANDATORY when any
 check is HIGH/CRITICAL or the verdict is uncertain. When the context
 budget is constrained (long swarm session, many agent reports already
@@ -745,7 +746,7 @@ T.1 research -> T.2 swarm_memory -> T.3 brainstorm N agents (parallel) -> T.4 cr
 D.1 remediation plan -> D.2 fix loop (ACT->OBSERVE->EVALUATE, with Rust/React pipelines) -> D.3 verification gate
     |
     v
-C.0 dead code -> C.1 STATIC (cargo build/clippy/test/audit + rust-best-practices / react-recette) -> C.2 RUNTIME (Playwright) -> C.3 CONTRACT (R17) -> C.4 REGRESSION -> C.5 scorecard -> C.6 replan?
+C.0 dead code -> C.1 STATIC (/rust-recette [clippy+audit+deny+geiger] + /react-recette) -> C.2 RUNTIME (Playwright) -> C.3 CONTRACT (R17) -> C.4 REGRESSION -> C.5 scorecard -> C.6 replan?
     |
     v
 A.1 re-scoring -------> score >= target? --YES--> F.1 librarian gate -> F.2 RETEX (DISPLAYED) -> F.3 scoring evolution -> F.4 post-RETEX
@@ -769,7 +770,7 @@ See `agentic-core.md` section 6. PDCA-specific scoring:
 | C1 Decomposition | /10 | Proper phase separation, atomic tasks |
 | C2 Planification | /10 | THINK phase quality: research depth, alternatives, swarm_memory populated |
 | C3 Replanification | /10 | Reaction to failures, 2+ alternatives, decision_log entries |
-| C4 Tooling | /10 | Proper skill invocation (rust-best-practices, error-handling-patterns, react-recette, test-first) + cargo gate, build pipelines followed |
+| C4 Tooling | /10 | Proper skill invocation (rust-recette, rust-best-practices, error-handling-patterns, react-recette, test-first), build pipelines followed |
 | C5 Traceability | /10 | action_journal, RETEX, DASHBOARD, PLAN, INDEX all updated |
 
 ---
@@ -781,7 +782,7 @@ See `agentic-core.md` section 6. PDCA-specific scoring:
 | Global score | < 50 | Full replanification with 2+ alternatives |
 | Domain regression | 3+ domains dropping | Conditional replan (C.6) |
 | Critical check FAIL | Any SEC/BUILD critical | Return to Phase D immediately |
-| Recette gate FAIL | Rust cargo gate not all-green (build/clippy/test) or react-recette < 36/40 | Return to Phase D |
+| Recette gate FAIL | rust-recette < 39/44 or react-recette < 36/40 | Return to Phase D |
 | R17 FAIL | Any API component without fixture+test | Return to Phase D |
 | Runtime crash | Any Component Error in Playwright | Return to Phase D |
 

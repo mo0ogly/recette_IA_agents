@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# pre-commit -- Rust static gate for AgentRail (Railgun).
+# Runs the blocking subset of /rust-recette Bloc D on staged .rs changes:
+#   fmt --check  ->  clippy -D warnings  ->  cargo audit (HIGH/CRITICAL)
+# Mirrors the role of the old Go pre-commit gate.
+#
+# Behaviour:
+#   - No staged .rs files          -> exit 0 (nothing to do).
+#   - cargo absent                 -> WARN, exit 0 (non-blocking; install via
+#                                     scripts/install_rust_audit.sh).
+#   - fmt/clippy/audit failure     -> BLOCK the commit (exit 1).
+#   - Bypass                       -> RUST_RECETTE_PRECOMMIT_SKIP=1 git commit ...
+#
+# Enable once per clone: git config core.hooksPath .githooks
+# Reference: .claude/commands/rust-recette.md (Bloc D)
+
+set -uo pipefail
+
+# --- bypass ---------------------------------------------------------------
+if [ "${RUST_RECETTE_PRECOMMIT_SKIP:-0}" = "1" ]; then
+  printf '[pre-commit] RUST_RECETTE_PRECOMMIT_SKIP=1 -- Rust gate skipped.\n' >&2
+  exit 0
+fi
+
+# --- staged .rs files -----------------------------------------------------
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
+if [ "${#STAGED[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+printf '[pre-commit] %d staged .rs file(s) -- running Rust static gate.\n' "${#STAGED[@]}" >&2
+
+# --- toolchain present? ---------------------------------------------------
+[ -f "${HOME}/.cargo/env" ] && # shellcheck disable=SC1091
+  . "${HOME}/.cargo/env" 2>/dev/null || true
+
+if ! command -v cargo >/dev/null 2>&1; then
+  printf '[pre-commit][WARN] cargo absent -- Rust gate skipped (non-blocking).\n' >&2
+  printf '[pre-commit][WARN] install with: scripts/install_rust_audit.sh\n' >&2
+  exit 0
+fi
+
+FAIL=0
+
+# --- 1. rustfmt --check on staged files only (fast) -----------------------
+if command -v rustfmt >/dev/null 2>&1; then
+  if ! rustfmt --edition 2021 --check "${STAGED[@]}" >/dev/null 2>&1; then
+    printf '[pre-commit][FAIL] rustfmt: staged files not formatted. Run: cargo fmt --all\n' >&2
+    FAIL=1
+  fi
+else
+  printf '[pre-commit][WARN] rustfmt absent -- skipping fmt check.\n' >&2
+fi
+
+# --- 2. clippy -D warnings (workspace; the correctness/lint gate) ---------
+if ! cargo clippy --all-targets --all-features -- -D warnings >/tmp/precommit-clippy.txt 2>&1; then
+  printf '[pre-commit][FAIL] cargo clippy reported warnings/errors:\n' >&2
+  grep -E '^(warning|error)' /tmp/precommit-clippy.txt | head -20 >&2
+  printf '[pre-commit]        full log: /tmp/precommit-clippy.txt\n' >&2
+  FAIL=1
+fi
+
+# --- 3. cargo audit (RUSTSEC HIGH/CRITICAL) -- non-blocking if tool absent -
+if command -v cargo-audit >/dev/null 2>&1; then
+  cargo audit >/tmp/precommit-audit.txt 2>&1 || true
+  HC=$(grep -cE 'Severity: (high|critical)' /tmp/precommit-audit.txt 2>/dev/null || echo 0)
+  if [ "$HC" -gt 0 ]; then
+    printf '[pre-commit][FAIL] cargo audit: %s HIGH/CRITICAL RUSTSEC advisory(ies).\n' "$HC" >&2
+    grep -E 'RUSTSEC-|Severity:|Crate:' /tmp/precommit-audit.txt | head -20 >&2
+    FAIL=1
+  fi
+else
+  printf '[pre-commit][WARN] cargo-audit absent -- skipping advisory scan.\n' >&2
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  printf '[pre-commit] BLOCKED. Fix the issues above, or bypass with RUST_RECETTE_PRECOMMIT_SKIP=1 (logged).\n' >&2
+  exit 1
+fi
+
+printf '[pre-commit] Rust static gate PASS.\n' >&2
+exit 0

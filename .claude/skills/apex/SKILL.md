@@ -377,23 +377,19 @@ When ALL subtasks are SUCCESS, enter the recette phase. Follow [recette-protocol
 
 ### 4a. STATIC (BLOCKING)
 
-Rust static gate (run at workspace root; all BLOCKING):
-- `cargo build` -- exit 0
-- `cargo fmt --all -- --check` -- 0 diff
-- `cargo clippy --all-targets --all-features -- -D warnings` -- 0 warnings
-- `cargo test` -- green, zero new failures vs pre-flight baseline
-- `cargo audit` (if installed) -- 0 unpatched RUSTSEC advisories (WARN if `cargo audit` absent)
-- Invoke the `rust-best-practices` skill as an adversarial review pass over the touched `.rs`
-  files (borrowing/clone abuse, error handling, clippy-allow without reason, perf). Findings
-  at HIGH severity = FAIL.
-
-For each `*.tsx`/`*.ts` touched -> `/react-recette {file}` (48 checks, Bloc E = R17 Contract Gate).
+Invoke via Skill tool (mandatory delegation, parity with the old `/go-recette`):
+- For each `*.rs` touched -> `Skill({skill: "rust-recette", args: "{file or crate}"})`
+  (Blocs A-F / score /44, Bloc D = clippy + cargo-audit + cargo-deny + cargo-geiger,
+  Bloc F = invariants I1-I6). The deep-scan helper `.claude/scripts/rust-recette-deep-scan.sh`
+  runs Bloc D end-to-end. Tools installed via `scripts/install_rust_audit.sh` (a missing tool
+  marks its bloc N/A, never invents a result).
+- For each `*.tsx`/`*.ts` touched -> `/react-recette {file}` (48 checks, Bloc E = R17 Contract Gate).
 
 **Minimum scores**:
-- Rust static gate: ALL 5 cargo steps green + rust-best-practices review with zero HIGH finding
+- `/rust-recette` >= 39/44 (or >= 35 with E+F N/A) AND zero CRITICAL in FAIL
 - `/react-recette` >= 36/40
-- Zero CRITICAL in FAIL (Rust: build / clippy -D warnings / cargo test / unwrap-on-fallible / RUSTSEC HIGH | React: A1-A3, B1-B2, C1-C2)
-- Zero Bloc E (R17) in FAIL
+- Zero CRITICAL in FAIL (Rust: A1-A3, B1-B4, D1 clippy, D2 cargo-audit HIGH | React: A1-A3, B1-B2, C1-C2)
+- Zero Bloc E (R17) in FAIL, zero Bloc F (invariant I1-I6) violated
 
 If FAIL: return to Phase 3 BUILD. Create fix subtasks. Do NOT proceed to 4b.
 
@@ -669,7 +665,7 @@ Phase 3: BUILD (loop per subtask)
     |
     v (all subtasks SUCCESS)
 Phase 4: RECETTE
-    |-- 4a: STATIC (cargo build/fmt/clippy/test/audit + rust-best-practices + react-recette) -- BLOCKING
+    |-- 4a: STATIC (/rust-recette [clippy+audit+deny+geiger] + /react-recette) -- BLOCKING
     |-- 4b: RUNTIME (Playwright smoke test) -- BLOCKING
     |-- 4c: CONTRACT (R17 fixtures) -- BLOCKING if API components
     |-- 4d: REGRESSION (delta scoring)

@@ -1,0 +1,28 @@
+[package]
+name = "agentrail_recette"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "Static recette scorer for AgentRail Rust code (blocs A-F + cargo SAST gate, scored report)"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "agentrail_recette"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+
+# Dogfood the AgentRail Rust rules on the tool itself.
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "deny"
