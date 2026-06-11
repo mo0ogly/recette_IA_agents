@@ -17,8 +17,10 @@ services:
       target: runtime
     image: railgun-recette:runtime
     command: python -m recette.discovery_mock
+    # Host port is overridable so parallel sessions don't fight over 8081.
+    # Default 8081 for interactive `make lab`; install.sh sets 0 (ephemeral).
     ports:
-      - "8081:8081"
+      - "${DISCOVERY_HOST_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz')"]
       interval: 3s

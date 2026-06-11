@@ -194,6 +194,12 @@ if [ "$DO_DOCKER" -eq 1 ]; then
   if docker_ready; then
     step "DOCKER LAB (build + verify)"
     DOCKER_OK=1
+    # Isolate from any parallel session: unique compose project (so our teardown
+    # never touches another run's containers) + ephemeral host port (so we do not
+    # fight over :8081). Images are tagged explicitly so the build cache is shared.
+    export COMPOSE_PROJECT_NAME="railgun-recette-$$"
+    export DISCOVERY_HOST_PORT=0
+    info "Isolated compose project: ${COMPOSE_PROJECT_NAME} (ephemeral host port)."
     if [ ! -f "${REPO_ROOT}/docker-compose.yml" ]; then
       err "docker-compose.yml not found; cannot build the lab. Use --no-docker to skip."
       DOCKER_OK=0

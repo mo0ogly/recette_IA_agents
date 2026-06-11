@@ -38,7 +38,10 @@ recette against the mock `:8081`. Flags: `--no-docker`, `--with-real`, `--check`
 
 The script is idempotent and safe to re-run (`set -Eeuo pipefail`; an interrupt or error
 tears the Docker lab down automatically so no orphan containers are left). It never claims
-success without running the recette, and exits non-zero if any step fails.
+success without running the recette, and exits non-zero if any step fails. Parallel runs do
+not collide: each invocation uses a unique `COMPOSE_PROJECT_NAME` and an ephemeral host port
+(`DISCOVERY_HOST_PORT=0`), so its teardown only touches its own containers. Interactive
+`make lab` keeps the fixed `:8081` for convenience.
 
 ### If a step fails
 
