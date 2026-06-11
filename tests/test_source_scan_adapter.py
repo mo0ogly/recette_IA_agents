@@ -54,8 +54,10 @@ class TestSourceScanAdapterContract(unittest.TestCase):
         self.assertEqual(risks[0].target_system, "github")
 
     def test_discovery_risk_is_frozen(self):
+        import dataclasses
+
         r = DiscoveryRisk("id", "push", "github", {"level": 3}, None)
-        with self.assertRaises(Exception):
+        with self.assertRaises(dataclasses.FrozenInstanceError):
             r.action_pattern = "merge_pr"  # type: ignore[misc]
 
 

@@ -60,7 +60,7 @@ def _cmd_validate(corpus_root: Path) -> int:
 
 
 def _validate_repo_corpus() -> tuple[int, int]:
-    """Schema-validate every discovery-ground-truth.json under corpus/repos. Returns (errors, count)."""
+    """Schema-validate discovery-ground-truth.json under corpus/repos. Returns (errors, count)."""
     repo_dirs = discover_repo_dirs()
     if not repo_dirs:
         return 0, 0
@@ -118,7 +118,9 @@ def main(argv: list[str] | None = None) -> int:
         help="path to corpus/agents (default: repo corpus)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("validate", help="schema-validate all corpus artifacts (agents + discovery repos)")
+    sub.add_parser(
+        "validate", help="schema-validate all corpus artifacts (agents + discovery repos)"
+    )
     sub.add_parser("run", help="run the identification recette and print the scorecard")
     disc = sub.add_parser("discovery", help="run the discovery recette over the repo corpus")
     disc.add_argument(
@@ -131,7 +133,9 @@ def main(argv: list[str] | None = None) -> int:
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
     pub.add_argument("--visibility", choices=["private", "public"], default="private")
-    pub.add_argument("--apply", action="store_true", help="actually create + push (default: dry-run)")
+    pub.add_argument(
+        "--apply", action="store_true", help="actually create + push (default: dry-run)"
+    )
 
     args = parser.parse_args(argv)
     if args.command == "validate":

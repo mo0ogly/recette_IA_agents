@@ -13,9 +13,9 @@ Safety:
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO_CORPUS = _REPO_ROOT / "corpus" / "repos"
@@ -104,17 +104,23 @@ def publish_repo(
 
     # Existence guard: never touch a repo we did not just create.
     if _repo_exists(plan.owner, plan.repo_name, run):
-        raise RuntimeError(
-            f"{plan.owner}/{plan.repo_name} already exists -- refusing to touch a repo we did not create"
-        )
+        raise RuntimeError(f"{plan.owner}/{plan.repo_name} already exists -- refusing to touch it")
 
     run(["git", "-C", str(tree), "init", "-q", "-b", "main"])
     run(["git", "-C", str(tree), "add", "-A"])
     run(["git", "-C", str(tree), "commit", "-q", "-m", f"chore: seed recette test agent {slug}"])
     run(
         [
-            "gh", "repo", "create", f"{plan.owner}/{plan.repo_name}",
-            f"--{visibility}", "--source", str(tree), "--remote", "origin", "--push",
+            "gh",
+            "repo",
+            "create",
+            f"{plan.owner}/{plan.repo_name}",
+            f"--{visibility}",
+            "--source",
+            str(tree),
+            "--remote",
+            "origin",
+            "--push",
         ]
     )
     plan.applied = True

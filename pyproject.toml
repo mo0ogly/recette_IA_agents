@@ -18,6 +18,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.5",
     "mypy>=1.10",
+    "types-jsonschema>=4.0",
 ]
 
 [project.scripts]
@@ -36,6 +37,19 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# One-shot corpus generator: long inline data literals are intentional.
+"scripts/gen_corpus_agents.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+# jsonschema ships partial stubs; treat as untyped to avoid import-untyped noise.
+module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,15 +9,15 @@ injected logical clock, so a scenario replays byte-identically (invariant I4).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class TargetSystem(str, Enum):
+class TargetSystem(StrEnum):
     GITHUB = "github"
     GITLAB = "gitlab"
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     READ_REPO = "read_repo"
     LIST_REPOS = "list_repos"
     OPEN_ISSUE = "open_issue"
@@ -31,7 +31,7 @@ class ActionType(str, Enum):
     TRIGGER_CI = "trigger_ci"
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     READ = "read"
     WRITE = "write"
 
@@ -73,7 +73,7 @@ class LogicalClock:
         import datetime as _dt
 
         return (
-            _dt.datetime.fromtimestamp(ts, tz=_dt.timezone.utc)
+            _dt.datetime.fromtimestamp(ts, tz=_dt.UTC)
             .replace(microsecond=0)
             .isoformat()
             .replace("+00:00", "Z")

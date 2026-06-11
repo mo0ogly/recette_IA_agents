@@ -29,7 +29,11 @@ _DONE = {"completed", "succeeded", "failed", "error", "timeout"}
 
 def _unwrap(payload: Any) -> Any:
     """Unwrap a {success, data} envelope if present; otherwise return as-is."""
-    if isinstance(payload, dict) and "data" in payload and set(payload).issubset({"success", "data", "error"}):
+    if (
+        isinstance(payload, dict)
+        and "data" in payload
+        and set(payload).issubset({"success", "data", "error"})
+    ):
         return payload["data"]
     return payload
 
@@ -45,7 +49,9 @@ class HttpSourceScanAdapter:
         token: str | None = None,
         client: Any | None = None,
     ) -> None:
-        self.base_url = (base_url or os.environ.get("AGENTRAIL_DISCOVERY_URL", "http://127.0.0.1:8081")).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("AGENTRAIL_DISCOVERY_URL", "http://127.0.0.1:8081")
+        ).rstrip("/")
         self.tenant = tenant or os.environ.get("AGENTRAIL_TENANT", "dev")
         self.token = token or os.environ.get("AGENTRAIL_DISCOVERY_TOKEN")
         self._client = client or self._default_client()
@@ -74,7 +80,12 @@ class HttpSourceScanAdapter:
         return _unwrap(resp.json())
 
     def register(self, location: str) -> str:
-        body = {"adapter": "github", "name": location, "location": location, "tenant_id": self.tenant}
+        body = {
+            "adapter": "github",
+            "name": location,
+            "location": location,
+            "tenant_id": self.tenant,
+        }
         data = self._post(ROUTE_SOURCES, body)
         return str(data["source_id"])
 

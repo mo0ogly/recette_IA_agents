@@ -69,9 +69,10 @@ class DiscoveryScorecard:
         return self.total > 0 and self.passed_count == self.total and self.ordering_ok
 
     def render(self) -> str:
+        failed = self.total - self.passed_count
         lines: list[str] = []
         lines.append("=== AgentRail Discovery Recette Scorecard ===")
-        lines.append(f"repos: {self.total}  passed: {self.passed_count}  failed: {self.total - self.passed_count}")
+        lines.append(f"repos: {self.total}  passed: {self.passed_count}  failed: {failed}")
         lines.append("")
         header = f"{'repo':24} " + " ".join(f"{d[:4]:>5}" for d in _DIMS)
         lines.append(header)
@@ -88,11 +89,22 @@ class DiscoveryScorecard:
         lines.append("")
         for d in _DIMS:
             lines.append(f"  {d:12} {self.dimension_accuracy(d) * 100:6.1f}%")
-        lines.append(f"risk ordering : {'OK' if self.ordering_ok else 'BROKEN -- ' + self.ordering_detail}")
-        lines.append(f"false positives: {self.false_positives}  (agent reported in a no-agent repo)")
-        lines.append(f"false negatives: {self.false_negatives}  (agent missed in a real-agent repo)")
+        lines.append(
+            f"risk ordering : {'OK' if self.ordering_ok else 'BROKEN -- ' + self.ordering_detail}"
+        )
+        lines.append(
+            f"false positives: {self.false_positives}  (agent reported in a no-agent repo)"
+        )
+        lines.append(
+            f"false negatives: {self.false_negatives}  (agent missed in a real-agent repo)"
+        )
         lines.append("")
         lines.append(
-            "VERDICT: " + ("PASS -- scanner matches ground-truth on all repos" if self.all_passed else "FAIL -- see MISS / ordering above")
+            "VERDICT: "
+            + (
+                "PASS -- scanner matches ground-truth on all repos"
+                if self.all_passed
+                else "FAIL -- see MISS / ordering above"
+            )
         )
         return "\n".join(lines)

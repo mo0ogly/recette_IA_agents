@@ -68,9 +68,10 @@ class Scorecard:
         return self.total > 0 and self.passed_count == self.total
 
     def render(self) -> str:
+        failed = self.total - self.passed_count
         lines: list[str] = []
         lines.append("=== AgentRail Recette Scorecard ===")
-        lines.append(f"agents: {self.total}  passed: {self.passed_count}  failed: {self.total - self.passed_count}")
+        lines.append(f"agents: {self.total}  passed: {self.passed_count}  failed: {failed}")
         lines.append("")
         header = f"{'agent_id':32} {'cat':9} " + " ".join(f"{d[:4]:>5}" for d in _DIMENSIONS)
         lines.append(header)
@@ -85,7 +86,16 @@ class Scorecard:
             lines.append(f"  {d:12} {self.dimension_accuracy(d) * 100:6.1f}%")
         lines.append(f"detection rate : {self.detection_rate * 100:.1f}%")
         lines.append(f"false positives: {self.false_positives}  (correct agent flagged incorrect)")
-        lines.append(f"false negatives: {self.false_negatives}  (incorrect agent passed as correct)")
+        lines.append(
+            f"false negatives: {self.false_negatives}  (incorrect agent passed as correct)"
+        )
         lines.append("")
-        lines.append("VERDICT: " + ("PASS -- tool matches ground-truth on all agents" if self.all_passed else "FAIL -- see MISS cells above"))
+        lines.append(
+            "VERDICT: "
+            + (
+                "PASS -- tool matches ground-truth on all agents"
+                if self.all_passed
+                else "FAIL -- see MISS cells above"
+            )
+        )
         return "\n".join(lines)

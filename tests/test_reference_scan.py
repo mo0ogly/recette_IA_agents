@@ -56,7 +56,9 @@ class TestReferenceScanReproducesGroundTruth(unittest.TestCase):
 
     def test_policy_presence(self):
         # Reporter (rank 1) -> no policy; pr-bot + admin -> policy emitted.
-        self.assertTrue(all(r.generated_policy in (None, "") for r in _scan("gh-readonly-reporter")))
+        self.assertTrue(
+            all(r.generated_policy in (None, "") for r in _scan("gh-readonly-reporter"))
+        )
         self.assertTrue(all(r.generated_policy for r in _scan("gh-pr-bot")))
         self.assertTrue(all(r.generated_policy for r in _scan("gh-admin-overreach")))
 

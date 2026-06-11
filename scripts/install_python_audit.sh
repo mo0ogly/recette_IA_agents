@@ -32,7 +32,7 @@ warn()  { printf '[WARN]  %s\n' "$*" >&2; }
 err()   { printf '[ERROR] %s\n' "$*" >&2; }
 
 # Tools pinned-by-floor; pip resolves the latest compatible at install time.
-TOOLS=(ruff mypy bandit pip-audit pytest)
+TOOLS=(ruff mypy bandit pip-audit pytest types-jsonschema)
 
 report() {
   printf '\n%-12s %s\n' "TOOL" "STATUS"

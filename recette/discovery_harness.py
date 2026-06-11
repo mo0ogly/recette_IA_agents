@@ -21,14 +21,18 @@ DEFAULT_REPO_CORPUS = _REPO_ROOT / "corpus" / "repos"
 
 def discover_repo_dirs(corpus_root: Path | str = DEFAULT_REPO_CORPUS) -> list[Path]:
     corpus_root = Path(corpus_root)
-    return sorted(
-        p.parent for p in corpus_root.glob("*/discovery-ground-truth.json")
-    )
+    return sorted(p.parent for p in corpus_root.glob("*/discovery-ground-truth.json"))
 
 
 def _risk_key(risks) -> list[tuple]:
     return sorted(
-        (r.canonical_agent_id, r.action_pattern, r.target_system, json.dumps(r.estimated_risk, sort_keys=True), r.generated_policy or "")
+        (
+            r.canonical_agent_id,
+            r.action_pattern,
+            r.target_system,
+            json.dumps(r.estimated_risk, sort_keys=True),
+            r.generated_policy or "",
+        )
         for r in risks
     )
 
@@ -61,7 +65,10 @@ def run_discovery_recette(
         deterministic = _risk_key(risks) == _risk_key(risks2)
 
         detected_actual = len(risks) > 0
-        matches: dict[str, bool] = {"detection": detected_actual == gt["detected"], "determinism": deterministic}
+        matches: dict[str, bool] = {
+            "detection": detected_actual == gt["detected"],
+            "determinism": deterministic,
+        }
         detail: list[str] = []
         if not matches["detection"]:
             detail.append(f"detected={detected_actual} expected={gt['detected']}")
@@ -80,7 +87,8 @@ def run_discovery_recette(
             got_actions = {r.action_pattern for r in risks}
             matches["actions"] = got_actions == set(gt.get("action_patterns", []))
             if not matches["actions"]:
-                detail.append(f"actions={sorted(got_actions)} expected={sorted(gt.get('action_patterns', []))}")
+                exp_actions = sorted(gt.get("action_patterns", []))
+                detail.append(f"actions={sorted(got_actions)} expected={exp_actions}")
 
             matches["target"] = all(r.target_system == gt["target_system"] for r in risks)
             if not matches["target"]:
@@ -89,7 +97,9 @@ def run_discovery_recette(
             policy_present = any(bool(r.generated_policy) for r in risks)
             matches["policy"] = policy_present == gt.get("policy_generated", policy_present)
             if not matches["policy"]:
-                detail.append(f"policy_present={policy_present} expected={gt.get('policy_generated')}")
+                detail.append(
+                    f"policy_present={policy_present} expected={gt.get('policy_generated')}"
+                )
 
             levels[repo_dir.name] = _max_level(risks)
             ranks[repo_dir.name] = gt.get("risk_rank", 0)
@@ -110,10 +120,12 @@ def run_discovery_recette(
     return scorecard
 
 
-def _check_ordering(scorecard: DiscoveryScorecard, levels: dict[str, int], ranks: dict[str, int]) -> None:
+def _check_ordering(
+    scorecard: DiscoveryScorecard, levels: dict[str, int], ranks: dict[str, int]
+) -> None:
     """Risk levels must be monotonic non-decreasing in the ground-truth rank (R5)."""
     ordered = sorted(ranks, key=lambda r: ranks[r])
-    for a, b in zip(ordered, ordered[1:]):
+    for a, b in zip(ordered, ordered[1:], strict=False):
         if ranks[a] < ranks[b] and levels.get(a, 0) > levels.get(b, 0):
             scorecard.ordering_ok = False
             scorecard.ordering_detail = (

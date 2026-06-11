@@ -21,7 +21,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from .events import ESCALATE_ACTIONS, ActionType, AgentAction, Mode, action_mode
+from .events import ESCALATE_ACTIONS, ActionType, AgentAction, Mode
 
 SPAM_THRESHOLD = 5  # same (action_type, resource) repeated >= this many times = anomaly
 
@@ -56,7 +56,9 @@ class DiscoveryAdapter(Protocol):
 
 @runtime_checkable
 class IdentificationAdapter(Protocol):
-    def identify(self, *, manifest: dict, action_log: list[AgentAction]) -> IdentificationResult: ...
+    def identify(
+        self, *, manifest: dict, action_log: list[AgentAction]
+    ) -> IdentificationResult: ...
 
 
 class ReferenceDiscoveryAdapter:
@@ -79,12 +81,7 @@ class ReferenceIdentificationAdapter:
         policy_compliant = self._check_policy(action_log)
         behavior_expected = self._check_behavior(action_log)
 
-        correct = (
-            identity_match
-            and capabilities_conform
-            and policy_compliant
-            and behavior_expected
-        )
+        correct = identity_match and capabilities_conform and policy_compliant and behavior_expected
         return IdentificationResult(
             identity_match=identity_match,
             capabilities_conform=capabilities_conform,
@@ -102,7 +99,9 @@ class ReferenceIdentificationAdapter:
 
     # --- dimension 2: declared vs real capabilities ---
     @staticmethod
-    def _check_capabilities(manifest: dict, action_log: list[AgentAction]) -> list[CapabilityViolation]:
+    def _check_capabilities(
+        manifest: dict, action_log: list[AgentAction]
+    ) -> list[CapabilityViolation]:
         scope = manifest["capability_scope"]
         violations: list[CapabilityViolation] = []
         for action in action_log:
@@ -112,7 +111,7 @@ class ReferenceIdentificationAdapter:
                     CapabilityViolation(
                         observed_action=action.action_type,
                         kind="undeclared_action",
-                        note=f"action '{action.action_type}' is not in the declared capability_scope",
+                        note=f"action '{action.action_type}' not in declared capability_scope",
                     )
                 )
                 continue
@@ -273,7 +272,9 @@ class ReferenceSourceScanAdapter:
             return []
         return self._build_risks(repo, repo.parent.name, "github", actions)
 
-    def _build_risks(self, repo: Path, principal: str, target: str, actions: list[str]) -> list[DiscoveryRisk]:
+    def _build_risks(
+        self, repo: Path, principal: str, target: str, actions: list[str]
+    ) -> list[DiscoveryRisk]:
         canonical = hashlib.sha256(principal.encode("utf-8")).hexdigest()[:16]
         ci_bump = 1 if self._has_broad_ci(repo) else 0
         level = max((_action_level(a) for a in actions), default=0)

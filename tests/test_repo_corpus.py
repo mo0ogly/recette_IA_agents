@@ -16,7 +16,9 @@ GT_SCHEMA = json.loads(
 
 
 def _repo_dirs():
-    return sorted(p for p in REPOS.iterdir() if p.is_dir() and (p / "discovery-ground-truth.json").exists())
+    return sorted(
+        p for p in REPOS.iterdir() if p.is_dir() and (p / "discovery-ground-truth.json").exists()
+    )
 
 
 class TestRepoCorpus(unittest.TestCase):
@@ -41,27 +43,39 @@ class TestRepoCorpus(unittest.TestCase):
             tree = d / "repo"
             surfaces = [
                 (tree / ".agentrail" / "manifest.json").exists(),
-                any((tree / ".github" / "workflows").glob("*.yml")) if (tree / ".github" / "workflows").is_dir() else False,
+                any((tree / ".github" / "workflows").glob("*.yml"))
+                if (tree / ".github" / "workflows").is_dir()
+                else False,
                 (tree / "agent").is_dir(),
             ]
             with self.subTest(repo=d.name):
                 if gt["detected"]:
-                    self.assertTrue(any(surfaces), f"{d.name}: detected agent has no scannable surface")
+                    self.assertTrue(
+                        any(surfaces), f"{d.name}: detected agent has no scannable surface"
+                    )
 
     def test_true_negative_present(self):
         negatives = [
-            d for d in _repo_dirs()
-            if not json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8"))["detected"]
+            d
+            for d in _repo_dirs()
+            if not json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8"))[
+                "detected"
+            ]
         ]
         self.assertGreaterEqual(len(negatives), 1, "corpus must include a true-negative repo")
 
     def test_risk_ranks_strictly_ordered(self):
         ranks = {
-            d.name: json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8")).get("risk_rank", 0)
+            d.name: json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8")).get(
+                "risk_rank", 0
+            )
             for d in _repo_dirs()
         }
         # The three discoverable ranked repos must be strictly increasing.
-        for low, high in [("gh-readonly-reporter", "gh-pr-bot"), ("gh-pr-bot", "gh-admin-overreach")]:
+        for low, high in [
+            ("gh-readonly-reporter", "gh-pr-bot"),
+            ("gh-pr-bot", "gh-admin-overreach"),
+        ]:
             self.assertIn(low, ranks)
             self.assertIn(high, ranks)
             self.assertLess(ranks[low], ranks[high], f"{low} must rank below {high}")

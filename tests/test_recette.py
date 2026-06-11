@@ -61,7 +61,12 @@ class TestSchemas(unittest.TestCase):
 
 class TestCoverage(unittest.TestCase):
     def test_all_violation_types_on_both_platforms(self):
-        wanted = {"identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"}
+        wanted = {
+            "identity_mismatch",
+            "capability_overreach",
+            "policy_violation",
+            "behavior_anomaly",
+        }
         seen: dict[str, set[str]] = {"github": set(), "gitlab": set()}
         for d in (CORPUS / "incorrect").iterdir():
             gt = load_ground_truth(d / "ground-truth.json")

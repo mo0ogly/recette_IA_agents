@@ -34,7 +34,10 @@ def _validator(kind: str) -> jsonschema.protocols.Validator:
 def validate(kind: str, data: dict) -> list[str]:
     """Return a list of human-readable validation errors (empty = valid)."""
     validator = _validator(kind)
-    return [f"{kind}: {e.message} at {'/'.join(map(str, e.path)) or '<root>'}" for e in sorted(validator.iter_errors(data), key=str)]
+    return [
+        f"{kind}: {e.message} at {'/'.join(map(str, e.path)) or '<root>'}"
+        for e in sorted(validator.iter_errors(data), key=str)
+    ]
 
 
 def load_validated(kind: str, path: Path) -> dict:

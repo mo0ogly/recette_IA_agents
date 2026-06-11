@@ -26,7 +26,7 @@ class TestAgent:
     scenario: dict
 
     @classmethod
-    def from_dir(cls, directory: Path | str) -> "TestAgent":
+    def from_dir(cls, directory: Path | str) -> TestAgent:
         directory = Path(directory)
         manifest = load_manifest(directory / "manifest.json")
         scenario = load_scenario(directory / "scenario.json")
