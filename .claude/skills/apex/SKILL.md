@@ -73,7 +73,7 @@ the apex_init wrapper which (i) exports `APEX_DEV_ROOT`/`APEX_LOGS_ROOT`/
 session, (iv) emits the canonical INIT entry. One line:
 
 ```bash
-source /opt/lia-sec/dev/scripts/apex_init.sh "apex-{YYYYMMDD}-{slug}" "session start; task=<description>"
+source /opt/agentrail/dev/scripts/apex_init.sh "apex-{YYYYMMDD}-{slug}" "session start; task=<description>"
 ```
 
 Closes the c37/c38 gap where `decision_log.jsonl` stayed empty because the
@@ -92,7 +92,7 @@ cycle starts. Surfaces eroded discipline early so it can be backfilled or
 acknowledged in this cycle's PLAN.
 
 ```bash
-python3 /opt/lia-sec/dev/scripts/verify_cycle_traceability.py \
+python3 /opt/agentrail/dev/scripts/verify_cycle_traceability.py \
     --scope {SCOPE_SLUG} \
     --to-cycle {N-1}
 ```
@@ -230,7 +230,7 @@ Launch an agent Plan (sonnet) to critique the plan BEFORE execution:
 DELEGATION:
   role: PLANNER
   model: sonnet
-  task: "Critique this implementation plan. Identify: missing edge cases, security risks (OWASP), LIA-SEC rule violations (R1-R18), integration risks, missing tests, and suggest improvements."
+  task: "Critique this implementation plan. Identify: missing edge cases, security risks (OWASP), AgentRail rule violations (R1-R17) and invariant breaches (I1-I6), integration risks, missing tests, and suggest improvements."
   input: {the full plan from 2c}
   expected_output: structured critique with severity per finding
 ```
@@ -259,7 +259,7 @@ For each subtask, execute the complete OODA cycle:
 ### ACT (Decide + Act)
 
 Execute the subtask. Rules:
-- LIA-SEC conventions: R1-R18, fetchWithConfig, LogSystemEvent, MUI v7, no emoji
+- AgentRail conventions: R1-R17, invariants I1-I6, deny-by-default, no emoji (see project CLAUDE.md)
 - Policy gates: NO STUB, NO MOCK, NO DISABLE, USAGE TRIAGE
 - 1 file at a time, gate after each file
 - Log in `action_journal.jsonl`:
@@ -342,7 +342,7 @@ Triggered on FAILURE. Procedure:
    `decision_log.jsonl` atomically so the decision_log cannot stay empty by
    accident:
    ```bash
-   source /opt/lia-sec/dev/scripts/journal_helpers.sh
+   source /opt/agentrail/dev/scripts/journal_helpers.sh
    apex_journal_init "apex-{session-id}"
    apex_log_replan "S1" "build fail because X" "approach C" \
      --alternatives "A:tried;B:rejected because Y" --confidence high
@@ -458,7 +458,7 @@ Delta scoring vs previous session:
 
 ### Cross-Cutting Checks (during 4a-4d)
 
-- **Anti-patterns LIA-SEC**: R4, R6, R10, fetchWithConfig, theme-aware
+- **Anti-patterns AgentRail**: R4 (no mock), R6 (structured logging), R7 (no unwrap), R10 (no emoji), R16 (Contract Gate)
 - **Security OWASP**: SQL injection, XSS, command injection, path traversal
 - **Adversarial review** (if `-x` or if >5 files): launch agent code-reviewer (sonnet)
 - **Consistency check** (if `--swarms`): verify all components use same patterns (error handling, loading, empty states, HelpButton)
@@ -499,7 +499,7 @@ Procedure (git-based, per `.claude/rules/deploy-workflow.md`):
 4. **Post-deploy live smoke (R26, BLOCKING for the "deployed" claim)**:
    - `./deploy.sh status` -> all services active.
    - Playwright navigate the deployed feature page on the prod URL
-     (https://liascan.tech/...), assert zero console error + the expected
+     (https://agentrail.example/...), assert zero console error + the expected
      DOM node. For themed UI, run the 6-theme WCAG smoke here against prod.
    - Only after this passes may the cycle report "deployed AND verified".
      Otherwise use the R26 escape phrase ("deploye, non verifie" + reason).
@@ -528,7 +528,7 @@ Follow [librarian-gate.md](../_shared/references/librarian-gate.md):
 [ ] 4. INDEX updated   : _alire/tracking/INDEX.md
 [ ] 5. DOC LIBRARIAN   : doc_classifier.py init + doc_librarian.py reindex (if doc created)
 [ ] 6. UI HELP (BLOQUANT) : INSERT ui_help_content + verify SELECT for EACH new *Tab/*Panel/*Dashboard/*Editor component. FAIL = cycle CANNOT close.
-[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on liascan.tech/docs/.
+[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on agentrail.example/docs/.
 [ ] 8. Clean commit    : session files only (not git add -A)
 [ ] 9. Push            : max 5 unpushed commits
 ```

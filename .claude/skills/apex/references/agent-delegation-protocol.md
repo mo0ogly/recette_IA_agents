@@ -63,7 +63,7 @@ Session:      apex-{YYYYMMDD}-{task-slug}
 Step:         {N} of {total}
 Objective:    {specific task description}
 Input:        {file paths, data references, or _staging/ artifacts}
-Constraints:  {LIA-SEC rules that apply: R1-R15, MUI v7, fetchWithConfig, etc.}
+Constraints:  {AgentRail rules that apply: R1-R17, invariants I1-I6, deny-by-default, etc.}
 Autonomy:     AUTONOMOUS | SUPERVISED
 Expected out: {description of deliverable}
 Success:      {measurable criteria — e.g., "build returns exit 0", "0 TS errors"}

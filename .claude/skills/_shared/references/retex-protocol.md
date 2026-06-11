@@ -22,35 +22,25 @@ Cout session : {cost_tokens} tokens (~${cost_estimate_usd}) -- relever depuis la
 
 Sous-taches : {N} total, {S} SUCCESS, {P} PARTIAL, {F} FAILURE, {R} REPLAN
 Boucles OODA : {N} cycles total
-Build pipeline Go : {score}/5
+Build pipeline Rust : {score}/5
+Build pipeline Python : {score}/5
 Build pipeline React : {score}/8
 
 Ce qui a fonctionne : ...
 Ce qui a echoue : ...
 Ameliorations : ...
 
-## Rules count delta (c{prev} -> c{curr})  -- MANDATORY for rule-touching cycles
+## Recette corpus delta (c{prev} -> c{curr})  -- si le cycle touche le corpus d'agents de test
 
-> If the cycle touched fingerprint / LIA-Scan rule corpus (add, remove,
-> disable, modify enabled status), this section is BLOCKING. Generate
-> via: `python3 scripts/rules_inventory.py --retex-stub --cycle {curr}`
-> and paste output here. If the cycle is filter/tooling/docs/audit-only,
-> state explicitly "zero rule modification expected -- inventory delta
-> +0 confirmed" with snapshot file paths.
+> If the cycle added/removed/modified test-agent manifests, scenarios or
+> ground-truth under `corpus/agents/`, run `python3 -m recette validate`
+> and paste the agent counts here. If the cycle is tooling/docs/audit-only,
+> state explicitly "zero corpus modification expected -- delta +0 confirmed".
 
-- grand_total: {+N | 0}
-- liaprobe.total: {delta}
-- liaprobe.enabled: {delta}
-- liaprobe.disabled: {delta}
-- liaprobe.{dir}: {delta}  (only directories with nonzero delta)
-- lia_scan.total: {delta}
-
-Snapshot files:
-- `_alire/tracking/liaprobe-fingerprint-rebuild/inventory/RULES_INVENTORY_<date>_c{prev}.json`
-- `_alire/tracking/liaprobe-fingerprint-rebuild/inventory/RULES_INVENTORY_<date>_c{curr}.json`
-
-Engine baseline (16641 corpus): {PASS} PASS / {FAIL} FAIL / {ERROR} ERROR
-{unchanged vs c{prev} | regressed | improved}.
+- corpus.agents.total: {delta}
+- corpus.correct: {delta}
+- corpus.incorrect: {delta}
+- detection_rate / accuracy-per-dimension: {unchanged vs c{prev} | regressed | improved}
 ```
 
 ---

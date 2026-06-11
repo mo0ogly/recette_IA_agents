@@ -74,10 +74,10 @@ Then I hand verification explicitly to the user. No weasel wording
 
 This rule applies to ALL changes declared "fixed":
 - Frontend React / TypeScript
-- Backend Go handlers, services, middleware
+- Backend Rust / Python handlers, services, middleware
 - Infra : deploy.sh runs, systemctl restarts, nginx config reloads,
   PostgreSQL migrations applied
-- LIA-Scan rules committed
+- Recette corpus / ground-truth manifests committed
 - Any skill output presented to the user as "ready"
 
 ## Enforcement

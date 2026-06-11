@@ -248,7 +248,7 @@ cd cmd/sigma_web && GOFLAGS="" go vet . 2>&1 | wc -l
 cd sigma-react-frontend && node node_modules/.bin/vite build 2>&1 | tail -1
 
 # PostgreSQL (si DB dans le scope)
-PGPASSWORD="$LIA_DB_PASS" psql -h localhost -U lia_admin -d lia_scan -c "SELECT 1" 2>/dev/null
+PGPASSWORD="$AGENTRAIL_DB_PASS" psql -h localhost -U agentrail -d agentrail -c "SELECT 1" 2>/dev/null
 ```
 
 Si FAIL : STOP, fixer. Exception : si le perimetre EST le composant casse.

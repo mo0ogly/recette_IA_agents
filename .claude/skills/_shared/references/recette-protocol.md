@@ -8,11 +8,7 @@
 ## Vue d'ensemble
 
 ```
-ETAPE 0: ENGINE DELTA (c37 A40 -- si fichiers pkg/fingerprint/* modifies)
-    |-- BLOQUANT : zero CORRECT regression vs baseline
-    |
-    v
-ETAPE 1: STATIC (go-recette + react-recette)
+ETAPE 1: STATIC (rust-recette / python-recette + react-recette)
     |-- BLOQUANT : score minimum requis
     |
     v
@@ -34,39 +30,6 @@ ETAPE 4: REGRESSION (delta scoring)
     v
 RECETTE PASSED -> Phase suivante (COMPLETE/FINALIZE)
 ```
-
----
-
-## Etape 0 : ENGINE DELTA (c37 A40 -- MANDATORY pour pkg/fingerprint/* changes)
-
-Avant tout commit qui modifie `pkg/fingerprint/loader.go`, `pkg/fingerprint/model.go`, `pkg/fingerprint/matcher.go`, ou tout autre fichier `pkg/fingerprint/*.go`, executer :
-
-```bash
-bash /opt/lia-sec/dev/.claude/skills/liaprobe-fingerprint-rebuild/scripts/verify_engine_delta.sh
-```
-
-Le script :
-1. `git stash push --include-untracked` les changes courants
-2. `make recette` rebuild baseline (liaprobe + recette-onyphe propres)
-3. `recette-onyphe` -> PRE verdict counts (CORRECT / MISS / WRONG)
-4. `git stash pop` restore working tree
-5. `make recette` rebuild avec changes
-6. `recette-onyphe` -> POST verdict counts
-7. Print DELTA + exit non-zero si CORRECT regression > threshold
-
-Defaut : threshold = 0 (toute regression CORRECT bloque).
-
-**Incident origine** : c36 A34 -- loader.go filter caused CORRECT 15200 -> 12267 regression (-2933). Filter logic was conceptually wrong (permanent_doubtful = metadata != engine-scan-skip). Script aurait revele la regression avant le commit. Documente dans `.claude/skills/liaprobe-fingerprint-rebuild/SKILL.md` section "permanent_doubtful is METADATA, not engine-scan-skip".
-
-**Trigger conditions** :
-- Modification d'un fichier dans `liaprobe/pkg/fingerprint/*.go`
-- Modification de la structure d'un pattern JSON (champ ajoute/retire/renomme)
-- Modification du loader.go validation logic
-- Ajout d'un nouveau matcher type ou probe type
-
-**Skip conditions** (avec justification explicite dans action_journal.jsonl) :
-- Pas de pkg/fingerprint/* dans le changeset
-- Skill-only changes (scripts/, SKILL.md)
 
 ---
 
@@ -238,7 +201,7 @@ Reference complete : `.claude/rules/frontend-contract-gate.md`
 ### 3a : Fixture payload reel
 ```bash
 # Capturer depuis le vrai backend
-curl -s -H "Authorization: Bearer $TOKEN" https://liascan.tech/api/endpoint > \
+curl -s -H "Authorization: Bearer $TOKEN" https://agentrail.example/api/endpoint > \
   sigma-react-frontend/src/components/**/__fixtures__/{Component}.fixture.json
 ```
 - La fixture DOIT contenir `_captured_from` avec l'URL exacte

@@ -70,7 +70,7 @@ Phase:        {P|D|C|A}
 Step:         {step_id}
 Objective:    {specific audit/fix task}
 Input:        {D_INVENTORY.json, D_BENCHMARK.json, SCORING_CONFIG.json}
-Constraints:  {LIA-SEC R1-R15, policy gates: NO STUB, NO MOCK, USAGE TRIAGE, NO DISABLE}
+Constraints:  {AgentRail R1-R17, invariants I1-I6, policy gates: NO STUB, NO MOCK, USAGE TRIAGE, NO DISABLE}
 Autonomy:     AUTONOMOUS | SUPERVISED
 Expected out: {report format, score /100, gap list}
 Success:      {measurable — e.g., "score >= previous + 5 points"}

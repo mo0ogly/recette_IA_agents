@@ -11,7 +11,7 @@
 [ ] 2. RETEX ECRIT     : _alire/02_LOGS/Journals/retex/RETEX_{SKILL}_{DATE}.md
 [ ] 3. RETEX AFFICHE   : contenu du RETEX AFFICHE dans la conversation (pas juste ecrit en fichier)
 [ ] 4. TRACEABILITY GATE (BLOQUANT, c54+) :
-                         python3 /opt/lia-sec/dev/scripts/verify_cycle_traceability.py \
+                         python3 /opt/agentrail/dev/scripts/verify_cycle_traceability.py \
                            --scope {SCOPE_SLUG} --from-cycle {N} --to-cycle {N}
                          Exit 0 REQUIS (PLAN + RETEX presents pour le cycle courant).
                          Exit 1 (PARTIAL) ou 2 (MISSING_BOTH) sur le cycle courant = STOP commit
@@ -27,8 +27,8 @@
 [ ] 8. UI HELP (BLOQUANT) : INSERT ui_help_content + verify SELECT pour CHAQUE composant *Tab/*Panel/*Dashboard/*Editor/*Manager/*Status cree. Contenu 200-800 car., anglais (R8). HelpButton sans contenu DB = PLACEHOLDER INTERDIT (R4). Cycle NE PEUT PAS fermer si manquant.
 [ ] 9. DOCS-SITE (SI DOC MODIFIEE) : Si un .md a ete cree/modifie dans _alire/01_DOCUMENTATION/ :
                          cd docs-site && npm run build:search (Docusaurus + Pagefind)
-                         rsync -avz --delete docs-site/build/ /opt/lia-sec/source/docs-site/
-                         Verifier : curl -s -o /dev/null -w "%{http_code}" https://liascan.tech/docs/ = 200
+                         rsync -avz --delete docs-site/build/ /opt/agentrail/source/docs-site/
+                         Verifier : curl -s -o /dev/null -w "%{http_code}" https://agentrail.example/docs/ = 200
 [ ] 10. COMMIT PROPRE  : fichiers de session uniquement (pas git add -A)
                          Stager UNIQUEMENT les fichiers de la session
 [ ] 11. PUSH           : max 5 commits non pushes

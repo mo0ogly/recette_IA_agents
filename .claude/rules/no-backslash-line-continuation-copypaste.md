@@ -25,15 +25,15 @@ into a terminal:
 ```bash
 # FORBIDDEN -- backslashes break on copy-paste
 mkdir -p /etc/nginx/archive && \
-mv /etc/nginx/sites-enabled/lia-sec.bak.20260313 /etc/nginx/archive/ && \
+mv /etc/nginx/sites-enabled/agentrail.bak.20260313 /etc/nginx/archive/ && \
 nginx -t && systemctl reload nginx
 ```
 
 ```bash
 # FORBIDDEN -- even with indentation
-rm -v /opt/lia-sec/backups/lia_scan_20260414.dump \
-      /opt/lia-sec/backups/lia_scan_20260415.dump \
-      /opt/lia-sec/backups/lia_scan_20260416.dump
+rm -v /opt/agentrail/backups/agentrail_20260414.dump \
+      /opt/agentrail/backups/agentrail_20260415.dump \
+      /opt/agentrail/backups/agentrail_20260416.dump
 ```
 
 ## Correct patterns
@@ -41,29 +41,29 @@ rm -v /opt/lia-sec/backups/lia_scan_20260414.dump \
 **Option 1 -- one long line, chained with `&&`:**
 
 ```bash
-mkdir -p /etc/nginx/archive && mv /etc/nginx/sites-enabled/lia-sec.bak.20260313 /etc/nginx/sites-enabled/lia-sec.bak.20260409-093040 /etc/nginx/archive/ && nginx -t && systemctl reload nginx
+mkdir -p /etc/nginx/archive && mv /etc/nginx/sites-enabled/agentrail.bak.20260313 /etc/nginx/sites-enabled/agentrail.bak.20260409-093040 /etc/nginx/archive/ && nginx -t && systemctl reload nginx
 ```
 
 **Option 2 -- separate independent lines (preferred when steps are commutative):**
 
 ```bash
-rm -v /opt/lia-sec/backups/lia_scan_20260414.dump
-rm -v /opt/lia-sec/backups/lia_scan_20260415.dump
-rm -v /opt/lia-sec/backups/lia_scan_20260416.dump
-rm -v /opt/lia-sec/backups/lia_scan_20260417.dump
+rm -v /opt/agentrail/backups/agentrail_20260414.dump
+rm -v /opt/agentrail/backups/agentrail_20260415.dump
+rm -v /opt/agentrail/backups/agentrail_20260416.dump
+rm -v /opt/agentrail/backups/agentrail_20260417.dump
 df -h / | tail -1
 ```
 
 **Option 3 -- list form for `rm` / `mv` with multiple targets on one line:**
 
 ```bash
-rm -v /opt/lia-sec/backups/lia_scan_20260414.dump /opt/lia-sec/backups/lia_scan_20260415.dump /opt/lia-sec/backups/lia_scan_20260416.dump /opt/lia-sec/backups/lia_scan_20260417.dump
+rm -v /opt/agentrail/backups/agentrail_20260414.dump /opt/agentrail/backups/agentrail_20260415.dump /opt/agentrail/backups/agentrail_20260416.dump /opt/agentrail/backups/agentrail_20260417.dump
 ```
 
 **Option 4 -- shell loop on one line when the pattern fits:**
 
 ```bash
-for d in 20260414 20260415 20260416 20260417; do rm -v /opt/lia-sec/backups/lia_scan_${d}.dump; done
+for d in 20260414 20260415 20260416 20260417; do rm -v /opt/agentrail/backups/agentrail_${d}.dump; done
 ```
 
 ## Exception (documented in code files only)

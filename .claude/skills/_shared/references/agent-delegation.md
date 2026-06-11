@@ -27,7 +27,7 @@ Phase:        {phase en cours}
 Step:         {N} of {total}
 Objective:    {tache specifique}
 Input:        {fichiers, artefacts, swarm_memory.json}
-Constraints:  {LIA-SEC R1-R18, policy gates: NO STUB, NO MOCK, USAGE TRIAGE, NO DISABLE}
+Constraints:  {AgentRail R1-R17, invariants I1-I6, policy gates: NO STUB, NO MOCK, USAGE TRIAGE, NO DISABLE}
 Autonomy:     AUTONOMOUS | SUPERVISED
 Expected out: {format du livrable}
 Success:      {critere mesurable}

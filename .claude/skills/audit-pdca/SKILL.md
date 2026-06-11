@@ -646,7 +646,7 @@ Follow `librarian-gate.md` for full checklist:
 [ ] 4. INDEX updated   : _alire/tracking/INDEX.md
 [ ] 5. DASHBOARD updated : pdca/{scope}/DASHBOARD.md
 [ ] 6. UI HELP (BLOQUANT) : INSERT ui_help_content for EACH new *Tab/*Panel/*Dashboard/*Editor. Verify with SELECT. Cycle CANNOT close if HelpButton has no DB content.
-[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on liascan.tech/docs/.
+[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on agentrail.example/docs/.
 [ ] 8. Commit + push   : session files only (max 5 unpushed commits)
 ```
 

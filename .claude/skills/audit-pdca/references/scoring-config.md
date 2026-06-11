@@ -86,8 +86,8 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
     "benchmark_parity": {
       "weight": 10,
       "checks": [
-        {"id": "BNC-01", "name": "Feature parity", "type": "gap_count", "description": "Number of features in benchmark absent from LIA-SEC"},
-        {"id": "BNC-02", "name": "Unique advantages", "type": "manual", "description": "Features in LIA-SEC absent from benchmark"},
+        {"id": "BNC-01", "name": "Feature parity", "type": "gap_count", "description": "Number of features in benchmark absent from AgentRail"},
+        {"id": "BNC-02", "name": "Unique advantages", "type": "manual", "description": "Features in AgentRail absent from benchmark"},
         {"id": "BNC-03", "name": "No regression", "type": "delta_check", "description": "No domain score decreased vs previous cycle"}
       ]
     }
@@ -104,7 +104,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
 | `count_files` | Compte les fichiers correspondant au pattern | `pattern`, `scope`, `target` |
 | `adoption_rate` | Pourcentage de fichiers du scope qui contiennent le pattern | `pattern`, `scope`, `target` |
 | `file_exists` | Verifie l'existence d'un fichier ou repertoire | `path` |
-| `gap_count` | Nombre de gaps identifies (benchmark vs LIA-SEC) | `description` |
+| `gap_count` | Nombre de gaps identifies (benchmark vs AgentRail) | `description` |
 | `delta_check` | Verifie que le score n'a pas baisse vs cycle precedent | `description` |
 | `manual` | Check manuel -- l'agent doit evaluer et justifier | `description` |
 

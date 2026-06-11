@@ -52,7 +52,7 @@
 | Rust build | `cargo build 2>&1 \| tail -1` | exit != 0 (erreur de compilation) |
 | Rust lint | `cargo clippy --all-targets -- -D warnings 2>&1 \| grep -c "warning:"` | > 0 (warnings clippy) |
 | React build | `cd sigma-react-frontend && node node_modules/.bin/vite build 2>&1 \| tail -1` | Pas "built in" |
-| PostgreSQL | `psql -U lia_admin -d lia_scan -c "SELECT 1" 2>/dev/null` | exit != 0 |
+| PostgreSQL | `psql -U agentrail -d agentrail -c "SELECT 1" 2>/dev/null` | exit != 0 |
 | Backend health | `curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health` | != 200 (warning, pas bloquant si audit offline) |
 
 ## Checks dead code triage (C.0 -- OBLIGATOIRE)
@@ -95,7 +95,7 @@ Classification :
 | States | Loading/Error/Empty states presents | Manquant = FAIL |
 | Accessibilite | aria-label, tooltips, contraste | Absent = FAIL |
 
-## Checks recette LIA-SEC (C.2 -- si applicable)
+## Checks recette AgentRail (C.2 -- si applicable)
 
 | Check | Commande | Quand |
 |-------|----------|-------|

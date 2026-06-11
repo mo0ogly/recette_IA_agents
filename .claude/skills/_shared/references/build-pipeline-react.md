@@ -80,7 +80,7 @@ ALL 9 GATES PASSED -> fichier pret pour phase RECETTE
 
 ---
 
-## Regles de construction React (conventions LIA-SEC)
+## Regles de construction React (conventions AgentRail)
 
 ### MUI v7 Grid (CRITIQUE)
 ```tsx
@@ -151,7 +151,7 @@ Avant de coder, choisir une direction esthetique :
 - **Differentiation** : qu'est-ce qui rend ce composant memorable ?
 
 JAMAIS : design generique AI (Inter, Roboto, purple gradient on white, cookie-cutter layout).
-TOUJOURS : theme-aware, les themes LIA-SEC definissent les polices dans `*Theme.tsx`.
+TOUJOURS : theme-aware, les themes AgentRail definissent les polices dans `*Theme.tsx`.
 
 ### Performance Vercel (top critiques)
 
