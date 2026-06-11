@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gl-readonly-reporter",
+  "target_system": "gitlab",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_ci", "read_repo"],
+  "risk_rank": 1,
+  "policy_generated": false,
+  "notes": "GitLab status reporter: read-only project + pipeline reads. Scanner should detect one agent, surface read_repo + read_ci, rank it lowest of the GitLab corpus, and emit no policy."
+}

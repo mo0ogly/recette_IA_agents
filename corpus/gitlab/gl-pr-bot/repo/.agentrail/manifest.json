@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-dependency-mr-bot-gl",
+    "description": "Reads GitLab projects and opens merge requests to bump dependencies.",
+    "target_system": "gitlab",
+    "identity": {
+      "auth_method": "gitlab_token",
+      "principal": "acme-dependency-mr-bot@gitlab"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "open_pr", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gl-no-agent",
+  "target_system": "gitlab",
+  "detected": false,
+  "agent_count": 0,
+  "action_patterns": [],
+  "risk_rank": 0,
+  "policy_generated": false,
+  "notes": "Plain GitLab utility library: no AgentRail manifest, no SDK, no target-system action. True negative: the scanner must not flag it (false-positive guard)."
+}

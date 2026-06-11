@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-status-reporter-gl",
+    "description": "Reads GitLab project and pipeline status and emits a report. Read-only.",
+    "target_system": "gitlab",
+    "identity": {
+      "auth_method": "gitlab_token",
+      "principal": "acme-status-reporter@gitlab"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "read_ci", "mode": "read", "resources": ["acme/*"] }
+    ]
+  }
+}

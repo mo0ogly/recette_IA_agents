@@ -22,12 +22,13 @@ DEFAULT_REPO_CORPUS = _CORPUS / "repos"
 # Scanner surface -> corpus sub-directory. github is corpus/repos for historical reasons.
 SURFACE_CORPUS: dict[str, Path] = {
     "github": _CORPUS / "repos",
+    "gitlab": _CORPUS / "gitlab",
     "temporal": _CORPUS / "temporal",
     "openapi": _CORPUS / "openapi",
     "mcp": _CORPUS / "manifests",
 }
 # Order surfaces are reported in when running "all".
-SURFACE_ORDER: tuple[str, ...] = ("github", "temporal", "openapi", "mcp")
+SURFACE_ORDER: tuple[str, ...] = ("github", "gitlab", "temporal", "openapi", "mcp")
 
 
 def discover_repo_dirs(corpus_root: Path | str = DEFAULT_REPO_CORPUS) -> list[Path]:
