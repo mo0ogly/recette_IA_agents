@@ -31,8 +31,9 @@ COPY recette ./recette
 COPY corpus ./corpus
 
 # Runtime dep + editable install (keeps corpus a sibling of recette as required).
+# [bundle] brings cryptography so `recette bundle-verify` works and its tests run for real.
 RUN pip install "jsonschema>=4.0" && \
-    pip install -e . && \
+    pip install -e ".[bundle]" && \
     chown -R recette:recette /app
 
 USER recette

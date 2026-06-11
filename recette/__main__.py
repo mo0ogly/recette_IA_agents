@@ -139,6 +139,24 @@ def _cmd_discovery(adapter_name: str, surface: str) -> int:
     return 0 if all_ok else 1
 
 
+def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
+    from .bundle import verify_bundle_file
+
+    schema_path = _REPO_ROOT / "corpus" / "schemas" / "policy-bundle.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    bundle = json.loads(Path(path).read_text(encoding="utf-8"))
+    shape_errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(bundle), key=str)
+    if shape_errors:
+        for err in shape_errors:
+            print(f"INVALID bundle shape: {err.message}", file=sys.stderr)
+        return 1
+
+    result = verify_bundle_file(path, expected_public_key=pubkey)
+    print(f"bundle: {path}")
+    print(f"verdict: {'VALID' if result.valid else 'INVALID'} -- {result.reason}")
+    return 0 if result.valid else 1
+
+
 def _cmd_report(as_json: bool) -> int:
     from .report import build_report
 
@@ -178,6 +196,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     rep = sub.add_parser("report", help="aggregate report: identification + all discovery surfaces")
     rep.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    bnd = sub.add_parser("bundle-verify", help="verify an Ed25519-signed policy bundle")
+    bnd.add_argument("path", help="path to the policy bundle JSON")
+    bnd.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -195,6 +216,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_discovery(args.adapter, args.surface)
     if args.command == "report":
         return _cmd_report(args.json)
+    if args.command == "bundle-verify":
+        return _cmd_bundle_verify(args.path, args.pubkey)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")

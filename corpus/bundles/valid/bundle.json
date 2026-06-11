@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "policy_version": "v1",
+  "decisions": [
+    {
+      "agent_id": "acme-status-reporter",
+      "action": "read_repo",
+      "decision": "allow"
+    },
+    {
+      "agent_id": "acme-dependency-pr-bot",
+      "action": "open_pr",
+      "decision": "escalate"
+    },
+    {
+      "agent_id": "acme-infra-syncer",
+      "action": "push",
+      "decision": "deny"
+    }
+  ],
+  "public_key": "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29",
+  "signature": "163a036fb94402efd1393f571a22dfed7406d37d6c7c8137e72e4cfbe81680875445fb1e2cb31fe1f919779e2bca217e76854ec90e5f798ab622e7f936ab000a"
+}

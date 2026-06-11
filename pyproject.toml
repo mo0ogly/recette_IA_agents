@@ -18,6 +18,11 @@ real = [
 temporal = [
     "temporalio>=1.7",
 ]
+# Ed25519 policy-bundle verification (recette bundle-verify). Optional: the rest of the
+# recette has no crypto dependency.
+bundle = [
+    "cryptography>=44",
+]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [
     "pytest>=8.0",
@@ -54,6 +59,11 @@ ignore_missing_imports = false
 [[tool.mypy.overrides]]
 # jsonschema ships partial stubs; treat as untyped to avoid import-untyped noise.
 module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# cryptography is an optional [bundle] extra; not present in the audit venv where mypy runs.
+module = ["cryptography", "cryptography.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
