@@ -716,6 +716,6 @@ marker does NOT exempt creation. Pre-commit hook blocks files in
 regardless of marker. If a generated file would exceed ceiling, BUILD
 phase MUST chain `/refactor-long-file` before commit (emit the split
 modules, not a single over-ceiling file). Incident reference:
-`anssi_references_api.go` born 1554 LOC, grew to 1864 LOC -- exactly
+a generated handler born 1554 LOC, grew to 1864 LOC -- exactly
 the silent bypass pattern R29 was designed to prevent. Editing a
 legacy over-ceiling file is unaffected (delta-scoped to creation).

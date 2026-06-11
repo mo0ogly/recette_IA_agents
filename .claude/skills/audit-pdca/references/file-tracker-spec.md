@@ -21,7 +21,7 @@ Chaque session produit un fichier `FILE_TRACKER.json` dans son repertoire de tra
     "skill": "apex|pdca|analyze-repo",
     "skill_version": "6.0",
     "task": "Human-readable task description",
-    "scope": "cmd/sigma_web/discovery_*",
+    "scope": "crates/gateway/src/discovery/*",
     "created_at": "2026-03-27T10:00:00Z",
     "updated_at": "2026-03-27T12:30:00Z",
     "status": "IN_PROGRESS|COMPLETED|ABANDONED|REMASTERED",
@@ -48,8 +48,8 @@ Chaque session produit un fichier `FILE_TRACKER.json` dans son repertoire de tra
 | Champ | Type | Obligatoire | Description |
 |-------|------|-------------|-------------|
 | `id` | string | oui | Identifiant unique (`F001`, `F002`, ...) |
-| `path` | string | oui | Chemin relatif du fichier (`cmd/sigma_web/foo.go`) |
-| `type` | string | oui | Extension : `go`, `ts`, `tsx`, `py`, `yaml`, `json`, `sql`, `md`, `sh` |
+| `path` | string | oui | Chemin relatif du fichier (`crates/gateway/src/foo.rs`) |
+| `type` | string | oui | Extension : `rs`, `ts`, `tsx`, `py`, `yaml`, `json`, `sql`, `md`, `sh` |
 | `status` | string | oui | Voir statuts ci-dessous |
 | `priority` | string | non | `P0` (critique) / `P1` (haute) / `P2` (moyenne) / `P3` (basse) |
 | `action` | string | oui | `CREATE`, `MODIFY`, `DELETE`, `AUDIT`, `REVIEW` |

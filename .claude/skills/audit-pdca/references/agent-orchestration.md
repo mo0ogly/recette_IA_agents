@@ -242,7 +242,7 @@ pdca/{perimetre}/cycle_{N}/manifeste.jsonl
 ```
 
 ```json
-{"timestamp":"ISO8601","file":"cmd/sigma_web/grc_campaign_api.go","action":"MODIFIED","phase":"A.2","loc":12,"status":"FINAL","gate":"build_pass","domain":"security"}
+{"timestamp":"ISO8601","file":"crates/gateway/src/grc/campaign.rs","action":"MODIFIED","phase":"A.2","loc":12,"status":"FINAL","gate":"build_pass","domain":"security"}
 {"timestamp":"ISO8601","file":"pdca/grc/cycle_001/C_SCORECARD.json","action":"CREATED","phase":"C.3","loc":85,"status":"FINAL","gate":"N/A","domain":"scoring"}
 ```
 

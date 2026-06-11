@@ -51,7 +51,7 @@ Fichiers produits pendant la session, perdus si pas commites.
     "skill": "apex|pdca",
     "skill_version": "6.0",
     "task": "description",
-    "scope": "cmd/sigma_web/discovery_*",
+    "scope": "crates/gateway/src/discovery/*",
     "status": "IN_PROGRESS|COMPLETED|ABANDONED|REMASTERED",
     "cycle": 1,
     "plan_ref": "_alire/tracking/PLAN_*.md"
@@ -62,8 +62,8 @@ Fichiers produits pendant la session, perdus si pas commites.
   },
   "files": [
     {
-      "id": "F001", "path": "cmd/sigma_web/foo.go",
-      "type": "go", "status": "PENDING|IN_PROGRESS|DONE|BLOCKED|ABANDONED|REMASTERED",
+      "id": "F001", "path": "crates/gateway/src/foo.rs",
+      "type": "rust", "status": "PENDING|IN_PROGRESS|DONE|BLOCKED|ABANDONED|REMASTERED",
       "priority": "P0|P1|P2|P3",
       "action": "CREATE|MODIFY|DELETE|AUDIT|REVIEW",
       "phase": "EXECUTE|BUILD|CHECK", "step": "E.1",
@@ -150,7 +150,7 @@ Chaque action significative tracee. Non modifiable. Sert de preuve.
 ```json
 {
   "timestamp": "ISO8601",
-  "file": "cmd/sigma_web/foo.go",
+  "file": "crates/gateway/src/foo.rs",
   "action": "CREATED|MODIFIED|DELETED|DISABLED",
   "phase": "BUILD|EXECUTE",
   "loc": 145,
@@ -235,14 +235,14 @@ Cout relatif : haiku ~x1, sonnet ~x5, opus ~x25.
 ## 4. Pre-flight checks
 
 ```bash
-# Go build
-bash cmd/sigma_web/build_secure_lia.sh 2>&1 | grep "Build"
+# Rust build
+cargo build --release 2>&1 | grep -E "Compiling|Finished|error"
 
 # Backend health
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health
 
-# Go vet
-cd cmd/sigma_web && GOFLAGS="" go vet . 2>&1 | wc -l
+# Rust lint
+cargo clippy --all-targets --all-features -- -D warnings 2>&1 | grep -c '^warning'
 
 # React build (si frontend dans le scope)
 cd agentrail-console && node node_modules/.bin/vite build 2>&1 | tail -1
@@ -255,7 +255,7 @@ Si FAIL : STOP, fixer. Exception : si le perimetre EST le composant casse.
 
 **Test pre-flight (WARN, pas BLOCK) :**
 ```bash
-cd cmd/sigma_web && go test -tags unit -count=1 . 2>&1 | grep FAIL
+cargo test 2>&1 | grep -E "FAILED|test result: FAILED"
 ```
 Noter les fails pre-existants pour ne pas les compter comme regressions.
 

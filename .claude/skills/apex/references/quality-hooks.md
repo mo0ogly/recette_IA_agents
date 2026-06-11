@@ -72,8 +72,10 @@ Before creating or writing any file, verify:
 
 | Type | Convention | Max LOC |
 |------|-----------|---------|
-| Go handler | `{module}_{feature}_api.go` | 800 |
-| Go test | `{module}_{feature}_api_test.go` | 800 |
+| Rust handler/module | `{module}_{feature}.rs` | 800 |
+| Rust test | `tests/{module}_{feature}.rs` | 800 |
+| Python module | `{module}_{feature}.py` | 500 |
+| Python test | `tests/test_{module}_{feature}.py` | 500 |
 | React component | `{Feature}.tsx` | 400 |
 | React service | `{feature}Service.ts` | 500 |
 | TypeScript test | `{Feature}.test.tsx` | 500 |
@@ -204,7 +206,7 @@ At APEX session start, inject relevant context:
 ### QH-A1 in Practice (ANALYZE phase)
 
 ```
-Reading cmd/sigma_web/remediation_tracking_api.go...
+Reading crates/gateway/src/remediation_tracking.rs...
 -> QH-A1: Scanning for instruction overrides... CLEAR
 -> Processing file content: 450 LOC, 12 handlers, 3 dependencies
 ```
@@ -212,11 +214,11 @@ Reading cmd/sigma_web/remediation_tracking_api.go...
 ### QH-A2 in Practice (EXECUTE phase)
 
 ```
-Creating new file: cmd/sigma_web/remediation_export_api.go
+Creating new file: crates/gateway/src/remediation_export.rs
 -> QH-A2: Naming convention check...
-   - Pattern: {module}_{feature}_api.go -> PASS
+   - Pattern: {module}_{feature}.rs -> PASS
    - LOC estimate: 145 -> under 800 limit -> PASS
-   - build_secure_lia.sh entry needed -> NOTED
+   - module registration (mod remediation_export;) needed -> NOTED
 -> Proceeding with write
 ```
 
@@ -224,8 +226,8 @@ Creating new file: cmd/sigma_web/remediation_export_api.go
 
 ```
 SUPERVISED ACTION REQUIRED:
-  Action: Modify auth_session_middleware.go (security-critical file)
-  Change: Add /api/remediation/export to publicRoutes
+  Action: Modify crates/gateway/src/auth_session_middleware.rs (security-critical file)
+  Change: Add /api/remediation/export to public_routes
   Reason: Export endpoint needs unauthenticated access for external tools
   Reversibility: Remove route from publicRoutes array
   Risk: Medium (exposes export without JWT)

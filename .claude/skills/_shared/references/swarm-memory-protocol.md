@@ -27,12 +27,12 @@
     "scope": "crates/gateway/src/grc/ + agentrail-console/src/components/grc/",
     "retex_previous": "Score 72/100, gaps: missing tests, 3 SQLi patterns",
     "known_issues": [
-      "discovery_api.go a 0 tests (RETEX cycle 3)",
-      "fetchWithConfig manquant dans 2 services (RETEX cycle 3)"
+      "discovery.rs a 0 tests (RETEX cycle 3)",
+      "input validation manquante dans 2 handlers (RETEX cycle 3)"
     ],
     "files_inventory": {
-      "cmd/sigma_web/grc_campaign_api.go": {"loc": 450, "tests": false, "last_modified": "2026-04-08"},
-      "cmd/sigma_web/grc_dashboard_config_api.go": {"loc": 280, "tests": true, "last_modified": "2026-04-05"}
+      "crates/gateway/src/grc/campaign.rs": {"loc": 450, "tests": false, "last_modified": "2026-04-08"},
+      "crates/gateway/src/grc/dashboard_config.rs": {"loc": 280, "tests": true, "last_modified": "2026-04-05"}
     }
   },
 
@@ -61,7 +61,7 @@
       "timestamp": "ISO8601",
       "type": "FINDING|BLOCKER|INFO",
       "severity": "CRITICAL|HIGH|MEDIUM|LOW",
-      "file": "cmd/sigma_web/grc_campaign_api.go",
+      "file": "crates/gateway/src/grc/campaign.rs",
       "line": 145,
       "description": "SQL injection via fmt.Sprintf in handleListCampaigns",
       "impacts_domains": ["security", "architecture"]
@@ -70,7 +70,7 @@
 
   "file_locks": [
     {
-      "file": "cmd/sigma_web/grc_campaign_api.go",
+      "file": "crates/gateway/src/grc/campaign.rs",
       "locked_by": "fix-agent-security",
       "since": "ISO8601",
       "reason": "Fixing SQLi B1",

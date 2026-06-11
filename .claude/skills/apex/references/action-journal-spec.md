@@ -32,13 +32,13 @@ One JSON line per action:
   "agent_role": "EXECUTOR",
   "action": "EDIT_FILE",
   "tool": "Edit",
-  "input": "cmd/sigma_web/remediation_tracking_api.go:245",
+  "input": "crates/gateway/src/remediation_tracking.rs:245",
   "output": "Added exportToCSV handler (32 LOC)",
   "autonomy": "AUTONOMOUS",
   "approval": "N/A",
   "security": "CLEAR",
   "status": "success",
-  "file": "cmd/sigma_web/remediation_tracking_api.go"
+  "file": "crates/gateway/src/remediation_tracking.rs"
 }
 ```
 
@@ -153,9 +153,9 @@ _alire/temp/apex/{task-id}/manifeste.jsonl
 One line per file:
 
 ```json
-{"timestamp":"2026-04-02T14:30:00Z","file":"cmd/sigma_web/remediation_export_api.go","action":"CREATED","phase":"EXECUTE","loc":145,"status":"FINAL","gate":"build_pass"}
-{"timestamp":"2026-04-02T14:35:00Z","file":"cmd/sigma_web/remediation_export_api_test.go","action":"CREATED","phase":"TESTS","loc":89,"status":"FINAL","gate":"test_pass"}
-{"timestamp":"2026-04-02T14:40:00Z","file":"cmd/sigma_web/build_secure_lia.sh","action":"MODIFIED","phase":"EXECUTE","loc":1,"status":"FINAL","gate":"build_pass"}
+{"timestamp":"2026-04-02T14:30:00Z","file":"crates/gateway/src/remediation_export.rs","action":"CREATED","phase":"EXECUTE","loc":145,"status":"FINAL","gate":"build_pass"}
+{"timestamp":"2026-04-02T14:35:00Z","file":"crates/gateway/tests/remediation_export.rs","action":"CREATED","phase":"TESTS","loc":89,"status":"FINAL","gate":"test_pass"}
+{"timestamp":"2026-04-02T14:40:00Z","file":"crates/gateway/Cargo.toml","action":"MODIFIED","phase":"EXECUTE","loc":1,"status":"FINAL","gate":"build_pass"}
 ```
 
 ### Fields
