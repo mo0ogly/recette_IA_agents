@@ -272,7 +272,7 @@ cargo build                                   # Rust compile
 cargo clippy --all-targets -- -D warnings     # Rust lint (0 warnings)
 cargo test                                     # Rust tests
 # React: hook block_direct_build.sh blocks vite directly on VPS; use the escape variable:
-LIA_ALLOW_RAW_VITE_BUILD=1 node node_modules/.bin/vite build --config sigma-react-frontend/vite.config.ts
+LIA_ALLOW_RAW_VITE_BUILD=1 node node_modules/.bin/vite build --config agentrail-console/vite.config.ts
 ```
 
 **Runtime crash gate (MANDATORY if frontend modified)**:
@@ -437,7 +437,7 @@ Each pattern that matches triggers a **FAIL** -> return to Phase D.
 **A. Button/IconButton/Chip with hardcoded `color: 'white'` or `'black'`**
 ```bash
 # Find color: 'white'/'black' without adjacent contrastText (theme-unaware)
-for f in $(grep -rlE "color: '(white|black)'" --include="*.tsx" sigma-react-frontend/src/ | grep -v "/themes/\|/constants/\|_archive/"); do
+for f in $(grep -rlE "color: '(white|black)'" --include="*.tsx" agentrail-console/src/ | grep -v "/themes/\|/constants/\|_archive/"); do
   if ! grep -q "contrastText\|theme.palette.getContrastText" "$f"; then
     echo "R25 FAIL: $f -- color white/black without theme awareness"
   fi
@@ -446,7 +446,7 @@ done
 
 **B. `borderColor: 'white'` on bordered elements**
 ```bash
-grep -rn "borderColor: 'white'\|borderColor: 'black'" --include="*.tsx" sigma-react-frontend/src/ | grep -v "/themes/\|/constants/\|_archive/"
+grep -rn "borderColor: 'white'\|borderColor: 'black'" --include="*.tsx" agentrail-console/src/ | grep -v "/themes/\|/constants/\|_archive/"
 ```
 
 **C. Tremor `badgeColor` with invalid values**
@@ -455,7 +455,7 @@ Valid Tremor v4 values: `"blue" | "gray" | "green" | "orange" | "red"`.
 Any other named color (`emerald`, `cyan`, `yellow`, `amber`, `violet`, `rose`, etc.) causes TS2322.
 
 ```bash
-grep -rn 'badgeColor="' --include="*.tsx" sigma-react-frontend/src/ | \
+grep -rn 'badgeColor="' --include="*.tsx" agentrail-console/src/ | \
   grep -vE 'badgeColor="(blue|gray|green|orange|red)"'
 # Any match = invalid Tremor color -> replace with closest valid equivalent:
 # emerald -> green | cyan -> blue | yellow/amber -> orange | rose/pink -> red
@@ -464,35 +464,35 @@ grep -rn 'badgeColor="' --include="*.tsx" sigma-react-frontend/src/ | \
 **D. Hardcoded `bgcolor: '#RRGGBB'` on containers**
 ```bash
 # ERE with {3,8} quantifier to match real hex strings (3 to 8 hex chars)
-grep -rnE "bgcolor: '#[0-9a-fA-F]{3,8}'" --include="*.tsx" sigma-react-frontend/src/ | \
+grep -rnE "bgcolor: '#[0-9a-fA-F]{3,8}'" --include="*.tsx" agentrail-console/src/ | \
   grep -v "/themes/\|/constants/\|_archive/"
 ```
 
 **E. Dark hex gradients (existing R25 check, reminder)**
 ```bash
-grep -rn "linear-gradient" --include="*.tsx" sigma-react-frontend/src/ | \
+grep -rn "linear-gradient" --include="*.tsx" agentrail-console/src/ | \
   grep "#[0-4]" | grep -v "/themes/\|/constants/\|_archive/"
 ```
 
 **F. Dark overlay `rgba(0,0,0,...)` as component background** (R25 -- 20 occurrences at rule creation)
 ```bash
-grep -rn "bgcolor: 'rgba(0,0,0" --include="*.tsx" sigma-react-frontend/src/ | \
+grep -rn "bgcolor: 'rgba(0,0,0" --include="*.tsx" agentrail-console/src/ | \
   grep -v "position: 'fixed'" | grep -v "/themes/"
 # Exception: position:fixed backdrops (Dialog/Modal dimming) are allowed
 ```
 
 **G. Dialog without maxHeight or overflow (R21)**
 ```bash
-grep -rn "<Dialog" --include="*.tsx" sigma-react-frontend/src/ | \
+grep -rn "<Dialog" --include="*.tsx" agentrail-console/src/ | \
   grep -v "maxHeight\|/themes/\|_archive/" | grep -v "//.*<Dialog"
 # Any Dialog missing maxHeight: '90vh' on PaperProps = R21 violation
 ```
 
 **H. Chart/visualization with 4+ inline labels without leader lines (R23)**
 ```bash
-grep -rn "angularExternalLabels\|deOverlapLabels" --include="*.tsx" sigma-react-frontend/src/
+grep -rn "angularExternalLabels\|deOverlapLabels" --include="*.tsx" agentrail-console/src/
 # Any *Radar.tsx, *Chart.tsx, *Graph.tsx NOT using these helpers for 4+ labeled marks = R23 violation
-grep -l "Radar\|Bubble\|Scatter" sigma-react-frontend/src/components/**/*.tsx 2>/dev/null | \
+grep -l "Radar\|Bubble\|Scatter" agentrail-console/src/components/**/*.tsx 2>/dev/null | \
   xargs grep -L "angularExternalLabels\|deOverlapLabels" 2>/dev/null
 ```
 

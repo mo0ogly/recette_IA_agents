@@ -245,7 +245,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health
 cd cmd/sigma_web && GOFLAGS="" go vet . 2>&1 | wc -l
 
 # React build (si frontend dans le scope)
-cd sigma-react-frontend && node node_modules/.bin/vite build 2>&1 | tail -1
+cd agentrail-console && node node_modules/.bin/vite build 2>&1 | tail -1
 
 # PostgreSQL (si DB dans le scope)
 PGPASSWORD="$AGENTRAIL_DB_PASS" psql -h localhost -U agentrail -d agentrail -c "SELECT 1" 2>/dev/null

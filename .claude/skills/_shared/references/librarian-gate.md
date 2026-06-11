@@ -63,11 +63,9 @@ RETEX 2026-04-01 :
 - Les collisions de noms de fonctions Go (truncate, nilIfEmpty) ont cause 3 iterations de build
 - Les fichiers owned par `ubuntu` sur le VPS bloquent git pull pendant 30+ minutes
 
-RETEX 2026-05-13/14 (incident c53 traceability gap) :
-- 5 cycles marathon (c10-c14, scope liaprobe-fingerprint-rebuild) ont produit du
-  travail reel (2666 file renames c11, 36 rebrand audit blocks c13) SANS produire
-  PLAN+RETEX. Trace forensique seule (audit-block grep) a permis reconstruction
-  retroactive en c53.
+RETEX traceability gap :
+- Plusieurs cycles marathon ont produit du travail reel SANS produire PLAN+RETEX ;
+  seule la trace forensique (audit-block grep) a permis une reconstruction retroactive.
 - Sans gate verifiee par script, la discipline librarian-gate s'erode silencieusement
   pendant les sessions marathon. Le gate item 4 (TRACEABILITY GATE) est automatise
   via `scripts/verify_cycle_traceability.py` (exit 2 si gap consecutif detecte).

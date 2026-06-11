@@ -24,7 +24,7 @@
 
   "context": {
     "objective": "Audit GRC module | Implement export CSV",
-    "scope": "cmd/sigma_web/grc_*.go + sigma-react-frontend/src/components/grc/",
+    "scope": "crates/gateway/src/grc/ + agentrail-console/src/components/grc/",
     "retex_previous": "Score 72/100, gaps: missing tests, 3 SQLi patterns",
     "known_issues": [
       "discovery_api.go a 0 tests (RETEX cycle 3)",

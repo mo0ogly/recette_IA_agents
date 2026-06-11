@@ -33,12 +33,12 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
       "weight": 15,
       "checks": [
         {"id": "TST-01", "name": "Rust compiles + clippy clean", "type": "command", "cmd": "cargo build && cargo clippy --all-targets --all-features -- -D warnings", "expect": "exit 0"},
-        {"id": "TST-02", "name": "React compiles (vite build)", "type": "command", "cmd": "cd sigma-react-frontend && node node_modules/.bin/vite build", "expect": "exit 0"},
+        {"id": "TST-02", "name": "React compiles (vite build)", "type": "command", "cmd": "cd agentrail-console && node node_modules/.bin/vite build", "expect": "exit 0"},
         {"id": "TST-03", "name": "Rust test modules exist", "type": "command", "cmd": "grep -rlE '#\\[cfg\\(test\\)\\]|#\\[test\\]|#\\[tokio::test\\]' src/ tests/ --include='*.rs' | wc -l", "target": ">10"},
-        {"id": "TST-04", "name": "React test files exist", "type": "count_files", "pattern": "*.test.ts*", "scope": "sigma-react-frontend/", "target": ">10"},
+        {"id": "TST-04", "name": "React test files exist", "type": "count_files", "pattern": "*.test.ts*", "scope": "agentrail-console/", "target": ">10"},
         {"id": "TST-05", "name": "NATS event bus reachable", "type": "command", "cmd": "curl -s -o /dev/null -w '%{http_code}' http://localhost:8222/healthz 2>/dev/null", "expect": "200"},
-        {"id": "TST-06", "name": "Vitest passes", "type": "command", "cmd": "cd sigma-react-frontend && npx vitest run 2>/dev/null", "expect": "exit 0"},
-        {"id": "TST-07", "name": "No null .map() crashes", "type": "grep_count", "pattern": "\\.[a-z]+\\.map\\(", "scope": "sigma-react-frontend/src/", "exclude_pattern": "|| \\[\\]", "description": "Every .property.map() must have || [] guard. Incident 2026-04-06: 9 components crashed in prod."},
+        {"id": "TST-06", "name": "Vitest passes", "type": "command", "cmd": "cd agentrail-console && npx vitest run 2>/dev/null", "expect": "exit 0"},
+        {"id": "TST-07", "name": "No null .map() crashes", "type": "grep_count", "pattern": "\\.[a-z]+\\.map\\(", "scope": "agentrail-console/src/", "exclude_pattern": "|| \\[\\]", "description": "Every .property.map() must have || [] guard. Incident 2026-04-06: 9 components crashed in prod."},
         {"id": "TST-08", "name": "Runtime smoke test (Playwright)", "type": "manual", "description": "Navigate to 5 main pages with Playwright, verify 0 Component Error in snapshot. Pages: Dashboard, Discovery, Analysis, Admin, Compliance."}
       ]
     },
@@ -46,7 +46,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
       "weight": 15,
       "checks": [
         {"id": "ARC-01", "name": "tracing instrumentation adoption", "type": "adoption_rate", "pattern": "tracing::|#\\[instrument", "scope": "src/**/*.rs", "target": ">80%", "description": "Structured logging via tracing, not println"},
-        {"id": "ARC-02", "name": "customLogger adoption", "type": "adoption_rate", "pattern": "customLogger", "scope": "sigma-react-frontend/src/services/*.ts", "target": ">80%"},
+        {"id": "ARC-02", "name": "customLogger adoption", "type": "adoption_rate", "pattern": "customLogger", "scope": "agentrail-console/src/services/*.ts", "target": ">80%"},
         {"id": "ARC-03", "name": "Control-plane mediation (I2)", "type": "manual", "description": "No direct agent->external path bypassing the Gateway; all side-effects via controlled proxies (I5)"},
         {"id": "ARC-04", "name": "Migrations numbered", "type": "count_files", "pattern": "migrations/*.sql", "scope": "migrations/"},
         {"id": "ARC-05", "name": "Axum CORS layer present", "type": "grep_count", "pattern": "CorsLayer", "scope": "src/", "target": ">0", "description": "Gateway router applies a tower-http CorsLayer (deny-by-default policy)"}
@@ -59,11 +59,11 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
         {"id": "HYG-01", "name": "No stub handlers", "type": "grep_count", "pattern": "todo!\\(\\)|unimplemented!\\(\\)|StatusCode::NOT_IMPLEMENTED", "scope": "src/", "target": 0, "description": "Aucun handler todo!()/unimplemented!()/501 dans le code actif"},
         {"id": "HYG-02", "name": "No dead code (compiler)", "type": "command", "cmd": "cargo build 2>&1 | grep -cE 'never used|unused import|unused variable'", "expect": "0"},
         {"id": "HYG-03", "name": "Dead code ratio < 10%", "type": "dead_code_ratio", "description": "Symboles publics avec 0 appels externes < 10% du total (voir triage C.0)"},
-        {"id": "HYG-04", "name": "No emoji in code/docs", "type": "grep_count", "pattern": "[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}\\x{2600}-\\x{26FF}]", "scope": "src/,sigma-react-frontend/src/", "target": 0},
-        {"id": "HYG-05", "name": "MUI v7 Grid syntax", "type": "grep_count", "pattern": "<Grid item |<Grid.*item ", "scope": "sigma-react-frontend/src/", "target": 0, "description": "Ancienne syntaxe MUI v5/v6 interdite"},
-        {"id": "HYG-06", "name": "No hardcoded fontFamily", "type": "grep_count", "pattern": "fontFamily:.*['\"]monospace['\"]|fontFamily:.*['\"]Arial|fontFamily:.*['\"]Fira Code", "scope": "sigma-react-frontend/src/components/", "target": 0, "description": "Utiliser fontFamily: 'inherit' ou theme.typography.fontFamily"},
+        {"id": "HYG-04", "name": "No emoji in code/docs", "type": "grep_count", "pattern": "[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}\\x{2600}-\\x{26FF}]", "scope": "src/,agentrail-console/src/", "target": 0},
+        {"id": "HYG-05", "name": "MUI v7 Grid syntax", "type": "grep_count", "pattern": "<Grid item |<Grid.*item ", "scope": "agentrail-console/src/", "target": 0, "description": "Ancienne syntaxe MUI v5/v6 interdite"},
+        {"id": "HYG-06", "name": "No hardcoded fontFamily", "type": "grep_count", "pattern": "fontFamily:.*['\"]monospace['\"]|fontFamily:.*['\"]Arial|fontFamily:.*['\"]Fira Code", "scope": "agentrail-console/src/components/", "target": 0, "description": "Utiliser fontFamily: 'inherit' ou theme.typography.fontFamily"},
         {"id": "HYG-07", "name": "Chip borderRadius: 1", "type": "manual", "description": "Tous les composants Chip MUI ont borderRadius: 1 (pas oval par defaut). Verifier via grep -rn 'Chip' dans le perimetre"},
-        {"id": "HYG-08", "name": "No mock/placeholder data", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,sigma-react-frontend/src/", "target": 0}
+        {"id": "HYG-08", "name": "No mock/placeholder data", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,agentrail-console/src/", "target": 0}
       ]
     },
     "completeness": {
@@ -80,7 +80,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
         {"id": "DOC-01", "name": "Module docs exist", "type": "file_exists", "path": "_alire/01_DOCUMENTATION/"},
         {"id": "DOC-02", "name": "API documented", "type": "manual"},
         {"id": "DOC-03", "name": "CLAUDE.md current", "type": "file_exists", "path": "CLAUDE.md"},
-        {"id": "DOC-04", "name": "UI Help content exists", "type": "grep_count", "pattern": "HelpButton|useHelp", "scope": "sigma-react-frontend/src/components/{perimetre}*/", "target": ">0", "description": "Les ecrans du perimetre doivent avoir des HelpButton integres et du contenu dans ui_help_content"}
+        {"id": "DOC-04", "name": "UI Help content exists", "type": "grep_count", "pattern": "HelpButton|useHelp", "scope": "agentrail-console/src/components/{perimetre}*/", "target": ">0", "description": "Les ecrans du perimetre doivent avoir des HelpButton integres et du contenu dans ui_help_content"}
       ]
     },
     "benchmark_parity": {

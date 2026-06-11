@@ -78,7 +78,7 @@ Task Delegation — Explore
 Session:      apex-20260402-remediation-export
 Step:         1 of 6
 Objective:    Map all files and dependencies for remediation export feature
-Input:        cmd/sigma_web/remediation_tracking_api.go, sigma-react-frontend/src/components/RemediationTracking/
+Input:        cmd/sigma_web/remediation_tracking_api.go, agentrail-console/src/components/RemediationTracking/
 Constraints:  R6 (LogSystemEvent only), R12 (English comments), fetchWithConfig
 Autonomy:     AUTONOMOUS
 Expected out: Dependency map with file paths, function names, route chains

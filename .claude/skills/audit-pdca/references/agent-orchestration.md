@@ -35,7 +35,7 @@ Each PDCA phase is executed by specialized agent roles.
 | D.1 | DO FIXES | EXECUTOR | Apply fixes per priority with Go/React build pipelines |
 | D.2 | VERIFY GATE | ANALYST | Build + test + import + smoke after each fix batch |
 | C.0 | DEAD CODE | ANALYST | Triage ACTIF/DEAD/PROTOTYPE |
-| C.1 | STATIC | ANALYST | /go-recette + /react-recette via Skill tool (NOT brainstorm) |
+| C.1 | STATIC | ANALYST | /rust-recette + /python-recette + /react-recette via Skill tool (NOT brainstorm) |
 | C.1bis | SECURITY DEEP-DIVE | ANALYST | /security-reviewer via Skill tool (if triggered conditions met) |
 | C.2 | RUNTIME | ANALYST | Playwright smoke tests on impacted pages |
 | C.2bis | DESIGN AUDIT | ANALYST | /frontend-design + R25 checks + WCAG AA across 6 themes |

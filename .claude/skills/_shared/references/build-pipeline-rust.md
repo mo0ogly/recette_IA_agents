@@ -165,8 +165,8 @@ RUST_BACKTRACE=1 cargo test <failing_test> -- --nocapture
 
 ## Go -> Rust tool equivalence (security domain mapping)
 
-Used by PDCA security scoring (the Go pipeline scored security via gosec + govulncheck
-inside `/go-recette`; there is no `/rust-recette`, so security is scored from these tools).
+Used by PDCA security scoring. The legacy Go pipeline scored security via gosec + govulncheck;
+`/rust-recette` Bloc D now scores it from the Rust tools below (clippy + cargo-audit + cargo-deny + cargo-geiger).
 
 | Go tool | Purpose | Rust equivalent | Gate |
 |---------|---------|-----------------|------|

@@ -98,7 +98,7 @@ python3 /opt/agentrail/dev/scripts/verify_cycle_traceability.py \
 ```
 
 Where `{SCOPE_SLUG}` is the upper-snake-case PDCA scope
-(e.g. `LIAPROBE_FINGERPRINT_REBUILD`, `REMEDIATION_TRACKING`).
+(e.g. `RECETTE_CORPUS`, `DISCOVERY_RECETTE`).
 
 Exit code interpretation at Phase 0:
 - 0 = clean, proceed
@@ -114,10 +114,9 @@ NOT BLOCKING at Phase 0 (some legitimate cycles like retex-analyzer or
 audit-only scopes may intentionally lack PLAN files). Phase 5 librarian-gate
 enforces the CURRENT cycle's PLAN+RETEX presence as BLOCKING.
 
-Reference incident : c53 (2026-05-14) discovered 5-cycle gap c10-c14 in
-liaprobe-fingerprint-rebuild scope, ran on 2026-05-13 marathon session
-without PLAN/RETEX. Forensic reconstruction via audit-block grep proved
-work happened (2666 file renames + 36 rebrand blocks) but trace was lost.
+Reference incident : a multi-cycle marathon session ran without PLAN/RETEX.
+Forensic reconstruction via audit-block grep proved work happened but the
+trace was lost -- hence the mandatory traceability gate.
 c54 bakes this preventive scan to prevent recurrence.
 
 1. **Parse** the task description: identify domain (backend Rust, backend Python, frontend React, rules, infra, mixed)
@@ -127,7 +126,7 @@ c54 bakes this preventive scan to prevent recurrence.
 3. **Create PLAN immediately**: `_alire/tracking/PLAN_APEX_{slug}_{date}.md` (template from agentic-core.md)
 4. **Pre-flight** (BLOCKING):
    - Rust: `cargo build 2>&1 | tail -20` (must compile; `-p <crate>` if multi-crate workspace)
-   - React: `cd sigma-react-frontend && node node_modules/.bin/vite build 2>&1 | tail -5` (must pass)
+   - React: `cd agentrail-console && node node_modules/.bin/vite build 2>&1 | tail -5` (must pass)
    - Backend health: `curl -s http://localhost:8081/api/health | head -1` (WARN only, not BLOCK)
 5. **Test pre-flight** (WARN, not BLOCK):
    - `cargo test --no-run 2>&1 | tail -5` then `cargo test 2>&1 | grep -cE 'FAILED|test result: FAILED'` -- note pre-existing failures for regression baseline
@@ -287,7 +286,7 @@ BEFORE writing fallible paths, invoke the `error-handling-patterns` skill. Then 
 Convention check: `logging` not `print`, no bare `except`, no `eval`/`exec`/`pickle.load`, typed hints.
 
 **React files**: follow [build-pipeline-react.md](../_shared/references/build-pipeline-react.md) after each .tsx/.ts write:
-0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `sigma-react-frontend/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Incident 2026-04-07 (LiaProbeAIStatus crash) + 2026-04-14 (EBIOS Dashboard contract drift, 4 correction passes, ~30 min wasted) mandated this pre-build gate.
+0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `agentrail-console/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Past incidents (component crash on undefined payload + dashboard contract drift requiring multiple correction passes) mandated this pre-build gate.
 1. BUILD: `vite build` zero TS errors
 2. IMPORT: fetchWithConfig (not fetch), getBackendUrl (not hardcode)
 3. THEME: fontFamily:'inherit', no hardcoded hex, theme.palette.*
@@ -387,7 +386,7 @@ When ALL subtasks are SUCCESS, enter the recette phase. Follow [recette-protocol
 
 ### 4a. STATIC (BLOCKING)
 
-Invoke via Skill tool (mandatory delegation, parity with the old `/go-recette`):
+Invoke via Skill tool (mandatory delegation):
 - For each `*.rs` touched -> `Skill({skill: "rust-recette", args: "{file or crate}"})`
   (Blocs A-F / score /44, Bloc D = clippy + cargo-audit + cargo-deny + cargo-geiger,
   Bloc F = invariants I1-I6). The deep-scan helper `.claude/scripts/rust-recette-deep-scan.sh`

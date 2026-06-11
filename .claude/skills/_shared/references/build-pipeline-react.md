@@ -12,7 +12,7 @@ EDIT/WRITE .tsx/.ts
     |
     v
 GATE 1: BUILD
-    |-- cd sigma-react-frontend && node node_modules/.bin/vite build
+    |-- cd agentrail-console && node node_modules/.bin/vite build
     |-- Zero erreurs TS = PASS
     |-- FAIL -> STOP, corriger
     |
@@ -51,7 +51,7 @@ GATE 6: HELP (BLOQUANT)
     |
     v
 GATE 7: TEST
-    |-- cd sigma-react-frontend && npx vitest run
+    |-- cd agentrail-console && npx vitest run
     |-- Tests existants ne cassent pas
     |-- Si nouveau composant : creer test render basique
     |
