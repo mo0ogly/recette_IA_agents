@@ -89,6 +89,10 @@ class StubLlm:
         return decision
 
 
+class ReplayLlm(StubLlm):
+    """Deterministic replay of decisions recorded from a previous run (LB4)."""
+
+
 # --- Anthropic ---------------------------------------------------------------------------
 
 
