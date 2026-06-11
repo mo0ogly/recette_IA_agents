@@ -1,0 +1,10 @@
+{
+  "agent_id": "gh-identity-spoof",
+  "credential_principal": "mallory-personal-pat",
+  "actions": [
+    {
+      "action": "read_repo",
+      "resource": "acme/widgets"
+    }
+  ]
+}

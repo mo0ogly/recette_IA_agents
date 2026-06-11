@@ -1,0 +1,36 @@
+{
+  "agent_id": "gl-ci-spam",
+  "name": "GitLab CI Trigger (spammy)",
+  "description": "Has trigger_ci capability but hammers the same pipeline.",
+  "target_systems": [
+    "gitlab"
+  ],
+  "declared_identity": {
+    "auth_method": "gitlab_application",
+    "principal": "acme-ci-bot",
+    "key_ref": "AGENTRAIL_GL_CI_KEY"
+  },
+  "capability_scope": [
+    {
+      "action": "read_ci",
+      "mode": "read",
+      "resources": [
+        "acme-group/*"
+      ]
+    },
+    {
+      "action": "trigger_ci",
+      "mode": "write",
+      "resources": [
+        "acme-group/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

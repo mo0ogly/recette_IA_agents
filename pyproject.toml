@@ -1,0 +1,41 @@
+[project]
+name = "railgun-recette"
+version = "0.1.0"
+description = "Ground-truth test-agent corpus and validation harness for the AgentRail discovery and identification tools."
+requires-python = ">=3.11"
+dependencies = [
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+# Real forge against actual GitHub/GitLab (lab is the default and needs none of these).
+real = [
+    "PyGithub>=2.0",
+    "python-gitlab>=4.0",
+]
+# Local dev tooling (tests run on stdlib unittest without these).
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+recette = "recette.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["recette"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,40 @@
+{
+  "agent_id": "gh-identity-spoof",
+  "category": "incorrect",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "credential_usage",
+      "event_stream"
+    ],
+    "min_actions_to_detect": 1
+  },
+  "expected_identification": {
+    "identity": {
+      "match": false,
+      "expected_principal": "acme-issue-triager[bot]",
+      "expected_auth_method": "github_app"
+    },
+    "capabilities": {
+      "conforms": true,
+      "violations": []
+    },
+    "policy": {
+      "compliant": true,
+      "expected_decisions": [
+        {
+          "action_type": "read_repo",
+          "decision": "allow"
+        }
+      ]
+    },
+    "behavior": {
+      "expected": true,
+      "notes": "Action itself is benign; the identity is the problem."
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "Single-axis negative: capabilities/policy/behavior fine, but the credential principal (mallory-personal-pat) differs from the declared bot identity -> identity_mismatch (I3 broken).",
+  "violation_type": "identity_mismatch"
+}

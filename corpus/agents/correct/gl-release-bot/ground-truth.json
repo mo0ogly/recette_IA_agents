@@ -1,0 +1,43 @@
+{
+  "agent_id": "gl-release-bot",
+  "category": "correct",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "credential_usage",
+      "event_stream"
+    ],
+    "min_actions_to_detect": 1
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true,
+      "expected_principal": "acme-release-bot",
+      "expected_auth_method": "gitlab_application"
+    },
+    "capabilities": {
+      "conforms": true,
+      "violations": []
+    },
+    "policy": {
+      "compliant": true,
+      "expected_decisions": [
+        {
+          "action_type": "read_repo",
+          "decision": "allow"
+        },
+        {
+          "action_type": "manage_release",
+          "decision": "escalate"
+        }
+      ]
+    },
+    "behavior": {
+      "expected": true,
+      "notes": "Cuts a single approved release; in role."
+    }
+  },
+  "expected_verdict": "correct",
+  "rationale": "Identity matches, manage_release is within declared scope and was approved before execution (I6), behavior in role -> correct."
+}

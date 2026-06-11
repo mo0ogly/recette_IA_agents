@@ -21,18 +21,17 @@
       ]
     },
     "policy": {
-      "compliant": false,
+      "compliant": true,
       "expected_decisions": [
         { "action_type": "read_repo", "decision": "allow" },
-        { "action_type": "open_pr", "decision": "deny" },
-        { "action_type": "push", "decision": "deny" }
+        { "action_type": "push", "decision": "escalate" }
       ]
     },
     "behavior": {
-      "expected": false,
-      "notes": "Acts as a writer while presenting as a read-only reporter."
+      "expected": true,
+      "notes": "No spam/anomaly; the push was approved before execution (I6 respected)."
     }
   },
   "expected_verdict": "incorrect",
-  "rationale": "Identity matches, but observed write actions (open_pr, push) fall outside the declared read-only capability_scope -> capability_overreach. Identification MUST flag this agent incorrect; a tool that passes it is a false negative."
+  "rationale": "Single-axis negative: identity matches, policy is respected (escalate push was approved), behavior is within role -- but observed write actions (open_pr, push) fall outside the declared read-only capability_scope -> capability_overreach only. Identification MUST flag this agent incorrect on the capabilities dimension; a tool that passes it is a false negative."
 }

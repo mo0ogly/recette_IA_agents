@@ -32,6 +32,15 @@ INCORRECT, `violation_type` indique l'axe casse :
 Cible de couverture : au moins 1 agent correct et 1 agent incorrect par `violation_type`,
 sur GitHub ET GitLab.
 
+## Langage d'implementation (recette = Python)
+
+Le code de la recette (agents de test, lab/forge, harnais, adaptateurs) est en **Python**
+dans le package `recette/`. Il est EXEMPTE des `rust-conventions.md` (qui visent la plateforme
+Rust/Axum). Determinisme (I4) impose neanmoins : pas de `time.time()`/`datetime.now()`/`random`
+dans l'execution d'un agent -- horloge logique injectee (`recette.events.LogicalClock`),
+`event_id` derive d'une sequence. Zero dependance dure hors `jsonschema` ; SDK reels
+(`PyGithub`, `python-gitlab`) = extra optionnel `[real]`.
+
 ## Structure
 
 ```
@@ -39,16 +48,38 @@ corpus/
   README.md
   schemas/
     agent-manifest.schema.json     # ce que l'agent DECLARE (identite + capability_scope)
+    scenario.schema.json           # ce que l'agent FAIT reellement (actions deterministes ordonnees)
     ground-truth.schema.json       # ce que la recette ATTEND des outils (discovery + 4 dimensions + verdict)
   agents/
-    correct/<slug>/{manifest.json, ground-truth.json}
-    incorrect/<slug>/{manifest.json, ground-truth.json}
+    correct/<slug>/{manifest.json, scenario.json, ground-truth.json}
+    incorrect/<slug>/{manifest.json, scenario.json, ground-truth.json}
+recette/                           # package Python (forge, agent, adapters, harness, scorecard)
+tests/                             # unittest stdlib (zero install)
 ```
 
 Chaque agent de test :
 1. DECLARE son identite + capabilities dans `manifest.json` (valide contre `agent-manifest.schema.json`).
-2. PORTE son ground-truth dans `ground-truth.json` (valide contre `ground-truth.schema.json`).
-3. (plus tard) a une implementation qui realise reellement les actions GitHub/GitLab.
+2. SCRIPTE ses actions reelles dans `scenario.json` (valide contre `scenario.schema.json`).
+   L'ecart manifest (declare) vs scenario (reel) est ce qui rend l'agent correct ou incorrect.
+3. PORTE son ground-truth dans `ground-truth.json` (valide contre `ground-truth.schema.json`).
+
+## Orthogonalite des dimensions (REGLE)
+
+Un agent INCORRECT casse EXACTEMENT UNE des 4 dimensions (le `violation_type` correspondant) ;
+les 3 autres restent conformes. Cela rend l'accuracy par dimension mesurable et chaque cas
+negatif mono-axe. Un test (`test_each_negative_breaks_exactly_one_dimension`) le verifie.
+
+## Invocation
+
+```
+python3 -m recette validate    # schema-valide tout le corpus
+python3 -m recette run         # joue le corpus -> scorecard (detection rate, accuracy/dimension, FP/FN)
+python3 -m unittest discover -s tests
+```
+
+Les outils reels discovery/identification se branchent en implementant les protocols
+`DiscoveryAdapter` / `IdentificationAdapter` (`recette/adapters.py`). Les `Reference*Adapter`
+fournis sont un evaluateur correct de reference (et le gabarit de ce qu'un vrai outil doit produire).
 
 ## Boucle de recette (mesurable)
 

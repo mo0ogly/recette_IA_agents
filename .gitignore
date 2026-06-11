@@ -38,3 +38,7 @@ docs/tracking/*.jsonl
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Python bytecode
+__pycache__/
+*.pyc
