@@ -157,12 +157,20 @@ def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
     return 0 if result.valid else 1
 
 
-def _cmd_agent_run(manifest_path: str, provider: str, model: str, max_steps: int) -> int:
+def _cmd_agent_run(
+    manifest_path: str, provider: str, model: str, max_steps: int, real: bool, enable_writes: bool
+) -> int:
     from .lane_b import run_agent
     from .llm import build_llm
 
     spec = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     llm = build_llm(provider, model)  # live; key from env (R8)
+    forge = None  # default = LabForge (no side effects)
+    if real:
+        from .realmode import build_real_forge
+
+        forge = build_real_forge(spec["target_system"], enable_writes=enable_writes)
+        print(f"REAL MODE on {spec['target_system']} (allowlisted, writes={enable_writes})")
     result = run_agent(
         agent_id=spec["agent_id"],
         principal=spec["principal"],
@@ -170,6 +178,7 @@ def _cmd_agent_run(manifest_path: str, provider: str, model: str, max_steps: int
         goal=spec["goal"],
         capability_scope=spec["capability_scope"],
         llm=llm,
+        forge=forge,
         provider=provider,
         model=model,
         max_steps=max_steps,
@@ -262,6 +271,14 @@ def main(argv: list[str] | None = None) -> int:
     a_run.add_argument("--provider", required=True, choices=["anthropic", "openai"])
     a_run.add_argument("--model", required=True)
     a_run.add_argument("--max-steps", type=int, default=10)
+    a_run.add_argument(
+        "--real",
+        action="store_true",
+        help="act on real systems (RealForge, token + AGENTRAIL_REAL_ALLOWLIST via env)",
+    )
+    a_run.add_argument(
+        "--enable-writes", action="store_true", help="allow write actions in real mode"
+    )
     a_rep = agent_sub.add_parser("replay", help="deterministically replay a recording")
     a_rep.add_argument("recording", help="path to a recording JSON")
     a_frz = agent_sub.add_parser("freeze", help="promote a recording into a Lane A golden")
@@ -288,7 +305,14 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_bundle_verify(args.path, args.pubkey)
     if args.command == "agent":
         if args.agent_cmd == "run":
-            return _cmd_agent_run(args.manifest, args.provider, args.model, args.max_steps)
+            return _cmd_agent_run(
+                args.manifest,
+                args.provider,
+                args.model,
+                args.max_steps,
+                args.real,
+                args.enable_writes,
+            )
         if args.agent_cmd == "replay":
             return _cmd_agent_replay(args.recording)
         if args.agent_cmd == "freeze":
