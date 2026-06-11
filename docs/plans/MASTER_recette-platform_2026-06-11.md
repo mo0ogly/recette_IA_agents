@@ -66,9 +66,10 @@ Legend: DONE / PARTIAL / TODO.
 | Docker lab (runtime/audit, non-root) | DONE |
 | One-shot installer + smoke tests | DONE |
 | Strict gates (ruff/mypy/bandit) green | DONE |
-| Ed25519 bundle contract recette | TODO |
+| Ed25519 bundle contract recette | TODO (in scope, M5) |
 | CI pipeline (gates + recette on push) | TODO |
 | Real API wiring confirmed with colleague | TODO (blocked on his routes) |
+| UX control console (launch/stop/monitor + Monaco + config) | TODO (Track U) |
 
 ---
 
@@ -100,12 +101,18 @@ DoD: `recette discovery --adapter reference --surface mcp` -> VERDICT PASS; gate
 - Adapter + harness + scorecard + tests.
 DoD: `recette discovery --surface openapi` -> VERDICT PASS.
 
-### M3 -- Temporal surface  [TODO]
-- `corpus/temporal/<slug>/` workflow/activity definitions (Python or pseudo-IR) that
-  act as agents; ground-truth on detected workflows + action patterns + risk.
-- Oracle parses workflow/activity signatures -> action patterns.
-- Adapter + harness + scorecard + tests.
-DoD: `recette discovery --surface temporal` -> VERDICT PASS.
+### M3 -- Temporal surface  [TODO]  (FIRST of the remaining surfaces, per decision #1)
+Real Temporal SDK definitions (decision #3). Heavier than the other surfaces, done first.
+- `[temporal]` optional extra (`temporalio` SDK); `temporal-dev` service in docker-compose
+  (Temporal dev server) so the lab can run real workflows; lab stays the default and
+  needs none of this unless the Temporal surface is exercised.
+- `corpus/temporal/<slug>/` real workflow/activity definitions acting as agents
+  (read-only reporter, write-capable, overreach, non-agent). ground-truth on detected
+  workflows + action patterns + risk rank + policy.
+- Determinism (I4): capture workflow time/history; assert re-run yields identical events.
+- Oracle parses workflow/activity signatures -> action patterns; adapter + harness +
+  scorecard + tests; surface-agnostic `--surface temporal`.
+DoD: `recette discovery --surface temporal` -> VERDICT PASS; gates green; re-run deterministic.
 
 ### M4 -- GitLab discovery parity  [TODO]
 - Mirror the 4 GitHub discovery repos for GitLab (`gl-*`), CI = `.gitlab-ci.yml`.
@@ -156,25 +163,90 @@ DoD: single command produces the full recette verdict for a release gate.
 
 ---
 
-## 4. Open decisions (need a call before/at the relevant milestone)
+## 4. Decisions (resolved 2026-06-11)
 
-1. **Surface order** -- recommended M1 (Manifest/MCP) -> M2 (OpenAPI) -> M3 (Temporal),
-   easiest-to-hardest. Confirm or reorder.
-2. **Ed25519 bundle (M5)** -- in scope for this repo, or deferred to a Control-Plane
-   recette? Earlier it was "out of scope"; the master view includes it -- confirm.
-3. **Temporal corpus form (M3)** -- real Temporal SDK definitions (heavy dep) vs a
-   deterministic IR the oracle parses (lighter, lab-friendly). Recommend the IR.
-4. **GitLab discovery (M4)** -- needed now, or after the 4 surfaces are covered on GitHub?
+1. **Surface order** -- RESOLVED: **Temporal first**, then OpenAPI, then Manifest/MCP.
+   (Business priority over easiest-first; accepts the added Temporal infra cost below.)
+2. **Ed25519 bundle (M5)** -- RESOLVED: **in scope** for this recette.
+3. **Temporal corpus form (M3)** -- RESOLVED: **real Temporal SDK** definitions, not an IR.
+   Implications: needs a Temporal dev server in the lab (docker-compose service) and a
+   `[temporal]` optional extra; non-determinism (workflow time/random) MUST be captured
+   so replay stays deterministic (I4) -- use Temporal's deterministic time + recorded
+   history, assert re-run yields identical event sets.
+4. **GitLab discovery (M4)** -- after the surfaces are covered (kept at M4).
+5. **UX console (Track U)** -- NEW requirement: a console to launch/stop/integrate/monitor
+   agents, a Monaco debug view, and a config area for agents + AIs. See Track U + its open
+   decisions (section 6).
 
 ---
 
-## 5. Recommended execution order
+## 5. Execution order (resolved)
+
+We STARTED with GitHub -- it is the established base (M0 done: GitHub discovery +
+identification). The remaining surfaces follow the resolved order Temporal -> OpenAPI ->
+Manifest/MCP.
 
 ```
-M0 (done) -> M1 Manifest/MCP -> M2 OpenAPI -> M3 Temporal -> M8 orthogonality audit
-          -> M4 GitLab parity -> M5 Ed25519 bundle -> M9 aggregate report
-          -> M6 real wiring (whenever colleague unblocks) -> M7 CI
+M0 GitHub (done)
+  -> M3 Temporal (real SDK)         <- first remaining surface
+  -> M2 OpenAPI
+  -> M1 Manifest/MCP
+  -> M8 orthogonality audit (all surfaces)
+  -> M4 GitLab parity
+  -> M5 Ed25519 bundle contract
+  -> M9 aggregate report
+  -> M6 real API wiring (when colleague unblocks)
+  -> M7 CI
+
+Track U (UX console) runs in parallel once M3 lands -- it needs at least one
+non-GitHub surface to be worth wiring, and an API layer (U1) it can drive.
 ```
 
 Each milestone is one writing-plans/executing-plans cycle: schema -> corpus ->
 oracle -> harness -> scorecard -> tests -> gates green -> commit.
+
+---
+
+## 6. Track U -- UX control console (NEW)
+
+Goal: a console to launch/stop/integrate/monitor the test agents, a Monaco-based
+debug view of what each agent does, and a configuration area for agents + AIs.
+This sits ON TOP of the existing recette (it drives the same corpus + harness + forge),
+it does not replace the CLI.
+
+### U1 -- Recette API layer  [TODO]  (prerequisite for the UI)
+- A backend API (FastAPI, Python -- matches the recette package) exposing:
+  list/register agents (corpus), launch a run (replay a scenario against lab or real
+  forge), stop a run, stream events (SSE/WebSocket), fetch logs + scorecards, config CRUD.
+- Reuses `recette/*` directly; no business logic duplicated in the API.
+- Secrets (tokens, AI keys) via env only (R8); lab mode is the default.
+DoD: every CLI capability reachable over the API; a launched run streams events.
+
+### U2 -- Console frontend  [TODO]
+- React + TypeScript + Vite (AgentRail console stack). Views: agent catalog,
+  launch/stop controls, run status, live event feed, scorecard rendering.
+- R16 frontend contract gate: real fixture payloads + render-and-assert per component.
+DoD: launch an agent from the UI, see it run and its scorecard, stop it.
+
+### U3 -- Monaco debug console  [TODO]
+- Embedded Monaco editor: view the agent's scenario/code and a live, correlated
+  event/log stream (by event_id/agent_id) to debug what an agent is doing.
+- Read-only first; editing scenarios from Monaco is a later enhancement.
+DoD: select a running agent -> Monaco shows its definition + live event trace.
+
+### U4 -- Configuration area (agents + AIs)  [TODO]
+- Configure agents (identity, capability_scope, runtime lab/real) and AI backends
+  (provider, model) used by any LLM-powered agents. Keys via env/secret store only.
+- Persisted config in a single versioned source (R5), never hardcoded.
+DoD: create/edit an agent + an AI backend from the UI; config round-trips and validates.
+
+### Track U open decisions
+- **Agent execution model** -- are these test agents deterministic scripted action-logs
+  (current model, replay-safe, I4) OR live LLM-powered agents (most-real, but
+  non-deterministic)? If LLM-powered, runs must be recorded to stay replayable.
+- **API backend** -- FastAPI (Python, reuses recette directly) vs Axum (Rust, matches
+  the platform but reimplements glue). Recommend FastAPI for the recette.
+- **Real-time transport** -- SSE (simpler) vs WebSocket (bidirectional). Recommend SSE
+  for one-way event streaming, WebSocket only if interactive control needs it.
+- **Scope/timing** -- start Track U after M3 (one real non-GitHub surface exists), or
+  earlier as a thin shell over GitHub-only.
