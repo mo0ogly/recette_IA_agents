@@ -44,12 +44,9 @@ def render_text(target: Path, results: list[CheckResult], scored: ScoreReport) -
         if b.applicable == 0:
             lines.append(f"SCORE {b.bloc} : N/A (all manual/skipped)")
         else:
-            lines.append(
-                f"SCORE {b.bloc} : {b.score:.1f}/{b.max:.0f} ({b.passed}/{b.applicable} checks pass)"
-            )
+            lines.append(f"SCORE {b.bloc} : {b.score:.1f}/{b.max:.0f} ({b.passed}/{b.applicable} checks pass)")
     lines.append(
-        f"SCORE GLOBAL : {scored.global_score:.1f}/{scored.global_max:.0f}  "
-        f"(normalized {scored.normalized_44:.1f}/44)"
+        f"SCORE GLOBAL : {scored.global_score:.1f}/{scored.global_max:.0f}  (normalized {scored.normalized_44:.1f}/44)"
     )
     lines.append(
         f"CRITIQUES en FAIL : {scored.critical_fails} | "

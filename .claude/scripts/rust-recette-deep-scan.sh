@@ -55,15 +55,15 @@ if cargo clippy "${PKG_ARG[@]}" --all-targets --all-features -- -D warnings >"$O
 else
   D1="FAIL"; CRIT_FAIL=1
 fi
-CLIPPY_WARN=$(grep -cE '^warning' "$OUT/clippy.txt" 2>/dev/null || echo 0)
-CLIPPY_ERR=$(grep -cE '^error' "$OUT/clippy.txt" 2>/dev/null || echo 0)
+CLIPPY_WARN=$(grep -cE '^warning' "$OUT/clippy.txt" 2>/dev/null) || true; CLIPPY_WARN=${CLIPPY_WARN:-0}
+CLIPPY_ERR=$(grep -cE '^error' "$OUT/clippy.txt" 2>/dev/null) || true; CLIPPY_ERR=${CLIPPY_ERR:-0}
 
 # --- D2 cargo audit (RustSec) --------------------------------------------
 if have cargo-audit; then
   printf '[D2] cargo audit ...\n'
   cargo audit >"$OUT/audit.txt" 2>&1 || true
   cargo audit --json >"$OUT/audit.json" 2>/dev/null || true
-  AUDIT_HC=$(grep -cE 'Severity: (high|critical)' "$OUT/audit.txt" 2>/dev/null || echo 0)
+  AUDIT_HC=$(grep -cE 'Severity: (high|critical)' "$OUT/audit.txt" 2>/dev/null) || true; AUDIT_HC=${AUDIT_HC:-0}
   if [ "$AUDIT_HC" -gt 0 ]; then D2="FAIL"; CRIT_FAIL=1; else D2="PASS"; fi
 else
   D2="N/A"; AUDIT_HC="n/a"

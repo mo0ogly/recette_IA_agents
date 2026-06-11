@@ -38,53 +38,117 @@ def _c(  # noqa: PLR0913 - a check definition naturally has many fields
     allow_markers: tuple[str, ...] = (),
     note: str | None = None,
 ) -> PatternCheck:
-    return PatternCheck(
-        id_, name, bloc, severity, re.compile(pattern), exclude_test, allow_markers, note
-    )
+    return PatternCheck(id_, name, bloc, severity, re.compile(pattern), exclude_test, allow_markers, note)
 
 
 def _checks() -> list[PatternCheck]:
     return [
-        _c("A1", "logging not print", "A", Severity.CRITICAL,
-           r"\bprint\(", note="use the logging module, not print()"),
-        _c("A2", "No bare except", "A", Severity.MAJOR,
-           r"except\s*:|except\s+Exception\s*:\s*(#.*)?$",
-           note="no bare/blanket except that swallows errors"),
-        _c("A3", "No hardcoded secret", "A", Severity.CRITICAL,
-           r"""(?i)(api_key|password|secret|token)\s*=\s*['"][^'"]+['"]|['"](gsk_|sk-|eyJ)"""),
-        _c("A5", "Comments in English", "A", Severity.MINOR,
-           r"#.*\b(le|la|les|une|des|avec|pour|donnee|donnees|fichier|nous|vous)\b",
-           exclude_test=False, note="heuristic: French words in comments"),
-        _c("A6", "No open-source attribution", "A", Severity.MAJOR,
-           r"(?i)\b(nuclei|wappalyzer|nmap|recog)\b", exclude_test=False),
-        _c("A7", "Type hints on def", "A", Severity.MINOR,
-           r"^\s*(async\s+)?def\s+\w+\s*\([^)]*\)\s*:",
-           note="heuristic: function without -> return annotation"),
-        _c("A10", "Fail-safe default", "A", Severity.MINOR,
-           r"\.get\(\s*['\"]\w+['\"]\s*,\s*True\s*\)",
-           note="verify this default does not open access on error"),
-        _c("B1", "No SQL injection", "B", Severity.CRITICAL,
-           r"""execute\(\s*f['"]|execute\([^)]*%[^)]*%|execute\([^)]*\.format\("""),
-        _c("B2", "No command injection", "B", Severity.CRITICAL,
-           r"os\.system\(|subprocess\.[A-Za-z_]+\([^)]*shell\s*=\s*True"),
-        _c("B5", "Path traversal guard", "B", Severity.MAJOR,
-           r"=\s*open\(", note="verify path is validated against an allowed root"),
-        _c("B6", "No eval/exec/unsafe deser", "B", Severity.CRITICAL,
-           r"\beval\(|\bexec\(|pickle\.load|yaml\.load\(\s*[^)]*\)",
-           allow_markers=("Loader=", "SafeLoader")),
-        _c("B9", "TLS verification", "B", Severity.CRITICAL,
-           r"verify\s*=\s*False|_create_unverified_context"),
-        _c("B10", "No assert for security", "B", Severity.MAJOR,
-           r"^\s*assert\b", note="asserts are stripped under python -O; validate explicitly"),
-        _c("C1", "No stub", "C", Severity.MAJOR,
-           r"raise NotImplementedError|^\s*\.\.\.\s*$|pass\s*#\s*TODO"),
-        _c("C7", "No manual JSON string", "C", Severity.MINOR,
-           r"""json\s*=\s*f?['"].*\{""", note="build payloads with json.dumps, not f-strings"),
-        _c("F1", "Event store immutability (I1)", "F", Severity.CRITICAL,
-           r"(?i)(UPDATE|DELETE)\b.{0,40}event"),
-        _c("F4", "Deterministic replay (I4)", "F", Severity.CRITICAL,
-           r"datetime\.now\(|time\.time\(|random\.|uuid\.uuid4\(",
-           note="forbidden in the decision path unless captured in the event"),
+        _c("A1", "logging not print", "A", Severity.CRITICAL, r"\bprint\(", note="use the logging module, not print()"),
+        _c(
+            "A2",
+            "No bare except",
+            "A",
+            Severity.MAJOR,
+            r"except\s*:|except\s+Exception\s*:\s*(#.*)?$",
+            note="no bare/blanket except that swallows errors",
+        ),
+        _c(
+            "A3",
+            "No hardcoded secret",
+            "A",
+            Severity.CRITICAL,
+            r"""(?i)(api_key|password|secret|token)\s*=\s*['"][^'"]+['"]|['"](gsk_|sk-|eyJ)""",
+        ),
+        _c(
+            "A5",
+            "Comments in English",
+            "A",
+            Severity.MINOR,
+            r"#.*\b(le|la|les|une|des|avec|pour|donnee|donnees|fichier|nous|vous)\b",
+            exclude_test=False,
+            note="heuristic: French words in comments",
+        ),
+        _c(
+            "A6",
+            "No open-source attribution",
+            "A",
+            Severity.MAJOR,
+            r"(?i)\b(nuclei|wappalyzer|nmap|recog)\b",
+            exclude_test=False,
+        ),
+        _c(
+            "A7",
+            "Type hints on def",
+            "A",
+            Severity.MINOR,
+            r"^\s*(async\s+)?def\s+\w+\s*\([^)]*\)\s*:",
+            note="heuristic: function without -> return annotation",
+        ),
+        _c(
+            "A10",
+            "Fail-safe default",
+            "A",
+            Severity.MINOR,
+            r"\.get\(\s*['\"]\w+['\"]\s*,\s*True\s*\)",
+            note="verify this default does not open access on error",
+        ),
+        _c(
+            "B1",
+            "No SQL injection",
+            "B",
+            Severity.CRITICAL,
+            r"""execute\(\s*f['"]|execute\([^)]*%[^)]*%|execute\([^)]*\.format\(""",
+        ),
+        _c(
+            "B2",
+            "No command injection",
+            "B",
+            Severity.CRITICAL,
+            r"os\.system\(|subprocess\.[A-Za-z_]+\([^)]*shell\s*=\s*True",
+        ),
+        _c(
+            "B5",
+            "Path traversal guard",
+            "B",
+            Severity.MAJOR,
+            r"=\s*open\(",
+            note="verify path is validated against an allowed root",
+        ),
+        _c(
+            "B6",
+            "No eval/exec/unsafe deser",
+            "B",
+            Severity.CRITICAL,
+            r"\beval\(|\bexec\(|pickle\.load|yaml\.load\(\s*[^)]*\)",
+            allow_markers=("Loader=", "SafeLoader"),
+        ),
+        _c("B9", "TLS verification", "B", Severity.CRITICAL, r"verify\s*=\s*False|_create_unverified_context"),
+        _c(
+            "B10",
+            "No assert for security",
+            "B",
+            Severity.MAJOR,
+            r"^\s*assert\b",
+            note="asserts are stripped under python -O; validate explicitly",
+        ),
+        _c("C1", "No stub", "C", Severity.MAJOR, r"raise NotImplementedError|^\s*\.\.\.\s*$|pass\s*#\s*TODO"),
+        _c(
+            "C7",
+            "No manual JSON string",
+            "C",
+            Severity.MINOR,
+            r"""json\s*=\s*f?['"].*\{""",
+            note="build payloads with json.dumps, not f-strings",
+        ),
+        _c("F1", "Event store immutability (I1)", "F", Severity.CRITICAL, r"(?i)(UPDATE|DELETE)\b.{0,40}event"),
+        _c(
+            "F4",
+            "Deterministic replay (I4)",
+            "F",
+            Severity.CRITICAL,
+            r"datetime\.now\(|time\.time\(|random\.|uuid\.uuid4\(",
+            note="forbidden in the decision path unless captured in the event",
+        ),
     ]
 
 
@@ -125,7 +189,10 @@ def _structural(files: list[Path], root: Path) -> list[CheckResult]:
         a9 = model.passed("A9", "Dependency lockfile committed", "A", Severity.MAJOR)
     else:
         a9 = model.not_applicable(
-            "A9", "Dependency lockfile committed", "A", Severity.MAJOR,
+            "A9",
+            "Dependency lockfile committed",
+            "A",
+            Severity.MAJOR,
             "no requirements/lock file at project root (needed for pip-audit determinism)",
         )
 
@@ -136,7 +203,10 @@ def _structural(files: list[Path], root: Path) -> list[CheckResult]:
         c10 = model.passed("C10", "Tests present", "C", Severity.MAJOR)
     else:
         c10 = model.failed(
-            "C10", "Tests present", "C", Severity.MAJOR,
+            "C10",
+            "Tests present",
+            "C",
+            Severity.MAJOR,
             note="no test_*.py / tests/ found in scope",
         )
     return [a9, c10]
@@ -147,7 +217,13 @@ def _manual() -> list[CheckResult]:
         ("A4", "ruff format clean", "A", Severity.MAJOR, "covered by Bloc D3 (ruff format --check)"),
         ("A8", "Context managers for resources", "A", Severity.MAJOR, "manual: open()/locks via with-statement"),
         ("B3", "Hardcoded secrets", "B", Severity.CRITICAL, "covered by A3"),
-        ("B4", "AuthN/Z + identity binding (I3)", "B", Severity.CRITICAL, "manual: protected routes; action tied to agent_id"),
+        (
+            "B4",
+            "AuthN/Z + identity binding (I3)",
+            "B",
+            Severity.CRITICAL,
+            "manual: protected routes; action tied to agent_id",
+        ),
         ("B7", "Security logging", "B", Severity.MAJOR, "manual: attacks logged via logger.warning"),
         ("B8", "Input validation at boundary", "B", Severity.MAJOR, "manual: pydantic / explicit validation"),
         ("C2", "No mock data", "C", Severity.MAJOR, "manual: values from real data, not literals"),

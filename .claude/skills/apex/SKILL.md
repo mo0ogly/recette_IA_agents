@@ -53,6 +53,7 @@ APEX v6.0 delegates protocol details to shared reference files. Read these BEFOR
 | [_shared/references/agentic-core.md](../_shared/references/agentic-core.md) | Memory 3 levels, autonomy perimeter, model selection, pre-flight, scoring /50 |
 | [_shared/references/swarm-memory-protocol.md](../_shared/references/swarm-memory-protocol.md) | swarm_memory.json schema, lifecycle, merge protocol |
 | [_shared/references/build-pipeline-rust.md](../_shared/references/build-pipeline-rust.md) | Rust build pipeline (5 sequential steps per .rs file) -- imposes rust-best-practices + error-handling-patterns skills |
+| [_shared/references/build-pipeline-python.md](../_shared/references/build-pipeline-python.md) | Python build pipeline (ruff + mypy + bandit + pip-audit + pytest) -- secondary backend language |
 | [_shared/references/build-pipeline-react.md](../_shared/references/build-pipeline-react.md) | React build pipeline (8 gates per .tsx/.ts file) |
 | [_shared/references/recette-protocol.md](../_shared/references/recette-protocol.md) | 4-step blocking recette (static, runtime, contract, regression) |
 | [_shared/references/librarian-gate.md](../_shared/references/librarian-gate.md) | Blocking end-of-cycle checklist |
@@ -119,7 +120,7 @@ without PLAN/RETEX. Forensic reconstruction via audit-block grep proved
 work happened (2666 file renames + 36 rebrand blocks) but trace was lost.
 c54 bakes this preventive scan to prevent recurrence.
 
-1. **Parse** the task description: identify domain (backend Rust, frontend React, rules, infra, mixed)
+1. **Parse** the task description: identify domain (backend Rust, backend Python, frontend React, rules, infra, mixed)
 2. **Resume check** (`-r <id>` flag):
    - If resume: load `_alire/temp/apex/{id}/FILE_TRACKER.json`, resume from last incomplete subtask
    - If fresh: generate session id `apex-{YYYYMMDD}-{slug}` and feed it to `apex_journal_init`
@@ -205,7 +206,7 @@ SUBTASK {N}/{total}
   Success      : {measurable criterion}
   Failure      : {signal to trigger REPLAN}
   Rollback     : {how to revert}
-  Pipeline     : RUST | REACT | MIXED | NONE
+  Pipeline     : RUST | PYTHON | REACT | MIXED | NONE
 ```
 
 **Decomposition constraints:**
@@ -275,6 +276,15 @@ panic, thiserror/anyhow, retry/circuit-breaker). Both are MANDATORY, not optiona
 3. `cargo clippy --all-targets --all-features -- -D warnings` (0 warnings, BLOCKING)
 4. `/test-first` via Skill tool (create `#[cfg(test)] mod tests` or `tests/*.rs` BEFORE merge; `cargo test` green)
 5. Convention check: no `.unwrap()`/`.expect()`/`panic!` on fallible paths, typed errors, `tracing` not `println!`
+
+**Python files**: follow [build-pipeline-python.md](../_shared/references/build-pipeline-python.md) after each .py write.
+BEFORE writing fallible paths, invoke the `error-handling-patterns` skill. Then (tools in `.venv-pyaudit/bin/`):
+1. `ruff check {file}` (0 findings, incl. flake8-bandit S security rules)
+2. `ruff format --check {file}` (0 diff)
+3. `mypy {file or package}` (0 errors)
+4. `bandit -q -r --severity-level medium {package}` (0 MEDIUM+)
+5. `/test-first` via Skill tool (create `tests/test_*.py` BEFORE merge; `pytest` green)
+Convention check: `logging` not `print`, no bare `except`, no `eval`/`exec`/`pickle.load`, typed hints.
 
 **React files**: follow [build-pipeline-react.md](../_shared/references/build-pipeline-react.md) after each .tsx/.ts write:
 0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `sigma-react-frontend/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Incident 2026-04-07 (LiaProbeAIStatus crash) + 2026-04-14 (EBIOS Dashboard contract drift, 4 correction passes, ~30 min wasted) mandated this pre-build gate.
@@ -383,6 +393,10 @@ Invoke via Skill tool (mandatory delegation, parity with the old `/go-recette`):
   Bloc F = invariants I1-I6). The deep-scan helper `.claude/scripts/rust-recette-deep-scan.sh`
   runs Bloc D end-to-end. Tools installed via `scripts/install_rust_audit.sh` (a missing tool
   marks its bloc N/A, never invents a result).
+- For each `*.py` touched -> `Skill({skill: "python-recette", args: "{file or package}"})`
+  (Blocs A-F / score /44, Bloc D = ruff + pip-audit + mypy + bandit). Scorer:
+  `cmd/python_recette` (`python -m python_recette --format json`). Tools in `.venv-pyaudit/`
+  via `scripts/install_python_audit.sh` (missing tool -> bloc N/A).
 - For each `*.tsx`/`*.ts` touched -> `/react-recette {file}` (48 checks, Bloc E = R17 Contract Gate).
 
 **Minimum scores**:
@@ -650,7 +664,7 @@ Phase 2: THINK
     |-- create swarm_memory.json if --swarms
     v
 Phase 3: BUILD (loop per subtask)
-    +---> ACT (execute, Rust/React pipeline per file)
+    +---> ACT (execute, Rust/Python/React pipeline per file)
     |       |
     |       v
     |     OBSERVE (build gate, vet, test, runtime crash)

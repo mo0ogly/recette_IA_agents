@@ -13,23 +13,14 @@ def collect_py_files(path: Path) -> list[Path]:
     skip = {".venv", ".venv-pyaudit", "venv", "__pycache__", ".git", "build", "dist", ".mypy_cache"}
     if path.is_file():
         return [path] if path.suffix == ".py" else []
-    files = [
-        p
-        for p in path.rglob("*.py")
-        if not any(part in skip for part in p.parts)
-    ]
+    files = [p for p in path.rglob("*.py") if not any(part in skip for part in p.parts)]
     return sorted(files)
 
 
 def is_test_path(p: Path) -> bool:
     """True if the path is conventionally test-only."""
     name = p.name
-    return (
-        "tests" in p.parts
-        or name.startswith("test_")
-        or name.endswith("_test.py")
-        or name == "conftest.py"
-    )
+    return "tests" in p.parts or name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
 
 
 def nearest_project_dir(path: Path) -> Path:

@@ -47,6 +47,7 @@ These files contain reusable protocols. Read them, do not duplicate their conten
 | [_shared/references/agentic-core.md](../_shared/references/agentic-core.md) | Memory 3 levels, autonomy perimeter, model selection, pre-flight, agentic score /50 |
 | [_shared/references/swarm-memory-protocol.md](../_shared/references/swarm-memory-protocol.md) | swarm_memory.json schema and inter-agent shared memory |
 | [_shared/references/build-pipeline-rust.md](../_shared/references/build-pipeline-rust.md) | Rust build pipeline (5 gates) + Go->Rust tool equivalence + security score /20 -- imposes rust-best-practices + error-handling-patterns |
+| [_shared/references/build-pipeline-python.md](../_shared/references/build-pipeline-python.md) | Python build pipeline (ruff + mypy + bandit + pip-audit + pytest) + security score /20 -- secondary backend |
 | [_shared/references/build-pipeline-react.md](../_shared/references/build-pipeline-react.md) | React build pipeline (8 gates) |
 | [_shared/references/recette-protocol.md](../_shared/references/recette-protocol.md) | 4-step blocking recette (static, runtime, contract, regression) |
 | [_shared/references/librarian-gate.md](../_shared/references/librarian-gate.md) | Blocking end-of-cycle checklist |
@@ -93,7 +94,7 @@ If FAIL: STOP, fix. Exception: if the scope IS the broken component.
 
 ### P.2 : Scope detection
 
-Cartograph: Rust/React files, LOC, crates, NATS subjects, event schemas, endpoints, components.
+Cartograph: Rust/Python/React files, LOC, crates/packages, NATS subjects, event schemas, endpoints, components.
 Create: `pdca/{scope}/cycle_{N}/` + `P_PLAN.md` (IMMEDIATELY).
 
 ### P.2b : Health Scan (MANDATORY -- display BEFORE agents)
@@ -111,7 +112,7 @@ Load or create `SCORING_CONFIG.json` with 7 domains:
 
 | Domain | Weight | Source |
 |--------|--------|--------|
-| security | 20 | Rust: cargo clippy + cargo audit (RUSTSEC) + cargo deny + rust-best-practices review (security score /20, see build-pipeline-rust.md) OR React: /react-recette BLOC B (converted /20) |
+| security | 20 | Rust: clippy + cargo-audit + cargo-deny + geiger (build-pipeline-rust.md) / Python: ruff S-rules + bandit + pip-audit (build-pipeline-python.md) / React: /react-recette BLOC B -- security score /20 |
 | testing | 15 | TST-01..08 checks |
 | architecture | 15 | ARC-01..05 checks |
 | code_hygiene | 15 | HYG-01..08 checks |
@@ -243,6 +244,7 @@ For each fix, cycle:
 
 **BUILD GATE** (after each file modification):
 - **Rust files**: follow `build-pipeline-rust.md` (5 gates: cargo build, cargo fmt --check, cargo clippy -D warnings, cargo test, conventions). Invoke `rust-best-practices` + `error-handling-patterns` skills BEFORE writing.
+- **Python files**: follow `build-pipeline-python.md` (ruff check + ruff format --check + mypy + bandit MEDIUM+ + pytest; pip-audit at package level). Tools in `.venv-pyaudit/bin/`.
 - **React files**: follow `build-pipeline-react.md` (8 gates: tsc, vite build, imports, fetchWithConfig, theme, Grid v7, logger, HelpButton)
 - **/test-first**: invoke automatically after each handler/component creation or modification
 
@@ -351,6 +353,11 @@ Only ACTIF code participates in scoring. DEAD code excluded, proposed for .disab
 **This is NOT a passive reference. It is a mandatory delegation via Skill tool.**
 
 For each file modified in the cycle:
+
+**If `*.py` (backend)**: invoke `Skill({skill: "python-recette", args: "{file or package}"})`
+  - Blocs A-F / score /44 (D = ruff + pip-audit + mypy + bandit, F = invariants I1-I6)
+  - **BLOC D SCORE = security domain score** (see build-pipeline-python.md, /20)
+  - Scorer: `cmd/python_recette`. Reference: `.claude/commands/python-recette.md`
 
 **If `*.rs` (backend)**: invoke `Skill({skill: "rust-recette", args: "{file or crate}"})`
   - Blocs A-F / score /44 (A conventions, B OWASP Rust, C arch/perf, D static = clippy+cargo-audit+cargo-deny+cargo-geiger, E R17 Contract Gate, F invariants I1-I6)
@@ -799,6 +806,7 @@ See `agentic-core.md` section 6. PDCA-specific scoring:
 | [_shared/references/agentic-core.md](../_shared/references/agentic-core.md) | Memory, autonomy, model selection, pre-flight, agentic score |
 | [_shared/references/swarm-memory-protocol.md](../_shared/references/swarm-memory-protocol.md) | swarm_memory.json protocol |
 | [_shared/references/build-pipeline-rust.md](../_shared/references/build-pipeline-rust.md) | Rust build pipeline (5 gates) + Go->Rust tool equivalence + security score /20 -- imposes rust-best-practices + error-handling-patterns |
+| [_shared/references/build-pipeline-python.md](../_shared/references/build-pipeline-python.md) | Python build pipeline (ruff + mypy + bandit + pip-audit + pytest) + security score /20 -- secondary backend |
 | [_shared/references/build-pipeline-react.md](../_shared/references/build-pipeline-react.md) | React build pipeline (8 gates) |
 | [_shared/references/recette-protocol.md](../_shared/references/recette-protocol.md) | 4-step blocking recette protocol |
 | [_shared/references/librarian-gate.md](../_shared/references/librarian-gate.md) | End-of-cycle blocking checklist |

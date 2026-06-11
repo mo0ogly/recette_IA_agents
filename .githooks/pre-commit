@@ -1,82 +1,142 @@
 #!/usr/bin/env bash
-# pre-commit -- Rust static gate for AgentRail (Railgun).
-# Runs the blocking subset of /rust-recette Bloc D on staged .rs changes:
-#   fmt --check  ->  clippy -D warnings  ->  cargo audit (HIGH/CRITICAL)
-# Mirrors the role of the old Go pre-commit gate.
+# pre-commit -- Rust + Python static gate for AgentRail (Railgun).
 #
-# Behaviour:
-#   - No staged .rs files          -> exit 0 (nothing to do).
-#   - cargo absent                 -> WARN, exit 0 (non-blocking; install via
-#                                     scripts/install_rust_audit.sh).
-#   - fmt/clippy/audit failure     -> BLOCK the commit (exit 1).
-#   - Bypass                       -> RUST_RECETTE_PRECOMMIT_SKIP=1 git commit ...
+# Acts only on STAGED files, per language, and is crate/venv-aware so it works in
+# a monorepo where crates live under cmd/<name>/ (no Cargo.toml at the repo root).
 #
+# Rust (.rs staged):
+#   rustfmt --check (per file) -> cargo clippy -D warnings (per crate dir)
+#   -> cargo audit HIGH/CRITICAL (per crate dir)
+# Python (.py staged):
+#   ruff check + ruff format --check -> mypy -> bandit (MEDIUM+)  via .venv-pyaudit
+#
+# Non-blocking (WARN, never block) when: a toolchain is absent, OR a staged file
+# has no owning crate/project. Blocking only on a real lint/format/audit failure.
+#
+# Bypass (logged): RUST_RECETTE_PRECOMMIT_SKIP=1 git commit ...
 # Enable once per clone: git config core.hooksPath .githooks
-# Reference: .claude/commands/rust-recette.md (Bloc D)
+# Refs: .claude/commands/rust-recette.md, .claude/commands/python-recette.md
 
 set -uo pipefail
 
-# --- bypass ---------------------------------------------------------------
 if [ "${RUST_RECETTE_PRECOMMIT_SKIP:-0}" = "1" ]; then
-  printf '[pre-commit] RUST_RECETTE_PRECOMMIT_SKIP=1 -- Rust gate skipped.\n' >&2
+  printf '[pre-commit] RUST_RECETTE_PRECOMMIT_SKIP=1 -- static gate skipped.\n' >&2
   exit 0
 fi
 
-# --- staged .rs files -----------------------------------------------------
-mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
-if [ "${#STAGED[@]}" -eq 0 ]; then
-  exit 0
-fi
-
-printf '[pre-commit] %d staged .rs file(s) -- running Rust static gate.\n' "${#STAGED[@]}" >&2
-
-# --- toolchain present? ---------------------------------------------------
-[ -f "${HOME}/.cargo/env" ] && # shellcheck disable=SC1091
-  . "${HOME}/.cargo/env" 2>/dev/null || true
-
-if ! command -v cargo >/dev/null 2>&1; then
-  printf '[pre-commit][WARN] cargo absent -- Rust gate skipped (non-blocking).\n' >&2
-  printf '[pre-commit][WARN] install with: scripts/install_rust_audit.sh\n' >&2
-  exit 0
-fi
-
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 FAIL=0
 
-# --- 1. rustfmt --check on staged files only (fast) -----------------------
-if command -v rustfmt >/dev/null 2>&1; then
-  if ! rustfmt --edition 2021 --check "${STAGED[@]}" >/dev/null 2>&1; then
-    printf '[pre-commit][FAIL] rustfmt: staged files not formatted. Run: cargo fmt --all\n' >&2
-    FAIL=1
+# Walk up from a file to the nearest ancestor that holds a marker file.
+# Prints the directory, or nothing if none is found at/under REPO_ROOT.
+nearest_dir_with() {
+  local file="$1" marker="$2" dir
+  dir="$(dirname "$file")"
+  while :; do
+    if [ -f "${dir}/${marker}" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    [ "$dir" = "$REPO_ROOT" ] && return 1
+    [ "$dir" = "/" ] && return 1
+    [ "$dir" = "." ] && return 1
+    dir="$(dirname "$dir")"
+  done
+}
+
+# ==========================================================================
+# RUST
+# ==========================================================================
+mapfile -t RS < <(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
+if [ "${#RS[@]}" -gt 0 ]; then
+  printf '[pre-commit] %d staged .rs file(s).\n' "${#RS[@]}" >&2
+  # shellcheck disable=SC1091
+  [ -f "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env" 2>/dev/null || true
+
+  if ! command -v cargo >/dev/null 2>&1; then
+    printf '[pre-commit][WARN] cargo absent -- Rust gate skipped (install: scripts/install_rust_audit.sh).\n' >&2
+  else
+    # rustfmt --check on the staged files directly (no manifest needed).
+    if command -v rustfmt >/dev/null 2>&1; then
+      if ! rustfmt --edition 2021 --check "${RS[@]}" >/dev/null 2>&1; then
+        printf '[pre-commit][FAIL] rustfmt: staged .rs not formatted (run: cargo fmt).\n' >&2
+        FAIL=1
+      fi
+    fi
+
+    # Resolve the unique owning crate dirs of the staged .rs files.
+    declare -A CRATE_DIRS=()
+    for f in "${RS[@]}"; do
+      if cdir="$(nearest_dir_with "${REPO_ROOT}/${f}" Cargo.toml)"; then
+        CRATE_DIRS["$cdir"]=1
+      else
+        printf '[pre-commit][WARN] %s has no owning Cargo.toml -- clippy skipped for it.\n' "$f" >&2
+      fi
+    done
+
+    for cdir in "${!CRATE_DIRS[@]}"; do
+      printf '[pre-commit] clippy in %s\n' "${cdir#"$REPO_ROOT"/}" >&2
+      if ! ( cd "$cdir" && cargo clippy --all-targets --all-features -- -D warnings ) \
+            >/tmp/precommit-clippy.txt 2>&1; then
+        printf '[pre-commit][FAIL] cargo clippy in %s:\n' "$cdir" >&2
+        grep -E '^(warning|error)' /tmp/precommit-clippy.txt | head -15 >&2
+        FAIL=1
+      fi
+      if command -v cargo-audit >/dev/null 2>&1 && [ -f "${cdir}/Cargo.lock" ]; then
+        ( cd "$cdir" && cargo audit ) >/tmp/precommit-audit.txt 2>&1 || true
+        HC=$(grep -cE 'Severity: (high|critical)' /tmp/precommit-audit.txt 2>/dev/null) || true
+        HC=${HC:-0}
+        if [ "$HC" -gt 0 ]; then
+          printf '[pre-commit][FAIL] cargo audit in %s: %s HIGH/CRITICAL advisory(ies).\n' "$cdir" "$HC" >&2
+          FAIL=1
+        fi
+      fi
+    done
   fi
-else
-  printf '[pre-commit][WARN] rustfmt absent -- skipping fmt check.\n' >&2
 fi
 
-# --- 2. clippy -D warnings (workspace; the correctness/lint gate) ---------
-if ! cargo clippy --all-targets --all-features -- -D warnings >/tmp/precommit-clippy.txt 2>&1; then
-  printf '[pre-commit][FAIL] cargo clippy reported warnings/errors:\n' >&2
-  grep -E '^(warning|error)' /tmp/precommit-clippy.txt | head -20 >&2
-  printf '[pre-commit]        full log: /tmp/precommit-clippy.txt\n' >&2
-  FAIL=1
-fi
+# ==========================================================================
+# PYTHON
+# ==========================================================================
+mapfile -t PY < <(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+if [ "${#PY[@]}" -gt 0 ]; then
+  printf '[pre-commit] %d staged .py file(s).\n' "${#PY[@]}" >&2
+  PYBIN="${REPO_ROOT}/.venv-pyaudit/bin"
 
-# --- 3. cargo audit (RUSTSEC HIGH/CRITICAL) -- non-blocking if tool absent -
-if command -v cargo-audit >/dev/null 2>&1; then
-  cargo audit >/tmp/precommit-audit.txt 2>&1 || true
-  HC=$(grep -cE 'Severity: (high|critical)' /tmp/precommit-audit.txt 2>/dev/null || echo 0)
-  if [ "$HC" -gt 0 ]; then
-    printf '[pre-commit][FAIL] cargo audit: %s HIGH/CRITICAL RUSTSEC advisory(ies).\n' "$HC" >&2
-    grep -E 'RUSTSEC-|Severity:|Crate:' /tmp/precommit-audit.txt | head -20 >&2
-    FAIL=1
+  if [ ! -x "${PYBIN}/ruff" ]; then
+    printf '[pre-commit][WARN] .venv-pyaudit absent -- Python gate skipped (install: scripts/install_python_audit.sh).\n' >&2
+  else
+    ABS_PY=()
+    for f in "${PY[@]}"; do ABS_PY+=("${REPO_ROOT}/${f}"); done
+
+    if ! "${PYBIN}/ruff" check "${ABS_PY[@]}" >/tmp/precommit-ruff.txt 2>&1; then
+      printf '[pre-commit][FAIL] ruff check:\n' >&2
+      head -15 /tmp/precommit-ruff.txt >&2
+      FAIL=1
+    fi
+    if ! "${PYBIN}/ruff" format --check "${ABS_PY[@]}" >/dev/null 2>&1; then
+      printf '[pre-commit][FAIL] ruff format: staged .py not formatted (run: ruff format).\n' >&2
+      FAIL=1
+    fi
+    if [ -x "${PYBIN}/mypy" ]; then
+      if ! "${PYBIN}/mypy" "${ABS_PY[@]}" >/tmp/precommit-mypy.txt 2>&1; then
+        printf '[pre-commit][FAIL] mypy:\n' >&2
+        grep -E 'error:' /tmp/precommit-mypy.txt | head -15 >&2
+        FAIL=1
+      fi
+    fi
+    if [ -x "${PYBIN}/bandit" ]; then
+      if ! "${PYBIN}/bandit" -q --severity-level medium "${ABS_PY[@]}" >/tmp/precommit-bandit.txt 2>&1; then
+        printf '[pre-commit][FAIL] bandit: MEDIUM+ security issue(s) in staged .py.\n' >&2
+        grep -E 'Issue:|Severity:' /tmp/precommit-bandit.txt | head -15 >&2
+        FAIL=1
+      fi
+    fi
   fi
-else
-  printf '[pre-commit][WARN] cargo-audit absent -- skipping advisory scan.\n' >&2
 fi
 
 if [ "$FAIL" -ne 0 ]; then
   printf '[pre-commit] BLOCKED. Fix the issues above, or bypass with RUST_RECETTE_PRECOMMIT_SKIP=1 (logged).\n' >&2
   exit 1
 fi
-
-printf '[pre-commit] Rust static gate PASS.\n' >&2
 exit 0

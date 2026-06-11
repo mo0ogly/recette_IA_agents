@@ -62,7 +62,10 @@ def run_all(target: Path, root: Path) -> list[CheckResult]:
             model.passed("D2", "pip-audit", "D", Severity.CRITICAL)
             if code == 0
             else model.failed(
-                "D2", "pip-audit", "D", Severity.CRITICAL,
+                "D2",
+                "pip-audit",
+                "D",
+                Severity.CRITICAL,
                 note=f"vulnerable dependency advisories detected ({vulns} markers)",
             )
         )
@@ -92,15 +95,19 @@ def run_all(target: Path, root: Path) -> list[CheckResult]:
     else:
         out.append(model.not_applicable("D4", "mypy", "D", Severity.MAJOR, "mypy not installed"))
 
-    # D5 -- bandit (deep SAST).
+    # D5 -- bandit (deep SAST). Gate on MEDIUM+ severity so LOW noise (e.g. B101
+    # assert_used in tests) does not block; HIGH/MEDIUM is the failing threshold.
     bandit = paths["bandit"]
     if bandit:
-        code, text = _run([bandit, "-q", "-r", tgt], root)
+        code, text = _run([bandit, "-q", "-r", "--severity-level", "medium", tgt], root)
         high = text.count("Severity: High")
+        medium = text.count("Severity: Medium")
         out.append(
             model.passed("D5", "bandit", "D", Severity.CRITICAL)
-            if code == 0 and high == 0
-            else model.failed("D5", "bandit", "D", Severity.CRITICAL, note=f"bandit issues ({high} HIGH)")
+            if code == 0
+            else model.failed(
+                "D5", "bandit", "D", Severity.CRITICAL, note=f"bandit issues ({high} HIGH, {medium} MEDIUM)"
+            )
         )
     else:
         out.append(model.not_applicable("D5", "bandit", "D", Severity.CRITICAL, "bandit not installed"))
@@ -111,6 +118,4 @@ def run_all(target: Path, root: Path) -> list[CheckResult]:
 def skipped_bloc_d() -> list[CheckResult]:
     """Bloc D entries when ``--skip-tools`` is set."""
     names = [("D1", "ruff check"), ("D2", "pip-audit"), ("D3", "ruff format"), ("D4", "mypy"), ("D5", "bandit")]
-    return [
-        model.not_applicable(i, n, "D", Severity.CRITICAL, "skipped (--skip-tools)") for i, n in names
-    ]
+    return [model.not_applicable(i, n, "D", Severity.CRITICAL, "skipped (--skip-tools)") for i, n in names]

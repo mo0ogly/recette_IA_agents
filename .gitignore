@@ -42,3 +42,12 @@ docs/tracking/*.jsonl
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Python virtualenvs and tool caches (audit toolchain venv is a local artifact)
+.venv/
+.venv-*/
+venv/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
