@@ -7,7 +7,7 @@
 **Maintainer:** gabrielhociel@gmail.com
 **Base:** `/home/mo0ogly/Bureau/recette_railgun/`
 **Stack:** Rust (Axum gateway) + Temporal (approvals) + NATS JetStream (event bus) + React/TS (console approbation + audit)
-**Persistance event store:** NON FIGEE -- voir `.claude/rules/event-store-decision.md` (PostgreSQL event-sourcing vs EventStoreDB vs JetStream-as-truth)
+**Persistance event store:** PHASEE -- Phase 1 SQLite (debut mono-hote) -> Phase 2 PostgreSQL (quand distribue). Trait `EventStore` obligatoire. Detail : `.claude/rules/event-store-decision.md`
 
 ---
 

@@ -1,8 +1,8 @@
-# Event Store -- decision de persistance (NON FIGEE)
+# Event Store -- decision de persistance (PHASEE)
 
-> Statut : OUVERT. Le choix de la persistance de l'event store n'est pas tranche.
-> Ce fichier documente les options et les criteres. NE PAS coder de couplage fort a une
-> implementation tant que la decision n'est pas prise et inscrite ici (passer en "FIGE").
+> Statut : PHASE 1 = SQLite (debut, mono-hote). PHASE 2 = PostgreSQL (quand distribue).
+> Decide le 2026-06-11. La couche persistance DOIT rester derriere le trait `EventStore`
+> pour que le passage Phase 1 -> Phase 2 ne touche que l'implementation, pas le reste du systeme.
 
 ## Contraintes imposees par les invariants
 
@@ -12,7 +12,38 @@ Quel que soit le choix, le store DOIT garantir :
 - Reconstruction des projections/read-models depuis le log seul.
 - Integrite verifiable (hash chain / `side_effect_hash`).
 
-## Options evaluees
+## Decision phasee (retenue)
+
+### PHASE 1 -- SQLite (debut, mono-hote) [ACTIVE]
+
+- Log = table `events` INSERT-only, `seq INTEGER PRIMARY KEY AUTOINCREMENT` (ordre total monotone).
+- Immutabilite ENFORCEE par triggers, pas seulement par discipline :
+  ```sql
+  CREATE TRIGGER events_no_update BEFORE UPDATE ON events
+    BEGIN SELECT RAISE(ABORT, 'events are immutable (I1)'); END;
+  CREATE TRIGGER events_no_delete BEFORE DELETE ON events
+    BEGIN SELECT RAISE(ABORT, 'events are immutable (I1)'); END;
+  ```
+- `PRAGMA journal_mode=WAL;` (lecteurs concurrents pendant l'ecriture).
+- Integrite : colonne `prev_hash` (hash chain) + `side_effect_hash`.
+- Atout : SQLite est mono-ecrivain -> ordre total deterministe GRATUIT (I4), sans coordination.
+- Pour : zero composant a operer, ecosysteme Rust mur (`sqlx` sqlite / `rusqlite`), demarrage immediat.
+- Contre / limites = criteres de bascule Phase 2 (voir plus bas).
+
+### PHASE 2 -- PostgreSQL event-sourcing [TRIGGERED WHEN...]
+
+Migrer vers PostgreSQL (cf. Option A) des qu'UN de ces seuils tombe :
+1. Control / Data / Audit Plane sur des **hotes separes** (un fichier SQLite ne se partage pas en reseau).
+2. Besoin de **plusieurs ecrivains concurrents** sur l'event store.
+3. Throughput d'append soutenu > ~quelques milliers/s.
+
+Migration indolore car `EventStore` est un trait : ecrire `PostgresEventStore`, garder le reste.
+`sqlx` supporte les deux moteurs (queries verifiees a la compilation). Attention aux
+differences de dialecte (AUTOINCREMENT vs BIGSERIAL, types) -- isolees dans l'impl du trait.
+
+NATS JetStream reste le transport temps reel dans les deux phases (jamais la source de verite).
+
+## Autres options (non retenues, conservees pour reference)
 
 ### Option A -- PostgreSQL event-sourcing
 - Log = table append-only `events` (PK `event_id` ULID, ordre par sequence monotone).
@@ -40,14 +71,17 @@ Quel que soit le choix, le store DOIT garantir :
 4. Cout operationnel (nombre de composants a maintenir).
 5. Capacite de requetage forensique sur l'historique.
 
-## Recommandation par defaut (a confirmer)
+## Checklist d'implementation Phase 1 (SQLite)
 
-En l'absence de contrainte d'echelle extreme connue : **Option A (PostgreSQL event-sourcing)
-+ JetStream transport** -- meilleur ratio maturite Rust / simplicite ops / requetage forensique.
-A re-evaluer si le throughput d'append ou le besoin de subscriptions natives le justifie.
+- [ ] Trait `EventStore` defini AVANT toute impl (append, read_from_seq, replay).
+- [ ] `SqliteEventStore` : table `events` INSERT-only + triggers anti-UPDATE/DELETE (I1).
+- [ ] `seq` monotone + `event_id` ULID/UUIDv7 ; ordre de replay base sur `seq` (I4).
+- [ ] `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`.
+- [ ] hash chain `prev_hash` calcule a l'append, verifiable par le pipeline de validation.
+- [ ] Test de replay deterministe (cf. `determinism-replay.md`).
+- [ ] Aucune requete SQLite directe hors de l'impl du trait (pas de couplage).
 
-## Quand cette decision est prise
+## Quand basculer en Phase 2
 
-Remplacer le statut OUVERT par FIGE, dater, et inscrire l'option retenue + justification ici.
-Toute la couche persistance doit etre derriere un trait (`EventStore`) pour ne pas coupler
-le reste du systeme a l'implementation choisie.
+Inscrire ici la date + le seuil declencheur atteint, livrer `PostgresEventStore`, basculer la
+construction du trait par config (`AGENTRAIL_EVENT_STORE=sqlite|postgres`).
