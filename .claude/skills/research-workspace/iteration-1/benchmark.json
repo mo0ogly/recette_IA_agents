@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "skill_name": "research",
+    "skill_version": "2.3",
+    "iteration": 1,
+    "date": "2026-03-02",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "claude-sonnet-4-6",
+    "evals_run": ["close-session-after-work", "research-status", "context-compression-recovery"],
+    "runs_per_configuration": 1
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "close-session-after-work",
+      "with_skill": {
+        "passed": 3,
+        "total": 6,
+        "pass_rate": 0.50,
+        "duration_ms": 181733,
+        "total_tool_calls": 20
+      },
+      "without_skill": {
+        "passed": 1,
+        "total": 6,
+        "pass_rate": 0.167,
+        "duration_ms": 107997,
+        "total_tool_calls": 11
+      },
+      "delta_pass_rate_pct": 33.3,
+      "failures_with_skill": [
+        "Annonce 'Using research skill' absente (besoin: 1ere ligne du body)",
+        "Aucun fichier validated/ cree (outputs/ flat, sans sous-repertoire)",
+        "Tag [COMMIT] absent du RESEARCH_LOG (hash en texte libre seulement)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "research-status",
+      "with_skill": {
+        "passed": 5,
+        "total": 7,
+        "pass_rate": 0.714,
+        "duration_ms": 167381,
+        "total_tool_calls": 15
+      },
+      "without_skill": {
+        "passed": 2,
+        "total": 7,
+        "pass_rate": 0.286,
+        "duration_ms": 122370,
+        "total_tool_calls": 12
+      },
+      "delta_pass_rate_pct": 42.8,
+      "failures_with_skill": [
+        "Annonce 'Using research skill' absente",
+        "Compteurs numeriques recapitulatifs manquants (listes ok, mais pas 'validated: 14 | investigated: 6 | ...')"
+      ],
+      "notable_baseline_failure": "Contamination MEMORY.md: cite 15719 patterns au lieu de 7563 (INDEX.md) - skill force la lecture des fichiers avant de repondre"
+    },
+    {
+      "id": 3,
+      "name": "context-compression-recovery",
+      "with_skill": {
+        "passed": 7,
+        "total": 7,
+        "pass_rate": 1.0,
+        "duration_ms": 156101,
+        "total_tool_calls": 13
+      },
+      "without_skill": {
+        "passed": 2,
+        "total": 7,
+        "pass_rate": 0.286,
+        "duration_ms": 190846,
+        "total_tool_calls": 14
+      },
+      "delta_pass_rate_pct": 71.4,
+      "failures_with_skill": [],
+      "notable_baseline_failure": "Propose du code immediatement en fin de reponse (violation regle 7 : ne pas coder avant 9 etapes)"
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 0.738,
+    "without_skill_avg_pass_rate": 0.246,
+    "delta": {
+      "pass_rate": "+49.2%",
+      "time_seconds": "+27.0",
+      "tool_calls": "+4.7"
+    },
+    "verdict": "IMPROVEMENT_CONFIRMED"
+  },
+  "key_findings": [
+    "Annonce 'Using research skill' echoue dans 2/3 evals with_skill (eval-1 et eval-2) - doit etre ligne 1 absolue",
+    "Eval-3 parfait 7/7 : la procedure post-compression 9 etapes est la plus solide du skill",
+    "Eval-2 baseline contamination MEMORY.md vs INDEX.md - le skill previent ce biais en forcant la lecture",
+    "Eval-3 baseline propose du code sans annonce ni procedure - le skill bloque ce comportement"
+  ],
+  "top_improvements_needed": [
+    "P0 CRITIQUE : 'Using research skill. Reading state files...' doit etre ligne 1 du body SKILL.md",
+    "P1 : Dans /research close, specifier explicitement : creer validated/YYYY-MM-DD_{nom}.md avec commit hash",
+    "P2 : Ajouter exemple [COMMIT] tag dans les templates RESEARCH_LOG (section formats)"
+  ]
+}

@@ -1,0 +1,178 @@
+id: A-VULN-MZLA-Firefox-Win-CVE-2024-9680-128
+
+# NOTICE: La suggestion d'utiliser is_vulnerable: true dans where a ete rejetee.
+# MOTOR_FIX_010 interdit les champs booléens de vulnerabilite dans la where clause.
+# La detection se fait via version_lt() - logique auditable directement dans ce YAML.
+
+title: "Mozilla Firefox Windows - Version < 128 Vulnerable (ESR Baseline)"
+metadata:
+  created_date: "2026/03/02"
+  last_updated: "2026/03/02"
+  version: "1.0"
+  author: "LIA Security Team"
+description: >
+  Detects Windows workstations running Mozilla Firefox with version strictly below 128.0.0.
+  Firefox 128 is the current ESR baseline. All versions prior to 128 are end-of-life
+  and exposed to multiple CRITICAL/HIGH CVEs including CVE-2024-9680 (CVSS 9.8, CISA KEV,
+  actively exploited by RomCom threat actor). Detection uses version_lt() for full
+  auditability - no logic delegated to collection script (MOTOR_FIX_010 compliant).
+author: LIA Security Team
+
+# MOTOR_FIX_010 COMPLIANCE NOTE:
+# The collection script (Collect-InstalledSoftware.ps1) provides raw Version field only.
+# Vulnerability logic (version < 128) is expressed exclusively in this YAML where clause.
+# Forbidden patterns NOT used: is_vulnerable, CVE_XXXX_is_vulnerable, is_compliant.
+
+data_source:
+  description: "Windows installed software inventory via WMI Win32_Product"
+  collection_method: "PowerShell WMI - Win32_Product"
+  prerequisites:
+    - "WMI access on Windows endpoints"
+    - "PowerShell execution policy allowing scripts"
+  collection_script: "scripts/collect/windows/Collect-InstalledSoftware.ps1"
+  collection_type: "STANDARD"
+  required_files:
+    - pattern: "*.json"
+      object_class: "InstalledSoftware"
+      description: "Windows installed software inventory from WMI"
+  notes: >
+    Collect-InstalledSoftware.ps1 uses Win32_Product and returns ObjectClass,
+    Name, Version, Vendor, Hostname. The Version field is collected raw - no CVE
+    logic is applied in the script (MOTOR_FIX_010).
+
+target: Windows workstations / Mozilla Firefox
+status: active
+
+object_type_field: ObjectClass
+
+taxonomy:
+  taxonomy: MOZILLA
+  taxonomy_short: MZLA
+  axis: security
+  axis_short: SECU
+  block: Vulnerability Management
+  block_short: VULN
+  component: Browser
+  component_short: BRWS
+
+classification:
+  family: enterprise_software
+  category: vulnerability_detection
+  subcategory: outdated_software
+  rule_id: A-VULN-MZLA-Firefox-Win-CVE-2024-9680-128
+  cwe: CWE-416
+  cvss_score: 9.8
+  cvss_severity: CRITICAL
+
+cve_info:
+  cve_id: "CVE-2024-9680"
+  cvss_version: "3.1"
+  cvss_score: 9.8
+  cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+  cvss_severity: "CRITICAL"
+  is_kev: true
+  kev_date_added: "2024-10-15"
+  kev_due_date: "2024-11-05"
+  kev_ransomware: false
+  cwe:
+    - "CWE-416"
+  exploit_available: true
+  exploit_maturity: "Weaponized"
+  patch_available: true
+  published_date: "2024-10-09"
+  remediation_priority: "P0_EMERGENCY"
+
+references:
+  - https://nvd.nist.gov/vuln/detail/CVE-2024-9680
+  - https://www.mozilla.org/en-US/security/advisories/mfsa2024-51/
+  - https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+  - https://www.welivesecurity.com/en/eset-research/romcom-exploits-firefox-and-windows-zero-days/
+
+remediation: >
+  Upgrade Mozilla Firefox to version 128.0 (ESR) or later.
+  Recommended: Firefox ESR 128.3.1+ for enterprise deployments.
+  For consumer: Firefox 131.0.2+.
+  Apply via WSUS, SCCM, Intune, or direct download from https://www.mozilla.org/firefox/
+
+object_detection:
+  match:
+    ObjectClass:
+      in:
+        - InstalledSoftware
+        - installed_software
+        - Browser
+        - WebBrowser
+        - Application
+
+  where:
+    condition: and
+    rules:
+      # Identifier Firefox (pas Thunderbird, pas Chrome)
+      - condition: or
+        rules:
+          - Name:
+              regex: '(?i)^mozilla firefox'
+          - Product:
+              regex: '(?i)^firefox'
+          - ApplicationName:
+              regex: '(?i)^firefox'
+
+      # MOTOR_FIX_010: Logique de detection AUDITABLE ici - PAS dans le script PowerShell
+      # Version strictement inferieure a 128.0.0 (avant ESR baseline)
+      # Utilisation de version_lt() avec 3 segments (conformite commandement 11)
+      - version_lt(Version, "128.0.0"):
+          eq: true
+
+fields:
+  - Hostname
+  - Name
+  - Version
+  - Vendor
+  - ObjectClass
+
+output:
+  fields:
+    Hostname: Hostname
+    Name: Name
+    Version: Version
+    Vendor: Vendor
+    ObjectClass: ObjectClass
+
+  computed:
+    Severity: "if(version_lt(Version, '128.0.0'), 'CRITICAL - Firefox EOL vulnérable (< 128.0.0)', 'INFO')"
+    RiskReason: "if(version_lt(Version, '128.0.0'), 'Firefox version ' + Version + ' antérieure à ESR 128 - CVE-2024-9680 (CVSS 9.8) + multiples CVEs critiques EOL', 'Version conforme')"
+    RecommendedAction: "if(version_lt(Version, '128.0.0'), 'Mettre à jour Firefox vers 128.0 ESR minimum - Priorité P0 (CISA KEV)', 'Aucune action requise')"
+    DetectionLogic: "'version_lt(Version, 128.0.0) - Version collectée: ' + Version + ' | Seuil: 128.0.0 | Script: Collect-InstalledSoftware.ps1'"
+    ComplianceImpact: "if(version_lt(Version, '128.0.0'), 'CRITICAL - Non-conformité ANSSI R15/NIST.ID.RA-1 - Logiciel vulnérable non mis à jour', 'Conforme')"
+
+compliance_mapping:
+  anssi:
+    - id: "ANSSI-R15"
+      name: "Mises à jour de sécurité"
+      description: "Appliquer les mises à jour de sécurité dans les délais recommandés"
+    - id: "ANSSI-R19"
+      name: "Gestion des vulnérabilités"
+      description: "Maintenir un inventaire des vulnérabilités et les corriger"
+
+  nist_csf:
+    - id: "ID.RA-1"
+      function: "Identify"
+      category: "Risk Assessment"
+      description: "Asset vulnerabilities are identified and documented"
+    - id: "RS.MI-3"
+      function: "Respond"
+      category: "Mitigation"
+      description: "Newly identified vulnerabilities are mitigated or documented as accepted risks"
+
+  iso_27001:
+    - id: "A.12.6.1"
+      name: "Management of technical vulnerabilities"
+      description: "Timely identification and remediation of technical vulnerabilities"
+
+  mitre_attack:
+    - tactic: "Initial Access"
+      technique: "T1190"
+      name: "Exploit Public-Facing Application"
+    - tactic: "Execution"
+      technique: "T1203"
+      name: "Exploitation for Client Execution"

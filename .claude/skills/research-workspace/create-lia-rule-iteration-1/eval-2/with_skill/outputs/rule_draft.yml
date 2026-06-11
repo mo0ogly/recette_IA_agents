@@ -1,0 +1,196 @@
+id: A-VULN-MZLA-Firefox-CVE-2024-Windows-ESR128
+title: "Mozilla Firefox Windows - Pre-ESR128 Vulnerable Installations (Multiple CVEs)"
+metadata:
+  created_date: "2026-03-02"
+  last_updated: "2026-03-02"
+  version: "1.0"
+  author: "LIA Security Team"
+description: >
+  Detects Windows workstations running Mozilla Firefox versions prior to 128.0 (ESR baseline).
+  Firefox versions before 128 are affected by multiple critical vulnerabilities including
+  CVE-2024-9680 (use-after-free in Animation timelines, CVSS 9.8, CISA KEV),
+  CVE-2024-9396 (memory corruption), CVE-2024-9397 (directory listing bypass),
+  and dozens of additional CVEs fixed in the Firefox 128 ESR baseline release.
+  Firefox ESR 128 is the current long-term support branch recommended for enterprise deployments.
+author: LIA Security Team
+status: active
+target: MOZILLA
+
+taxonomy:
+  taxonomy: MOZILLA
+  taxonomy_short: MZLA
+  axis: security
+  axis_short: SECU
+  block: Vulnerability Management
+  block_short: VULN
+  component: Firefox Windows
+  component_short: FFWN
+
+classification:
+  family: enterprise_software
+  category: vulnerability_detection
+  subcategory: outdated_browser
+  rule_id: A-VULN-MZLA-Firefox-CVE-2024-Windows-ESR128
+  cwe: CWE-1035
+  cvss_score: 9.8
+  cvss_severity: CRITICAL
+
+cve_info:
+  cve_id: "CVE-2024-9680"
+  cvss_version: "3.1"
+  cvss_score: 9.8
+  cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+  cvss_severity: "CRITICAL"
+  is_kev: true
+  kev_date_added: "2024-10-15"
+  kev_due_date: "2024-11-05"
+  kev_ransomware: false
+  cwe:
+    - "CWE-416"
+  exploit_available: true
+  exploit_maturity: "Weaponized"
+  patch_available: true
+  published_date: "2024-10-09"
+  remediation_priority: "P0_EMERGENCY"
+  additional_cves:
+    - "CVE-2024-9396"
+    - "CVE-2024-9397"
+    - "CVE-2024-9398"
+    - "CVE-2024-9399"
+    - "CVE-2024-9400"
+    - "CVE-2024-9401"
+    - "CVE-2024-9402"
+
+references:
+  - https://nvd.nist.gov/vuln/detail/CVE-2024-9680
+  - https://www.mozilla.org/en-US/security/advisories/mfsa2024-51/
+  - https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+  - https://www.mozilla.org/en-US/firefox/128.0esr/releasenotes/
+
+remediation: >
+  Upgrade Firefox to version 128.0 ESR or later (enterprise) or 131.0+ (standard).
+  For enterprise deployments, use Firefox ESR 128.x which provides long-term support.
+  Deploy via WSUS, SCCM, Intune, or preferred software deployment tool.
+  Priority: P0 EMERGENCY - CVE-2024-9680 is actively exploited (CISA KEV).
+
+object_type_field: ObjectClass
+
+data_source:
+  type: collection
+  description: "Windows installed software inventory via WMI Win32_Product"
+  collection_method: "PowerShell Get-CimInstance Win32_Product"
+  collection_script: "scripts/collect/windows/Collect-InstalledSoftware.ps1"
+  prerequisites:
+    - "Local administrator rights on target workstation"
+    - "WMI enabled (Win32_Product class)"
+  required_files:
+    - pattern: "DATA_InstalledSoftware.json"
+      object_class: "installed_software"
+      description: "Windows installed software inventory"
+  fields:
+    - ObjectClass
+    - Name
+    - Version
+    - Vendor
+    - Hostname
+
+object_detection:
+  match:
+    condition: or
+    rules:
+      - ObjectClass:
+          eq: "installed_software"
+      - ObjectClass:
+          eq: "windows_application"
+      - ObjectClass:
+          eq: "Application"
+  where:
+    condition: and
+    rules:
+      # MOTOR_FIX_010 CONFORME : logique de detection AUDITABLE ici
+      # Identifier Firefox par le nom du logiciel (collecte brute Win32_Product.Name)
+      - Name:
+          regex: '(?i)mozilla\s+firefox'
+      # Comparer la version brute collectee - aucune logique CVE dans le script PowerShell
+      # Firefox < 128.0 est vulnerable (baseline ESR 128 = version cible minimum entreprise)
+      # Note: Win32_Product.Version retourne "127.0" ou "127.0.1" (2-3 segments)
+      # version_lt gere les formats X.Y et X.Y.Z de facon semantiquement correcte
+      - version_lt(Version, "128.0.0"):
+          eq: true
+
+output:
+  fields:
+    Hostname: Hostname
+    Name: Name
+    Version: Version
+    Vendor: Vendor
+    ObjectClass: ObjectClass
+
+  computed:
+    Severity: "if(version_lt(Version, '128.0.0'), 'CRITICAL - Firefox pre-ESR128 on ' + Hostname, 'SAFE')"
+    RiskReason: "if(version_lt(Version, '128.0.0'), 'Firefox ' + Version + ' vulnerable to CVE-2024-9680 (CISA KEV) and multiple critical CVEs fixed in ESR 128', 'Firefox version is at or above ESR 128 baseline')"
+    RecommendedAction: "if(version_lt(Version, '128.0.0'), 'URGENT: Upgrade Firefox to 128.0 ESR or later via software deployment tool', 'No action required')"
+    DetectionLogic: "'Firefox Name regex match + version_lt(Version, 128.0.0) | Collected version: ' + Version"
+    ComplianceImpact: "if(version_lt(Version, '128.0.0'), 'Non-compliant: Unpatched browser with CISA KEV CVE. Violates patch management policy.', 'Compliant')"
+
+compliance_mapping:
+  anssi:
+    - id: "ANSSI-Hygiene-Numerique-12"
+      title: "Mettre a jour les logiciels"
+      description: "Maintenir les navigateurs a jour pour corriger les vulnerabilites connues"
+  nist_csf:
+    - id: "ID.RA-1"
+      function: "Identify"
+      category: "Risk Assessment"
+      description: "Asset vulnerabilities are identified and documented"
+    - id: "RS.MI-3"
+      function: "Respond"
+      category: "Mitigation"
+      description: "Newly identified vulnerabilities are mitigated or documented as accepted risks"
+  iso_27001:
+    - id: "A.12.6.1"
+      title: "Management of technical vulnerabilities"
+      description: "Timely identification and remediation of technical vulnerabilities"
+  cis_controls:
+    - control: "7.3"
+      version: "v8"
+      title: "Perform Automated Operating System Patch Management"
+    - control: "7.4"
+      version: "v8"
+      title: "Perform Automated Application Patch Management"
+  pci_dss:
+    - id: "6.3.3"
+      description: "All system components are protected from known vulnerabilities by installing applicable security patches"
+  mitre_attack:
+    - tactic: "Initial Access"
+      technique: "T1190"
+      name: "Exploit Public-Facing Application"
+    - tactic: "Execution"
+      technique: "T1203"
+      name: "Exploitation for Client Execution"
+    - tactic: "Initial Access"
+      technique: "T1189"
+      name: "Drive-by Compromise"
+
+tags:
+  - windows
+  - firefox
+  - mozilla
+  - browser
+  - cve-2024-9680
+  - cisa-kev
+  - rce
+  - use-after-free
+  - esr128
+
+falsepositives:
+  - "Firefox installations with vendor-backported security patches maintaining old version numbers"
+  - "Portable Firefox installations not registered in Win32_Product (not captured by Collect-InstalledSoftware.ps1)"
+  - "Firefox installed via Microsoft Store (different product name format)"
+
+fields:
+  - ObjectClass
+  - Name
+  - Version
+  - Vendor
+  - Hostname

@@ -1,0 +1,35 @@
+{
+  "eval_name": "taxonomy-block-mismatch",
+  "configuration": "without_skill",
+  "criteria": [
+    {
+      "id": "confirms_vuln_to_sysc",
+      "passed": true,
+      "explanation": "La reponse confirme explicitement que VULN doit etre remplace par SYSC. Le tableau de mapping montre 'VULN' -> 'SYSC' avec la justification semantique : SYSC (System Configuration) est le block standard pour les vulnerabilites kernel/systeme dans la taxonomie UBUNTU."
+    },
+    {
+      "id": "fixes_yaml_block_short",
+      "passed": true,
+      "explanation": "La reponse fournit un diff YAML concret avec la section taxonomy avant/apres : block: 'Vulnerability' -> block: 'System Configuration' et block_short: 'VULN' -> block_short: 'SYSC'. Les deux champs sont corriges."
+    },
+    {
+      "id": "notes_directory_rename",
+      "passed": true,
+      "explanation": "La reponse signale explicitement que le repertoire VULN/ doit etre renomme en SYSC/ et fournit les commandes bash pour le deplacer vers UBUNTU/SECU/SYSC/, en citant le message d'erreur du validateur ('Directory path contains: VULN, Expected path: UBUNTU/{AXIS}/SYSC/')."
+    },
+    {
+      "id": "proposes_revalidation",
+      "passed": true,
+      "explanation": "La reponse propose de relancer validate_rules_recipe.sh (et validate_rules_ALL.sh) sur le nouveau chemin apres correction, avec la commande exacte et la note que la Phase 14 doit passer avec exit code 0."
+    },
+    {
+      "id": "no_json_modification",
+      "passed": true,
+      "explanation": "La reponse inclut explicitement la mise en garde : 'Ne pas modifier le fichier config/taxonomy/UB22_taxonomy.json pour y ajouter VULN comme block. Utiliser le block existant SYSC.' Elle oriente vers l'utilisation du block existant plutot que la creation d'un nouveau block."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 18
+}

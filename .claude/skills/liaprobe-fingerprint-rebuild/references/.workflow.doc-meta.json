@@ -1,0 +1,22 @@
+{
+  "title": "Workflow",
+  "subtitle": "",
+  "type": "TECH",
+  "classification": "INTERNAL",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "author": "mo0ogly@proton.me",
+  "created": "2026-05-12",
+  "updated": "2026-05-12",
+  "platform": "LIA-Security v2",
+  "description": "",
+  "tags": [],
+  "version_history": [
+    {
+      "version": "1.0.0",
+      "date": "2026-05-12",
+      "author": "mo0ogly@proton.me",
+      "description": "Initial version"
+    }
+  ]
+}

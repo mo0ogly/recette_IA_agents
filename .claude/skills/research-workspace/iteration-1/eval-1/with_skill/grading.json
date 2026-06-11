@@ -1,0 +1,107 @@
+{
+  "expectations": [
+    {
+      "text": "Annonce 'Using research skill' au debut",
+      "passed": false,
+      "evidence": "Le transcript commence directement par '## Etape 1 : Lecture du SKILL.md' sans aucune annonce 'Using research skill'. La phrase exacte est absente du transcript. Ligne 10-14 : 'Action : Read SKILL.md' puis 'Resultat : SKILL.md lu integralement.' - pas de message d'annonce de skill."
+    },
+    {
+      "text": "Cree un fichier dans outputs/ simulant validated/ avec commit 3b82e8bfe5 comme preuve",
+      "passed": false,
+      "evidence": "Le repertoire outputs/ contient : tracking_entry.md, research_log_entry.md, index_update.md, metrics.json, transcript.md. Aucun fichier ne simule un repertoire validated/ ni ne porte un nom evoquant validated/. Le commit 3b82e8bfe5 est reference dans tracking_entry.md et research_log_entry.md mais pas dans un fichier dedie de type 'validated/COUCHE5_banner_server.md' ou similaire."
+    },
+    {
+      "text": "Inclut le tag [VALIDATED] et [COMMIT] dans les sorties RESEARCH_LOG",
+      "passed": false,
+      "evidence": "research_log_entry.md (ligne 13) contient le tag [VALIDATED] : '`[DISCOVERY]` `[VALIDATED]` - **COUCHE 5 banner-server...**'. Cependant, le tag [COMMIT] est ABSENT. Les commits sont references en texte inline ('Commit 3b82e8bfe5') mais jamais avec le tag explicite `[COMMIT]`. Les deux tags requis ne sont pas tous les deux presents."
+    },
+    {
+      "text": "Produit une mise a jour du INDEX.md (ou simulation)",
+      "passed": true,
+      "evidence": "Le fichier index_update.md (1716 bytes) produit une simulation detaillee des modifications a appliquer sur _alire/research_discovery/discovery/INDEX.md. Il contient : la ligne a ajouter dans le tableau VALIDATED, la ligne backlog a ajouter, le status global avant/apres avec chiffres mis a jour (Validated : 13 -> 14). La simulation est complete et actionnable."
+    },
+    {
+      "text": "Annonce explicitement 'Session close. Tracking, RESEARCH_LOG et INDEX mis a jour.' a la fin",
+      "passed": true,
+      "evidence": "Transcript ligne 109 : 'Session close. Tracking, RESEARCH_LOG et INDEX mis a jour.' - annonce exactement conforme a l'expectation, positionnee dans la section '## Annonce finale' en toute fin du transcript."
+    },
+    {
+      "text": "Ne se contente pas de confirmer verbalement sans creer de fichiers",
+      "passed": true,
+      "evidence": "3 fichiers de contenu crees dans outputs/ : tracking_entry.md (1348 bytes), research_log_entry.md (2016 bytes), index_update.md (1716 bytes). Les fichiers contiennent du contenu substantiel et actionnable, pas de simples confirmations verbales. Le metrics.json (141 bytes) confirme 5 Write tool calls."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.5
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 7,
+      "Write": 5,
+      "Glob": 4,
+      "Bash": 2
+    },
+    "total_tool_calls": 18,
+    "steps": 4,
+    "errors": 0
+  },
+  "timing": {
+    "executor_duration_seconds": null
+  },
+  "claims": [
+    {
+      "claim": "SKILL.md lu integralement avant toute action",
+      "type": "process",
+      "verified": true,
+      "evidence": "Etape 1 du transcript : 'Action : Read SKILL.md' et 'Resultat : SKILL.md lu integralement. Points cles identifies'. Conforme au BLOC 4 du CLAUDE.md."
+    },
+    {
+      "claim": "3 fichiers de cloture produits (tracking, log, index)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "tracking_entry.md, research_log_entry.md, index_update.md presents dans outputs/. Tableau de conformite en fin de transcript ligne 100 confirme 'DONE'."
+    },
+    {
+      "claim": "Tags [VALIDATED] utilises avec preuves",
+      "type": "factual",
+      "verified": true,
+      "evidence": "research_log_entry.md lignes 13 et 29 : '[DISCOVERY] [VALIDATED]' avec commits references. Mais [COMMIT] tag absent - claim partiellement incorrect (le skill pourrait exiger [COMMIT] explicitement)."
+    },
+    {
+      "claim": "30/30 banners detectes confirmes par scans #145 et #148",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Tracking_entry.md et research_log_entry.md referent coheremment scan #145 (23/23) + scan #148 (7/7) avec commit 3b82e8bfe5. Consistent avec MEMORY.md du projet."
+    },
+    {
+      "claim": "Aucune information inventee - tout traceable dans fichiers existants",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Etape 2 et 3 du transcript documentent la lecture de RECETTE_INDEX.md, BANNER_INTEGRATION_2026-03-02.md, FINGERPRINTING_ENGINE_2026-02-28.md. Les chiffres (30/30, commits, scans) correspondent aux sources lues. Conforme R4 (No Mock/Placeholder)."
+    },
+    {
+      "claim": "Workflow /research close suivi dans l'ordre impose",
+      "type": "process",
+      "verified": true,
+      "evidence": "Etape 4 du transcript suit l'ordre : 4a tracking -> 4b RESEARCH_LOG -> 4c INDEX. Ordre conforme au skill. Mais les fichiers sont des drafts a appliquer, pas des modifications directes des fichiers cibles - ce qui peut etre une divergence selon l'interpretation du skill."
+    },
+    {
+      "claim": "Fichiers crees dans outputs/ et non dans les fichiers cibles reels",
+      "type": "process",
+      "verified": true,
+      "evidence": "Chaque fichier produit indique explicitement 'Fichier cible : ...' et 'Entree a ajouter'. Les fichiers reels (_alire/research_discovery/, BANNER_INTEGRATION_2026-03-02.md) n'ont pas ete modifies directement. C'est un mode simulation/draft - coherent avec un contexte d'evaluation isole."
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [
+      "Ajouter une annonce explicite 'Using research skill' ou 'Skill research v2.3 charge' en toute premiere ligne de la reponse ou du transcript.",
+      "Creer un fichier dedie simulant l'entree validated/ (ex: outputs/validated_COUCHE5_banner_server.md) avec le commit 3b82e8bfe5 comme preuve principale, distinct des fichiers de mise a jour de log/index.",
+      "Ajouter le tag [COMMIT] dans les entrees RESEARCH_LOG pour chaque commit de production : '[COMMIT] 3b82e8bfe5' en plus du tag [VALIDATED]. Les deux tags sont explicitement requis par l'expectation.",
+      "Verifier dans le SKILL.md si [COMMIT] est un tag attendu dans le format de RESEARCH_LOG - si oui, l'implementer systematiquement."
+    ],
+    "overall": "L'execution est methodique et produit des outputs de qualite (3 fichiers substantiels, contenu factuel verifiable, workflow sequentiel respecte). Les 3 echecs concernent des elements formels : l'annonce de skill manquante au debut, l'absence d'un fichier validated/ dedie, et le tag [COMMIT] absent du RESEARCH_LOG. Le fond est correct (contenu juste, pieges documentes, commits references) mais la forme ne respecte pas integralement les 6 expectations. Score 50% (3/6). Niveau : Acceptable pour un premier run, corrigeable facilement."
+  }
+}

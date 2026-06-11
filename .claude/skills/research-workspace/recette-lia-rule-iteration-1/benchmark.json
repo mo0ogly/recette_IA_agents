@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "skill_name": "recette-lia-rule",
+    "skill_version": "1.0",
+    "iteration": 1,
+    "date": "2026-03-02",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "claude-sonnet-4-6",
+    "evals_run": ["full-validation-order", "diagnose-critical-error"],
+    "runs_per_configuration": 1
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "full-validation-order",
+      "with_skill": {
+        "passed": 6,
+        "total": 6,
+        "pass_rate": 1.0,
+        "total_tool_calls": 50
+      },
+      "without_skill": {
+        "passed": 6,
+        "total": 6,
+        "pass_rate": 1.0,
+        "total_tool_calls": 32
+      },
+      "delta_pass_rate_pct": 0.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [],
+      "notable_finding": "EVAL NON DISCRIMINANTE - CLAUDE.md et le recette/ du projet documentent deja l'ordre moteur->recipe->ultimate->reportrule. Le baseline execute toutes les validations dans l'ordre correct sans skill. Le skill produit plus de documentation mais pas de comportement different mesurable."
+    },
+    {
+      "id": 2,
+      "name": "diagnose-critical-error",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 16
+      },
+      "without_skill": {
+        "passed": 4,
+        "total": 5,
+        "pass_rate": 0.8,
+        "total_tool_calls": 16
+      },
+      "delta_pass_rate_pct": 20.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "critical_before_medium: Baseline inverse l'ordre - Phase 8 (URL HTTP) traitee EN PREMIER car 'correction la plus rapide (1 caractere)' au lieu de respecter l'ordre par severite (Phase 4 HIGH avant Phase 8 MEDIUM)"
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 1.0,
+    "without_skill_avg_pass_rate": 0.9,
+    "delta": {
+      "pass_rate": "+10.0%",
+      "tool_calls": "+19"
+    },
+    "verdict": "MARGINAL_IMPROVEMENT"
+  },
+  "key_findings": [
+    "Eval-1 non discriminante (0pp): l'ordre de validation est deja dans CLAUDE.md. Besoin d'evals qui testent des scenarios non documentes dans le projet (par ex. gestion d'un batch avec regles mixees PASS/FAIL).",
+    "Eval-2 discriminante (+20pp): la priorite par severite (HIGH avant MEDIUM) vs la priorite par effort minimal est la seule divergence. Le skill apporte la connaissance des niveaux de severite.",
+    "Baseline atteint 6/6 sur eval-1 avec 32 appels outils vs 50 pour WITH_SKILL - le skill produit plus de documentation mais pas plus de precision.",
+    "Annonce 'Using recette-lia-rule skill' absente dans les deux runs WITH_SKILL - meme probleme que create-lia-rule.",
+    "Violation R7 dans WITH_SKILL: utilisation de /tmp/ au lieu de _alire/temp/ - le skill ne rappelle pas cette regle."
+  ],
+  "top_improvements_needed": [
+    "P0 CRITIQUE: Ajouter annonce 'Using recette-lia-rule skill. Reading reference files...' en ligne 1 du body SKILL.md",
+    "P1: Corriger frontmatter illegal (user-invocable + argument-hint -> metadata section)",
+    "P2: Ajouter section explicite sur la priorite des corrections: CRITICAL > HIGH > MEDIUM avec justification (ne pas optimiser par effort minimal)",
+    "P3: Ajouter rappel R7 (pas de /tmp/, utiliser _alire/temp/) dans la section chemins critiques",
+    "P4: Redesigner eval-1 avec scenarios non couverts par CLAUDE.md (batch avec erreurs mixees, regle avec taxonomie incorrecte)"
+  ]
+}

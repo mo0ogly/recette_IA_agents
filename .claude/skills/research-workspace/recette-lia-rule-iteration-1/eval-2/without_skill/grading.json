@@ -1,0 +1,61 @@
+{
+  "expectations": [
+    {
+      "text": "Priorise Phase 4 (CRITICAL) avant Phase 8 (HIGH/MEDIUM)",
+      "passed": false,
+      "evidence": "Le transcript et le correction_plan inversent l'ordre : 'CORRECTION 1 - Phase 8 : URL HTTP non securisee (A FAIRE EN PREMIER)' puis 'CORRECTION 2 - Phase 4 : Nombre de cas de test insuffisant (A FAIRE EN SECOND)'. L'agent justifie ce choix par la rapidite ('1 caractere a changer') mais ignore la severite documentee. Le critere exige que Phase 4 (HIGH) passe avant Phase 8 (MEDIUM/check_critical)."
+    },
+    {
+      "text": "Fournit du contenu concret a ajouter dans test_data.json (pas juste 'ajoutez des cas')",
+      "passed": true,
+      "evidence": "Le correction_plan fournit 4 objets JSON complets : deux cas vulnerables (Version 7.1.0 et 7.4.1) et deux cas safe (Version 7.4.4 boundary et OtherFTPServer). Chaque objet est pleinement rempli avec tous les champs."
+    },
+    {
+      "text": "Respecte le format test_data.json (objets avec _expected_match et champs reels)",
+      "passed": true,
+      "evidence": "Les objets JSON fournis contiennent bien '_expected_match' (true/false), 'ObjectClass' (WingFTPServer / OtherFTPServer), et des champs reels : Hostname, Version, VersionNormalized, Platform, AdminPort, AnonymousFTPEnabled, _test_description. Format conforme."
+    },
+    {
+      "text": "Corrige l'URL en https://nvd.nist.gov/vuln/detail/CVE-2025-47812",
+      "passed": true,
+      "evidence": "Le correction_plan indique explicitement : 'URL correcte : https://nvd.nist.gov/vuln/detail/CVE-2025-47812' et montre le diff YAML avant/apres avec remplacement de 'http://' par 'https://'."
+    },
+    {
+      "text": "Indique comment relancer la validation apres correction",
+      "passed": true,
+      "evidence": "Section 'Verification finale' du correction_plan : 'cd /home/mo0ogly/Bureau/vscode_lia_audit/recette && ./validate_rules_recipe.sh ../lia_rules/rule_analysis/WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812/' avec l'attendu EXIT=0."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": "4/5"
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 4,
+      "Glob": 0,
+      "Bash": 6,
+      "Write": 3
+    },
+    "total_tool_calls": 13
+  },
+  "eval_feedback": {
+    "strengths": [
+      "Contenu concret et actionnable : 4 cas JSON complets fournis, pas d'instruction vague",
+      "Format test_data.json rigoureusement respecte (_expected_match, ObjectClass, champs reels, _test_description)",
+      "Fix URL HTTPS correct et explicite avec diff YAML avant/apres",
+      "Commande de revalidation precise avec chemin absolu vers la regle concernee",
+      "L'agent a verifie le code source des validateurs (phase04 et phase08) avant de formuler sa reponse",
+      "Distribution 55-65% vulnerables mentionnee et respectee dans les cas proposes",
+      "Avertissements anti-patterns Phase 4 inclus (domaines fictifs, homogeneite, mots interdits dans descriptions)"
+    ],
+    "weaknesses": [
+      "Ordre de correction inverse : l'agent place Phase 8 (URL) avant Phase 4 (nombre de cas), alors que le skill documente que Phase 4 est CRITICAL/HIGH et doit etre traite en priorite. L'agent a raisonne par facilite operationnelle ('1 caractere') plutot que par severite documentee.",
+      "Aucun appel Glob : la recherche de la regle s'est faite via Bash find au lieu de l'outil dedie",
+      "Le transcript note que la regle reelle a deja 16 cas et HTTPS - l'agent a travaille sur un scenario hypothetique sans ancrage reel, ce qui fragilise la credibilite du plan"
+    ],
+    "overall": "L'agent WITHOUT_SKILL livre un plan de correction de qualite technique correcte (4/5 criteres passes) mais echoue sur le critere discriminant : l'ordre de priorite. Sans le skill, l'agent a optimise par effort minimal (Phase 8 = 1 caractere) plutot que par severite documentee (Phase 4 = CRITICAL). C'est exactement le comportement que le skill est cense corriger."
+  }
+}

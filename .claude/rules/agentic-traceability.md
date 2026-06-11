@@ -1,0 +1,62 @@
+# Agentic Traceability -- Decision Log & Plan Persistence
+
+Tracking du projet dans `docs/tracking/` (a la racine du repo, cree au besoin).
+Ne PAS eparpiller de fichiers de suivi a la racine du projet.
+
+## Decision Log (pour decisions non-triviales)
+
+Fichier : `docs/tracking/decision_log.jsonl`
+
+### Quand ecrire une entree
+- Choix d'architecture (nouveau plane, nouveau trait, nouveau sujet NATS, schema d'evenement).
+- Replanification (plan A echoue -> plan B).
+- Rejet d'une approche (et pourquoi).
+- Choix touchant un invariant (I1-I6) ou un failure mode.
+- Tout choix impactant plus de 3 fichiers.
+
+### Format JSONL (1 ligne = 1 decision)
+
+```json
+{"timestamp":"ISO8601","session":"nom-court","action":"VERBE_COURT","reasoning":"pourquoi","alternatives_rejected":["B rejetee car..."],"invariants_touched":["I1","I4"],"outcome":"resultat","confidence":"high|medium|low","plan_ref":"docs/tracking/PLAN_*.md ou null"}
+```
+
+### Ce qu'on NE trace PAS
+- Decisions triviales (formatage, renommage simple).
+- Actions mecaniques (build, test, commit) -- deja dans git log.
+
+## Plans Persistants (pour taches multi-etapes)
+
+Repertoire : `docs/tracking/PLAN_*.md`. Nommage : `PLAN_{TASK}_{YYYY-MM-DD}.md`.
+
+```markdown
+# Plan : {TITRE}
+Date : {YYYY-MM-DD}
+Status : EN_COURS | TERMINE | ABANDONNE | REPLANIFIE
+Invariants concernes : I1..I6 (lister)
+
+## Objectif
+{1-2 phrases}
+
+## Etapes
+- [ ] Etape 1
+- [ ] Etape 2
+
+## Decisions prises
+- {decision} -> {raison}
+
+## Ecarts et replanification
+- {ecart} -> {ajustement}
+
+## Resultat
+{bilan final}
+```
+
+### Mise a jour
+- Cocher les etapes au fil de l'eau (`[x]`).
+- Replanification : Status -> REPLANIFIE, nouveau plan avec lien.
+- Abandon : Status -> ABANDONNE + raison.
+
+## Skill /replan
+
+Quand un plan derive : observer l'etat reel (fichiers, build, tests), comparer au plan,
+identifier les ecarts, produire un plan ajuste.

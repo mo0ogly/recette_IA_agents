@@ -1,0 +1,64 @@
+{
+  "expectations": [
+    {
+      "text": "mode_identified: L'agent identifie le mode (single rule vs batch) en vérifiant si le répertoire contient directement un .yml",
+      "passed": true,
+      "evidence": "Etape 1 du transcript: 'Une recherche find a permis de localiser la règle au chemin réel' + 'Fichiers présents dans le répertoire: A-S-WFTP-WingFTP-CVE-2025-47812.yml (10.7 KB)'. L'agent explore le répertoire, liste les fichiers présents dont le .yml, ce qui établit implicitement le mode single rule. La vérification est faite via ls/find avant toute validation."
+    },
+    {
+      "text": "engine_first: L'agent exécute test_rule.sh EN PREMIER, avant recipe et ultimate",
+      "passed": true,
+      "evidence": "Etape 3 du transcript AVANT Etape 5 et 6: 'Etape 3: Test moteur (Bash - test_rule.sh) - Commande: bash test_rule.sh - Résultat: Matches: 10/16 (62.5%) - Engine exit code: 0 - RESULT: PASS'. Le test moteur est explicitement placé en Etape 3, avant la Recipe (Etape 5) et Ultimate (Etape 6). Confirmé par metrics.json: engine_test_first: true."
+    },
+    {
+      "text": "recipe_after_engine: L'agent exécute validate_rules_recipe.sh après le test moteur",
+      "passed": true,
+      "evidence": "Etape 5 du transcript après Etape 3: 'Etape 5: Validation Recipe (validate_rules_recipe.sh) - Commande: cd recette/recette_rule_cli && bash validate_rules_recipe.sh <rule_dir> - Résultat: Exit code 2 (HIGH warnings) - Score: 83/100'. Confirmé par metrics.json: recipe_after_engine: true."
+    },
+    {
+      "text": "ultimate_after_recipe: L'agent exécute validate_rules_ultimate.sh après recipe",
+      "passed": true,
+      "evidence": "Etape 6 du transcript après Etape 5: 'Etape 6: Validation Ultimate (validate_rules_ultimate.sh) - Commande: cd recette && bash validate_rules_ultimate.sh <rule_dir> - Résultat: Exit code 0 (ALL PASS) - Score: 98/100 (EXCELLENT)'. Confirmé par metrics.json: ultimate_after_recipe: true."
+    },
+    {
+      "text": "reportrule_checked: L'agent cherche et exécute validate_reportrules si R-*.json existe",
+      "passed": true,
+      "evidence": "Etape 2 du transcript liste explicitement le fichier 'R-S-WFTP-WingFTP-CVE-2025-47812.json (18 KB)'. L'Etape 8 analyse les issues ReportRule en détail: 'Issues ReportRule identifiées: 1. vulnerability.rationale manquant 2. compliance_mapping format incorrect 3. mitre_attack format 4. titre mismatch'. validate_rules_ALL.sh inclut ReportRule (11 checks, exit 2, score 87/115). Confirmé par metrics.json: reportrule_checked: true."
+    },
+    {
+      "text": "exit_codes_analyzed: L'agent analyse les exit codes et propose des corrections concrètes",
+      "passed": true,
+      "evidence": "Synthèse finale liste exit codes par phase: 'Moteur exit 0, Recipe exit 2, Ultimate exit 0, ReportRule exit 2, ALL exit 2'. Corrections concrètes proposées dans validation_plan.md section 'Issues détectées': format correct pour compliance_mapping avec exemple JSON avant/après, RESEARCH_EVIDENCE.md à créer, titre YAML/JSON tiret manquant à corriger, format PCI DSS 'Req-6.3.3'. Transcript identifie 3 bloquants pour commit avec corrections précises."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 4,
+      "Glob": 2,
+      "Bash": 11,
+      "Write": 3
+    },
+    "total_tool_calls": 20
+  },
+  "eval_feedback": {
+    "strengths": [
+      "Ordre d'exécution parfaitement respecté: moteur FIRST (Etape 3) -> recipe (Etape 5) -> ultimate (Etape 6) -> reportrule (Etape 8)",
+      "Résolution du chemin erroné (TECH/VULN/A-VULN-WFTPS-RemoteCodeExecution -> WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812) sans abandon",
+      "Analyse de exit codes précise et structurée avec tableau récapitulatif clair",
+      "Corrections concrètes et actionnables proposées, notamment l'exemple JSON avant/après pour compliance_mapping",
+      "Identification des 3 bloquants pour commit (compliance_mapping format, RESEARCH_EVIDENCE.md manquant, titre mismatch)",
+      "Exploration préalable des scripts de recette avant exécution (localisation correcte de validate_rules_recipe.sh dans recette/recette_rule_cli/)"
+    ],
+    "weaknesses": [
+      "Le mode single rule n'est pas verbalisé explicitement comme une décision de mode (pas de phrase type 'Mode identifié: single rule car .yml trouvé directement dans le répertoire') - implicite plutôt qu'explicite",
+      "Le transcript ne montre pas la vérification explicite de présence du R-*.json AVANT d'exécuter validate_reportrules - la décision d'inclure ReportRule semble découler de la liste de fichiers en Etape 2 mais sans étape dédiée de vérification conditionnelle"
+    ],
+    "overall": "Run excellent: 6/6 critères satisfaits. L'agent sans skill démontre un comportement attendu correct sur l'ordre d'exécution et l'analyse des résultats. La discrimination attendue selon eval_metadata (baseline va sauter le moteur ou aller directement à recipe) ne s'est pas produite - l'agent a correctement exécuté test_rule.sh en premier. Ce résultat suggère que le prompt du eval ou le contexte CLAUDE.md suffisent pour guider l'ordre, ce qui réduit potentiellement la valeur discriminante du skill recette-lia-rule sur ce critère spécifique."
+  }
+}

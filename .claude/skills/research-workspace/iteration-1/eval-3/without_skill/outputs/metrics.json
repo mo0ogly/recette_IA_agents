@@ -1,0 +1,12 @@
+{
+  "tool_calls": {
+    "Bash": 4,
+    "Read": 8,
+    "Write": 3,
+    "Glob": 0,
+    "Grep": 0
+  },
+  "total_tool_calls": 15,
+  "steps": 8,
+  "errors": 0
+}

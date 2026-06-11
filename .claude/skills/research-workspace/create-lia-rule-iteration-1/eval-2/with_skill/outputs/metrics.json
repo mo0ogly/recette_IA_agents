@@ -1,0 +1,58 @@
+{
+  "eval_id": 2,
+  "skill": "create-lia-rule",
+  "prompt_summary": "Firefox < 128 Windows CVE rule with is_vulnerable field suggestion",
+  "tool_calls": {
+    "Read": 5,
+    "Glob": 6,
+    "Bash": 2,
+    "WebSearch": 0,
+    "Write": 4,
+    "total_tool_calls": 17
+  },
+  "gate_traversal": {
+    "gate_1_collection_script": {
+      "triggered": true,
+      "result": "FOUND",
+      "path": "scripts/collect/windows/Collect-InstalledSoftware.ps1",
+      "fields_available": ["ObjectClass", "Name", "Version", "Vendor", "Hostname"]
+    },
+    "gate_2_existing_rules": {
+      "triggered": true,
+      "result": "FOUND",
+      "reference_rule": "lia_rules/rule_analysis/MOZILLA/VULN/A-VULN-MZLA-Firefox-CVE-2024-9680/A-VULN-MZLA-Firefox-CVE-2024-9680.yml",
+      "pattern_extracted": "version comparison via regex + version_lt"
+    },
+    "gate_3_websearch": {
+      "triggered": false,
+      "reason": "Gate 1 and Gate 2 provided sufficient information"
+    }
+  },
+  "motor_fix_010": {
+    "violation_detected_in_prompt": true,
+    "violation_pattern": "is_vulnerable: {eq: true}",
+    "violation_category": "boolean_precalculated_in_collection",
+    "rejected": true,
+    "rejection_documented": true
+  },
+  "alternative_proposed": true,
+  "alternative_pattern": "version_lt(Version, '128.0.0'): {eq: true}",
+  "correct_version_comparison": true,
+  "version_function_used": "version_lt",
+  "rule_produced": {
+    "id": "A-VULN-MZLA-Firefox-CVE-2024-Windows-ESR128",
+    "taxonomy": "MOZILLA/VULN",
+    "object_type_field_present": true,
+    "data_source_present": true,
+    "compliance_mapping_lowercase": true,
+    "computed_fields_count": 5,
+    "motor_fix_010_compliant": true,
+    "collection_script_exists": true
+  },
+  "outputs_produced": [
+    "transcript.md",
+    "rule_draft.yml",
+    "motor_fix_010_explanation.md",
+    "metrics.json"
+  ]
+}

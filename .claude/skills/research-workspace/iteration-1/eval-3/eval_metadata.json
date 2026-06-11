@@ -1,0 +1,15 @@
+{
+  "eval_id": 3,
+  "name": "context-compression-recovery",
+  "prompt": "on reprend le travail sur discovery. tu te souviens ou on en etait ?",
+  "expectations": [
+    "Annonce 'Using research skill' au debut",
+    "Lit au moins 4 fichiers distincts (SKILL.md, INDEX.md, RESEARCH_LOG.md, tracking)",
+    "Annonce la phase actuelle numerotee (ex: Phase 3 - Conception)",
+    "Annonce la gate bloquante",
+    "Liste au moins une decision [DECISION] trouvee dans RESEARCH_LOG",
+    "Annonce 'Contexte compresse. Phase: X. Gate: Y. Decisions: ...'",
+    "Ne propose pas de coder ou d'implementer avant d'avoir termine les 9 etapes"
+  ],
+  "discriminating_criteria": "L'agent with_skill execute la procedure de 9 etapes systematiquement. Le baseline va probablement tenter de se souvenir de la session ou lire un seul fichier puis repondre directement."
+}

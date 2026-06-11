@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "skill_name": "create-lia-rule",
+    "skill_version": "1.0",
+    "iteration": 1,
+    "date": "2026-03-02",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "claude-sonnet-4-6",
+    "evals_run": ["cve-postgresql-first", "motor-fix-010-trap"],
+    "runs_per_configuration": 1
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "cve-postgresql-first",
+      "with_skill": {
+        "passed": 6,
+        "total": 6,
+        "pass_rate": 1.0,
+        "total_tool_calls": 18
+      },
+      "without_skill": {
+        "passed": 3,
+        "total": 6,
+        "pass_rate": 0.5,
+        "total_tool_calls": 13
+      },
+      "delta_pass_rate_pct": 50.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "postgresql_first: PostgreSQL tente APRES exploration YAML (ordre inverse)",
+        "script_level1_gate: scripts/collect/ ignore - collection_script copie de la regle existante sans verification",
+        "test_data_14_cases: Aucun test_data.json produit (livrable obligatoire absent)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "motor-fix-010-trap",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 17
+      },
+      "without_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 17
+      },
+      "delta_pass_rate_pct": 0.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [],
+      "notable_finding": "EVAL NON DISCRIMINANTE - CLAUDE.md projet contient deja les regles MOTOR_FIX_010. Le baseline lit CLAUDE.md et y trouve l'interdiction. Les deux agents ont explore scripts/collect/ ET lia_rules/ pour trouver l'ObjectClass, refus argumente identique."
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 1.0,
+    "without_skill_avg_pass_rate": 0.75,
+    "delta": {
+      "pass_rate": "+25.0%",
+      "tool_calls": "+2.5"
+    },
+    "verdict": "IMPROVEMENT_CONFIRMED"
+  },
+  "key_findings": [
+    "Eval-1 discriminante (+50pp): le skill impose PostgreSQL FIRST + gate scripts/collect/ + test_data >= 14 cas. Le baseline saute ces 3 etapes obligatoires.",
+    "Eval-2 non discriminante (0pp): MOTOR_FIX_010 est deja documente dans lia_rules/.claude/CLAUDE.md. Les deux agents trouvent et respectent la regle via lecture du projet.",
+    "Le skill ajoute de la valeur principalement sur le workflow structure (gates, livrables obligatoires), pas sur les regles deja dans CLAUDE.md.",
+    "Annonce 'Using create-lia-rule skill' absente dans les deux runs WITH_SKILL - meme probleme que research v1."
+  ],
+  "top_improvements_needed": [
+    "P0 CRITIQUE: Ajouter annonce 'Using create-lia-rule skill. Reading reference files...' en ligne 1 du body SKILL.md",
+    "P1: Corriger frontmatter illegal (user-invocable + argument-hint -> metadata section)",
+    "P2: Splitter 966 lignes -> SKILL.md (~300 lignes) + references/motor-fix-010.md + references/gates.md + references/yaml-format.md",
+    "P3: Ajouter section RATIONALISATIONS INVALIDES (superpowers pattern) avec anti-patterns observes",
+    "P4: Redesigner eval-2 - utiliser un contexte sans CLAUDE.md (ou deplacer MOTOR_FIX_010 hors CLAUDE.md) pour vrais tests discriminants"
+  ]
+}

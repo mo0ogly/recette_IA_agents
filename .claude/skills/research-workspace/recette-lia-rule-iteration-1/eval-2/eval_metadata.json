@@ -1,0 +1,14 @@
+{
+  "eval_id": 2,
+  "skill": "recette-lia-rule",
+  "name": "diagnose-critical-error",
+  "prompt": "La recette retourne EXIT=1 CRITICAL sur une règle avec deux problèmes : Phase 4 (qualité données test) : 5 cas seulement, requis >= 8. Phase 8 (références) : URL 'http://nvd.nist.gov/vuln/detail/CVE-2025-47812' non sécurisée (HTTP au lieu de HTTPS). Comment corriger dans le bon ordre ?",
+  "expectations": [
+    "Priorise Phase 4 (CRITICAL) avant Phase 8 (HIGH/MEDIUM)",
+    "Fournit du contenu concret à ajouter dans test_data.json (pas juste 'ajoutez des cas')",
+    "Respecte le format test_data.json (objets avec _expected_match et champs réels)",
+    "Corrige l'URL en https://nvd.nist.gov/vuln/detail/CVE-2025-47812",
+    "Indique comment relancer la validation après correction"
+  ],
+  "discriminating_criteria": "Le skill connait les exit codes (0=PASS 1=CRITICAL) et la structure de test_data.json. Le baseline risque de ne fournir que des instructions vagues ('ajoutez 3 cas') sans le format réel des données de test."
+}

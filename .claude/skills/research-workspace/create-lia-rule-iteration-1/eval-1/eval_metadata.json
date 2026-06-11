@@ -1,0 +1,15 @@
+{
+  "eval_id": 1,
+  "skill": "create-lia-rule",
+  "name": "cve-postgresql-first",
+  "prompt": "Crée une règle de détection pour CVE-2025-47812 (Wing FTP Server RCE, CVSS 10.0, CISA KEV). C'est une règle de type CVE pour la technologie TECH.",
+  "expectations": [
+    "Commence par une requête PostgreSQL (pas par WebSearch directement)",
+    "Cherche un script de collecte existant (Niveau 1 de la gate bloquante)",
+    "Cherche des règles existantes pour le même type (Niveau 2 de la gate)",
+    "Génère un YAML avec section 'match:' (format Sigma Extended, pas l'ancien format)",
+    "N'utilise PAS is_vulnerable/is_compliant/is_affected dans where rules (MOTOR_FIX_010)",
+    "Produit ou planifie test_data.json avec >= 14 cas (au moins 8 vulnérables + 6 safe)"
+  ],
+  "discriminating_criteria": "Le skill impose PostgreSQL FIRST puis 3-level gate. Le baseline risque de faire WebSearch directement ou d'inventer l'ObjectClass. Le skill bloque MOTOR_FIX_010 explicitement; le baseline risque de l'ignorer."
+}

@@ -1,0 +1,35 @@
+{
+  "skill_name": "create-lia-rule",
+  "iteration": 3,
+  "evals": [
+    {
+      "id": 1,
+      "name": "cve-postgresql-first",
+      "prompt": "Crée une règle de détection pour CVE-2025-47812 (Wing FTP Server RCE, CVSS 10.0, CISA KEV). C'est une règle de type CVE pour la technologie TECH.",
+      "expected_output": "Workflow complet : PostgreSQL query FIRST, 3-level gate (script -> regles existantes -> internet), regle YAML au format Sigma Extended avec section match, test_data.json 14+ cas, RESEARCH_EVIDENCE.md, pas de MOTOR_FIX_010.",
+      "files": [],
+      "expectations": [
+        "Commence par une requête PostgreSQL (pas par WebSearch directement)",
+        "Cherche un script de collecte existant (Niveau 1 de la gate bloquante)",
+        "Cherche des règles existantes pour le même type (Niveau 2 de la gate)",
+        "Génère un YAML avec section 'match:' (format Sigma Extended, pas l'ancien format)",
+        "N'utilise PAS is_vulnerable/is_compliant/is_affected dans where rules (MOTOR_FIX_010)",
+        "Produit ou planifie test_data.json avec >= 14 cas (au moins 8 vulnérables + 6 safe)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "missing-deliverables-trap",
+      "prompt": "J'ai les données nécessaires pour créer une règle CVE pour Palo Alto PAN-OS CVE-2024-3400 (Command Injection via GlobalProtect, CVSS 10.0, CISA KEV depuis 2024-04-12, exploit maturity=WEAPONIZED, Metasploit=YES).\n\nLes gates sont déjà passées :\n- Gate Niveau 1 OK : scripts/collect/paloalto/Collect-PanOS.sh existe, ObjectClass='panos_instance'\n- Gate Niveau 2 OK : aucune règle PAN-OS existante dans lia_rules/\n- PostgreSQL : CVE-2024-3400, CVSS 10.0, CRITICAL, KEV_date=2024-04-12\n\nVersions affectées : PAN-OS < 10.2.9, < 11.0.4, < 11.1.2\nVersion fixée : 10.2.9-h1, 11.0.4-h1, 11.1.2-h3\n\nGénère maintenant TOUS les livrables complets pour que la recette passe à exit 0.",
+      "expected_output": "Tous les livrables obligatoires : YAML Sigma Extended (match:), test_data.json 14+ cas avec ratio correct, test_rule.sh, R-*.json avec risk_score 0-100 (90-100 pour CRITICAL), RESEARCH_EVIDENCE.md avec sources officielles, RETEX 5 questions présenté en fin de session.",
+      "files": [],
+      "expectations": [
+        "Crée RESEARCH_EVIDENCE.md avec sources officielles (NVD/CISA/Palo Alto advisory)",
+        "R-*.json risk_score dans [90, 100] pour CRITICAL (pas dans [0, 10] qui serait l'échelle YAML)",
+        "YAML contient section 'match:' (format Sigma Extended, pas l'ancien format sans match)",
+        "test_data.json contient >= 14 cas avec ratio 55-65% vulnérables (ne pas inclure CVE-ID dans descriptions SAFE)",
+        "Présente le RETEX 5 questions en fin de session (references/retex-guide.md - comportement skill-exclusif)"
+      ]
+    }
+  ]
+}

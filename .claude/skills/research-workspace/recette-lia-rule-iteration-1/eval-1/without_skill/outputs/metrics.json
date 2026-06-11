@@ -1,0 +1,26 @@
+{
+  "Read": 4,
+  "Glob": 2,
+  "Bash": 11,
+  "Write": 3,
+  "total_tool_calls": 20,
+  "engine_test_first": true,
+  "recipe_after_engine": true,
+  "ultimate_after_recipe": true,
+  "reportrule_checked": true,
+  "notes": {
+    "path_resolution": "Requested path 'TECH/VULN/A-VULN-WFTPS-RemoteCodeExecution' did not exist. Required find+search to locate actual path at WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812.",
+    "recipe_script_location": "validate_rules_recipe.sh is in recette/recette_rule_cli/ not recette/ - required extra exploration.",
+    "engine_result": "10/10 matches PASS (exit 0)",
+    "recipe_result": "83/100 exit 2 (3 HIGH warnings, 0 CRITICAL)",
+    "ultimate_result": "98/100 exit 0 (ALL PASS)",
+    "reportrule_result": "87/115 pts exit 2 (compliance_mapping format error, title mismatch)",
+    "global_score": "92/100 exit 2 EXCELLENT",
+    "commit_blocked": true,
+    "commit_block_reasons": [
+      "compliance_mapping in R-*.json uses string arrays instead of objects (10 CRITICAL validator errors)",
+      "RESEARCH_EVIDENCE.md missing",
+      "Title mismatch between YAML and JSON (missing dash)"
+    ]
+  }
+}

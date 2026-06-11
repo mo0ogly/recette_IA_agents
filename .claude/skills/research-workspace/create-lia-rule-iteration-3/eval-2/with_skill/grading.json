@@ -1,0 +1,35 @@
+{
+  "eval_name": "missing-deliverables-trap",
+  "configuration": "with_skill",
+  "criteria": [
+    {
+      "id": "creates_research_evidence",
+      "passed": true,
+      "explanation": "RESEARCH_EVIDENCE.md genere avec : Gate Niveau 1 documente (Collect-PaloAltoPanOS.ps1), correction ObjectClass panos_instance->paloalto_device avec source OBJECTCLASS_REFERENCE.md, donnees PostgreSQL (CVSS 10.0, KEV 2024-04-12, exploit_maturity WEAPONIZED, Metasploit excellent, 5 exploits), tableau compliance mapping, section 'Collection Method Discovery' avec URLs reelles (pan.dev, nvd.nist.gov, cisa.gov, cert.ssi.gouv.fr)."
+    },
+    {
+      "id": "risk_score_correct_scale",
+      "passed": true,
+      "explanation": "R-VULN-PALO-GlobalProtect-CVE-2024-3400.json contient risk_score: 100 (echelle 0-100, plage CRITICAL = 90-100 conforme validator RR06) et risk_level: 'critical'. Le YAML A-*.yml utilise risk_score: 10 (echelle 0-10 CVSS-like). Les deux echelles sont correctement distinguees selon le fichier."
+    },
+    {
+      "id": "yaml_match_section",
+      "passed": true,
+      "explanation": "La regle YAML contient la section object_detection.match avec ObjectClass eq: paloalto_device (format Sigma Extended obligatoire). La section where repete le filtre ObjectClass puis applique la logique de detection multi-branch via regex auditable (branches 10.2.x, 11.0.x, 11.1.x) sans aucun pattern MOTOR_FIX_010 interdit (pas de is_vulnerable, is_compliant, is_patched). Les 5 computed fields MOTOR_FIX_003 sont presents avec wrapper if() obligatoire."
+    },
+    {
+      "id": "test_data_14_ratio",
+      "passed": true,
+      "explanation": "test_data.json contient 14 cas exactement : 8 VULNERABLE (_expected_match: true, 57%) + 6 SAFE (_expected_match: false, 43%). Ratio dans la plage 55-65% exigee. Les descriptions SAFE ne contiennent pas les mots interdits CVE/CRITICAL/HIGH/Vulnerable/Affected. Les hostnames sont diversifies et realistes (pa-fw-paris-01, pa-fw-lyon-02, etc.). ObjectClass paloalto_device coherent avec la regle YAML."
+    },
+    {
+      "id": "presents_retex",
+      "passed": true,
+      "explanation": "RETEX present avec les 5 questions obligatoires repondues : (1) checks qui auraient echoue - ObjectClass incorrect du prompt detecte par gate; (2) checks necessitant un nouveau validator - verification croisee gate claims; (3) coherence Python/Go - Phase 16 a porter en Python; (4) moteur canonique Go identifie; (5) effort des corrections categorise S/M/L. Bloc 'Evolutions possibles' avec 3 niveaux (quick win, amelioration, refactor) conforme BLOC 9 CLAUDE.md."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 9
+}

@@ -1,0 +1,112 @@
+# RETEX -- Campaign Orchestrator
+
+Session : {SLUG}
+Date    : {YYYY-MM-DD}
+Author  : campaign-orchestrator skill v1.0
+
+## Summary
+
+- Duration total    : {DURATION_SECONDS} s ({DURATION_HUMAN})
+- Quadrigrammes     : {QUAD_LIST}
+- Products          : {PRODUCT_LIST}
+- `-R` flag         : {true|false}
+- `--ai` flag       : {true|false}
+- Final status      : SUCCESS | PARTIAL | FAILURE
+- grc_campaigns.id  : {GRC_CAMPAIGN_ID}
+
+Classification rules (autonomous agent protocol):
+- SUCCESS = every phase closed with all expected outputs present and usable.
+- PARTIAL = at least one phase closed with a degraded output accepted by the agent (e.g. 3/4 products collected, merge without AI after REPLAN) + justification in `decision_log.jsonl`.
+- FAILURE = the campaign ended without a valid PPTX in `_alire/temp/campaign-orchestrator/{SLUG}/reports/` OR user escalation was triggered.
+
+## Phase outcomes
+
+Per-phase status uses the same SUCCESS | PARTIAL | FAILURE classification (EVALUATE step).
+
+| Phase | Status | Complexity | Duration (s) | Key metric |
+|-------|--------|------------|--------------|------------|
+| INIT        | SUCCESS | TRIVIAL  | {d0} | pre-flight green |
+| OBSERVE     | SUCCESS | TRIVIAL  | {d1} | grc_campaign_id = {...} |
+| COLLECTION  | {SUCCESS/PARTIAL/FAILURE} | MODERATE | {d2} | {ok_count}/{total} products |
+| ANALYSIS    | {SUCCESS/PARTIAL/FAILURE} | COMPLEX  | {d3} | findings={total_findings} |
+| MERGE       | {SUCCESS/PARTIAL/FAILURE} | COMPLEX  | {d4} | score={global_score}, rules={total_rules} |
+| REPORTING   | {SUCCESS/PARTIAL/FAILURE} | COMPLEX  | {d5} | slides={slide_count}, pptx={KB}KB |
+| RECETTE     | {SUCCESS/PARTIAL/FAILURE} | MODERATE | {d6} | 164/164 checks passed |
+
+## What went right
+
+- {e.g. all 4 products collected in parallel within 90 s}
+- {e.g. analysis completed with 0 engine errors, 842 findings}
+- {e.g. merge produced 18-slide PPTX, AI insights available}
+
+## What went wrong / REPLAN events
+
+- {e.g. PostgreSQL collection script timed out -> REPLAN with --verbose -> success}
+- {e.g. Merge 500 with enableAI=true -> REPLAN with enableAI=false -> success}
+
+## Findings summary
+
+- Total findings   : {N}
+- CRITICAL         : {N}
+- HIGH             : {N}
+- MEDIUM           : {N}
+- LOW              : {N}
+- Global score     : {X}/100
+
+## Output artifacts
+
+- PLAN        : `_alire/tracking/PLAN_CAMPAIGN_ORCHESTRATOR_{SLUG}_{YYYY-MM-DD}.md`
+- Decision log: `_alire/temp/campaign-orchestrator/{SLUG}/decision_log.jsonl`
+- PPTX        : `_alire/temp/campaign-orchestrator/{SLUG}/reports/{QUAD}_{DATE}.pptx`
+- JSON        : `_alire/temp/campaign-orchestrator/{SLUG}/reports/{QUAD}_{DATE}.json`
+- RETEX       : `_alire/02_LOGS/Journals/retex/RETEX_CAMPAIGN_ORCHESTRATOR_{YYYY-MM-DD}_{SLUG}.md`
+
+## UX deeplinks
+
+- CampaignManager  : https://liascan.tech/#/grc/campaigns
+- CampaignCalendar : https://liascan.tech/#/analysis/calendar
+- LogManager       : https://liascan.tech/#/admin/logs?component=CAMPAIGN_ORCHESTRATOR
+
+## Agentic scoring (/50)
+
+| Criterion | Score | Notes |
+|-----------|-------|-------|
+| C1 Decomposition      | /10 | {subtasks count, atomic, dependencies clear} |
+| C2 Planification      | /10 | {PLAN created before action, alternatives evaluated for -R} |
+| C3 Replanification    | /10 | {N REPLAN events, always 2+ alternatives before picking} |
+| C4 Outillage          | /10 | {haiku on polling, sonnet on diagnosis, opus on orchestration} |
+| C5 Tracabilite        | /10 | {decision_log, LogSystemEvent, grc_campaigns all updated} |
+| **Total**             |  /50 | |
+
+## Improvements for next run
+
+1. {e.g. add `--resume` test case to prove checkpoint works after a crash}
+2. {e.g. apply migration 101 to get per-phase dashboard}
+3. {e.g. create CampaignOrchestrationDashboard.tsx for unified UX}
+
+## SQL verification queries (paste into psql)
+
+```sql
+-- Campaign status
+SELECT id, name, status, progress, updated_at
+FROM grc_campaigns
+WHERE metadata->>'session_slug' = '{SLUG}';
+
+-- Log timeline
+SELECT created_at, level, action, details
+FROM unified_logs
+WHERE component = 'CAMPAIGN_ORCHESTRATOR'
+  AND details LIKE '%{SLUG}%'
+ORDER BY created_at ASC;
+
+-- Phase tracking (v2 only)
+SELECT phase, phase_status, progress_pct, started_at, completed_at,
+       metadata->>'product' AS product, error_message
+FROM campaign_workflow_runs
+WHERE session_slug = '{SLUG}'
+ORDER BY phase, started_at;
+```
+
+---
+
+End of RETEX. This file was also displayed in the console at the end of the run (C5 mandatory display).

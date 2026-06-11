@@ -1,0 +1,35 @@
+{
+  "eval_name": "taxonomy-block-mismatch",
+  "configuration": "with_skill",
+  "criteria": [
+    {
+      "id": "confirms_vuln_to_sysc",
+      "passed": true,
+      "explanation": "La reponse confirme explicitement le mapping VULN->SYSC en section 2, avec tableau de reference et justification semantique (CVE kernel/privilege escalation = composant systeme SYSC). Le mapping est source du CORRECTIONS_REFERENCE.md du skill."
+    },
+    {
+      "id": "fixes_yaml_block_short",
+      "passed": true,
+      "explanation": "La reponse fournit le diff YAML complet en section 3, Correction 1, montrant explicitement le changement de 'block_short: VULN' en 'block_short: SYSC' avec le champ 'block' mis a jour en 'System Components'."
+    },
+    {
+      "id": "notes_directory_rename",
+      "passed": true,
+      "explanation": "La reponse note en section 3, Correction 2, que le repertoire physique doit passer de 'UBUNTU/VULN/A-VULN-UB22-KernelLocalPrivilege/' a 'UBUNTU/SYSC/A-VULN-UB22-KernelLocalPrivilege/' et fournit les commandes bash exactes pour effectuer ce renommage."
+    },
+    {
+      "id": "proposes_revalidation",
+      "passed": true,
+      "explanation": "La reponse propose en section 4 de relancer validate_rules_recipe.sh (ainsi que validate_rules_ALL.sh et les deux autres scripts) sur le nouveau chemin apres correction, avec le resultat attendu en Phase 14."
+    },
+    {
+      "id": "no_json_modification",
+      "passed": true,
+      "explanation": "La reponse indique explicitement 'Ne pas modifier le JSON de taxonomie config/taxonomy/UBUNTU_taxonomy.json pour y ajouter VULN comme nouveau block' et 'Ne pas ajouter VULN dans le JSON taxonomie' dans le recap final. La correction utilise uniquement le block existant SYSC."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 11
+}

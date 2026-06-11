@@ -1,0 +1,11 @@
+{
+  "Read": 4,
+  "Glob": 0,
+  "Bash": 6,
+  "Write": 3,
+  "total_tool_calls": 13,
+  "critical_prioritized": true,
+  "concrete_test_cases_provided": true,
+  "url_fix_provided": true,
+  "rerun_command_provided": true
+}
