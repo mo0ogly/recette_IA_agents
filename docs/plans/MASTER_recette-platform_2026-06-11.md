@@ -64,11 +64,11 @@ Legend: DONE / PARTIAL / TODO.
 
 | Surface | GitHub | GitLab | OpenAPI | Temporal | Manifest/MCP |
 |---------|--------|--------|---------|----------|--------------|
-| corpus subjects | DONE (4) | TODO | DONE (4) | DONE (4) | DONE (4) |
-| reference oracle | DONE | TODO | DONE (json) | DONE (AST) | DONE (manifest) |
-| ground-truth schema | DONE | reuse | DONE (reuse) | DONE (reuse) | DONE (reuse) |
-| http adapter wiring | PARTIAL (assumed routes) | -- | DONE (same oracle/mock) | DONE (same oracle/mock) | DONE (same oracle/mock) |
-| publisher | DONE (GitHub) | TODO | n/a | n/a | n/a |
+| corpus subjects | DONE (4) | DONE (4) | DONE (4) | DONE (4) | DONE (4) |
+| reference oracle | DONE | DONE (manifest) | DONE (json) | DONE (AST) | DONE (manifest) |
+| ground-truth schema | DONE | DONE (reuse) | DONE (reuse) | DONE (reuse) | DONE (reuse) |
+| http adapter wiring | PARTIAL (assumed routes) | DONE (same oracle/mock) | DONE (same oracle/mock) | DONE (same oracle/mock) | DONE (same oracle/mock) |
+| publisher | DONE (GitHub) | TODO (deferred) | n/a | n/a | n/a |
 
 ### Identification recette (corpus/agents -> IdentificationAdapter -> 4-dim scorecard)
 
@@ -222,9 +222,10 @@ M0 GitHub                         DONE
   -> M9 aggregate report            DONE 2026-06-11 (brought forward)
   -> M7 CI                          BLOCKED (needs gh token `workflow` scope)
   -> M5 Ed25519 bundle contract     DONE 2026-06-11 (brought forward)
-  -> M8 orthogonality audit (all surfaces)   <- next (light)
-  -> M4 GitLab parity
-  -> M6 real API wiring (when colleague unblocks)
+  -> M8 orthogonality + coverage audit       DONE 2026-06-11
+  -> M4 GitLab parity               DONE 2026-06-11 (publisher backend deferred)
+  -> M6 real API wiring (when colleague unblocks)   <- blocked
+  -> Track U UX console             <- the remaining large effort
 
 Track U (UX console) runs in parallel once M3 lands -- it needs at least one
 non-GitHub surface to be worth wiring, and an API layer (U1) it can drive.
