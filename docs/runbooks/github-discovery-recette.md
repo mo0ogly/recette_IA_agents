@@ -13,6 +13,18 @@ against the ground-truth test-agent repositories in this repo.
 
 ## Install (one shot)
 
+### Prerequisites
+
+| Requirement | Why | Check |
+|-------------|-----|-------|
+| Python >= 3.11 | `StrEnum` + modern typing in the recette package | `python3 --version` |
+| Writable repo checkout | the script creates `.venv` and `.venv-pyaudit` in-tree | `test -w .` |
+| Docker + Compose v2 (optional) | reproducible lab (`runtime` ~153MB, `audit` ~324MB) | `docker compose version` |
+| Free TCP port 8081 (Docker path only) | the mock Discovery service binds it | `ss -ltn 'sport = :8081'` |
+
+Docker is optional: pass `--no-docker` (or `make install` on a host without Docker just
+skips the lab with a `[WARN]`, native install still succeeds).
+
 ```bash
 make install          # native venv + Docker lab, each step smoke-tested
 make install-check    # report status only, change nothing
@@ -23,6 +35,26 @@ venv (`.venv-pyaudit`), then verifies: `recette validate`, the offline discovery
 (`VERDICT: PASS`), the unittest suite, and -- when Docker is present -- builds the
 `runtime`/`audit` images and runs the container tests, strict gates, and the HTTP discovery
 recette against the mock `:8081`. Flags: `--no-docker`, `--with-real`, `--check`.
+
+The script is idempotent and safe to re-run (`set -Eeuo pipefail`; an interrupt or error
+tears the Docker lab down automatically so no orphan containers are left). It never claims
+success without running the recette, and exits non-zero if any step fails.
+
+### If a step fails
+
+| Symptom (script output) | Cause | Fix |
+|-------------------------|-------|-----|
+| `python3 not found` / `... too old` | Python < 3.11 | install Python 3.11+, re-run |
+| `pyproject.toml not found ...` | run from outside the repo | `cd` into the repo root first |
+| `Repo root ... is not writable` | permissions | fix ownership/permissions of the checkout |
+| `docker build FAILED` | daemon down / no disk | start Docker, free disk, or `make install` with `--no-docker` |
+| `docker-compose.yml is invalid` | bad/edited compose file | `docker compose config` to see the error |
+| `HTTP discovery recette FAILED` | port 8081 busy or mock unhealthy | `make lab-down`, free `:8081`, re-run |
+| pip stalls/aborts | flaky network/proxy | the script retries 3x; check connectivity/`HTTPS_PROXY`, re-run |
+
+Secrets (`AGENTRAIL_DISCOVERY_TOKEN`, `gh auth`) come from your environment only -- never
+commit them. The `--with-real` extras (`PyGithub`, `python-gitlab`) are optional and only
+needed for section B against a real org.
 
 ## 0. Docker lab (reproducible, recommended)
 

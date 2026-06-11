@@ -18,7 +18,8 @@
 #
 # Idempotent. Safe to re-run.
 
-set -euo pipefail
+set -Eeuo pipefail
+IFS=$'\n\t'
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${REPO_ROOT}/.venv"
@@ -35,6 +36,28 @@ ok()    { printf '[OK]    %s\n' "$*"; }
 warn()  { printf '[WARN]  %s\n' "$*" >&2; }
 err()   { printf '[ERROR] %s\n' "$*" >&2; }
 step()  { printf '\n==== %s ====\n' "$*"; }
+
+# --- robustness: error diagnostics + lab teardown on interrupt -------------
+# LAB_STARTED flips to 1 once Docker containers may be running so that an
+# interrupt (Ctrl-C) or an unexpected error never leaves orphan containers up.
+LAB_STARTED=0
+
+cleanup() {
+  local code=$?
+  trap - EXIT INT TERM ERR
+  if [ "$LAB_STARTED" -eq 1 ] && docker_ready; then
+    info "Tearing down Docker lab (cleanup)."
+    (cd "$REPO_ROOT" && docker compose down --remove-orphans) >/dev/null 2>&1 || true
+  fi
+  exit "$code"
+}
+
+on_err() {
+  err "Failed at line ${1} (exit ${2}): ${3}"
+}
+
+trap 'on_err "${LINENO}" "$?" "${BASH_COMMAND}"' ERR
+trap cleanup EXIT INT TERM
 
 usage() {
   sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -103,6 +126,15 @@ fi
 # --- native install --------------------------------------------------------
 require_python
 
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+  err "pyproject.toml not found in ${REPO_ROOT}; run this script from inside the repo."
+  exit 1
+fi
+if [ ! -w "${REPO_ROOT}" ]; then
+  err "Repo root ${REPO_ROOT} is not writable; cannot create the virtualenv."
+  exit 1
+fi
+
 step "NATIVE ENV (${VENV})"
 if [ ! -d "$VENV" ]; then
   info "Creating virtualenv."
@@ -112,8 +144,11 @@ else
   ok "virtualenv already present."
 fi
 
+# pip flags shared by every install: non-interactive + network resilience.
+PIP_FLAGS=(--quiet --no-input --retries 3 --timeout 60)
+
 info "Upgrading pip."
-"${BIN}/python" -m pip install --quiet --upgrade pip
+"${BIN}/python" -m pip install "${PIP_FLAGS[@]}" --upgrade pip
 
 EXTRA_SPEC="dev"
 if [ "$WITH_REAL" -eq 1 ]; then
@@ -121,7 +156,7 @@ if [ "$WITH_REAL" -eq 1 ]; then
   info "Including [real] extras (PyGithub, python-gitlab)."
 fi
 info "Installing recette (editable) with extras: [${EXTRA_SPEC}]"
-"${BIN}/python" -m pip install --quiet --upgrade -e "${REPO_ROOT}[${EXTRA_SPEC}]"
+"${BIN}/python" -m pip install "${PIP_FLAGS[@]}" --upgrade -e "${REPO_ROOT}[${EXTRA_SPEC}]"
 ok "recette installed editable in ${VENV}."
 
 # --- audit env (for native gates + pre-commit hook) -----------------------
@@ -159,8 +194,18 @@ if [ "$DO_DOCKER" -eq 1 ]; then
   if docker_ready; then
     step "DOCKER LAB (build + verify)"
     DOCKER_OK=1
-    info "Building images (runtime + audit)."
-    if (cd "$REPO_ROOT" && docker compose build); then ok "images built."; else err "docker build FAILED."; DOCKER_OK=0; fi
+    if [ ! -f "${REPO_ROOT}/docker-compose.yml" ]; then
+      err "docker-compose.yml not found; cannot build the lab. Use --no-docker to skip."
+      DOCKER_OK=0
+    elif ! (cd "$REPO_ROOT" && docker compose config >/dev/null 2>&1); then
+      err "docker-compose.yml is invalid (docker compose config failed); skipping lab."
+      DOCKER_OK=0
+    fi
+    if [ "$DOCKER_OK" -eq 1 ]; then
+      LAB_STARTED=1   # from here on, ensure teardown on interrupt/error
+      info "Building images (runtime + audit)."
+      if (cd "$REPO_ROOT" && docker compose build); then ok "images built."; else err "docker build FAILED."; DOCKER_OK=0; fi
+    fi
 
     if [ "$DOCKER_OK" -eq 1 ]; then
       info "tests in container"
@@ -174,6 +219,7 @@ if [ "$DO_DOCKER" -eq 1 ]; then
 
       info "tearing down lab"
       (cd "$REPO_ROOT" && docker compose down --remove-orphans) >/dev/null 2>&1 || true
+      LAB_STARTED=0   # explicit teardown done; EXIT trap no longer needs to
     fi
   else
     warn "Docker (with compose v2) not available -- skipping the lab. Re-run after installing Docker, or use --no-docker to silence this."
