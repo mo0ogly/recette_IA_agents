@@ -87,7 +87,7 @@ Legend: DONE / PARTIAL / TODO.
 | One-shot installer + smoke tests | DONE |
 | Strict gates (ruff/mypy/bandit) green | DONE |
 | Ed25519 bundle contract recette | DONE (M5) -- recette bundle-verify + fixtures |
-| CI pipeline (gates + recette on push) | BLOCKED (M7 workflow written; needs gh token `workflow` scope to push) |
+| CI pipeline (gates + recette on push) | DONE (M7) -- .github/workflows/recette.yml, green on main |
 | Aggregate report (`recette report`) | DONE (M9) |
 | Real API wiring confirmed with colleague | TODO (blocked on his routes) |
 | UX control console (launch/stop/monitor + Monaco + config) | TODO (Track U) |
@@ -220,7 +220,7 @@ M0 GitHub                         DONE
   -> M2 OpenAPI                     DONE 2026-06-11
   -> M1 Manifest/MCP                DONE 2026-06-11
   -> M9 aggregate report            DONE 2026-06-11 (brought forward)
-  -> M7 CI                          BLOCKED (needs gh token `workflow` scope)
+  -> M7 CI                          DONE 2026-06-11 (green on main)
   -> M5 Ed25519 bundle contract     DONE 2026-06-11 (brought forward)
   -> M8 orthogonality + coverage audit       DONE 2026-06-11
   -> M4 GitLab parity               DONE 2026-06-11 (publisher backend deferred)
