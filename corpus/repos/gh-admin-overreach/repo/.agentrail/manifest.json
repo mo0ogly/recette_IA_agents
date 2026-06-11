@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-infra-syncer",
+    "description": "Synchronizes infrastructure config across acme repos: pushes commits and manages webhooks.",
+    "target_system": "github",
+    "identity": {
+      "auth_method": "pat",
+      "principal": "acme-infra-syncer"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "push", "mode": "write", "resources": ["acme/*"] },
+      { "action": "manage_webhook", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}

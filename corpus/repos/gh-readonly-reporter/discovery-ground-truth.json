@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gh-readonly-reporter",
+  "target_system": "github",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_repo", "read_ci"],
+  "risk_rank": 1,
+  "policy_generated": false,
+  "notes": "Read-only reporter: reads repos + CI, no writes. Benign baseline; scanner should detect one agent with read-only action patterns and assign the lowest non-zero risk; no restrictive policy needed."
+}
