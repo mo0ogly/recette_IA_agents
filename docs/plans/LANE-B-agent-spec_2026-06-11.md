@@ -116,11 +116,37 @@ Like Lane A, Lane B can be correct or deliberately incorrect, to exercise identi
 - I5 mediated side-effects: all tool calls go through the forge proxy; `side_effect_hash`.
 - I2/I6 (control-plane/approval): out of scope for the subject; the platform enforces these.
 
-## 11. Open decisions (need your call before U-LaneB build)
+## 11. Decisions (resolved 2026-06-11)
 
-1. **LLM backend** -- real provider/model for live mode (recommend Claude via Anthropic API,
-   key from env), PLUS an offline `StubLlm`/`ReplayLlm` so tests + CI need no key/cost. Confirm.
-2. **v1 action surface** -- start Lane B on ONE surface+target (recommend GitHub:
-   read_repo/open_pr) and expand, or cover more at once?
-3. **Promotion in v1** -- include the "record -> freeze as Lane A golden" command now, or later?
-4. **Real mode** -- in scope now (with a test-org allowlist) or lab-only for v1?
+1. **LLM backend** -- **multi-provider**. A `LlmBackend` protocol with provider adapters
+   (Claude/Anthropic, OpenAI, ...) for live mode (keys via env, R8), plus offline
+   `StubLlm` (scripted) and `ReplayLlm` (recorded) so tests + CI need no key and no cost.
+2. **v1 action surface** -- **all surfaces** (github, gitlab, openapi, temporal, mcp). Needs
+   a per-surface forge mapping canonical actions -> simulated (lab) / real calls.
+3. **Promotion** -- **in v1**: a command that freezes a recorded run into a Lane A golden
+   (`scenario.json` + `ground-truth.json`).
+4. **Real mode** -- **in v1, opt-in**: `RealForge` guarded by an explicit `--real` flag + a
+   test-org/endpoint allowlist; lab is still the default and the only thing CI runs.
+
+## 12. Build decomposition (v1)
+
+Ordered, each its own cycle (schema/code -> tests -> gates -> commit). Live-LLM and real
+mode adapters are written but unit-tested with stubbed transports (no key, no network, no
+side effect) -- like `http_adapter`.
+
+- **LB1 LLM backend** -- `recette/llm.py`: `LlmBackend` protocol; `StubLlm` + `ReplayLlm`
+  (offline, deterministic); provider adapters (`AnthropicLlm`, `OpenAiLlm`) with stubbed-
+  transport unit tests. Keys via env; clear error if absent.
+- **LB2 tool registry + per-surface forges** -- map canonical actions to forge calls for all
+  five surfaces; `LabForge` simulates (default), `RealForge` behind the allowlist.
+- **LB3 agent loop + recorder** -- `recette/lane_b.py`: the decide->act loop emitting
+  `AgentAction`; `recette/recording.py` captures every step (replayable).
+- **LB4 replay** -- `ReplayLlm` re-runs a recording to an identical `AgentAction` log;
+  determinism test.
+- **LB5 promotion** -- `recette ... freeze <recording>` -> Lane A `scenario.json` +
+  `ground-truth.json`; validates against the existing schemas.
+- **LB6 real mode** -- `RealForge` per surface + `--real` flag + allowlist; lab stays CI default.
+- **LB7 CLI** -- `recette agent run <manifest> [--provider --model --mode lab|real]`,
+  `recette agent replay <recording>`, `recette agent freeze <recording>`.
+
+This engine is the foundation the console (Track U) drives.
