@@ -16,7 +16,18 @@ from .adapters import ReferenceSourceScanAdapter, SourceScanAdapter
 from .discovery_scorecard import DiscoveryRepoResult, DiscoveryScorecard
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_REPO_CORPUS = _REPO_ROOT / "corpus" / "repos"
+_CORPUS = _REPO_ROOT / "corpus"
+DEFAULT_REPO_CORPUS = _CORPUS / "repos"
+
+# Scanner surface -> corpus sub-directory. github is corpus/repos for historical reasons.
+SURFACE_CORPUS: dict[str, Path] = {
+    "github": _CORPUS / "repos",
+    "temporal": _CORPUS / "temporal",
+    "openapi": _CORPUS / "openapi",
+    "mcp": _CORPUS / "manifests",
+}
+# Order surfaces are reported in when running "all".
+SURFACE_ORDER: tuple[str, ...] = ("github", "temporal", "openapi", "mcp")
 
 
 def discover_repo_dirs(corpus_root: Path | str = DEFAULT_REPO_CORPUS) -> list[Path]:

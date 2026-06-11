@@ -15,6 +15,7 @@ from enum import StrEnum
 class TargetSystem(StrEnum):
     GITHUB = "github"
     GITLAB = "gitlab"
+    TEMPORAL = "temporal"
 
 
 class ActionType(StrEnum):

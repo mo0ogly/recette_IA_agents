@@ -14,7 +14,7 @@
     },
     "target_system": {
       "type": "string",
-      "enum": ["github", "gitlab"]
+      "enum": ["github", "gitlab", "temporal", "openapi", "mcp"]
     },
     "detected": {
       "type": "boolean",

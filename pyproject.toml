@@ -13,6 +13,11 @@ real = [
     "PyGithub>=2.0",
     "python-gitlab>=4.0",
 ]
+# Running the Temporal-surface corpus workflows (Lane B). The discovery recette parses
+# them statically via AST and needs none of this; only running the workflows does.
+temporal = [
+    "temporalio>=1.7",
+]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [
     "pytest>=8.0",

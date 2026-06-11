@@ -9,7 +9,12 @@ from pathlib import Path
 
 import jsonschema
 
-from .discovery_harness import discover_repo_dirs, run_discovery_recette
+from .discovery_harness import (
+    SURFACE_CORPUS,
+    SURFACE_ORDER,
+    discover_repo_dirs,
+    run_discovery_recette,
+)
 from .harness import DEFAULT_CORPUS, discover_agent_dirs, run_recette
 from .manifest import load_ground_truth, load_manifest, load_scenario
 
@@ -60,22 +65,25 @@ def _cmd_validate(corpus_root: Path) -> int:
 
 
 def _validate_repo_corpus() -> tuple[int, int]:
-    """Schema-validate discovery-ground-truth.json under corpus/repos. Returns (errors, count)."""
-    repo_dirs = discover_repo_dirs()
-    if not repo_dirs:
-        return 0, 0
+    """Schema-validate discovery-ground-truth.json across every surface. Returns (errors, count)."""
     schema = json.loads(_DISCOVERY_GT_SCHEMA.read_text(encoding="utf-8"))
     validator = jsonschema.Draft202012Validator(schema)
     errors = 0
-    for d in repo_dirs:
-        gt = json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8"))
-        for err in sorted(validator.iter_errors(gt), key=str):
-            errors += 1
-            print(f"INVALID {d.name}/discovery-ground-truth.json: {err.message}", file=sys.stderr)
-        if gt.get("agent_repo") != d.name:
-            errors += 1
-            print(f"INVALID {d.name}: agent_repo != dir name", file=sys.stderr)
-    return errors, len(repo_dirs)
+    count = 0
+    for surface in SURFACE_ORDER:
+        for d in discover_repo_dirs(SURFACE_CORPUS[surface]):
+            count += 1
+            gt = json.loads((d / "discovery-ground-truth.json").read_text(encoding="utf-8"))
+            for err in sorted(validator.iter_errors(gt), key=str):
+                errors += 1
+                print(
+                    f"INVALID {surface}/{d.name}/discovery-ground-truth.json: {err.message}",
+                    file=sys.stderr,
+                )
+            if gt.get("agent_repo") != d.name:
+                errors += 1
+                print(f"INVALID {surface}/{d.name}: agent_repo != dir name", file=sys.stderr)
+    return errors, count
 
 
 def _cmd_run(corpus_root: Path) -> int:
@@ -94,19 +102,41 @@ def _cmd_publish(slug: str, owner: str, visibility: str, apply: bool) -> int:
     return 0
 
 
-def _cmd_discovery(adapter_name: str) -> int:
+def _build_source_adapter(adapter_name: str):
+    """Return a fresh SourceScanAdapter for one surface run (None = reference oracle)."""
     if adapter_name == "reference":
-        adapter = None  # harness default = ReferenceSourceScanAdapter
-    elif adapter_name == "http":
+        return None  # harness default = ReferenceSourceScanAdapter
+    if adapter_name == "http":
         from .http_adapter import HttpSourceScanAdapter
 
-        adapter = HttpSourceScanAdapter()
-    else:
-        print(f"unknown adapter {adapter_name}", file=sys.stderr)
+        return HttpSourceScanAdapter()
+    raise ValueError(f"unknown adapter {adapter_name}")
+
+
+def _cmd_discovery(adapter_name: str, surface: str) -> int:
+    try:
+        _build_source_adapter(adapter_name)  # validate adapter name early
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
-    scorecard = run_discovery_recette(adapter)
-    print(scorecard.render())
-    return 0 if scorecard.all_passed else 1
+
+    if surface == "all":
+        surfaces = [s for s in SURFACE_ORDER if discover_repo_dirs(SURFACE_CORPUS[s])]
+    else:
+        surfaces = [surface]
+
+    all_ok = True
+    for s in surfaces:
+        scorecard = run_discovery_recette(
+            _build_source_adapter(adapter_name), corpus_root=SURFACE_CORPUS[s]
+        )
+        print(f"--- surface: {s} ---")
+        print(scorecard.render())
+        all_ok = all_ok and scorecard.all_passed
+    if not surfaces:
+        print("no discovery corpus found for the requested surface", file=sys.stderr)
+        return 1
+    return 0 if all_ok else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -129,6 +159,12 @@ def main(argv: list[str] | None = None) -> int:
         default="reference",
         help="reference = offline oracle (default); http = live Discovery :8081",
     )
+    disc.add_argument(
+        "--surface",
+        choices=["all", *SURFACE_ORDER],
+        default="all",
+        help="scanner surface to score (default: all surfaces that have a corpus)",
+    )
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -143,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         return _cmd_run(args.corpus)
     if args.command == "discovery":
-        return _cmd_discovery(args.adapter)
+        return _cmd_discovery(args.adapter, args.surface)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")

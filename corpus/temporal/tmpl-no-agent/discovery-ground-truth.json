@@ -1,0 +1,10 @@
+{
+  "agent_repo": "tmpl-no-agent",
+  "target_system": "temporal",
+  "detected": false,
+  "agent_count": 0,
+  "action_patterns": [],
+  "risk_rank": 0,
+  "policy_generated": false,
+  "notes": "Plain Temporal workflow that only aggregates numbers in memory. No target-system action. True negative: the scanner must not flag it (false-positive guard)."
+}

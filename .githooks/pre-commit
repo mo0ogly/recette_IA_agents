@@ -98,7 +98,11 @@ fi
 # ==========================================================================
 # PYTHON
 # ==========================================================================
-mapfile -t PY < <(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+# Exclude corpus/ -- those .py are test SUBJECTS (intentionally diverse, importing
+# optional SDKs, duplicate module names by design). They are validated by the recette
+# tests, not type/lint-checked as product code (same scope as the docker/Makefile gates,
+# which only target recette/tests/scripts).
+mapfile -t PY < <(git diff --cached --name-only --diff-filter=ACM -- '*.py' | grep -v '^corpus/')
 if [ "${#PY[@]}" -gt 0 ]; then
   printf '[pre-commit] %d staged .py file(s).\n' "${#PY[@]}" >&2
   PYBIN="${REPO_ROOT}/.venv-pyaudit/bin"

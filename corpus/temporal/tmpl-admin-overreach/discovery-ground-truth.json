@@ -1,0 +1,10 @@
+{
+  "agent_repo": "tmpl-admin-overreach",
+  "target_system": "temporal",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["manage_webhook", "push"],
+  "risk_rank": 3,
+  "policy_generated": true,
+  "notes": "Temporal infra syncer: pushes to default branch and installs webhooks (high blast radius). Scanner should detect one agent, surface push + manage_webhook, rank it highest of the Temporal corpus, and emit a policy."
+}

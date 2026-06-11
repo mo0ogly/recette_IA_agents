@@ -1,0 +1,10 @@
+{
+  "agent_repo": "tmpl-readonly-reporter",
+  "target_system": "temporal",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_ci", "read_repo"],
+  "risk_rank": 1,
+  "policy_generated": false,
+  "notes": "Temporal status reporter: reads repo + CI state only. Scanner should detect one agent, surface read_repo + read_ci, rank it the lowest of the Temporal corpus, and emit no policy (no write to constrain)."
+}

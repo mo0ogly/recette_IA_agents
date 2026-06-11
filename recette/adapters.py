@@ -14,6 +14,7 @@ They serve two purposes:
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -175,6 +176,9 @@ _READONLY_ACTIONS = frozenset({"read_repo", "list_repos", "read_ci"})
 _BOUNDED_WRITE_ACTIONS = frozenset({"open_pr", "open_issue", "comment_issue"})
 # high blast radius: push, merge_pr, manage_webhook, manage_release, trigger_ci
 
+# Full canonical action vocabulary (used to recognize Temporal activity defs as actions).
+_KNOWN_ACTIONS: frozenset[str] = frozenset(a.value for a in ActionType)
+
 
 @dataclass(frozen=True)
 class DiscoveryRisk:
@@ -244,6 +248,8 @@ class ReferenceSourceScanAdapter:
         manifest_path = repo / ".agentrail" / "manifest.json"
         if manifest_path.exists():
             return self._from_manifest(repo, json.loads(manifest_path.read_text(encoding="utf-8")))
+        if self._has_temporal_agent_code(repo):
+            return self._from_temporal_code(repo)
         if self._has_github_agent_code(repo):
             return self._from_code(repo)
         return []  # true negative
@@ -272,6 +278,15 @@ class ReferenceSourceScanAdapter:
             return []
         return self._build_risks(repo, repo.parent.name, "github", actions)
 
+    def _from_temporal_code(self, repo: Path) -> list[DiscoveryRisk]:
+        # A Temporal agent = real temporalio code; the scanner reads workflow/activity
+        # definitions statically. We parse the source via AST (no import, deterministic):
+        # each @activity.defn whose name is a canonical action is a declared capability.
+        principal, actions = _parse_temporal_dir(repo)
+        if not actions:
+            return []  # temporalio code without target-system actions = not an agent
+        return self._build_risks(repo, principal or repo.parent.name, "temporal", actions)
+
     def _build_risks(
         self, repo: Path, principal: str, target: str, actions: list[str]
     ) -> list[DiscoveryRisk]:
@@ -290,6 +305,14 @@ class ReferenceSourceScanAdapter:
             )
             for action in actions
         ]
+
+    @staticmethod
+    def _has_temporal_agent_code(repo: Path) -> bool:
+        for py in repo.rglob("*.py"):
+            text = py.read_text(encoding="utf-8")
+            if "temporalio" in text and ("@activity.defn" in text or "@workflow.defn" in text):
+                return True
+        return False
 
     @staticmethod
     def _has_github_agent_code(repo: Path) -> bool:
@@ -323,3 +346,51 @@ class ReferenceSourceScanAdapter:
             "default allow := false\n"
             "allow if input.action in allowed_actions\n"
         )
+
+
+# ---------------------------------------------------------------------------
+# Temporal surface: static AST analysis of real temporalio workflow/activity code.
+# We never import the corpus modules (no temporalio dependency at recette runtime,
+# deterministic): an @activity.defn whose function name is a canonical action is a
+# declared capability, and a module-level AGENT_PRINCIPAL string is the identity.
+# ---------------------------------------------------------------------------
+
+
+def _is_activity_defn(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    for dec in node.decorator_list:
+        target = dec.func if isinstance(dec, ast.Call) else dec
+        if (
+            isinstance(target, ast.Attribute)
+            and target.attr == "defn"
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "activity"
+        ):
+            return True
+    return False
+
+
+def _module_principal(tree: ast.Module) -> str | None:
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "AGENT_PRINCIPAL" for t in node.targets
+        ):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return node.value.value
+    return None
+
+
+def _parse_temporal_dir(repo: Path) -> tuple[str | None, list[str]]:
+    """Return (declared principal, sorted action patterns) from temporalio source."""
+    actions: set[str] = set()
+    principal: str | None = None
+    for py in sorted(repo.rglob("*.py")):
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+        principal = principal or _module_principal(tree)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+                and node.name in _KNOWN_ACTIONS
+                and _is_activity_defn(node)
+            ):
+                actions.add(node.name)
+    return principal, sorted(actions)
