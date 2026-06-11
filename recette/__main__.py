@@ -139,6 +139,17 @@ def _cmd_discovery(adapter_name: str, surface: str) -> int:
     return 0 if all_ok else 1
 
 
+def _cmd_report(as_json: bool) -> int:
+    from .report import build_report
+
+    report = build_report()
+    if as_json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(report.render())
+    return 0 if report.all_passed else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="recette", description="AgentRail recette harness")
     parser.add_argument(
@@ -165,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         default="all",
         help="scanner surface to score (default: all surfaces that have a corpus)",
     )
+    rep = sub.add_parser("report", help="aggregate report: identification + all discovery surfaces")
+    rep.add_argument("--json", action="store_true", help="emit JSON instead of text")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -180,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_run(args.corpus)
     if args.command == "discovery":
         return _cmd_discovery(args.adapter, args.surface)
+    if args.command == "report":
+        return _cmd_report(args.json)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")

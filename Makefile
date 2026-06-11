@@ -1,5 +1,5 @@
 # AgentRail recette -- local + Docker lab targets.
-.PHONY: help install install-check validate run discovery test gates \
+.PHONY: help install install-check validate run discovery report test gates \
         docker-build lab lab-down docker-test docker-gates
 
 help:
@@ -9,7 +9,8 @@ help:
 	@echo "Local (needs python3 + .venv-pyaudit for gates):"
 	@echo "  make validate     schema-validate the corpus"
 	@echo "  make run          identification recette scorecard"
-	@echo "  make discovery    discovery recette (offline reference oracle)"
+	@echo "  make discovery    discovery recette (offline reference oracle, all surfaces)"
+	@echo "  make report       aggregate report (identification + all discovery surfaces)"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
 	@echo "Docker lab:"
@@ -35,6 +36,9 @@ run:
 
 discovery:
 	python3 -m recette discovery --adapter reference
+
+report:
+	python3 -m recette report
 
 test:
 	python3 -m unittest discover -s tests
