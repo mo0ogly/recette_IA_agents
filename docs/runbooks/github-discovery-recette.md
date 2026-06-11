@@ -11,6 +11,19 @@ against the ground-truth test-agent repositories in this repo.
   action coverage, target, relative risk ordering, determinism, policy presence, FP/FN).
 - An offline reference oracle so the recette is meaningful even before `:8081` is reachable.
 
+## Install (one shot)
+
+```bash
+make install          # native venv + Docker lab, each step smoke-tested
+make install-check    # report status only, change nothing
+```
+
+`scripts/install.sh` creates `.venv` (recette installed editable), bootstraps the audit
+venv (`.venv-pyaudit`), then verifies: `recette validate`, the offline discovery scorecard
+(`VERDICT: PASS`), the unittest suite, and -- when Docker is present -- builds the
+`runtime`/`audit` images and runs the container tests, strict gates, and the HTTP discovery
+recette against the mock `:8081`. Flags: `--no-docker`, `--with-real`, `--check`.
+
 ## 0. Docker lab (reproducible, recommended)
 
 Everything runs in a container so the toolchain (Python + audit tools) and the mock

@@ -1,8 +1,11 @@
 # AgentRail recette -- local + Docker lab targets.
-.PHONY: help install validate run discovery test gates \
+.PHONY: help install install-check validate run discovery test gates \
         docker-build lab lab-down docker-test docker-gates
 
 help:
+	@echo "Setup:"
+	@echo "  make install      install the platform (native venv + Docker lab, verified)"
+	@echo "  make install-check report install status, change nothing"
 	@echo "Local (needs python3 + .venv-pyaudit for gates):"
 	@echo "  make validate     schema-validate the corpus"
 	@echo "  make run          identification recette scorecard"
@@ -15,6 +18,13 @@ help:
 	@echo "  make docker-test  run the test suite in the image"
 	@echo "  make docker-gates run the strict gates in the image"
 	@echo "  make lab-down     stop the lab"
+
+# --- setup ---
+install:
+	scripts/install.sh
+
+install-check:
+	scripts/install.sh --check
 
 # --- local ---
 validate:

@@ -5,13 +5,17 @@
 #   docker compose run --rm gates           # run the strict Python gates
 #   docker compose run --rm tests           # run the full test suite
 #
-# The mock is a lab double of the colleague's Discovery/Enrichment Plane, backed by
-# the reference oracle. Swap AGENTRAIL_DISCOVERY_URL to point at the real service.
+# discovery-mock + recette use the lean "runtime" image; gates + tests use the
+# "audit" image (adds ruff/mypy/bandit/pytest + tests/ + scripts/). The mock is a
+# lab double of the colleague's Discovery/Enrichment Plane, backed by the reference
+# oracle. Swap AGENTRAIL_DISCOVERY_URL to point recette at the real service.
 
 services:
   discovery-mock:
-    build: .
-    image: railgun-recette:latest
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
     command: python -m recette.discovery_mock
     ports:
       - "8081:8081"
@@ -23,8 +27,10 @@ services:
       start_period: 2s
 
   recette:
-    image: railgun-recette:latest
-    build: .
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
     depends_on:
       discovery-mock:
         condition: service_healthy
@@ -34,8 +40,10 @@ services:
     command: python -m recette discovery --adapter http
 
   gates:
-    image: railgun-recette:latest
-    build: .
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
     command: >
       sh -c "ruff check recette tests scripts &&
              ruff format --check recette tests scripts &&
@@ -44,6 +52,8 @@ services:
              echo 'gates: PASS'"
 
   tests:
-    image: railgun-recette:latest
-    build: .
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
     command: python -m unittest discover -s tests
