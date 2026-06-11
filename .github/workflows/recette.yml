@@ -1,0 +1,34 @@
+name: recette
+
+# Runs the full recette in the Docker lab so CI == local. Build the images once, then
+# run the strict gates, the test suite, the offline aggregate report, and the HTTP
+# discovery recette against the mock Discovery service (all four surfaces).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  recette:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build lab images (runtime + audit)
+        run: docker compose build
+
+      - name: Strict gates (ruff + ruff format + mypy + bandit)
+        run: docker compose run --rm gates
+
+      - name: Test suite
+        run: docker compose run --rm tests
+
+      - name: Aggregate report (identification + all discovery surfaces, offline)
+        run: docker compose run --rm recette python -m recette report
+
+      - name: HTTP discovery recette vs mock :8081 (all surfaces)
+        run: docker compose run --rm recette
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --remove-orphans
