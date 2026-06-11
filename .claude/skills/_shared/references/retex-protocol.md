@@ -66,32 +66,24 @@ Cout cycle : {cost_tokens} tokens (~${cost_estimate_usd}) -- relever depuis la s
 | C5 Tracabilite | /10 |
 
 Boucles OODA : {N} cycles
-Build pipeline Go : {score}/5
+Build pipeline Rust : {score}/5
+Build pipeline Python : {score}/5
 Build pipeline React : {score}/8
 
 Ce qui a fonctionne : ...
 Ce qui a echoue : ...
 Ameliorations cycle N+1 : ...
 
-## Rules count delta (c{prev} -> c{curr})  -- MANDATORY for rule-touching cycles
+## Recette corpus delta (c{prev} -> c{curr})  -- si le cycle touche le corpus d'agents de test
 
-> Same rule as APEX template. Generate via:
-> `python3 scripts/rules_inventory.py --retex-stub --cycle {curr}`
-> Paste output here. If cycle is filter/tooling/docs/audit-only, state
-> explicitly "zero rule modification expected -- inventory delta +0
-> confirmed" with snapshot paths.
+> Same rule as APEX template. Generate via `python3 -m recette validate`.
+> If cycle is tooling/docs/audit-only, state explicitly "zero corpus
+> modification expected -- delta +0 confirmed".
 
-- grand_total: {delta}
-- liaprobe.total: {delta}
-- liaprobe.enabled: {delta}
-- liaprobe.disabled: {delta}
-- lia_scan.total: {delta}
-
-Snapshot files:
-- `_alire/tracking/liaprobe-fingerprint-rebuild/inventory/RULES_INVENTORY_<date>_c{prev}.json`
-- `_alire/tracking/liaprobe-fingerprint-rebuild/inventory/RULES_INVENTORY_<date>_c{curr}.json`
-
-Engine baseline (16641 corpus): {PASS} / {FAIL} / {ERROR} {unchanged | regressed | improved}.
+- corpus.agents.total: {delta}
+- corpus.correct: {delta}
+- corpus.incorrect: {delta}
+- detection_rate / accuracy-per-dimension: {unchanged | regressed | improved}
 ```
 
 ---
@@ -184,45 +176,3 @@ Engine baseline (16641 corpus): {PASS} / {FAIL} / {ERROR} {unchanged | regressed
    - Logger evolution SCORING_CONFIG
    - Logger evolution swarm memory
 3. **AFFICHER le RETEX** dans la conversation (pas juste ecrire le fichier)
-
----
-
-## Rules count delta -- protocole obligatoire (c52+)
-
-Incident pattern: cycles c1-c49 produisaient des rapports partiels (1226
-web-sigs, 4335 patterns, 211 audit subset) sans metric commune. User
-feedback c50: "pas ok faut instrumentalise je veux pas tout recommencer
-tout a chque fois". c52 enforce.
-
-### Procedure obligatoire Phase 5 COMPLETE
-
-```bash
-# 1. Take snapshot at cycle close (BEFORE writing RETEX)
-cd /opt/lia-sec/dev
-python3 scripts/rules_inventory.py --snapshot --cycle <N> --note "<short context>"
-
-# 2. Generate ready-to-paste markdown block
-python3 scripts/rules_inventory.py --retex-stub --cycle <N>
-
-# 3. Paste output into the "Rules count delta" section of the RETEX
-```
-
-### Cas exception (cycle sans modif rule corpus)
-
-Toujours inclure la section. Si delta +0 attendu, ecrire explicitement :
-
-```
-## Rules count delta (c{prev} -> c{curr})
-- grand_total: +0 (audit-only / tooling-only / filter-only / docs-only -- justifie ici)
-Snapshot files: ... (inclure quand meme pour tracabilite)
-```
-
-### Tool reference
-
-- Script: `scripts/rules_inventory.py` (c50)
-- Protocol rule: `.claude/rules/liaprobe-rules-inventory.md`
-- Inventory dir: `_alire/tracking/liaprobe-fingerprint-rebuild/inventory/`
-- Modes: `--snapshot`, `--history`, `--diff`, `--retex-stub` (c52)
-
-Cycle ne peut PAS cloturer (librarian-gate) si la section "Rules count
-delta" est absente d'un cycle qui touche du code fingerprint/rules.
