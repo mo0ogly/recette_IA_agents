@@ -19,9 +19,9 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
     "security": {
       "weight": 20,
       "checks": [
-        {"id": "SEC-01", "name": "No raw fetch()", "type": "grep_count", "pattern": "await fetch(", "scope": "services/", "exclude": ["apiConfig.ts", "loggerService.ts"], "target": 0},
+        {"id": "SEC-01", "name": "No hardcoded URL in fetch()", "type": "grep_count", "pattern": "fetch\\(['\\\"]https?://", "scope": "services/", "target": 0, "description": "fetch is allowed; the base URL must come from config (R5), never a literal in the call"},
         {"id": "SEC-02", "name": "No hardcoded URLs", "type": "grep_count", "pattern": "localhost:8081", "target": 0},
-        {"id": "SEC-03", "name": "No console.log", "type": "grep_count", "pattern": "console.log", "scope": "src/", "exclude": ["loggerService.ts"], "target": 0},
+        {"id": "SEC-03", "name": "No console.log", "type": "grep_count", "pattern": "console.log", "scope": "src/", "target": 0, "description": "Frontend uses a structured logger (R6), never console.log"},
         {"id": "SEC-04", "name": "No println/dbg logging (use tracing)", "type": "grep_count", "pattern": "println!|eprintln!|dbg!", "scope": "src/", "exclude_pattern": "#\\[cfg\\(test\\)\\]", "target": 0},
         {"id": "SEC-05", "name": "No SQL injection (dynamic query)", "type": "grep_count", "pattern": "format!.*(SELECT|INSERT|UPDATE|DELETE)", "scope": "src/", "target": 0},
         {"id": "SEC-06", "name": "No vulnerable deps (RUSTSEC)", "type": "command", "cmd": "cargo audit 2>&1 | grep -cE 'Severity: (high|critical)'", "expect": "0"},
@@ -46,7 +46,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
       "weight": 15,
       "checks": [
         {"id": "ARC-01", "name": "tracing instrumentation adoption", "type": "adoption_rate", "pattern": "tracing::|#\\[instrument", "scope": "src/**/*.rs", "target": ">80%", "description": "Structured logging via tracing, not println"},
-        {"id": "ARC-02", "name": "customLogger adoption", "type": "adoption_rate", "pattern": "customLogger", "scope": "agentrail-console/src/services/*.ts", "target": ">80%"},
+        {"id": "ARC-02", "name": "Structured frontend logging", "type": "manual", "description": "Frontend services use a structured logger (not console.*); base URL comes from config, never hardcoded"},
         {"id": "ARC-03", "name": "Control-plane mediation (I2)", "type": "manual", "description": "No direct agent->external path bypassing the Gateway; all side-effects via controlled proxies (I5)"},
         {"id": "ARC-04", "name": "Migrations numbered", "type": "count_files", "pattern": "migrations/*.sql", "scope": "migrations/"},
         {"id": "ARC-05", "name": "Axum CORS layer present", "type": "grep_count", "pattern": "CorsLayer", "scope": "src/", "target": ">0", "description": "Gateway router applies a tower-http CorsLayer (deny-by-default policy)"}

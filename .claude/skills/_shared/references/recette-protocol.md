@@ -76,7 +76,7 @@ Skill({skill: "react-recette", args: "{fichier ou repertoire}"})
 - Bloc C Vercel performance (20) : imports directs, Promise.all, dependencies primitives, memo, setState fonctionnel, lazy init, rendu conditionnel, cache localStorage, event listeners, JSX hisse, await differe, etat derive, lecture differee, startTransition, content-visibility, Map lookups, iterations fusionnees, early return, SWR/React Query, handlers refs
 - Bloc D react-doctor : PASS/FAIL
 - Bloc E R17 Contract Gate (4) : fixture, render-assert, smoke Playwright, unwrap envelope
-- Bloc F legacy health (4) : fetchWithConfig, no raw fetch, no API_BASE_URL, no console.*
+- Bloc F hygiene (4) : fetch base URL from config (R5), no hardcoded URL, structured logger, no console.*
 
 **Verdicts :**
 - >= 36/40 (A+B+C) ET 0 critique : PASS
@@ -218,7 +218,7 @@ curl -s -H "Authorization: Bearer $TOKEN" https://agentrail.example/api/endpoint
 ```tsx
 // __tests__/{Component}.test.tsx
 import fixture from '../__fixtures__/{Component}.fixture.json';
-// Mock fetchWithConfig -> retourne fixture
+// Mock fetch -> retourne fixture
 // Render composant
 // Assert : 0 throw, element attendu present, cas erreur 500 sans crash
 ```

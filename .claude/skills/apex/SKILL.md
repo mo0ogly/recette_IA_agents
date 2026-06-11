@@ -242,7 +242,7 @@ Before launching parallel agents, prepare a **Swarm Context Sheet** included in 
 
 1. **Parent behavior**: what the parent component already does (auto-refresh, error handling, data loading) so children do not duplicate
 2. **UI patterns**: components used for error states (`<Alert severity="error">`), loading (`CircularProgress`), feedback (`Snackbar`), empty states -- for cross-tab consistency
-3. **Mandatory checklist**: HelpButton (component+tabKey), borderRadius:1, fontFamily:'inherit', customLogger, no console.log
+3. **Mandatory checklist**: HelpButton (component+tabKey), borderRadius:1, fontFamily:'inherit', structured logger, no console.log
 4. **Shared state contract**: which props come from parent, which callbacks are available, what the agent MUST NOT re-implement
 
 ### Swarm Memory (if `--swarms`)
@@ -288,9 +288,9 @@ Convention check: `logging` not `print`, no bare `except`, no `eval`/`exec`/`pic
 **React files**: follow [build-pipeline-react.md](../_shared/references/build-pipeline-react.md) after each .tsx/.ts write:
 0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `agentrail-console/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Past incidents (component crash on undefined payload + dashboard contract drift requiring multiple correction passes) mandated this pre-build gate.
 1. BUILD: `vite build` zero TS errors
-2. IMPORT: fetchWithConfig (not fetch), getBackendUrl (not hardcode)
+2. IMPORT: fetch with base URL from config (R5, never hardcode the URL)
 3. THEME: fontFamily:'inherit', no hardcoded hex, theme.palette.*
-4. LOGGER: customLogger (not console.log)
+4. LOGGER: structured logger (R6, not console.log)
 5. CHIP: borderRadius:1 on all Chip/badge
 6. HELP (BLOQUANT): INSERT ui_help_content AVANT HelpButton, verify SELECT, FAIL si contenu absent
 7. TEST: `/test-first` via Skill tool (runs the contract test from step 0 against the captured fixture)

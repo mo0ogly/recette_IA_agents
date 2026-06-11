@@ -102,12 +102,12 @@ Task Delegation — general-purpose (EXECUTOR role)
 Session:      pdca-grc-001-20260402
 Phase:        A
 Step:         A.2
-Objective:    Fix SEC-01 violations (raw fetch) in GRC services
+Objective:    Fix SEC-01 violations (hardcoded backend URL) in GRC services
 Input:        pdca/grc/cycle_001/A_REMEDIATION/phase_1_critical.md
-Constraints:  R6, fetchWithConfig only, verify imports after each file
+Constraints:  R5 (no hardcoded URL), R6, verify imports after each file
 Autonomy:     SUPERVISED (>5 files affected)
-Expected out: All fetch() replaced with fetchWithConfig(), build passes
-Success:      grep "await fetch(" returns 0 results in scope, vite build passes
+Expected out: All hardcoded URLs replaced with config base URL, build passes
+Success:      grep for hardcoded http URL returns 0 results in scope, vite build passes
 Failure:      Build fails or new violations introduced
 Budget:       Max 10 files per batch, gate after each
 ```

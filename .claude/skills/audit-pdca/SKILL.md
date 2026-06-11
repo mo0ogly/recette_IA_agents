@@ -245,7 +245,7 @@ For each fix, cycle:
 **BUILD GATE** (after each file modification):
 - **Rust files**: follow `build-pipeline-rust.md` (5 gates: cargo build, cargo fmt --check, cargo clippy -D warnings, cargo test, conventions). Invoke `rust-best-practices` + `error-handling-patterns` skills BEFORE writing.
 - **Python files**: follow `build-pipeline-python.md` (ruff check + ruff format --check + mypy + bandit MEDIUM+ + pytest; pip-audit at package level). Tools in `.venv-pyaudit/bin/`.
-- **React files**: follow `build-pipeline-react.md` (8 gates: tsc, vite build, imports, fetchWithConfig, theme, Grid v7, logger, HelpButton)
+- **React files**: follow `build-pipeline-react.md` (8 gates: tsc, vite build, imports, fetch base URL from config, theme, Grid v7, logger, HelpButton)
 - **/test-first**: invoke automatically after each handler/component creation or modification
 
 **OBSERVE**: build gate + vet gate + test gate results
@@ -532,7 +532,7 @@ FAIL = any pattern A/B/C/D/E/F/G/H found -> fix all occurrences, return to Phase
 
 **Triggers** — component must pass this gate if ALL true:
 - File matches `*Tab.tsx`, `*Panel.tsx`, `*Status.tsx`, `*Dashboard.tsx`, `*Manager.tsx`, `*Editor.tsx`
-- AND contains `fetchWithConfig` or a direct service function call returning API data
+- AND contains a `fetch` call or a direct service function call returning API data
 
 For each qualifying component:
 0. If no API Handoff document exists for this endpoint: run `/api-handoff {feature} --r17` to capture the contract before writing tests

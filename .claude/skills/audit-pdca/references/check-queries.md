@@ -7,9 +7,9 @@
 
 | Check ID | Type | Query / Commande | Target | Scope |
 |----------|------|-------------------|--------|-------|
-| SEC-01 | grep_count | `grep -rn "await fetch(" {scope}/services/ --include="*.ts" --exclude="apiConfig.ts" --exclude="loggerService.ts"` | 0 | Frontend -- fetch() brut hors fetchWithConfig |
+| SEC-01 | grep_count | `grep -rnE "fetch\(['\"]https?://" {scope}/services/ --include="*.ts"` | 0 | Frontend -- fetch() avec URL hardcodee (base URL doit venir de la config, R5) |
 | SEC-02 | grep_count | `grep -rn "localhost:8081" {scope}` | 0 | Tous -- URLs hardcodees |
-| SEC-03 | grep_count | `grep -rn "console.log" {scope}/src/ --include="*.ts" --include="*.tsx" --exclude="loggerService.ts"` | 0 | Frontend -- console.log |
+| SEC-03 | grep_count | `grep -rn "console.log" {scope}/src/ --include="*.ts" --include="*.tsx"` | 0 | Frontend -- console.log (utiliser un logger structure, R6) |
 | SEC-04 | grep_count | `grep -rn "println!\|eprintln!\|dbg!" {scope}/src/ --include="*.rs"` (exclure tests) | 0 | Backend -- logging via println au lieu de tracing |
 | SEC-05 | grep_count | `grep -rnE "format!.*(SELECT\|INSERT\|UPDATE\|DELETE)" {scope} --include="*.rs"` | 0 | Backend -- SQL injection (dynamic query au lieu de bind params sqlx/diesel) |
 | SEC-06 | command | `cargo audit 2>&1 \| grep -cE "Severity: (high\|critical)"` | 0 | Backend -- RUSTSEC advisories vulnerables (deps) |

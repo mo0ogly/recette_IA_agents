@@ -19,8 +19,8 @@ GATE 1: BUILD
     v
 GATE 2: IMPORT
     |-- @mui/material : imports directs (Button from '@mui/material/Button')
-    |-- fetchWithConfig depuis '../config/apiConfig' (JAMAIS fetch() brut)
-    |-- customLogger depuis '../services/loggerService' (JAMAIS console.log)
+    |-- fetch() avec base URL depuis config (JAMAIS d'URL hardcodee -- R5)
+    |-- structured logger (JAMAIS console.log -- R6)
     |-- useTheme depuis '@mui/material/styles'
     |
     v
@@ -32,7 +32,7 @@ GATE 3: THEME
     v
 GATE 4: LOGGER
     |-- Zero console.log/warn/error/info
-    |-- customLogger.info/warn/error partout
+    |-- structured logger info/warn/error partout
     |
     v
 GATE 5: CHIP
@@ -91,22 +91,21 @@ ALL 9 GATES PASSED -> fichier pret pour phase RECETTE
 <Grid item xs={12} md={8}>
 ```
 
-### fetchWithConfig (CRITIQUE)
+### fetch with config-driven base URL (CRITIQUE)
 ```tsx
-// CORRECT
-import { fetchWithConfig } from '../config/apiConfig';
-const response = await fetchWithConfig('/api/endpoint');
+// CORRECT -- plain fetch; base URL injected from config, never hardcoded (R5)
+const base = import.meta.env.VITE_API_BASE_URL; // from env/config, not a literal
+const response = await fetch(`${base}/api/endpoint`, { headers: authHeaders });
 
 // INTERDIT
-const response = await fetch(url);
-const response = await fetch(`${API_BASE_URL}/api/endpoint`);
+const response = await fetch('http://localhost:8081/api/endpoint'); // hardcoded URL
 ```
 
-### ConfigurationService (pour URLs)
+### Backend URL from config (downloads, websocket)
 ```tsx
-// CORRECT (downloads, websocket)
-import { getBackendUrl } from '../../services/ConfigurationService';
-const url = `${getBackendUrl()}/api/download/file`;
+// CORRECT -- read the backend URL from config (R5)
+const base = import.meta.env.VITE_API_BASE_URL;
+const url = `${base}/api/download/file`;
 
 // INTERDIT
 const API_BASE = 'http://localhost:8081';
@@ -125,9 +124,8 @@ backgroundColor: 'rgba(255, 165, 0, 0.15)'
 
 ### Logger
 ```tsx
-// CORRECT
-import { customLogger } from '../../services/loggerService';
-customLogger.info('COMPONENT', 'message', { data });
+// CORRECT -- structured logger (R6), never console.log
+logger.info('COMPONENT', 'message', { data });
 
 // INTERDIT
 console.log('debug:', data);
@@ -172,7 +170,7 @@ const a = await fetch1(); const b = await fetch2();       // INTERDIT
 | Gate | Points | Quand 1 point |
 |------|--------|---------------|
 | BUILD (vite build) | /1 | exit 0 |
-| IMPORT (directs, fetchWithConfig, customLogger) | /1 | 0 violation |
+| IMPORT (directs, fetch base URL from config, structured logger) | /1 | 0 violation |
 | THEME (pas de hex hardcode) | /1 | 0 violation |
 | LOGGER (zero console.*) | /1 | 0 violation |
 | CHIP (borderRadius: 1) | /1 | 0 violation |

@@ -48,8 +48,8 @@
       "HelpButton component+tabKey (pas helpId)",
       "borderRadius: 1 sur Chip",
       "fontFamily: 'inherit'",
-      "customLogger (pas console.log)",
-      "fetchWithConfig (pas fetch brut)",
+      "structured logger (pas console.log)",
+      "fetch base URL depuis config (pas d'URL hardcodee)",
       "MUI Grid v7 size={{ xs: 12, md: 8 }}"
     ],
     "shared_state_contract": "description des props parent, callbacks, ce que l'agent NE doit PAS reimplementer"
