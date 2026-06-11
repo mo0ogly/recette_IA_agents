@@ -64,10 +64,10 @@ Legend: DONE / PARTIAL / TODO.
 
 | Surface | GitHub | GitLab | OpenAPI | Temporal | Manifest/MCP |
 |---------|--------|--------|---------|----------|--------------|
-| corpus subjects | DONE (4) | TODO | TODO | DONE (4) | TODO |
-| reference oracle | DONE | TODO | TODO | DONE (AST) | TODO |
-| ground-truth schema | DONE | reuse | reuse | DONE (reuse) | TODO |
-| http adapter wiring | PARTIAL (assumed routes) | -- | -- | DONE (same oracle/mock) | -- |
+| corpus subjects | DONE (4) | TODO | DONE (4) | DONE (4) | DONE (4) |
+| reference oracle | DONE | TODO | DONE (json) | DONE (AST) | DONE (manifest) |
+| ground-truth schema | DONE | reuse | DONE (reuse) | DONE (reuse) | DONE (reuse) |
+| http adapter wiring | PARTIAL (assumed routes) | -- | DONE (same oracle/mock) | DONE (same oracle/mock) | DONE (same oracle/mock) |
 | publisher | DONE (GitHub) | TODO | n/a | n/a | n/a |
 
 ### Identification recette (corpus/agents -> IdentificationAdapter -> 4-dim scorecard)
@@ -87,7 +87,8 @@ Legend: DONE / PARTIAL / TODO.
 | One-shot installer + smoke tests | DONE |
 | Strict gates (ruff/mypy/bandit) green | DONE |
 | Ed25519 bundle contract recette | TODO (in scope, M5) |
-| CI pipeline (gates + recette on push) | TODO |
+| CI pipeline (gates + recette on push) | BLOCKED (M7 workflow written; needs gh token `workflow` scope to push) |
+| Aggregate report (`recette report`) | DONE (M9) |
 | Real API wiring confirmed with colleague | TODO (blocked on his routes) |
 | UX control console (launch/stop/monitor + Monaco + config) | TODO (Track U) |
 
@@ -214,16 +215,16 @@ identification). The remaining surfaces follow the resolved order Temporal -> Op
 Manifest/MCP.
 
 ```
-M0 GitHub (done)
+M0 GitHub                         DONE
   -> M3 Temporal (real SDK)         DONE 2026-06-11
-  -> M2 OpenAPI                     <- next
-  -> M1 Manifest/MCP
-  -> M8 orthogonality audit (all surfaces)
+  -> M2 OpenAPI                     DONE 2026-06-11
+  -> M1 Manifest/MCP                DONE 2026-06-11
+  -> M9 aggregate report            DONE 2026-06-11 (brought forward)
+  -> M7 CI                          BLOCKED (needs gh token `workflow` scope)
+  -> M8 orthogonality audit (all surfaces)   <- next
   -> M4 GitLab parity
   -> M5 Ed25519 bundle contract
-  -> M9 aggregate report
   -> M6 real API wiring (when colleague unblocks)
-  -> M7 CI
 
 Track U (UX console) runs in parallel once M3 lands -- it needs at least one
 non-GitHub surface to be worth wiring, and an API layer (U1) it can drive.
