@@ -69,11 +69,25 @@ Un agent INCORRECT casse EXACTEMENT UNE des 4 dimensions (le `violation_type` co
 les 3 autres restent conformes. Cela rend l'accuracy par dimension mesurable et chaque cas
 negatif mono-axe. Un test (`test_each_negative_breaks_exactly_one_dimension`) le verifie.
 
+## Deux recettes : identification (action-log) et discovery (repos)
+
+- **Identification** (`corpus/agents/`) : agents = action-logs deterministes (manifest +
+  scenario), juges sur 4 dimensions. CLI : `python -m recette run`.
+- **Discovery** (`corpus/repos/`) : agents = vrais repos GitHub publiables (code + CI/CD +
+  manifest `.agentrail`) que le GitHubScanner du collegue scanne. Ground-truth = proprietes
+  INVARIANTES (detection, count/dedup, couverture action_pattern, target, ordre relatif de
+  risque, determinisme I7, presence de policy) -- jamais les valeurs opaques
+  (`canonical_agent_id`, score exact). CLI : `python -m recette discovery --adapter reference|http`.
+  Publication des repos : `python -m recette publish <slug> --owner <org> [--apply]`
+  (dry-run par defaut). Detail : `docs/runbooks/github-discovery-recette.md`.
+
 ## Invocation
 
 ```
-python3 -m recette validate    # schema-valide tout le corpus
-python3 -m recette run         # joue le corpus -> scorecard (detection rate, accuracy/dimension, FP/FN)
+python3 -m recette validate                      # schema-valide agents + repos discovery
+python3 -m recette run                           # identification -> scorecard 4 dimensions
+python3 -m recette discovery --adapter reference # discovery -> scorecard invariants (offline oracle)
+python3 -m recette publish <slug> --owner <org>  # publie un repo de test (dry-run)
 python3 -m unittest discover -s tests
 ```
 

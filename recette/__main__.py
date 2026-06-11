@@ -84,6 +84,16 @@ def _cmd_run(corpus_root: Path) -> int:
     return 0 if scorecard.all_passed else 1
 
 
+def _cmd_publish(slug: str, owner: str, visibility: str, apply: bool) -> int:
+    from .publish import publish_repo
+
+    plan = publish_repo(slug, owner, visibility=visibility, dry_run=not apply)
+    print(plan.render())
+    if not apply:
+        print("\n(dry-run -- nothing created. Re-run with --apply to create the repo.)")
+    return 0
+
+
 def _cmd_discovery(adapter_name: str) -> int:
     if adapter_name == "reference":
         adapter = None  # harness default = ReferenceSourceScanAdapter
@@ -117,6 +127,11 @@ def main(argv: list[str] | None = None) -> int:
         default="reference",
         help="reference = offline oracle (default); http = live Discovery :8081",
     )
+    pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
+    pub.add_argument("slug", help="repo slug under corpus/repos/")
+    pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
+    pub.add_argument("--visibility", choices=["private", "public"], default="private")
+    pub.add_argument("--apply", action="store_true", help="actually create + push (default: dry-run)")
 
     args = parser.parse_args(argv)
     if args.command == "validate":
@@ -125,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_run(args.corpus)
     if args.command == "discovery":
         return _cmd_discovery(args.adapter)
+    if args.command == "publish":
+        return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")
     return 2
 
