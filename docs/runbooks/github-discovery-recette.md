@@ -11,6 +11,25 @@ against the ground-truth test-agent repositories in this repo.
   action coverage, target, relative risk ordering, determinism, policy presence, FP/FN).
 - An offline reference oracle so the recette is meaningful even before `:8081` is reachable.
 
+## 0. Docker lab (reproducible, recommended)
+
+Everything runs in a container so the toolchain (Python + audit tools) and the mock
+Discovery service are identical for everyone:
+
+```bash
+make docker-build            # build the lab image
+make lab                     # discovery recette over HTTP vs the mock :8081 -> scorecard PASS
+make docker-test             # full test suite in the image (51 tests)
+make docker-gates            # strict ruff + ruff format + mypy + bandit -> gates PASS
+make lab-down                # stop the lab
+```
+
+`make lab` starts `discovery-mock` (a stdlib `:8081` service backed by the reference
+oracle -- a lab double of the colleague's Discovery/Enrichment Plane) and runs the
+`recette` service against it over the Docker network. To target the colleague's REAL
+service instead, set `AGENTRAIL_DISCOVERY_URL` on the `recette` service in
+`docker-compose.yml` (or run `recette discovery --adapter http` with that env locally).
+
 ## A. Offline pre-flight (no scanner needed)
 
 ```bash
