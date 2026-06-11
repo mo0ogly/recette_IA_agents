@@ -36,6 +36,26 @@ Plus a downstream contract: Risk Scoring Engine -> **Ed25519-signed policy bundl
 
 ---
 
+## 0bis. Agent execution model -- HYBRID, two lanes (resolved 2026-06-11)
+
+The structural decision that shapes the whole platform and Track U:
+
+- **Lane A -- Ground-truth corpus (the measurable recette).** Deterministic subjects
+  (action-logs, repo trees, OpenAPI specs, Temporal workflows). I4/I7-safe: a re-run is
+  byte-identical. This is the ONLY lane scored against ground-truth. ALL existing work
+  (M0) and every surface milestone (M1-M9) live here.
+- **Lane B -- Live LLM agents (realism/demo in the console).** Agents driven by real AIs
+  for the "most-real-possible" experience. Inherently non-deterministic, so **every run is
+  RECORDED** (prompt / response / actions -> event log) to stay replayable after the fact.
+  Lane B output is NEVER used as ground-truth; it powers the console's launch / monitor /
+  debug experience only.
+
+Consequence: Track U's "configure AIs" + "launch/stop agents live" are Lane B; the
+scorecards and surface milestones stay Lane A. The two lanes share the canonical
+`AgentActionEvent` shape and the forge abstraction, never the ground-truth role.
+
+---
+
 ## 1. Coverage matrix (current truth)
 
 Legend: DONE / PARTIAL / TODO.
@@ -175,8 +195,12 @@ DoD: single command produces the full recette verdict for a release gate.
    history, assert re-run yields identical event sets.
 4. **GitLab discovery (M4)** -- after the surfaces are covered (kept at M4).
 5. **UX console (Track U)** -- NEW requirement: a console to launch/stop/integrate/monitor
-   agents, a Monaco debug view, and a config area for agents + AIs. See Track U + its open
-   decisions (section 6).
+   agents, a Monaco debug view, and a config area for agents + AIs. See Track U (section 6).
+6. **Agent execution model** -- RESOLVED: **hybrid, two lanes** (see 0bis below).
+   Lane A = deterministic ground-truth corpus (the measurable recette, I4-safe).
+   Lane B = live LLM-powered agents for realism/demo in the console, every run RECORDED,
+   NEVER used as ground-truth.
+7. **API backend** -- RESOLVED: **FastAPI (Python)**, reuses the recette package directly.
 
 ---
 
@@ -240,13 +264,11 @@ DoD: select a running agent -> Monaco shows its definition + live event trace.
 - Persisted config in a single versioned source (R5), never hardcoded.
 DoD: create/edit an agent + an AI backend from the UI; config round-trips and validates.
 
-### Track U open decisions
-- **Agent execution model** -- are these test agents deterministic scripted action-logs
-  (current model, replay-safe, I4) OR live LLM-powered agents (most-real, but
-  non-deterministic)? If LLM-powered, runs must be recorded to stay replayable.
-- **API backend** -- FastAPI (Python, reuses recette directly) vs Axum (Rust, matches
-  the platform but reimplements glue). Recommend FastAPI for the recette.
-- **Real-time transport** -- SSE (simpler) vs WebSocket (bidirectional). Recommend SSE
-  for one-way event streaming, WebSocket only if interactive control needs it.
-- **Scope/timing** -- start Track U after M3 (one real non-GitHub surface exists), or
-  earlier as a thin shell over GitHub-only.
+### Track U decisions (resolved 2026-06-11)
+- **Agent execution model** -- RESOLVED: **hybrid two-lane** (section 0bis). Lane A drives
+  the scorecards (deterministic); Lane B drives live LLM agents in the console (recorded).
+- **API backend** -- RESOLVED: **FastAPI (Python)**, reuses the recette package directly.
+- **Real-time transport** -- OPEN: SSE (recommended, one-way event streaming) vs WebSocket
+  (only if interactive control needs it). Decide at U1.
+- **Scope/timing** -- RESOLVED: start Track U after M3 (one real non-GitHub surface exists)
+  and once U1 (the FastAPI layer) is in place.
