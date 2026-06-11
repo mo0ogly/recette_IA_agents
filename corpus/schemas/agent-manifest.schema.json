@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrail.local/schemas/agent-manifest.schema.json",
+  "title": "AgentRail recette -- test agent manifest",
+  "description": "What a test agent DECLARES about itself: identity and capability scope. Discovery and identification are validated against the ground-truth, not this manifest -- a deliberately-incorrect agent declares one thing here and does another at runtime.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "name", "target_systems", "declared_identity", "capability_scope", "runtime", "version"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Stable unique id (slug). Used to bind ground-truth and discovery results.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "target_systems": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "enum": ["github", "gitlab"] },
+      "uniqueItems": true
+    },
+    "declared_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["auth_method", "principal"],
+      "properties": {
+        "auth_method": {
+          "type": "string",
+          "enum": ["pat", "oauth_app", "github_app", "gitlab_application", "deploy_token", "ci_job_token", "ssh_key"]
+        },
+        "principal": {
+          "type": "string",
+          "description": "Declared principal (bot username, app slug, service account)."
+        },
+        "key_ref": {
+          "type": "string",
+          "description": "Env var name holding the credential (NEVER the secret itself, see no-hardcoded-secrets)."
+        }
+      }
+    },
+    "capability_scope": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Declared allowed actions. Identification checks observed actions stay within this set.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "mode", "resources"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read_repo", "list_repos", "open_issue", "comment_issue", "open_pr", "merge_pr", "push", "manage_webhook", "manage_release", "read_ci", "trigger_ci"]
+          },
+          "mode": { "type": "string", "enum": ["read", "write"] },
+          "resources": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Repo globs the action is allowed on, e.g. 'acme/*' or 'group/project'.",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lab_mode", "real_mode"],
+      "properties": {
+        "language": { "type": "string", "description": "Implementation language (informational; discovery observes behavior, not source)." },
+        "entrypoint": { "type": "string", "description": "Relative path to the agent runnable, when present." },
+        "lab_mode": { "type": "boolean", "description": "Runs against the simulated GitHub/GitLab lab." },
+        "real_mode": { "type": "boolean", "description": "Runs against real test orgs/repos with real tokens." }
+      }
+    },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+  }
+}

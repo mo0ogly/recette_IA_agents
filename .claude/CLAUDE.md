@@ -276,6 +276,7 @@ reelle + render-and-assert + unwrap de l'enveloppe de reponse. Detail :
 
 | Fichier | Sujet |
 |---------|-------|
+| `.claude/rules/recette-corpus.md` | Conventions du corpus d'agents de test GitHub/GitLab (cible lab/reel, 4 dimensions, positifs+negatifs) |
 | `.claude/rules/invariants.md` | I1-I6 detail + checklist par invariant (LOI) |
 | `.claude/rules/canonical-event-model.md` | Schema AgentActionEvent, versioning |
 | `.claude/rules/architecture-planes.md` | Control/Data/Audit -- responsabilites, frontieres |

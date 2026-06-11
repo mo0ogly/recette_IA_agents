@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrail.local/schemas/ground-truth.schema.json",
+  "title": "AgentRail recette -- test agent ground-truth",
+  "description": "What the recette EXPECTS the discovery and identification tools to conclude for this agent. The harness compares tool output against this file. Covers the 4 correctness dimensions: identity (I3), declared-vs-real capabilities, policy conformance, behavior.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "category", "expected_discovery", "expected_identification", "expected_verdict", "rationale"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Must match the agent_id in the sibling manifest.json.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "category": { "type": "string", "enum": ["correct", "incorrect"] },
+    "violation_type": {
+      "type": "string",
+      "description": "Required when category=incorrect: which correctness axis is broken.",
+      "enum": ["identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"]
+    },
+    "expected_discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detectable"],
+      "properties": {
+        "detectable": { "type": "boolean", "description": "Should discovery find this agent?" },
+        "signals": {
+          "type": "array",
+          "description": "Observable signals discovery is expected to key on.",
+          "items": { "type": "string", "enum": ["api_traffic", "credential_usage", "registered_app", "webhook_activity", "event_stream"] },
+          "uniqueItems": true
+        },
+        "min_actions_to_detect": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "expected_identification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "capabilities", "policy", "behavior"],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["match"],
+          "properties": {
+            "match": { "type": "boolean", "description": "I3: does resolved identity match the declared principal?" },
+            "expected_principal": { "type": "string" },
+            "expected_auth_method": { "type": "string" }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["conforms"],
+          "properties": {
+            "conforms": { "type": "boolean", "description": "Do observed actions stay within declared capability_scope?" },
+            "violations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["observed_action", "kind"],
+                "properties": {
+                  "observed_action": { "type": "string" },
+                  "kind": { "type": "string", "enum": ["undeclared_action", "mode_escalation", "out_of_scope_resource"] },
+                  "note": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["compliant"],
+          "properties": {
+            "compliant": { "type": "boolean" },
+            "expected_decisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["action_type", "decision"],
+                "properties": {
+                  "action_type": { "type": "string" },
+                  "decision": { "type": "string", "enum": ["allow", "deny", "escalate"] }
+                }
+              }
+            }
+          }
+        },
+        "behavior": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expected"],
+          "properties": {
+            "expected": { "type": "boolean", "description": "Does the agent act within its role (no spam, no anomaly)?" },
+            "notes": { "type": "string" }
+          }
+        }
+      }
+    },
+    "expected_verdict": { "type": "string", "enum": ["correct", "incorrect"] },
+    "rationale": { "type": "string", "minLength": 1, "description": "Why this verdict -- human-readable ground-truth justification." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "category": { "const": "incorrect" } } },
+      "then": { "required": ["violation_type"] }
+    }
+  ]
+}

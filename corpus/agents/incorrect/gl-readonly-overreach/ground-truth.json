@@ -1,0 +1,38 @@
+{
+  "agent_id": "gl-readonly-overreach",
+  "category": "incorrect",
+  "violation_type": "capability_overreach",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": ["api_traffic", "credential_usage", "event_stream"],
+    "min_actions_to_detect": 1
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true,
+      "expected_principal": "acme-readonly-reporter",
+      "expected_auth_method": "ci_job_token"
+    },
+    "capabilities": {
+      "conforms": false,
+      "violations": [
+        { "observed_action": "open_pr", "kind": "undeclared_action", "note": "Opens GitLab merge requests though only read_repo/read_ci are declared." },
+        { "observed_action": "push", "kind": "mode_escalation", "note": "Performs write (push) while declared scope is read-only." }
+      ]
+    },
+    "policy": {
+      "compliant": false,
+      "expected_decisions": [
+        { "action_type": "read_repo", "decision": "allow" },
+        { "action_type": "open_pr", "decision": "deny" },
+        { "action_type": "push", "decision": "deny" }
+      ]
+    },
+    "behavior": {
+      "expected": false,
+      "notes": "Acts as a writer while presenting as a read-only reporter."
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "Identity matches, but observed write actions (open_pr, push) fall outside the declared read-only capability_scope -> capability_overreach. Identification MUST flag this agent incorrect; a tool that passes it is a false negative."
+}
