@@ -157,6 +157,59 @@ def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
     return 0 if result.valid else 1
 
 
+def _cmd_agent_run(manifest_path: str, provider: str, model: str, max_steps: int) -> int:
+    from .lane_b import run_agent
+    from .llm import build_llm
+
+    spec = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    llm = build_llm(provider, model)  # live; key from env (R8)
+    result = run_agent(
+        agent_id=spec["agent_id"],
+        principal=spec["principal"],
+        target_system=spec["target_system"],
+        goal=spec["goal"],
+        capability_scope=spec["capability_scope"],
+        llm=llm,
+        provider=provider,
+        model=model,
+        max_steps=max_steps,
+    )
+    out = Path(f"{spec['agent_id']}.recording.json")
+    result.recording.save(out)
+    print(f"ran {len(result.actions)} actions; recording saved to {out}")
+    return 0
+
+
+def _cmd_agent_replay(recording_path: str) -> int:
+    from .lane_b import run_agent
+    from .recording import Recording, replay_backend
+
+    recording = Recording.load(recording_path)
+    result = run_agent(
+        agent_id=recording.agent_id,
+        principal=recording.principal,
+        target_system=recording.target_system,
+        goal=recording.goal,
+        capability_scope=[a["action_type"] for a in recording.actions()],
+        llm=replay_backend(recording),
+    )
+    replayed = [a.to_dict() for a in result.actions]
+    deterministic = replayed == recording.actions()
+    for a in result.actions:
+        print(f"  {a.action_type} {a.resource} (mode={a.mode})")
+    print(f"replay deterministic: {deterministic}")
+    return 0 if deterministic else 1
+
+
+def _cmd_agent_freeze(recording_path: str, out_dir: str) -> int:
+    from .promote import freeze_recording
+    from .recording import Recording
+
+    agent_dir = freeze_recording(Recording.load(recording_path), out_dir)
+    print(f"promoted to Lane A golden: {agent_dir}")
+    return 0
+
+
 def _cmd_report(as_json: bool) -> int:
     from .report import build_report
 
@@ -199,6 +252,21 @@ def main(argv: list[str] | None = None) -> int:
     bnd = sub.add_parser("bundle-verify", help="verify an Ed25519-signed policy bundle")
     bnd.add_argument("path", help="path to the policy bundle JSON")
     bnd.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
+    agent = sub.add_parser("agent", help="Lane B live LLM agents (run / replay / freeze)")
+    agent_sub = agent.add_subparsers(dest="agent_cmd", required=True)
+    a_run = agent_sub.add_parser("run", help="run a live LLM agent (provider key from env)")
+    a_run.add_argument(
+        "manifest",
+        help="Lane B manifest JSON (agent_id, principal, target_system, goal, capability_scope)",
+    )
+    a_run.add_argument("--provider", required=True, choices=["anthropic", "openai"])
+    a_run.add_argument("--model", required=True)
+    a_run.add_argument("--max-steps", type=int, default=10)
+    a_rep = agent_sub.add_parser("replay", help="deterministically replay a recording")
+    a_rep.add_argument("recording", help="path to a recording JSON")
+    a_frz = agent_sub.add_parser("freeze", help="promote a recording into a Lane A golden")
+    a_frz.add_argument("recording", help="path to a recording JSON")
+    a_frz.add_argument("--out", default="corpus/agents/correct", help="output corpus dir")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -218,6 +286,13 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(args.json)
     if args.command == "bundle-verify":
         return _cmd_bundle_verify(args.path, args.pubkey)
+    if args.command == "agent":
+        if args.agent_cmd == "run":
+            return _cmd_agent_run(args.manifest, args.provider, args.model, args.max_steps)
+        if args.agent_cmd == "replay":
+            return _cmd_agent_replay(args.recording)
+        if args.agent_cmd == "freeze":
+            return _cmd_agent_freeze(args.recording, args.out)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")
