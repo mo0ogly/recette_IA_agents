@@ -10,10 +10,13 @@ from __future__ import annotations
 from .adapters import (
     DiscoveryAdapter,
     DiscoveryResult,
+    DiscoveryRisk,
     IdentificationAdapter,
     IdentificationResult,
     ReferenceDiscoveryAdapter,
     ReferenceIdentificationAdapter,
+    ReferenceSourceScanAdapter,
+    SourceScanAdapter,
 )
 from .agent import TestAgent
 from .events import ActionType, AgentAction, TargetSystem
@@ -27,6 +30,7 @@ __all__ = [
     "AgentResult",
     "DiscoveryAdapter",
     "DiscoveryResult",
+    "DiscoveryRisk",
     "GitForge",
     "IdentificationAdapter",
     "IdentificationResult",
@@ -34,7 +38,9 @@ __all__ = [
     "RealForge",
     "ReferenceDiscoveryAdapter",
     "ReferenceIdentificationAdapter",
+    "ReferenceSourceScanAdapter",
     "Scorecard",
+    "SourceScanAdapter",
     "TargetSystem",
     "TestAgent",
     "run_agent",

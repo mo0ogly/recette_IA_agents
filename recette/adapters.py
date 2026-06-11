@@ -14,8 +14,11 @@ They serve two purposes:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from .events import ESCALATE_ACTIONS, ActionType, AgentAction, Mode, action_mode
@@ -156,3 +159,166 @@ class ReferenceIdentificationAdapter:
             if counts[key] >= SPAM_THRESHOLD:
                 return False
         return True
+
+
+# ---------------------------------------------------------------------------
+# Source-based scanning (Discovery / Enrichment Plane)
+#
+# The colleague's GitHubScanner reads a repository (code + CI/CD surface) and emits
+# discovery_risks rows. The harness depends only on the SourceScanAdapter protocol;
+# a real scanner is wired by implementing it (see recette/http_adapter.py). The
+# ReferenceSourceScanAdapter below is a deterministic offline oracle: what a correct
+# scanner MUST output, derived from the repo content alone.
+# ---------------------------------------------------------------------------
+
+# Risk level derived from an action (relative ordering, never an absolute opaque score).
+_READONLY_ACTIONS = frozenset({"read_repo", "list_repos", "read_ci"})
+_BOUNDED_WRITE_ACTIONS = frozenset({"open_pr", "open_issue", "comment_issue"})
+# high blast radius: push, merge_pr, manage_webhook, manage_release, trigger_ci
+
+
+@dataclass(frozen=True)
+class DiscoveryRisk:
+    """One discovered risk -- mirrors the discovery_risks table (arch doc section 7)."""
+
+    canonical_agent_id: str
+    action_pattern: str
+    target_system: str
+    estimated_risk: dict
+    generated_policy: str | None = None
+
+
+@runtime_checkable
+class SourceScanAdapter(Protocol):
+    """Register a source (repo), scan it, and read back the discovered risks."""
+
+    def register(self, location: str) -> str: ...
+    def scan(self, source_id: str) -> str: ...
+    def await_run(self, run_id: str) -> str: ...
+    def risks(self, source_id: str) -> list[DiscoveryRisk]: ...
+
+
+def _action_level(action: str) -> int:
+    if action in _READONLY_ACTIONS:
+        return 1
+    if action in _BOUNDED_WRITE_ACTIONS:
+        return 2
+    return 3  # high blast radius write
+
+
+class ReferenceSourceScanAdapter:
+    """Offline oracle. Derives the correct risk set from a repo tree on disk.
+
+    Detection signals (in precedence order):
+    1. `.agentrail/manifest.json` -- ManifestScanner native surface, highest precision.
+    2. fallback: an `agent/` directory whose Python imports the `github` SDK.
+
+    All outputs are deterministic (invariant 7): `canonical_agent_id` is a stable hash
+    of the agent principal, `estimated_risk.level` is derived from the action set + CI
+    permissions, and risks are returned in a stable (action-sorted) order.
+    """
+
+    def __init__(self) -> None:
+        self._sources: dict[str, Path] = {}
+        self._risks: dict[str, list[DiscoveryRisk]] = {}
+        self._n = 0
+
+    def register(self, location: str) -> str:
+        self._n += 1
+        sid = f"ref-src-{self._n:04d}"
+        self._sources[sid] = Path(location)
+        return sid
+
+    def scan(self, source_id: str) -> str:
+        repo = self._sources[source_id]
+        self._risks[source_id] = self._analyze(repo)
+        return f"ref-run-{source_id}"
+
+    def await_run(self, run_id: str) -> str:
+        return "completed"
+
+    def risks(self, source_id: str) -> list[DiscoveryRisk]:
+        return list(self._risks.get(source_id, []))
+
+    # --- analysis ---
+    def _analyze(self, repo: Path) -> list[DiscoveryRisk]:
+        manifest_path = repo / ".agentrail" / "manifest.json"
+        if manifest_path.exists():
+            return self._from_manifest(repo, json.loads(manifest_path.read_text(encoding="utf-8")))
+        if self._has_github_agent_code(repo):
+            return self._from_code(repo)
+        return []  # true negative
+
+    def _from_manifest(self, repo: Path, manifest: dict) -> list[DiscoveryRisk]:
+        agent = manifest["agent"]
+        principal = agent["identity"]["principal"]
+        target = agent["target_system"]
+        actions = sorted({cap["action"] for cap in agent["capabilities"]})
+        return self._build_risks(repo, principal, target, actions)
+
+    def _from_code(self, repo: Path) -> list[DiscoveryRisk]:
+        # Minimal code-derived fallback (used only when no manifest is present).
+        text = "\n".join(p.read_text(encoding="utf-8") for p in (repo / "agent").rglob("*.py"))
+        mapping = {
+            "create_pull": "open_pr",
+            "merge(": "merge_pr",
+            "create_hook": "manage_webhook",
+            "update_file": "push",
+            "create_file": "push",
+            "get_repos": "read_repo",
+            "get_workflow_runs": "read_ci",
+        }
+        actions = sorted({pattern for needle, pattern in mapping.items() if needle in text})
+        if not actions:
+            return []
+        return self._build_risks(repo, repo.parent.name, "github", actions)
+
+    def _build_risks(self, repo: Path, principal: str, target: str, actions: list[str]) -> list[DiscoveryRisk]:
+        canonical = hashlib.sha256(principal.encode("utf-8")).hexdigest()[:16]
+        ci_bump = 1 if self._has_broad_ci(repo) else 0
+        level = max((_action_level(a) for a in actions), default=0)
+        level = min(3, level + ci_bump) if level else 0
+        policy = self._policy(principal, actions, level) if level >= 2 else None
+        return [
+            DiscoveryRisk(
+                canonical_agent_id=canonical,
+                action_pattern=action,
+                target_system=target,
+                estimated_risk={"level": level},
+                generated_policy=policy,
+            )
+            for action in actions
+        ]
+
+    @staticmethod
+    def _has_github_agent_code(repo: Path) -> bool:
+        agent_dir = repo / "agent"
+        if not agent_dir.is_dir():
+            return False
+        for py in agent_dir.rglob("*.py"):
+            text = py.read_text(encoding="utf-8")
+            if "import github" in text or "from github import" in text:
+                return True
+        return False
+
+    @staticmethod
+    def _has_broad_ci(repo: Path) -> bool:
+        wf_dir = repo / ".github" / "workflows"
+        if not wf_dir.is_dir():
+            return False
+        for wf in wf_dir.glob("*.yml"):
+            if "write-all" in wf.read_text(encoding="utf-8"):
+                return True
+        return False
+
+    @staticmethod
+    def _policy(principal: str, actions: list[str], level: int) -> str:
+        # A minimal Rego-style policy bounding the agent to its observed actions.
+        allowed = ", ".join(f'"{a}"' for a in actions)
+        return (
+            "package agentrail.discovery\n"
+            f"# generated for {principal} (risk level {level})\n"
+            f"allowed_actions := {{{allowed}}}\n"
+            "default allow := false\n"
+            "allow if input.action in allowed_actions\n"
+        )
