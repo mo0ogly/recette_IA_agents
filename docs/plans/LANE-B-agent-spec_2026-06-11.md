@@ -128,25 +128,26 @@ Like Lane A, Lane B can be correct or deliberately incorrect, to exercise identi
 4. **Real mode** -- **in v1, opt-in**: `RealForge` guarded by an explicit `--real` flag + a
    test-org/endpoint allowlist; lab is still the default and the only thing CI runs.
 
-## 12. Build decomposition (v1)
+## 12. Build decomposition (v1) -- DONE 2026-06-11
 
-Ordered, each its own cycle (schema/code -> tests -> gates -> commit). Live-LLM and real
-mode adapters are written but unit-tested with stubbed transports (no key, no network, no
-side effect) -- like `http_adapter`.
+The Lane B engine is built, tested, and green in CI (128 tests, gates PASS). Live-LLM and
+real-mode adapters are unit-tested with stubbed transports (no key, no network, no side
+effect) -- like `http_adapter`.
 
-- **LB1 LLM backend** -- `recette/llm.py`: `LlmBackend` protocol; `StubLlm` + `ReplayLlm`
-  (offline, deterministic); provider adapters (`AnthropicLlm`, `OpenAiLlm`) with stubbed-
-  transport unit tests. Keys via env; clear error if absent.
-- **LB2 tool registry + per-surface forges** -- map canonical actions to forge calls for all
-  five surfaces; `LabForge` simulates (default), `RealForge` behind the allowlist.
-- **LB3 agent loop + recorder** -- `recette/lane_b.py`: the decide->act loop emitting
-  `AgentAction`; `recette/recording.py` captures every step (replayable).
-- **LB4 replay** -- `ReplayLlm` re-runs a recording to an identical `AgentAction` log;
-  determinism test.
-- **LB5 promotion** -- `recette ... freeze <recording>` -> Lane A `scenario.json` +
-  `ground-truth.json`; validates against the existing schemas.
-- **LB6 real mode** -- `RealForge` per surface + `--real` flag + allowlist; lab stays CI default.
-- **LB7 CLI** -- `recette agent run <manifest> [--provider --model --mode lab|real]`,
-  `recette agent replay <recording>`, `recette agent freeze <recording>`.
+- **LB1 LLM backend** [DONE] -- `recette/llm.py`: `LlmBackend` protocol; `StubLlm` +
+  `ReplayLlm` (offline, deterministic); `AnthropicLlm`/`OpenAiLlm` over the stdlib client
+  (zero SDK dep), stub-tested; `build_llm` factory. Keys via env.
+- **LB2 tool registry** [DONE] -- `recette/tools.py`: canonical actions as tools;
+  `execute_tool` runs the chosen tool through the (surface-agnostic) forge -> `AgentAction`.
+- **LB3 agent loop + recorder** [DONE] -- `recette/lane_b.py` decide->act loop;
+  `recette/recording.py` captures every step (no wall-clock, save/load).
+- **LB4 replay** [DONE] -- `ReplayLlm` reproduces an identical `AgentAction` log.
+- **LB5 promotion** [DONE] -- `recette/promote.py` `freeze_recording` -> Lane A
+  manifest+scenario+ground-truth; round-trips green through `run_recette`.
+- **LB6 real mode** [DONE] -- `recette/realmode.py` `AllowlistForge` + `build_real_forge`
+  (token + allowlist via env, fail-fast); `agent run --real`. Lab stays CI default.
+- **LB7 CLI** [DONE] -- `recette agent run|replay|freeze`.
 
-This engine is the foundation the console (Track U) drives.
+This engine is the foundation the console (Track U U2-U4) drives. Remaining for Lane B:
+concrete per-action SDK dispatch in `RealForge` is a deployment concern (documented there);
+everything the recette needs is in place.

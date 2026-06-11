@@ -90,7 +90,8 @@ Legend: DONE / PARTIAL / TODO.
 | CI pipeline (gates + recette on push) | DONE (M7) -- .github/workflows/recette.yml, green on main |
 | Aggregate report (`recette report`) | DONE (M9) |
 | Real API wiring confirmed with colleague | TODO (blocked on his routes) |
-| UX control console (launch/stop/monitor + Monaco + config) | TODO (Track U) |
+| Lane B agent engine (live LLM, record/replay/promote, real-mode guard) | DONE (LB1-LB7) -- recette agent run/replay/freeze |
+| UX control console (launch/stop/monitor + Monaco + config) | TODO (Track U: U1 FastAPI API -> U2-U4 React/Monaco) |
 
 ---
 
