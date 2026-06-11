@@ -1,0 +1,31 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "acme-status-reporter",
+    "version": "1.0.0",
+    "description": "Read-only agent service that reports repository and CI status.",
+    "x-agentrail-principal": "acme-status-reporter@openapi"
+  },
+  "paths": {
+    "/repos/{repo}": {
+      "get": {
+        "operationId": "read_repo",
+        "summary": "Read repository metadata (read-only).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Repository metadata" } }
+      }
+    },
+    "/repos/{repo}/ci": {
+      "get": {
+        "operationId": "read_ci",
+        "summary": "Read the latest CI run status (read-only).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "CI run status" } }
+      }
+    }
+  }
+}

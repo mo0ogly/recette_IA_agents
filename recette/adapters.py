@@ -250,6 +250,8 @@ class ReferenceSourceScanAdapter:
             return self._from_manifest(repo, json.loads(manifest_path.read_text(encoding="utf-8")))
         if self._has_temporal_agent_code(repo):
             return self._from_temporal_code(repo)
+        if (repo / "openapi.json").exists():
+            return self._from_openapi(repo)
         if self._has_github_agent_code(repo):
             return self._from_code(repo)
         return []  # true negative
@@ -286,6 +288,27 @@ class ReferenceSourceScanAdapter:
         if not actions:
             return []  # temporalio code without target-system actions = not an agent
         return self._build_risks(repo, principal or repo.parent.name, "temporal", actions)
+
+    def _from_openapi(self, repo: Path) -> list[DiscoveryRisk]:
+        # An OpenAPI-described agent declares each capability as an operation whose
+        # operationId (or x-agentrail-action) is a canonical action. The scanner reads
+        # the spec; we parse the JSON statically (deterministic, zero extra dependency).
+        spec = json.loads((repo / "openapi.json").read_text(encoding="utf-8"))
+        info = spec.get("info", {})
+        principal = info.get("x-agentrail-principal") or info.get("title") or repo.parent.name
+        actions: set[str] = set()
+        for operations in spec.get("paths", {}).values():
+            if not isinstance(operations, dict):
+                continue
+            for op in operations.values():
+                if not isinstance(op, dict):
+                    continue
+                action = op.get("operationId") or op.get("x-agentrail-action")
+                if action in _KNOWN_ACTIONS:
+                    actions.add(action)
+        if not actions:
+            return []  # a plain API with no agent capability = not an agent
+        return self._build_risks(repo, principal, "openapi", sorted(actions))
 
     def _build_risks(
         self, repo: Path, principal: str, target: str, actions: list[str]
