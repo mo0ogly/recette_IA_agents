@@ -9,6 +9,13 @@ Backends:
 - AnthropicLlm / OpenAiLlm -- live providers over plain HTTPS JSON (stdlib client, zero
   SDK dependency). The HTTP transport is injectable, so they are unit-tested with a stub
   client -- no API key, no network. Keys come from env (R8): ANTHROPIC_API_KEY / OPENAI_API_KEY.
+- OpenAiCompatLlm -- OpenAI wire format against a configurable base_url (Ollama, vLLM,
+  LiteLLM proxies); API key optional for local keyless servers.
+- GroqLlm -- Groq cloud, OpenAI wire format at api.groq.com. Key: GROQ_API_KEY.
+- MistralLlm -- Mistral cloud, OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY.
+- DeepSeekLlm -- DeepSeek cloud, OpenAI wire format at api.deepseek.com. Key: DEEPSEEK_API_KEY.
+- XaiLlm -- xAI cloud, OpenAI wire format at api.x.ai. Key: XAI_API_KEY.
+- GeminiLlm -- Google Gemini generateContent wire format. Key: GEMINI_API_KEY.
 
 ReplayLlm (deterministic replay of a recorded run) lands with the recorder in LB4.
 """
@@ -238,15 +245,240 @@ class OpenAiLlm:
         return _parse_openai(resp.json())
 
 
+class OpenAiCompatLlm(OpenAiLlm):
+    """OpenAI-wire-compatible backend with a configurable base URL.
+
+    Covers Ollama, vLLM, LiteLLM proxies. The API key is optional:
+    local servers run keyless; remote ones pass api_key explicitly.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        base_url: str,
+        client: _PostClient | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        if client is None:
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
+            client = StdlibHttpClient(self._normalize_base_url(base_url), headers=headers)
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+    @staticmethod
+    def _normalize_base_url(base_url: str) -> str:
+        """Strip trailing slashes and a trailing "/v1": request paths already start with /v1."""
+        base = base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[: -len("/v1")]
+        return base
+
+
+# --- Groq --------------------------------------------------------------------------------
+
+
+class GroqLlm(OpenAiLlm):
+    """Groq cloud backend -- OpenAI wire format at api.groq.com. Key: GROQ_API_KEY."""
+
+    BASE_URL = "https://api.groq.com/openai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("GROQ_API_KEY")
+            if not key:
+                raise RuntimeError("GROQ_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- Mistral -----------------------------------------------------------------------------
+
+
+class MistralLlm(OpenAiLlm):
+    """Mistral cloud backend -- OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.mistral.ai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("MISTRAL_API_KEY")
+            if not key:
+                raise RuntimeError("MISTRAL_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- DeepSeek ----------------------------------------------------------------------------
+
+
+class DeepSeekLlm(OpenAiLlm):
+    """DeepSeek cloud backend -- OpenAI wire format at api.deepseek.com. Key: DEEPSEEK_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.deepseek.com"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("DEEPSEEK_API_KEY")
+            if not key:
+                raise RuntimeError("DEEPSEEK_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- xAI ---------------------------------------------------------------------------------
+
+
+class XaiLlm(OpenAiLlm):
+    """xAI cloud backend -- OpenAI wire format at api.x.ai. Key: XAI_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.x.ai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("XAI_API_KEY")
+            if not key:
+                raise RuntimeError("XAI_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- Gemini ------------------------------------------------------------------------------
+
+
+def _to_gemini_contents(history: list[Message]) -> list[dict]:
+    out: list[dict] = []
+    for m in history:
+        if m.role == "assistant":
+            out.append({"role": "model", "parts": [{"text": m.content}]})
+        elif m.role == "tool":
+            text = f"[tool {m.tool_name} result] {m.content}"
+            out.append({"role": "user", "parts": [{"text": text}]})
+        else:
+            out.append({"role": "user", "parts": [{"text": m.content}]})
+    return out
+
+
+def _parse_gemini(data: dict) -> LlmDecision:
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return LlmDecision(kind="final", text="", raw=data)
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    text_parts: list[str] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        call = part.get("functionCall")
+        if call:
+            return LlmDecision(
+                kind="tool_call",
+                tool_name=call.get("name"),
+                tool_args=call.get("args", {}) or {},
+                text="".join(text_parts),
+                raw=data,
+            )
+        if "text" in part:
+            text_parts.append(part.get("text", ""))
+    return LlmDecision(kind="final", text="".join(text_parts), raw=data)
+
+
+class GeminiLlm:
+    """Google Gemini backend -- generateContent wire format. Key: GEMINI_API_KEY."""
+
+    BASE_URL = "https://generativelanguage.googleapis.com"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        self._model = model
+        if client is None:
+            key = api_key or os.environ.get("GEMINI_API_KEY")
+            if not key:
+                raise RuntimeError("GEMINI_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"x-goog-api-key": key})
+        self._client = client
+
+    def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:
+        body: dict = {
+            "system_instruction": {"parts": [{"text": system}]},
+            "contents": _to_gemini_contents(history),
+        }
+        if tools:
+            body["tools"] = [
+                {
+                    "functionDeclarations": [
+                        {"name": t.name, "description": t.description, "parameters": t.parameters}
+                        for t in tools
+                    ]
+                }
+            ]
+        resp = self._client.post(f"/v1beta/models/{self._model}:generateContent", json=body)
+        resp.raise_for_status()
+        return _parse_gemini(resp.json())
+
+
 # --- provider factory --------------------------------------------------------------------
 
-_PROVIDERS = ("anthropic", "openai")
+_PROVIDERS = (
+    "anthropic",
+    "openai",
+    "gemini",
+    "groq",
+    "mistral",
+    "deepseek",
+    "xai",
+    "openai_compat",
+)
 
 
-def build_llm(provider: str, model: str, *, client: _PostClient | None = None) -> LlmBackend:
-    """Construct a live provider backend by name. Keys come from env (R8)."""
+def build_llm(
+    provider: str,
+    model: str,
+    *,
+    client: _PostClient | None = None,
+    base_url: str | None = None,
+) -> LlmBackend:
+    """Construct a live provider backend by name. Keys come from env (R8).
+
+    base_url is required for (and only used by) the "openai_compat" provider.
+    """
     if provider == "anthropic":
         return AnthropicLlm(model=model, client=client)
     if provider == "openai":
         return OpenAiLlm(model=model, client=client)
+    if provider == "gemini":
+        return GeminiLlm(model=model, client=client)
+    if provider == "groq":
+        return GroqLlm(model=model, client=client)
+    if provider == "mistral":
+        return MistralLlm(model=model, client=client)
+    if provider == "deepseek":
+        return DeepSeekLlm(model=model, client=client)
+    if provider == "xai":
+        return XaiLlm(model=model, client=client)
+    if provider == "openai_compat":
+        if not base_url and client is None:
+            raise ValueError("openai_compat requires base_url")
+        return OpenAiCompatLlm(model=model, base_url=base_url or "", client=client)
     raise ValueError(f"unknown provider {provider!r}; known: {', '.join(_PROVIDERS)}")

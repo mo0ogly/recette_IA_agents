@@ -1,8 +1,13 @@
-"""U1/U4: config CRUD over HTTP."""
+"""U1/U4: config CRUD over HTTP. B5: server lifecycle + access-log tail."""
 
 from __future__ import annotations
 
+import http.server
+import json
+import os
+import socket
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -11,6 +16,7 @@ try:
 
     from recette.api.app import create_app
     from recette.api.config_store import ConfigStore
+    from recette.llm import LlmDecision, StubLlm
 
     _HAS_FASTAPI = True
 except ImportError:  # pragma: no cover
@@ -69,6 +75,67 @@ class TestConfigRoutes(unittest.TestCase):
         )
         self.assertEqual(self.client.delete("/config/agents/a1").status_code, 204)
 
+    def test_servers_list_empty(self) -> None:
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_create_and_roundtrip(self) -> None:
+        server = {"id": "s1", "system": "github", "mode": "mock_local", "port": 8081}
+        r = self.client.post("/config/servers", json=server)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json(), server)
+        self.assertEqual(self.client.get("/config/servers").json(), [server])
+
+    def test_server_duplicate_id_is_400(self) -> None:
+        server = {"id": "s1", "system": "github", "mode": "mock_local", "port": 8081}
+        self.client.post("/config/servers", json=server)
+        r = self.client.post("/config/servers", json=server)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(len(self.client.get("/config/servers").json()), 1)
+
+    def test_server_invalid_mode_is_400(self) -> None:
+        r = self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "bogus"},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_update_persists(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        r = self.client.put("/config/servers/s1", json={"port": 9090})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["port"], 9090)
+        self.assertEqual(self.client.get("/config/servers").json()[0]["port"], 9090)
+
+    def test_server_update_unknown_is_404(self) -> None:
+        r = self.client.put("/config/servers/nope", json={"port": 1})
+        self.assertEqual(r.status_code, 404)
+
+    def test_server_update_bad_mode_is_400_not_404(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        r = self.client.put("/config/servers/s1", json={"mode": "bogus"})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            self.client.get("/config/servers").json()[0]["mode"], "mock_local"
+        )
+
+    def test_server_delete_then_gone(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        self.assertEqual(self.client.delete("/config/servers/s1").status_code, 204)
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_delete_unknown_is_404(self) -> None:
+        self.assertEqual(self.client.delete("/config/servers/nope").status_code, 404)
+
     def test_update_bad_runtime_is_400_not_404(self) -> None:
         self.client.post(
             "/config/agents",
@@ -84,3 +151,297 @@ class TestConfigRoutes(unittest.TestCase):
         )
         r = self.client.put("/config/agents/a1", json={"runtime": "bogus"})
         self.assertEqual(r.status_code, 400)
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class TestAiBackendConnectivityProbe(unittest.TestCase):
+    """POST /config/ai-backends/{id}/test: diagnostic probe, 200 always (404 on unknown id)."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        store = ConfigStore(Path(self.tmp.name) / "cfg.json")
+        self.app = create_app(config_store=store)
+        self.client = TestClient(self.app)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _add_backend(self, backend: dict) -> None:
+        r = self.client.post("/config/ai-backends", json=backend)
+        self.assertEqual(r.status_code, 201)
+
+    def test_ok_true_with_stub_factory(self) -> None:
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+
+        def factory(provider: str, model: str, *, base_url: str | None = None) -> StubLlm:
+            return StubLlm([LlmDecision(kind="final", text="pong")])
+
+        self.app.state.llm_factory = factory
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["ok"])
+        self.assertIsInstance(body["latency_ms"], int)
+        self.assertGreaterEqual(body["latency_ms"], 0)
+        self.assertEqual(body["kind"], "final")
+
+    def test_missing_key_is_ok_false_not_500(self) -> None:
+        # Default factory (build_llm): constructing GeminiLlm without a key
+        # raises RuntimeError -- the probe maps it to ok=false, never a 500.
+        self._add_backend({"id": "b1", "provider": "gemini", "model": "m"})
+        old = os.environ.pop("GEMINI_API_KEY", None)
+        try:
+            r = self.client.post("/config/ai-backends/b1/test")
+        finally:
+            if old is not None:
+                os.environ["GEMINI_API_KEY"] = old
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["ok"])
+        self.assertIsInstance(body["latency_ms"], int)
+        self.assertIn("GEMINI_API_KEY", body["error"])
+
+    def test_unknown_backend_is_404(self) -> None:
+        r = self.client.post("/config/ai-backends/nope/test")
+        self.assertEqual(r.status_code, 404)
+
+    def test_factory_value_error_is_ok_false(self) -> None:
+        # e.g. openai_compat without base_url raises ValueError in build_llm.
+        self._add_backend({"id": "b1", "provider": "openai_compat", "model": "m"})
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["ok"])
+        self.assertIn("openai_compat requires base_url", body["error"])
+
+
+class _FakeServerManager:
+    """Test double for app.state.server_manager: records calls, canned results.
+
+    The real ServerManager spawns subprocesses; it is integration-tested in
+    tests/test_lab_server_lifecycle.py. Routes only need the call contract.
+    """
+
+    def __init__(self, log_path: Path) -> None:
+        self._log_path = log_path
+        self.calls: list[tuple] = []
+        self.start_result: dict = {"status": "up"}
+        self.status_result: str = "up"
+
+    def start(self, server: dict) -> dict:
+        self.calls.append(("start", server["id"]))
+        return self.start_result
+
+    def stop(self, server_id: str) -> dict:
+        self.calls.append(("stop", server_id))
+        return {"status": "down"}
+
+    def status(self, server_id: str) -> str:
+        self.calls.append(("status", server_id))
+        return self.status_result
+
+    def access_log_path(self, server_id: str) -> Path:
+        return self._log_path
+
+    def shutdown(self) -> None:  # lifespan hook compatibility
+        pass
+
+
+def _free_port() -> int:
+    """A port that nothing listens on (bound once then released)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    return port
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class TestServerLifecycleRoutes(unittest.TestCase):
+    """B5: POST start/stop, GET status, GET log tail."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        store = ConfigStore(Path(self.tmp.name) / "cfg.json")
+        app = create_app(config_store=store)
+        self.log_path = Path(self.tmp.name) / "srv.access.jsonl"
+        self.manager = _FakeServerManager(self.log_path)
+        app.state.server_manager = self.manager
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _add_server(self, server: dict) -> None:
+        r = self.client.post("/config/servers", json=server)
+        self.assertEqual(r.status_code, 201)
+
+    def _add_mock_server(self, server_id: str = "srv") -> None:
+        self._add_server(
+            {"id": server_id, "system": "github", "mode": "mock_local", "port": 9101}
+        )
+
+    def _serve_http(self, status_code: int) -> int:
+        """Local HTTP server on an ephemeral port answering every GET."""
+
+        class _Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(status_code)
+                self.end_headers()
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        return httpd.server_address[1]
+
+    # --- start ---
+    def test_start_unknown_server_is_404(self) -> None:
+        r = self.client.post("/config/servers/nope/start")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(self.manager.calls, [])
+
+    def test_start_non_mock_local_is_400(self) -> None:
+        self._add_server(
+            {
+                "id": "ext",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": "http://127.0.0.1:1",
+            }
+        )
+        r = self.client.post("/config/servers/ext/start")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.manager.calls, [])
+
+    def test_start_ok_returns_manager_dict(self) -> None:
+        self._add_mock_server()
+        r = self.client.post("/config/servers/srv/start")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "up"})
+        self.assertEqual(self.manager.calls, [("start", "srv")])
+
+    def test_start_busy_port_is_200_with_down_and_error(self) -> None:
+        # A busy port is a domain result the console renders, not a transport
+        # error: HTTP 200 with the manager dict as-is.
+        self._add_mock_server()
+        self.manager.start_result = {
+            "status": "down",
+            "error": "port 9101 already in use",
+        }
+        r = self.client.post("/config/servers/srv/start")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            r.json(), {"status": "down", "error": "port 9101 already in use"}
+        )
+
+    # --- stop ---
+    def test_stop_ok(self) -> None:
+        self._add_mock_server()
+        r = self.client.post("/config/servers/srv/stop")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "down"})
+        self.assertEqual(self.manager.calls, [("stop", "srv")])
+
+    def test_stop_unknown_server_is_404(self) -> None:
+        r = self.client.post("/config/servers/nope/stop")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(self.manager.calls, [])
+
+    # --- status ---
+    def test_status_unknown_server_is_404(self) -> None:
+        r = self.client.get("/config/servers/nope/status")
+        self.assertEqual(r.status_code, 404)
+
+    def test_status_mock_local_delegates_to_manager(self) -> None:
+        self._add_mock_server()
+        self.manager.status_result = "up"
+        r = self.client.get("/config/servers/srv/status")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "up"})
+        self.assertEqual(self.manager.calls, [("status", "srv")])
+
+    def test_status_declared_url_up_when_reachable(self) -> None:
+        port = self._serve_http(200)
+        self._add_server(
+            {
+                "id": "ext",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": f"http://127.0.0.1:{port}",
+            }
+        )
+        r = self.client.get("/config/servers/ext/status")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "up"})
+
+    def test_status_declared_url_up_even_on_http_error(self) -> None:
+        # Any HTTP answer means the server is alive, even 5xx.
+        port = self._serve_http(503)
+        self._add_server(
+            {
+                "id": "ext",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": f"http://127.0.0.1:{port}",
+            }
+        )
+        r = self.client.get("/config/servers/ext/status")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "up"})
+
+    def test_status_declared_url_down_when_unreachable(self) -> None:
+        self._add_server(
+            {
+                "id": "ext",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": f"http://127.0.0.1:{_free_port()}",
+            }
+        )
+        r = self.client.get("/config/servers/ext/status")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "down"})
+
+    def test_status_real_saas_is_not_applicable(self) -> None:
+        self._add_server(
+            {"id": "saas", "system": "github", "mode": "real_saas", "owner": "acme"}
+        )
+        r = self.client.get("/config/servers/saas/status")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"status": "n/a"})
+
+    # --- log tail ---
+    def test_log_unknown_server_is_404(self) -> None:
+        r = self.client.get("/config/servers/nope/log")
+        self.assertEqual(r.status_code, 404)
+
+    def test_log_absent_file_is_empty(self) -> None:
+        self._add_mock_server()
+        r = self.client.get("/config/servers/srv/log?after=3")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"lines": [], "next": 3})
+
+    def test_log_full_read(self) -> None:
+        self._add_mock_server()
+        entries = [{"seq": 1, "path": "/health"}, {"seq": 2, "path": "/repos"}]
+        self.log_path.write_text(
+            "".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8"
+        )
+        r = self.client.get("/config/servers/srv/log")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"lines": entries, "next": 2})
+
+    def test_log_incremental_read_after_n(self) -> None:
+        self._add_mock_server()
+        entries = [{"seq": i} for i in range(1, 5)]
+        self.log_path.write_text(
+            "".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8"
+        )
+        r = self.client.get("/config/servers/srv/log?after=2")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"lines": [{"seq": 3}, {"seq": 4}], "next": 4})

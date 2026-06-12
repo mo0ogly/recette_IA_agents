@@ -21,6 +21,7 @@ vi.mock("../../api/client", () => ({
   listAiBackends: vi.fn(),
   createAiBackend: vi.fn(),
   deleteAiBackend: vi.fn(),
+  testAiBackend: vi.fn(),
   listAgentActions: vi.fn(),
 }));
 

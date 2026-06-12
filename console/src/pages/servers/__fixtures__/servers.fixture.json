@@ -1,0 +1,22 @@
+[
+    {
+        "id": "gh-mock",
+        "system": "github",
+        "mode": "mock_local",
+        "port": 9101
+    },
+    {
+        "id": "gl-staging",
+        "system": "gitlab",
+        "mode": "declared_url",
+        "base_url": "http://127.0.0.1:9555",
+        "auth_env": "AGENTRAIL_EXTERNAL_GITLAB_TOKEN"
+    },
+    {
+        "id": "gh-saas",
+        "system": "github",
+        "mode": "real_saas",
+        "owner": "agentrail-recette",
+        "auth_env": "AGENTRAIL_EXTERNAL_GITHUB_TOKEN"
+    }
+]

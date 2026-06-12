@@ -8,11 +8,17 @@ from typing import Any
 
 from recette.llm import (
     AnthropicLlm,
+    DeepSeekLlm,
+    GeminiLlm,
+    GroqLlm,
     LlmDecision,
     Message,
+    MistralLlm,
+    OpenAiCompatLlm,
     OpenAiLlm,
     StubLlm,
     ToolSpec,
+    XaiLlm,
     build_llm,
 )
 
@@ -135,15 +141,223 @@ class TestOpenAi(unittest.TestCase):
                 os.environ["OPENAI_API_KEY"] = old
 
 
+class TestOpenAiCompat(unittest.TestCase):
+    def test_tool_call_parsed_from_openai_wire_format(self) -> None:
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "read_repo",
+                                    "arguments": '{"resource": "acme/x"}',
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        client = _StubClient(payload)
+        llm = OpenAiCompatLlm(model="qwen2.5", base_url="http://localhost:11434/v1", client=client)
+        decision = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertTrue(decision.is_tool_call)
+        self.assertEqual(decision.tool_name, "read_repo")
+        self.assertEqual(decision.tool_args, {"resource": "acme/x"})
+
+    def test_no_api_key_required(self) -> None:
+        # Local OpenAI-compatible servers (Ollama) have no key; must construct keyless.
+        old = os.environ.pop("OPENAI_API_KEY", None)
+        try:
+            llm = OpenAiCompatLlm(model="qwen2.5", base_url="http://localhost:11434/v1")
+            self.assertIsNotNone(llm)
+        finally:
+            if old is not None:
+                os.environ["OPENAI_API_KEY"] = old
+
+    def test_normalize_base_url_strips_v1_suffix(self) -> None:
+        # The "/v1" suffix is stripped: decide() paths already start with /v1.
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h"), "http://h")
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1"), "http://h")
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1/"), "http://h")
+
+    def test_base_url_v1_suffix_normalized(self) -> None:
+        # ".../v1" and bare base must both end up posting to /v1/chat/completions
+        client = _StubClient({"choices": []})
+        llm = OpenAiCompatLlm(model="m", base_url="http://h:1/v1", client=client)
+        llm.decide(system="s", history=[], tools=[])
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestGroq(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("GROQ_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError):
+                GroqLlm(model="llama-3.3-70b-versatile")
+        finally:
+            if old is not None:
+                os.environ["GROQ_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = GroqLlm(model="llama-3.3-70b-versatile", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestMistral(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("MISTRAL_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                MistralLlm(model="mistral-large-latest")
+            self.assertIn("MISTRAL_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["MISTRAL_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = MistralLlm(model="mistral-large-latest", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestDeepSeek(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("DEEPSEEK_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                DeepSeekLlm(model="deepseek-chat")
+            self.assertIn("DEEPSEEK_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["DEEPSEEK_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = DeepSeekLlm(model="deepseek-chat", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestXai(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("XAI_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                XaiLlm(model="grok-3")
+            self.assertIn("XAI_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["XAI_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = XaiLlm(model="grok-3", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestGemini(unittest.TestCase):
+    def test_parses_function_call(self) -> None:
+        payload = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"functionCall": {"name": "read_repo", "args": {"resource": "acme/x"}}}
+                        ]
+                    }
+                }
+            ]
+        }
+        client = _StubClient(payload)
+        llm = GeminiLlm(model="gemini-2.0-flash", client=client)
+        out = llm.decide(
+            system="be an agent",
+            history=[Message(role="user", content="go")],
+            tools=TOOLS,
+        )
+        self.assertTrue(out.is_tool_call)
+        self.assertEqual(out.tool_name, "read_repo")
+        self.assertEqual(out.tool_args, {"resource": "acme/x"})
+        self.assertEqual(client.last_path, "/v1beta/models/gemini-2.0-flash:generateContent")
+        assert client.last_body is not None
+        self.assertEqual(
+            client.last_body["system_instruction"], {"parts": [{"text": "be an agent"}]}
+        )
+        declarations = client.last_body["tools"][0]["functionDeclarations"]
+        self.assertEqual(declarations[0]["name"], "read_repo")
+        self.assertEqual(client.last_body["contents"][0]["role"], "user")
+
+    def test_parses_text_answer(self) -> None:
+        payload = {"candidates": [{"content": {"parts": [{"text": "done"}]}}]}
+        client = _StubClient(payload)
+        out = GeminiLlm(model="m", client=client).decide(system="s", history=[], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "done")
+
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("GEMINI_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError):
+                GeminiLlm(model="gemini-2.0-flash")
+        finally:
+            if old is not None:
+                os.environ["GEMINI_API_KEY"] = old
+
+    def test_empty_candidates_yield_empty_final(self) -> None:
+        client = _StubClient({"candidates": []})
+        out = GeminiLlm(model="m", client=client).decide(system="s", history=[], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "")
+
+
 class TestFactory(unittest.TestCase):
     def test_build_known_providers(self):
         client = _StubClient({"content": []})
         self.assertIsInstance(build_llm("anthropic", "m", client=client), AnthropicLlm)
         self.assertIsInstance(build_llm("openai", "m", client=client), OpenAiLlm)
+        self.assertIsInstance(build_llm("gemini", "m", client=client), GeminiLlm)
+        self.assertIsInstance(build_llm("groq", "m", client=client), GroqLlm)
+        self.assertIsInstance(build_llm("mistral", "m", client=client), MistralLlm)
+        self.assertIsInstance(build_llm("deepseek", "m", client=client), DeepSeekLlm)
+        self.assertIsInstance(build_llm("xai", "m", client=client), XaiLlm)
+        self.assertIsInstance(
+            build_llm("openai_compat", "m", client=client, base_url="http://h:1/v1"),
+            OpenAiCompatLlm,
+        )
 
     def test_unknown_provider_raises(self):
-        with self.assertRaises(ValueError):
-            build_llm("ollama", "m")
+        with self.assertRaises(ValueError) as ctx:
+            build_llm("bogus", "m")
+        for known in (
+            "anthropic",
+            "openai",
+            "gemini",
+            "groq",
+            "mistral",
+            "deepseek",
+            "xai",
+            "openai_compat",
+        ):
+            self.assertIn(known, str(ctx.exception))
+
+    def test_openai_compat_requires_base_url(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_llm("openai_compat", "m")
+        self.assertIn("openai_compat requires base_url", str(ctx.exception))
 
 
 if __name__ == "__main__":

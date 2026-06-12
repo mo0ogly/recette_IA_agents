@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "latency_ms": 0,
+  "error": "GEMINI_API_KEY not set (or pass client/api_key)"
+}

@@ -1,4 +1,4 @@
-"""U1: versioned config store for Lane B agents + AI backends."""
+"""U1: versioned config store for Lane B agents + AI backends + servers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from recette.api.config_store import ConfigStore, UnknownAgentError
+from recette.api.config_store import ConfigStore, UnknownAgentError, UnknownServerError
 
 
 class TestConfigStore(unittest.TestCase):
@@ -47,6 +47,13 @@ class TestConfigStore(unittest.TestCase):
             self.store.add_ai_backend(
                 {"id": "b1", "provider": "anthropic", "model": "x", "api_key": "sekret"}
             )
+
+    def test_add_ai_backend_rejects_password_fields(self) -> None:
+        for fname in ("password", "passwd"):
+            with self.assertRaises(ValueError, msg=f"field {fname!r} must be rejected"):
+                self.store.add_ai_backend(
+                    {"id": "b1", "provider": "anthropic", "model": "x", fname: "sekret"}
+                )
 
     def test_duplicate_id_rejected(self) -> None:
         self.store.add_ai_backend({"id": "b1", "provider": "openai", "model": "gpt"})
@@ -90,3 +97,104 @@ class TestConfigStore(unittest.TestCase):
             self.store.update_agent("a1", {"runtime": "bogus"})
         # the bad patch must not have been persisted
         self.assertEqual(self.store.get_agent("a1")["runtime"], "lab")
+
+
+class ServerSectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "cfg.json"
+        self.store = ConfigStore(self.path)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_add_list_update_delete_server(self) -> None:
+        self.store.add_server(
+            {"id": "gh-mock", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        self.assertEqual(self.store.read()["servers"][0]["id"], "gh-mock")
+        self.assertEqual(self.store.list_servers()[0]["id"], "gh-mock")
+        self.assertEqual(self.store.get_server("gh-mock")["port"], 9101)
+        self.store.update_server("gh-mock", {"port": 9102})
+        self.assertEqual(self.store.read()["servers"][0]["port"], 9102)
+        self.store.delete_server("gh-mock")
+        self.assertEqual(self.store.read()["servers"], [])
+        self.assertIsNone(self.store.get_server("gh-mock"))
+
+    def test_duplicate_server_id_rejected(self) -> None:
+        self.store.add_server(
+            {"id": "gh-mock", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        with self.assertRaises(ValueError):
+            self.store.add_server(
+                {"id": "gh-mock", "system": "github", "mode": "mock_local", "port": 9102}
+            )
+
+    def test_unknown_mode_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_server({"id": "gh-ssh", "system": "github", "mode": "ssh"})
+
+    def test_mode_specific_required_fields(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_server({"id": "s1", "system": "github", "mode": "mock_local"})
+        with self.assertRaises(ValueError):
+            self.store.add_server(
+                {"id": "s1", "system": "github", "mode": "mock_local", "port": "9101"}
+            )
+        with self.assertRaises(ValueError):
+            self.store.add_server({"id": "s2", "system": "github", "mode": "declared_url"})
+        with self.assertRaises(ValueError):
+            self.store.add_server({"id": "s3", "system": "github", "mode": "real_saas"})
+
+    def test_secret_fields_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_server(
+                {
+                    "id": "gh-real",
+                    "system": "github",
+                    "mode": "declared_url",
+                    "base_url": "https://gh.example",
+                    "token": "sekret",
+                }
+            )
+
+    def test_server_password_fields_rejected(self) -> None:
+        for fname in ("password", "passwd"):
+            with self.assertRaises(ValueError, msg=f"field {fname!r} must be rejected"):
+                self.store.add_server(
+                    {
+                        "id": "gh-real",
+                        "system": "github",
+                        "mode": "declared_url",
+                        "base_url": "https://gh.example",
+                        fname: "sekret",
+                    }
+                )
+
+    def test_update_unknown_server_raises(self) -> None:
+        with self.assertRaises(UnknownServerError):
+            self.store.update_server("nope", {"port": 9102})
+        self.assertTrue(issubclass(UnknownServerError, LookupError))
+
+    def test_delete_unknown_server_raises(self) -> None:
+        with self.assertRaises(UnknownServerError):
+            self.store.delete_server("nope")
+
+    def test_update_rejects_invalid_merged_entry_without_writing(self) -> None:
+        self.store.add_server(
+            {"id": "gh-mock", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        # switching mode without supplying the new required field must fail
+        with self.assertRaises(ValueError):
+            self.store.update_server("gh-mock", {"mode": "declared_url"})
+        # the bad patch must not have been persisted
+        self.assertEqual(self.store.get_server("gh-mock")["mode"], "mock_local")
+
+    def test_read_defaults_servers_to_empty_list(self) -> None:
+        # a config file written before this change has no "servers" key
+        self.path.write_text(
+            json.dumps({"schema_version": "1.0", "agents": [], "ai_backends": []}),
+            encoding="utf-8",
+        )
+        self.assertEqual(self.store.read()["servers"], [])
+        self.assertEqual(self.store.list_servers(), [])

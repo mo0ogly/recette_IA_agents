@@ -37,10 +37,14 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 raise HTTPException(status_code=400, detail="unknown ai_backend_id")
             from ...llm import build_llm
 
-            llm = build_llm(backend["provider"], backend["model"])  # live; key from env (R8)
+            # Live; key from env (R8). base_url only matters for openai_compat.
+            llm = build_llm(
+                backend["provider"], backend["model"], base_url=backend.get("base_url")
+            )
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b", params)
-        mgr.start(run, make_lane_b_runner(agent_cfg, llm))
+        # config_store carries the server registry for per-agent proxy routing (I5).
+        mgr.start(run, make_lane_b_runner(agent_cfg, llm, config_store=store))
         return {"run_id": run.id, "status": run.status}
     runner = _RUNNERS.get(kind) if isinstance(kind, str) else None
     if runner is None:

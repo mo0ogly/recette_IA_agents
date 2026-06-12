@@ -40,7 +40,7 @@ class TestCampaignRoutes(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
-        config = ConfigStore(root / "config.json")
+        self.config = config = ConfigStore(root / "config.json")
         config.add_agent(
             {
                 "id": "gh-pr-bot",
@@ -88,6 +88,77 @@ class TestCampaignRoutes(unittest.TestCase):
         events = self.client.get(f"/runs/{replay_id}/events").json()
         result = next(e for e in events if e["type"] == "replay_result")
         self.assertTrue(result["data"]["matches_original"])
+
+    def test_campaign_real_ai_step_openai_compat_uses_base_url(self) -> None:
+        """A4: a real-AI campaign step bound to an openai_compat backend passes the
+        backend's base_url to build_llm -- the step runs keyless against a local
+        OpenAI-wire stub server, end to end."""
+        import json
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        received: list[str] = []
+
+        class _StubOpenAi(BaseHTTPRequestHandler):
+            def log_message(self, *args: object) -> None:
+                return
+
+            def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
+                received.append(self.path)
+                payload = json.dumps(
+                    {"choices": [{"message": {"content": "done"}}]}
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        server = HTTPServer(("127.0.0.1", 0), _StubOpenAi)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            self.config.add_ai_backend(
+                {
+                    "id": "b-compat",
+                    "provider": "openai_compat",
+                    "model": "qwen2.5",
+                    "base_url": f"http://127.0.0.1:{port}/v1",
+                }
+            )
+            self.config.add_agent(
+                {
+                    "id": "gh-real",
+                    "runtime": "lab",
+                    "principal": "bot@acme",
+                    "target_system": "github",
+                    "goal": "open a PR",
+                    "capability_scope": ["read_repo", "open_pr"],
+                    "ai_mode": "real",
+                    "ai_backend_id": "b-compat",
+                }
+            )
+            created = self.client.post(
+                "/campaigns",
+                json={
+                    "id": "camp-real",
+                    "description": "real-AI step",
+                    "steps": [{"agent_id": "gh-real"}],
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            run_id = self.client.post("/campaigns/camp-real/run").json()["run_id"]
+            self.assertEqual(_wait_terminal(self.client, run_id)["status"], "completed")
+            events = self.client.get(f"/runs/{run_id}/events").json()
+            start = next(e for e in events if e["type"] == "agent_start")
+            self.assertEqual(start["data"]["provider"], "openai_compat")
+            self.assertFalse(any(e["type"] == "step_error" for e in events))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+        self.assertEqual(received, ["/v1/chat/completions"])
 
     def test_run_unknown_campaign_404(self) -> None:
         self.assertEqual(self.client.post("/campaigns/nope/run").status_code, 404)

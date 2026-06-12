@@ -62,6 +62,56 @@ export interface StoredEvent {
   hash: string;
 }
 
+/**
+ * Decision recorded with an audited action (carries the policy version, I4).
+ * Shape captured from a real GET /audit/events payload
+ * (src/hooks/__fixtures__/auditEvents.fixture.json).
+ */
+export interface AuditPolicyDecision {
+  verdict: PolicyVerdict;
+  policy_version: string;
+  rule_id: string | null;
+}
+
+/**
+ * Payload of an audited event. Fields are optional because the payload shape
+ * depends on the event kind: action_* events carry the full canonical action,
+ * approval_resolved carries a slim resolution record (agent_id, approver,
+ * approval_state, correlates_event_id). Derived from the real fixture.
+ */
+export interface AuditEventPayload {
+  agent_id?: string;
+  role?: string;
+  action_type?: string;
+  target_system?: string;
+  resource?: string;
+  capability_scope?: string[];
+  payload?: Record<string, unknown>;
+  risk_score?: number;
+  risk_level?: string;
+  policy_decision?: AuditPolicyDecision | null;
+  approval_state?: string;
+  side_effect_hash?: string | null;
+  correlates_event_id?: string | null;
+  approver?: string;
+  reason?: string;
+  timestamp?: string;
+  schema_version?: string;
+  extra?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** A StoredEvent with its payload typed from the real audit fixture. */
+export interface AuditEvent {
+  seq: number;
+  event_id: string;
+  schema_version: string;
+  kind: string;
+  payload: AuditEventPayload;
+  prev_hash: string;
+  hash: string;
+}
+
 /** Result of verifying the event store hash chain. */
 export interface ChainReport {
   ok: boolean;
@@ -167,11 +217,72 @@ export interface AgentAction {
   kind: "read" | "bounded_write" | "high_write";
 }
 
+/** Providers supported by the platform LLM factory (recette/llm.py). */
+export type AiProvider =
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "groq"
+  | "mistral"
+  | "deepseek"
+  | "xai"
+  | "openai_compat";
+
 /** A configured AI backend an agent can be bound to. */
 export interface AiBackend {
   id: string;
-  provider: string;
+  provider: AiProvider;
   model: string;
+  /** Required when provider = openai_compat (Ollama, vLLM, LiteLLM proxies). */
+  base_url?: string;
+}
+
+/** Result of POST /config/ai-backends/{id}/test (always 200; ok discriminates). */
+export type BackendTestResult =
+  | { ok: true; latency_ms: number; kind: string }
+  | { ok: false; latency_ms: number; error: string };
+
+/** How a target server is reached: local mock process, declared URL, or SaaS. */
+export type ServerMode = "mock_local" | "declared_url" | "real_saas";
+
+/** Live status of a server: process/probe result, or n/a (real_saas). */
+export type ServerStatus = "up" | "down" | "n/a";
+
+/** A configured target server agents act against (GET/POST /config/servers). */
+export interface ServerEntry {
+  id: string;
+  /** External system the server emulates or hosts (e.g. github, gitlab). */
+  system: string;
+  mode: ServerMode;
+  /** Required when mode = mock_local: local port of the mock process. */
+  port?: number;
+  /** Required when mode = declared_url: base URL of the declared server. */
+  base_url?: string;
+  /** Required when mode = real_saas: org/owner on the SaaS platform. */
+  owner?: string;
+  /** Name of the env var holding the credential (never the secret itself, R8). */
+  auth_env?: string;
+}
+
+/** Result of a start/stop lifecycle call; error explains a "down" outcome. */
+export interface ServerLifecycleResult {
+  status: ServerStatus;
+  error?: string;
+}
+
+/** One entry of a server's JSONL access log. */
+export interface ServerLogLine {
+  event_id: string;
+  target_system: string;
+  action_type: string;
+  resource: string;
+  status: number;
+}
+
+/** Incremental tail of a server access log; next is the cursor to pass back. */
+export interface ServerLogTail {
+  lines: ServerLogLine[];
+  next: number;
 }
 
 /** One rule of a policy document. */

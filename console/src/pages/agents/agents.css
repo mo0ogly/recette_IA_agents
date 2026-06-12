@@ -132,3 +132,39 @@
   letter-spacing: 0.04em;
   color: var(--color-text-muted);
 }
+
+.agents-test-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+}
+
+.agents-status-dot {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background-color: var(--badge-gray-fg);
+}
+
+.agents-status-dot[data-status="ok"] {
+  background-color: var(--badge-green-fg);
+}
+
+.agents-status-dot[data-status="error"] {
+  background-color: var(--badge-red-fg);
+}
+
+.agents-test-error {
+  color: var(--badge-red-fg);
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-key-hint {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
