@@ -64,3 +64,7 @@ data/agentrail.events.db-wal
 # Runtime campaign + recording artifacts
 config/campaigns.json
 data/recordings/
+
+# Runtime verdict submissions + lab access logs (regenerated at runtime)
+data/verdicts.json
+data/lab/

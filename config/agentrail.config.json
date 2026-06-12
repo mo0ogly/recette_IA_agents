@@ -75,7 +75,19 @@
           "kind": "final",
           "text": "done"
         }
-      ]
+      ],
+      "server": "gh-mock",
+      "ground_truth": {
+        "detectable": true,
+        "expected_identity": "bot@acme",
+        "dimensions": {
+          "identity": true,
+          "capabilities": true,
+          "policy": true,
+          "behavior": true
+        },
+        "expected_verdict": "correct"
+      }
     },
     {
       "id": "okta-rogue",
@@ -87,7 +99,8 @@
       "capability_scope": [
         "suspend_user",
         "delete_user"
-      ]
+      ],
+      "server": "okta-mock"
     },
     {
       "id": "finance-wire-fraud-agent",
@@ -130,5 +143,19 @@
       ]
     }
   ],
-  "ai_backends": []
+  "ai_backends": [],
+  "servers": [
+    {
+      "id": "gh-mock",
+      "system": "github",
+      "mode": "mock_local",
+      "port": 9121
+    },
+    {
+      "id": "okta-mock",
+      "system": "okta",
+      "mode": "mock_local",
+      "port": 9122
+    }
+  ]
 }

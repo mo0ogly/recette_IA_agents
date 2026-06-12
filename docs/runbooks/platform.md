@@ -226,3 +226,66 @@ VITE_AGENTRAIL_API_URL=http://localhost:8090 npm run dev
 
 Or `make console` from the repo root (uses the console's own env defaults;
 set `VITE_AGENTRAIL_API_URL` in `console/.env.local` to point at the lab API).
+
+## Server registry (mock_local / declared_url / real_saas)
+
+Servers are CRUD entities in `config/agentrail.config.json` (`servers` section)
+and in the console Servers tab. Three modes:
+
+- `mock_local`: the platform launches a real local HTTP process
+  (`python -m recette.lab.mock_server`) on the configured port. Start/stop from
+  the console or `POST /config/servers/{id}/start|stop`. `GET /health` probes it.
+  Every request received is appended to `data/lab/{id}.access.jsonl` and served
+  back by `GET /config/servers/{id}/log?after=N` (the console log panel tails it).
+- `declared_url`: any external server speaking the lab wire format
+  (`POST /{target_system}/execute`, `{"success","data"}` envelope).
+- `real_saas`: reserved; execution fails explicitly until realmode proxy wiring lands.
+
+An agent carrying `"server": "<id>"` executes through the proxy resolved from the
+registry (I5). A dangling reference fails the run explicitly -- never a silent
+fallback. Demo flow verified live:
+
+```bash
+curl -X POST localhost:8090/config/servers -d '{"id":"okta-mock","system":"okta","mode":"mock_local","port":9122}' -H 'Content-Type: application/json'
+curl -X POST localhost:8090/config/servers/okta-mock/start
+curl -X POST localhost:8090/runs -H 'Content-Type: application/json' -d '{"kind":"lane_b","params":{"agent_id":"okta-rogue","stub_script":[{"kind":"tool_call","tool_name":"suspend_user","tool_args":{"resource":"user:jdoe"}},{"kind":"final","text":"done"}]}}'
+curl "localhost:8090/config/servers/okta-mock/log?after=0"
+```
+
+Note: lab domain handlers simulate the catalog risk-action set; canonical
+read-style actions (`read_repo`, `open_pr`) are not simulated by the github
+domain and return 404 (the run then fails explicitly, by design).
+
+## AI providers
+
+`recette/llm.py` backends: anthropic, openai, gemini, groq, mistral, deepseek,
+xai, plus `openai_compat` (any OpenAI-wire vendor via `base_url` -- Ollama,
+OpenRouter, vLLM...). Keys via env only: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`,
+`XAI_API_KEY`. `POST /config/ai-backends/{id}/test` makes one minimal live call
+and returns `{ok, latency_ms, kind|error}` -- wired to the Test button in the
+console AI Backends panel.
+
+## Verdict scoring (recette of the external tool)
+
+Agents may carry a `ground_truth` block (`detectable`, `expected_identity`,
+4 `dimensions`, `expected_verdict`). The external discovery/identification tool
+pushes its results:
+
+```bash
+curl -X POST localhost:8090/verdicts -H 'Content-Type: application/json' -d '{"tool":"discovery-v1","results":[{"agent_id":"demo-gh-bot","detected":true,"verdict":"correct","identity":"bot@acme","dimensions":{"identity":true,"capabilities":true,"policy":true,"behavior":true}}]}'
+curl localhost:8090/verdicts/scorecard
+```
+
+Each result is judged against the agent ground truth (PASS/FAIL/SKIP + per-check
+detail + evidence event ids from the audit log). `GET /verdicts/scorecard`
+aggregates detection rate, per-dimension accuracy, false positives/negatives.
+The console Verdicts tab renders the banner, the per-agent table (expandable
+evidence) and accepts a JSON upload as an alternative to the HTTP push.
+
+## Observability surfaces for the external tool
+
+1. Real HTTP traffic against mock_local servers (sniff/scan the ports).
+2. `GET /audit/events` (filterable) and `GET /audit/export.jsonl` (full NDJSON
+   stream of the append-only event log, hash-chained).
+3. The REST API itself (agents, servers, runs, campaigns, verdicts).
