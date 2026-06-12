@@ -161,6 +161,140 @@ class TestCampaignRoutes(unittest.TestCase):
             thread.join(timeout=5)
         self.assertEqual(received, ["/v1/chat/completions"])
 
+    def test_campaign_runs_each_agent_on_its_own_provider(self) -> None:
+        """Multi-provider proof: in a SINGLE campaign, agent_a is bound to backend_a
+        and agent_b to backend_b. The runner builds one LlmBackend per step from the
+        agent's own ai_backend (runners.py build_llm call inside the step loop), so each
+        agent must reach ITS OWN provider. Two distinct local OpenAI-wire stub servers
+        each return a distinct final answer and record their hits; the persisted
+        recordings prove agent_a got "from-A" and agent_b got "from-B"."""
+        import json
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        def _make_stub(answer: str, hits: list[str]):
+            class _StubOpenAi(BaseHTTPRequestHandler):
+                def log_message(self, *args: object) -> None:
+                    return
+
+                def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
+                    hits.append(self.path)
+                    payload = json.dumps(
+                        {"choices": [{"message": {"content": answer}}]}
+                    ).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+
+            return _StubOpenAi
+
+        hits_a: list[str] = []
+        hits_b: list[str] = []
+        server_a = HTTPServer(("127.0.0.1", 0), _make_stub("from-A", hits_a))
+        server_b = HTTPServer(("127.0.0.1", 0), _make_stub("from-B", hits_b))
+        port_a = server_a.server_address[1]
+        port_b = server_b.server_address[1]
+        thread_a = threading.Thread(target=server_a.serve_forever, daemon=True)
+        thread_b = threading.Thread(target=server_b.serve_forever, daemon=True)
+        thread_a.start()
+        thread_b.start()
+
+        def _shutdown() -> None:
+            server_a.shutdown()
+            server_a.server_close()
+            thread_a.join(timeout=5)
+            server_b.shutdown()
+            server_b.server_close()
+            thread_b.join(timeout=5)
+
+        self.addCleanup(_shutdown)
+
+        # Two distinct backends, both openai_compat but different base_url + model.
+        self.config.add_ai_backend(
+            {
+                "id": "backend_a",
+                "provider": "openai_compat",
+                "model": "model-a",
+                "base_url": f"http://127.0.0.1:{port_a}/v1",
+            }
+        )
+        self.config.add_ai_backend(
+            {
+                "id": "backend_b",
+                "provider": "openai_compat",
+                "model": "model-b",
+                "base_url": f"http://127.0.0.1:{port_b}/v1",
+            }
+        )
+        self.config.add_agent(
+            {
+                "id": "agent_a",
+                "runtime": "lab",
+                "principal": "bot-a@acme",
+                "target_system": "github",
+                "goal": "ask provider A",
+                "capability_scope": ["read_repo"],
+                "ai_mode": "real",
+                "ai_backend_id": "backend_a",
+            }
+        )
+        self.config.add_agent(
+            {
+                "id": "agent_b",
+                "runtime": "lab",
+                "principal": "bot-b@acme",
+                "target_system": "github",
+                "goal": "ask provider B",
+                "capability_scope": ["read_repo"],
+                "ai_mode": "real",
+                "ai_backend_id": "backend_b",
+            }
+        )
+
+        # One campaign that runs BOTH agents.
+        created = self.client.post(
+            "/campaigns",
+            json={
+                "id": "camp-multi",
+                "description": "two agents, two providers",
+                "steps": [{"agent_id": "agent_a"}, {"agent_id": "agent_b"}],
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        run_id = self.client.post("/campaigns/camp-multi/run").json()["run_id"]
+        self.assertEqual(_wait_terminal(self.client, run_id)["status"], "completed")
+
+        events = self.client.get(f"/runs/{run_id}/events").json()
+        self.assertFalse(any(e["type"] == "step_error" for e in events))
+        # Both agents ran in the same campaign and each reported its own provider.
+        starts = {
+            e["data"]["agent_id"]: e["data"]["provider"]
+            for e in events
+            if e["type"] == "agent_start"
+        }
+        self.assertEqual(starts, {"agent_a": "openai_compat", "agent_b": "openai_compat"})
+
+        # Each stub server was hit exactly once on the chat endpoint -- proof that
+        # each agent ran on ITS OWN provider, not a single shared backend.
+        self.assertEqual(hits_a, ["/v1/chat/completions"])
+        self.assertEqual(hits_b, ["/v1/chat/completions"])
+
+        # The persisted recordings carry the distinct final answers, proving the
+        # routing reached the intended server per agent (agent_a -> A, agent_b -> B).
+        recs = {r["recording_id"]: r for r in self.client.get("/recordings").json()["recordings"]}
+        rec_a_id = next(rid for rid in recs if rid.endswith(".agent_a"))
+        rec_b_id = next(rid for rid in recs if rid.endswith(".agent_b"))
+        rec_a = self.client.get(f"/recordings/{rec_a_id}").json()
+        rec_b = self.client.get(f"/recordings/{rec_b_id}").json()
+        self.assertEqual(rec_a["model"], "model-a")
+        self.assertEqual(rec_b["model"], "model-b")
+        final_a = rec_a["steps"][-1]["decision"]["text"]
+        final_b = rec_b["steps"][-1]["decision"]["text"]
+        self.assertEqual(final_a, "from-A")
+        self.assertEqual(final_b, "from-B")
+
     def test_run_unknown_campaign_404(self) -> None:
         self.assertEqual(self.client.post("/campaigns/nope/run").status_code, 404)
 
