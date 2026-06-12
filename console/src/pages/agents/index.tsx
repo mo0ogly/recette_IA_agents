@@ -17,6 +17,7 @@ import {
   updateAgent,
 } from "../../api/client";
 import type { AgentConfig, AiBackend } from "../../types/platform";
+import PageHelp from "../../components/help/PageHelp";
 import "./agents.css";
 
 /** Form state: every field as the raw string the user types. */
@@ -162,7 +163,10 @@ export default function AgentsPage(): JSX.Element {
 
   return (
     <div>
-      <h1>Agents</h1>
+      <div className="page-head">
+        <h1>Agents</h1>
+        <PageHelp topic="agents" />
+      </div>
 
       {error !== null && (
         <div className="agents-error-banner" role="alert">

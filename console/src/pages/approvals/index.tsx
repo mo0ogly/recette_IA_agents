@@ -27,6 +27,7 @@ import type {
   RiskLevel,
 } from "../../types/platform";
 import { StatusBadge } from "../../components/StatusBadge";
+import PageHelp from "../../components/help/PageHelp";
 import "./approvals.css";
 
 const RISK_LEVELS: readonly RiskLevel[] = ["low", "medium", "high", "critical"];
@@ -234,7 +235,10 @@ export default function ApprovalsPage(): JSX.Element {
 
   return (
     <div>
-      <h1>Approval Inbox</h1>
+      <div className="page-head">
+        <h1>Approval Inbox</h1>
+        <PageHelp topic="approvals" />
+      </div>
 
       {error !== null ? (
         <div className="approvals-error" role="alert">

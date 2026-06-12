@@ -22,6 +22,7 @@ import type {
   PolicyRule,
   PolicyVerdict,
 } from "../../types/platform";
+import PageHelp from "../../components/help/PageHelp";
 import "./catalog.css";
 
 const VERDICTS: PolicyVerdict[] = ["allow", "deny", "escalate"];
@@ -289,7 +290,10 @@ export default function CatalogPage(): JSX.Element {
 
   return (
     <div className="catalog-page">
-      <h1>Catalog and policy</h1>
+      <div className="page-head">
+        <h1>Catalog and policy</h1>
+        <PageHelp topic="catalog" />
+      </div>
 
       {error !== null && (
         <div className="error-banner" role="alert">

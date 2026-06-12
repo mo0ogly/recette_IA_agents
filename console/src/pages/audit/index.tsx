@@ -26,6 +26,7 @@ import type {
   PolicyVerdict,
   StoredEvent,
 } from "../../types/platform";
+import PageHelp from "../../components/help/PageHelp";
 import "./audit.css";
 
 /** Event kinds offered by the kind filter (plus the "all" pseudo-value). */
@@ -176,7 +177,10 @@ export default function AuditPage(): JSX.Element {
 
   return (
     <section>
-      <h1>Audit Trail</h1>
+      <div className="page-head">
+        <h1>Audit Trail</h1>
+        <PageHelp topic="audit" />
+      </div>
 
       {chain !== null && chain.ok && (
         <div className="banner banner-ok" role="status">
