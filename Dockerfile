@@ -32,8 +32,9 @@ COPY corpus ./corpus
 
 # Runtime dep + editable install (keeps corpus a sibling of recette as required).
 # [bundle] brings cryptography so `recette bundle-verify` works and its tests run for real.
+# [api] brings fastapi/uvicorn so the Track U API (recette/api) tests run in the lab too.
 RUN pip install "jsonschema>=4.0" && \
-    pip install -e ".[bundle]" && \
+    pip install -e ".[bundle,api]" && \
     chown -R recette:recette /app
 
 USER recette
@@ -47,7 +48,8 @@ FROM runtime AS audit
 USER root
 
 # Strict-gate + test tooling kept out of the runtime image (smaller attack surface).
-RUN pip install ruff mypy bandit pip-audit pytest types-jsonschema
+# httpx backs fastapi.testclient.TestClient used by the Track U API tests.
+RUN pip install ruff mypy bandit pip-audit pytest types-jsonschema httpx
 
 # Tests + scripts are only needed by the gates/tests services.
 COPY tests ./tests
