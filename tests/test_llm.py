@@ -10,6 +10,7 @@ from recette.llm import (
     AnthropicLlm,
     LlmDecision,
     Message,
+    OpenAiCompatLlm,
     OpenAiLlm,
     StubLlm,
     ToolSpec,
@@ -133,6 +134,51 @@ class TestOpenAi(unittest.TestCase):
         finally:
             if old is not None:
                 os.environ["OPENAI_API_KEY"] = old
+
+
+class OpenAiCompatTests(unittest.TestCase):
+    def test_tool_call_parsed_from_openai_wire_format(self) -> None:
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "read_repo",
+                                    "arguments": '{"resource": "acme/x"}',
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        client = _StubClient(payload)
+        llm = OpenAiCompatLlm(model="qwen2.5", base_url="http://localhost:11434/v1", client=client)
+        decision = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertTrue(decision.is_tool_call)
+        self.assertEqual(decision.tool_name, "read_repo")
+        self.assertEqual(decision.tool_args, {"resource": "acme/x"})
+
+    def test_no_api_key_required(self) -> None:
+        # Local OpenAI-compatible servers (Ollama) have no key; must construct keyless.
+        old = os.environ.pop("OPENAI_API_KEY", None)
+        try:
+            llm = OpenAiCompatLlm(model="qwen2.5", base_url="http://localhost:11434/v1")
+            self.assertIsNotNone(llm)
+            # The "/v1" suffix is stripped: decide() paths already start with /v1.
+            self.assertEqual(llm._client.base_url, "http://localhost:11434")
+        finally:
+            if old is not None:
+                os.environ["OPENAI_API_KEY"] = old
+
+    def test_base_url_v1_suffix_normalized(self) -> None:
+        # ".../v1" and bare base must both end up posting to /v1/chat/completions
+        client = _StubClient({"choices": []})
+        llm = OpenAiCompatLlm(model="m", base_url="http://h:1/v1", client=client)
+        llm.decide(system="s", history=[], tools=[])
+        self.assertEqual(client.last_path, "/v1/chat/completions")
 
 
 class TestFactory(unittest.TestCase):

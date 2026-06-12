@@ -9,6 +9,8 @@ Backends:
 - AnthropicLlm / OpenAiLlm -- live providers over plain HTTPS JSON (stdlib client, zero
   SDK dependency). The HTTP transport is injectable, so they are unit-tested with a stub
   client -- no API key, no network. Keys come from env (R8): ANTHROPIC_API_KEY / OPENAI_API_KEY.
+- OpenAiCompatLlm -- OpenAI wire format against a configurable base_url (Ollama, vLLM,
+  LiteLLM proxies); API key optional for local keyless servers.
 
 ReplayLlm (deterministic replay of a recorded run) lands with the recorder in LB4.
 """
@@ -236,6 +238,32 @@ class OpenAiLlm:
         resp = self._client.post("/v1/chat/completions", json=body)
         resp.raise_for_status()
         return _parse_openai(resp.json())
+
+
+class OpenAiCompatLlm(OpenAiLlm):
+    """OpenAI-wire-compatible backend with a configurable base URL.
+
+    Covers Ollama, vLLM, LiteLLM proxies. The API key is optional:
+    local servers run keyless; remote ones pass api_key explicitly.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        base_url: str,
+        client: _PostClient | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        self._model = model
+        if client is None:
+            # Normalize: callers may pass ".../v1"; paths below already start with /v1.
+            base = base_url.rstrip("/")
+            if base.endswith("/v1"):
+                base = base[: -len("/v1")]
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
+            client = StdlibHttpClient(base, headers=headers)
+        self._client = client
 
 
 # --- provider factory --------------------------------------------------------------------
