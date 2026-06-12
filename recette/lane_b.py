@@ -7,6 +7,7 @@ shape as a Lane A scenario) plus a replayable Recording.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .events import AgentAction
@@ -48,6 +49,8 @@ def run_agent(
     provider: str = "stub",
     model: str = "",
     max_steps: int = 10,
+    on_step: Callable[[int, RecordedStep], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> LaneBResult:
     """Run the decide->act loop until a final answer or max_steps. Deterministic given a
     deterministic backend (StubLlm/ReplayLlm) + LabForge."""
@@ -65,10 +68,15 @@ def run_agent(
     )
     actions: list[AgentAction] = []
 
-    for _ in range(max_steps):
+    for i in range(max_steps):
+        if should_stop is not None and should_stop():
+            break
         decision = llm.decide(system=system, history=history, tools=tools)
         if not decision.is_tool_call:
-            recording.steps.append(RecordedStep(decision=decision, action=None))
+            step = RecordedStep(decision=decision, action=None)
+            recording.steps.append(step)
+            if on_step is not None:
+                on_step(i, step)
             break
         action = execute_tool(
             forge,
@@ -78,7 +86,10 @@ def run_agent(
             decision=decision,
         )
         actions.append(action)
-        recording.steps.append(RecordedStep(decision=decision, action=action.to_dict()))
+        step = RecordedStep(decision=decision, action=action.to_dict())
+        recording.steps.append(step)
+        if on_step is not None:
+            on_step(i, step)
         history.append(Message("assistant", f"calling {decision.tool_name}"))
         history.append(Message("tool", _result_text(action), tool_name=decision.tool_name))
 
