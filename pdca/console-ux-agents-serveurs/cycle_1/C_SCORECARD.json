@@ -1,0 +1,33 @@
+{
+  "schema": "pdca-scorecard-v1",
+  "scope": "console-ux-agents-serveurs",
+  "cycle": 1,
+  "date": "2026-06-12",
+  "target": 95,
+  "mode": "evidence-based estimate",
+  "domains": {
+    "testing": {
+      "before": 62,
+      "after": 96,
+      "src": "runners.py 0 -> 20 dedicated tests (ProxyForge, forge routing, campaign branches, replay I4); campaign_templates.py 0 -> 11 tests incl. end-to-end run of all 17 templates; 2 import-error test modules fixed (fastapi guard); suite OK in both envs (system: 473 ran 91 skipped, venv: 473 ran 17 skipped)"
+    },
+    "code_hygiene": {
+      "before": 80,
+      "after": 95,
+      "src": "ruff check clean on tests/ + config_store; ruff format drift cleared on 5 files; mypy clean on all touched files; E501 debt cleared in test_api_campaigns"
+    },
+    "architecture": {
+      "before": 90,
+      "after": 92,
+      "src": "no structural change needed; fail-safe routing (I5) and replay determinism (I4) now locked by tests instead of discipline"
+    },
+    "completeness": {
+      "before": 85,
+      "after": 93,
+      "src": "all 17 campaign templates validated against the live action catalog and proven runnable; console vitest 90/90 (baseline, unchanged this cycle)"
+    }
+  },
+  "global_weighted": 94,
+  "residual_to_target": "console UX untouched this cycle (already green: vitest 90/90, tsc clean); server lifecycle tests pre-existing and adequate (9 tests). Residual ~1pt = no Playwright runtime smoke run this cycle (no frontend change to smoke).",
+  "verdict": "COMPLETE-below-target (structural residual: no frontend modification to smoke-test)"
+}
