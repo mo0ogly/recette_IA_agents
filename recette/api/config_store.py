@@ -136,8 +136,8 @@ class ConfigStore:
         if "runtime" in patch:
             _check_runtime(patch["runtime"])  # reject bad input before mutating/writing
         if "ground_truth" in patch:
-            # update_agent validates patched fields only (it never re-validates
-            # the merged entry, unlike update_server); mirror that behavior.
+            # Validate the patch value alone, not the merged entry -- update_agent
+            # has always worked patch-only (update_server is the stricter one).
             _check_ground_truth(patch["ground_truth"])
         cfg = self.read()
         for a in cfg["agents"]:
