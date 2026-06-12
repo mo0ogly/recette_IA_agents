@@ -1,0 +1,1 @@
+{"event_id":"EV000000000000000001000002","verdict":"escalate","approval_state":"denied","risk_level":"high","policy_version":"v1","rule_id":"okta.reset_password.identity_admin","executed":false,"result":null,"side_effect_hash":null,"error":null}
