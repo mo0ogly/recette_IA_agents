@@ -7,7 +7,7 @@
  * returns.
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentConfig, AiBackend } from "../../types/platform";
 import agentsFixture from "./__fixtures__/agents.fixture.json";
@@ -25,6 +25,7 @@ vi.mock("../../api/client", () => ({
 }));
 
 import {
+  createAgent,
   listAgentActions,
   listAgents,
   listAiBackends,
@@ -81,5 +82,37 @@ describe("AgentsPage", () => {
     expect(banner).toHaveTextContent(
       "API request failed (500) on /config/agents: boom",
     );
+  });
+
+  it("composes capability_scope + mock scenario from the chosen catalog actions", async () => {
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listAiBackends).mockResolvedValue([]);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(createAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+
+    // Wait for the catalog checkboxes to render, then pick read_repo + open_pr.
+    const readRepo = await screen.findByRole("checkbox", { name: /read_repo/ });
+    fireEvent.click(readRepo);
+    fireEvent.click(screen.getByRole("checkbox", { name: /open_pr/ }));
+
+    // "Id" labels both the agent form and the AI-backend form; the agent one is first.
+    fireEvent.change(screen.getAllByLabelText("Id")[0], {
+      target: { value: "pr-bot" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(createAgent).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(createAgent).mock.calls[0][0];
+    expect(payload.id).toBe("pr-bot");
+    expect(payload.ai_mode).toBe("mock");
+    expect(payload.capability_scope).toEqual(["read_repo", "open_pr"]);
+    // Scenario = one tool_call per action, then a final step.
+    expect(payload.scenario).toEqual([
+      { kind: "tool_call", tool_name: "read_repo", tool_args: { resource: "acme/x" } },
+      { kind: "tool_call", tool_name: "open_pr", tool_args: { resource: "acme/x" } },
+      { kind: "final", text: "done" },
+    ]);
   });
 });
