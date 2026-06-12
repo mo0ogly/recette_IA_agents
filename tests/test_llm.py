@@ -8,14 +8,17 @@ from typing import Any
 
 from recette.llm import (
     AnthropicLlm,
+    DeepSeekLlm,
     GeminiLlm,
     GroqLlm,
     LlmDecision,
     Message,
+    MistralLlm,
     OpenAiCompatLlm,
     OpenAiLlm,
     StubLlm,
     ToolSpec,
+    XaiLlm,
     build_llm,
 )
 
@@ -206,6 +209,66 @@ class TestGroq(unittest.TestCase):
         self.assertEqual(client.last_path, "/v1/chat/completions")
 
 
+class TestMistral(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("MISTRAL_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                MistralLlm(model="mistral-large-latest")
+            self.assertIn("MISTRAL_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["MISTRAL_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = MistralLlm(model="mistral-large-latest", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestDeepSeek(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("DEEPSEEK_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                DeepSeekLlm(model="deepseek-chat")
+            self.assertIn("DEEPSEEK_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["DEEPSEEK_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = DeepSeekLlm(model="deepseek-chat", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestXai(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("XAI_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                XaiLlm(model="grok-3")
+            self.assertIn("XAI_API_KEY", str(ctx.exception))
+        finally:
+            if old is not None:
+                os.environ["XAI_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = XaiLlm(model="grok-3", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
 class TestGemini(unittest.TestCase):
     def test_parses_function_call(self) -> None:
         payload = {
@@ -268,6 +331,9 @@ class TestFactory(unittest.TestCase):
         self.assertIsInstance(build_llm("openai", "m", client=client), OpenAiLlm)
         self.assertIsInstance(build_llm("gemini", "m", client=client), GeminiLlm)
         self.assertIsInstance(build_llm("groq", "m", client=client), GroqLlm)
+        self.assertIsInstance(build_llm("mistral", "m", client=client), MistralLlm)
+        self.assertIsInstance(build_llm("deepseek", "m", client=client), DeepSeekLlm)
+        self.assertIsInstance(build_llm("xai", "m", client=client), XaiLlm)
         self.assertIsInstance(
             build_llm("openai_compat", "m", client=client, base_url="http://h:1/v1"),
             OpenAiCompatLlm,
@@ -275,8 +341,17 @@ class TestFactory(unittest.TestCase):
 
     def test_unknown_provider_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            build_llm("mistral", "m")
-        for known in ("anthropic", "openai", "gemini", "groq", "openai_compat"):
+            build_llm("bogus", "m")
+        for known in (
+            "anthropic",
+            "openai",
+            "gemini",
+            "groq",
+            "mistral",
+            "deepseek",
+            "xai",
+            "openai_compat",
+        ):
             self.assertIn(known, str(ctx.exception))
 
     def test_openai_compat_requires_base_url(self):

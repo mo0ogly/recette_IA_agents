@@ -12,6 +12,9 @@ Backends:
 - OpenAiCompatLlm -- OpenAI wire format against a configurable base_url (Ollama, vLLM,
   LiteLLM proxies); API key optional for local keyless servers.
 - GroqLlm -- Groq cloud, OpenAI wire format at api.groq.com. Key: GROQ_API_KEY.
+- MistralLlm -- Mistral cloud, OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY.
+- DeepSeekLlm -- DeepSeek cloud, OpenAI wire format at api.deepseek.com. Key: DEEPSEEK_API_KEY.
+- XaiLlm -- xAI cloud, OpenAI wire format at api.x.ai. Key: XAI_API_KEY.
 - GeminiLlm -- Google Gemini generateContent wire format. Key: GEMINI_API_KEY.
 
 ReplayLlm (deterministic replay of a recorded run) lands with the recorder in LB4.
@@ -292,6 +295,75 @@ class GroqLlm(OpenAiLlm):
         super().__init__(model=model, client=client)
 
 
+# --- Mistral -----------------------------------------------------------------------------
+
+
+class MistralLlm(OpenAiLlm):
+    """Mistral cloud backend -- OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.mistral.ai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("MISTRAL_API_KEY")
+            if not key:
+                raise RuntimeError("MISTRAL_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- DeepSeek ----------------------------------------------------------------------------
+
+
+class DeepSeekLlm(OpenAiLlm):
+    """DeepSeek cloud backend -- OpenAI wire format at api.deepseek.com. Key: DEEPSEEK_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.deepseek.com"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("DEEPSEEK_API_KEY")
+            if not key:
+                raise RuntimeError("DEEPSEEK_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+# --- xAI ---------------------------------------------------------------------------------
+
+
+class XaiLlm(OpenAiLlm):
+    """xAI cloud backend -- OpenAI wire format at api.x.ai. Key: XAI_API_KEY.
+
+    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
+    """
+
+    BASE_URL = "https://api.x.ai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("XAI_API_KEY")
+            if not key:
+                raise RuntimeError("XAI_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
 # --- Gemini ------------------------------------------------------------------------------
 
 
@@ -368,7 +440,16 @@ class GeminiLlm:
 
 # --- provider factory --------------------------------------------------------------------
 
-_PROVIDERS = ("anthropic", "openai", "gemini", "groq", "openai_compat")
+_PROVIDERS = (
+    "anthropic",
+    "openai",
+    "gemini",
+    "groq",
+    "mistral",
+    "deepseek",
+    "xai",
+    "openai_compat",
+)
 
 
 def build_llm(
@@ -390,6 +471,12 @@ def build_llm(
         return GeminiLlm(model=model, client=client)
     if provider == "groq":
         return GroqLlm(model=model, client=client)
+    if provider == "mistral":
+        return MistralLlm(model=model, client=client)
+    if provider == "deepseek":
+        return DeepSeekLlm(model=model, client=client)
+    if provider == "xai":
+        return XaiLlm(model=model, client=client)
     if provider == "openai_compat":
         if not base_url and client is None:
             raise ValueError("openai_compat requires base_url")
