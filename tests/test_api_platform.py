@@ -7,6 +7,7 @@ side effect, no network (I5 lab posture).
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -182,6 +183,23 @@ class TestPlatformApi(unittest.TestCase):
         report = self.client.get("/audit/verify").json()
         self.assertTrue(report["ok"])
         self.assertEqual(report["checked"], len(events))
+
+    def test_audit_export_jsonl(self) -> None:
+        self._execute("agent-admin", "list_users")
+        self._execute("agent-bot", "suspend_user")
+        events = self.client.get("/audit/events").json()["events"]
+        self.assertGreater(len(events), 0)
+
+        resp = self.client.get("/audit/export.jsonl")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertTrue(resp.headers["content-type"].startswith("application/x-ndjson"))
+
+        lines = [line for line in resp.text.split("\n") if line]
+        self.assertEqual(len(lines), len(events))
+        parsed = [json.loads(line) for line in lines]
+        seqs = [p["seq"] for p in parsed]
+        self.assertEqual(seqs, sorted(seqs))
+        self.assertEqual(parsed[0]["event_id"], events[0]["event_id"])
 
     def test_catalog_actions_listing(self) -> None:
         resp = self.client.get("/catalog/actions")

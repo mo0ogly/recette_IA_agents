@@ -5,7 +5,11 @@ Read-only by construction: the router exposes no write path on the store (I1).
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
+
 from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -23,6 +27,22 @@ def list_events(
         from_seq, limit=limit, agent_id=agent_id, target_system=target_system, kind=kind
     )
     return {"events": [e.to_dict() for e in events]}
+
+
+@router.get("/export.jsonl")
+def export_jsonl(request: Request) -> StreamingResponse:
+    """Stream the full event log as NDJSON for external tools (SIEM, forensics).
+
+    Read-only on the append-only store (I1): one JSON object per line, ordered
+    by seq, keys sorted for byte-stable output (I4-friendly diffing).
+    """
+    events = request.app.state.event_store.read_from(0)
+
+    def lines() -> Iterator[str]:
+        for event in events:
+            yield json.dumps(event.to_dict(), sort_keys=True) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 @router.get("/verify")
