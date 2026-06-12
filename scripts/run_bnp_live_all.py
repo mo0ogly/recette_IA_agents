@@ -90,19 +90,29 @@ def _drive(llm: LlmBackend, doc: dict, tools: list[ToolSpec], max_steps: int) ->
     # Remove each tool once called so the model is forced through every distinct
     # action instead of looping on the first one (llama-3.3 tends to repeat).
     remaining = list(tools)
-    for _ in range(max_steps):
+    errors = 0
+    for _ in range(max_steps + 4):
         if not remaining:
             break
-        decision = llm.decide(system=system, history=history, tools=remaining)
+        try:
+            decision = llm.decide(system=system, history=history, tools=remaining)
+        except RuntimeError as exc:
+            # Live providers occasionally emit a malformed tool call (Groq
+            # tool_use_failed / HTTP 400). Retry a couple of times (resampling
+            # often fixes it) before giving up on this campaign -- never abort
+            # the whole coverage run.
+            errors += 1
+            if errors <= 2:
+                continue
+            print(f"  provider error, stopping this campaign: {str(exc)[:80]}")
+            break
         if not decision.is_tool_call or decision.tool_name is None:
             break
         resource = str((decision.tool_args or {}).get("resource", "auto"))
         calls.append({"action_type": decision.tool_name, "resource": resource})
         remaining = [t for t in remaining if t.name != decision.tool_name]
         history.append(Message("assistant", f"calling {decision.tool_name}"))
-        history.append(
-            Message("tool", f"ok: {decision.tool_name}", tool_name=decision.tool_name)
-        )
+        history.append(Message("tool", f"ok: {decision.tool_name}", tool_name=decision.tool_name))
     return calls
 
 
@@ -156,8 +166,13 @@ def main(argv: list[str] | None = None) -> int:
             client.post("/config/agents", json=agent)
             expected = _expected_by_action(doc)
             total_steps += len(expected)
+            # An action_type can exist in several domains (e.g. invite_external_user in
+            # okta and slack); trust the target the campaign declares, not a global map.
+            doc_target = {a["action_type"]: a["target_system"] for a in doc["actions"]}
+            # Give the model room to reach every distinct action of this campaign.
+            steps = max(args.max_steps, len(expected) + 2)
 
-            calls = _drive(llm, doc, _tools_for(doc), args.max_steps)
+            calls = _drive(llm, doc, _tools_for(doc), steps)
             proposed = {c["action_type"] for c in calls}
 
             print(f"\n=== {doc['name']} (role={agent.get('role')}, live {args.model}) ===")
@@ -165,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
                 action_type = call["action_type"]
                 if action_type not in expected:
                     continue
-                target = target_of.get(action_type, "unknown")
+                target = doc_target.get(action_type) or target_of.get(action_type, "unknown")
                 resp = client.post(
                     "/actions/execute",
                     json={
