@@ -26,6 +26,12 @@ class _Response:
         return _json.loads(self._body.decode("utf-8"))
 
 
+# Some provider edges (e.g. Cloudflare-fronted api.groq.com) reject the default
+# "Python-urllib/x.y" agent with HTTP 403 code 1010. Send an explicit agent so
+# live provider calls are not blocked on the client signature.
+DEFAULT_USER_AGENT = "agentrail-recette/0.1"
+
+
 class StdlibHttpClient:
     """Tiny urllib-based client with a base_url and default headers."""
 
@@ -38,6 +44,7 @@ class StdlibHttpClient:
         url = f"{self.base_url}{path}"
         data = _json.dumps(body).encode("utf-8") if body is not None else None
         headers = dict(self.headers)
+        headers.setdefault("User-Agent", DEFAULT_USER_AGENT)
         if data is not None:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
