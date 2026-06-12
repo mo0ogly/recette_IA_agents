@@ -62,6 +62,56 @@ export interface StoredEvent {
   hash: string;
 }
 
+/**
+ * Decision recorded with an audited action (carries the policy version, I4).
+ * Shape captured from a real GET /audit/events payload
+ * (src/hooks/__fixtures__/auditEvents.fixture.json).
+ */
+export interface AuditPolicyDecision {
+  verdict: PolicyVerdict;
+  policy_version: string;
+  rule_id: string | null;
+}
+
+/**
+ * Payload of an audited event. Fields are optional because the payload shape
+ * depends on the event kind: action_* events carry the full canonical action,
+ * approval_resolved carries a slim resolution record (agent_id, approver,
+ * approval_state, correlates_event_id). Derived from the real fixture.
+ */
+export interface AuditEventPayload {
+  agent_id?: string;
+  role?: string;
+  action_type?: string;
+  target_system?: string;
+  resource?: string;
+  capability_scope?: string[];
+  payload?: Record<string, unknown>;
+  risk_score?: number;
+  risk_level?: string;
+  policy_decision?: AuditPolicyDecision | null;
+  approval_state?: string;
+  side_effect_hash?: string | null;
+  correlates_event_id?: string | null;
+  approver?: string;
+  reason?: string;
+  timestamp?: string;
+  schema_version?: string;
+  extra?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** A StoredEvent with its payload typed from the real audit fixture. */
+export interface AuditEvent {
+  seq: number;
+  event_id: string;
+  schema_version: string;
+  kind: string;
+  payload: AuditEventPayload;
+  prev_hash: string;
+  hash: string;
+}
+
 /** Result of verifying the event store hash chain. */
 export interface ChainReport {
   ok: boolean;

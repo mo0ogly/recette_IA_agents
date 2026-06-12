@@ -1,0 +1,90 @@
+{
+    "events": [
+        {
+            "seq": 1,
+            "event_id": "EV000000000000000001000001",
+            "schema_version": "2.0",
+            "kind": "action_denied",
+            "payload": {
+                "action_type": "suspend_user",
+                "agent_id": "fixture-bot",
+                "approval_state": "none",
+                "capability_scope": [],
+                "correlates_event_id": null,
+                "event_id": "EV000000000000000001000001",
+                "extra": {},
+                "payload": {
+                    "reason": "fixture deny"
+                },
+                "policy_decision": {
+                    "policy_version": "v1",
+                    "rule_id": null,
+                    "verdict": "deny"
+                },
+                "resource": "users/jdoe",
+                "risk_level": "high",
+                "risk_score": 3,
+                "role": "marketing_bot",
+                "schema_version": "2.0",
+                "side_effect_hash": null,
+                "target_system": "okta",
+                "timestamp": "2026-06-12T15:43:17.617716Z"
+            },
+            "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "hash": "24549751c26672b39a89c4c5ff479124c999ca568289a8dd983dd5153175476a"
+        },
+        {
+            "seq": 2,
+            "event_id": "EV000000000000000001000002",
+            "schema_version": "2.0",
+            "kind": "action_requested",
+            "payload": {
+                "action_type": "suspend_user",
+                "agent_id": "fixture-admin",
+                "approval_state": "pending",
+                "capability_scope": [
+                    "okta"
+                ],
+                "correlates_event_id": null,
+                "event_id": "EV000000000000000001000002",
+                "extra": {},
+                "payload": {
+                    "reason": "fixture escalate"
+                },
+                "policy_decision": {
+                    "policy_version": "v1",
+                    "rule_id": "okta.suspend_user.identity_admin",
+                    "verdict": "escalate"
+                },
+                "resource": "users/jdoe",
+                "risk_level": "high",
+                "risk_score": 3,
+                "role": "identity_admin",
+                "schema_version": "2.0",
+                "side_effect_hash": null,
+                "target_system": "okta",
+                "timestamp": "2026-06-12T15:43:17.632568Z"
+            },
+            "prev_hash": "24549751c26672b39a89c4c5ff479124c999ca568289a8dd983dd5153175476a",
+            "hash": "5b40b54b4086225128fa0e33b778e715dc855c33b276c5f08b80036797e5f8d6"
+        },
+        {
+            "seq": 3,
+            "event_id": "EV000000000000000001000003",
+            "schema_version": "2.0",
+            "kind": "approval_resolved",
+            "payload": {
+                "action_type": "suspend_user",
+                "agent_id": "fixture-admin",
+                "approval_state": "denied",
+                "approver": "user:rssi",
+                "correlates_event_id": "EV000000000000000001000002",
+                "reason": "fixture resolution",
+                "schema_version": "2.0",
+                "target_system": "okta"
+            },
+            "prev_hash": "5b40b54b4086225128fa0e33b778e715dc855c33b276c5f08b80036797e5f8d6",
+            "hash": "cef15b86efb0db3380d02b8f3d880767c5e0021e95e284b9c18e5fa94c240413"
+        }
+    ]
+}

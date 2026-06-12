@@ -13,6 +13,7 @@ import type {
   AgentAction,
   AgentConfig,
   AiBackend,
+  AuditEvent,
   BackendTestResult,
   Campaign,
   CampaignTemplate,
@@ -28,7 +29,6 @@ import type {
   ServerLifecycleResult,
   ServerLogTail,
   ServerStatus,
-  StoredEvent,
 } from "../types/platform";
 
 const API_BASE_URL: string =
@@ -54,6 +54,7 @@ export interface AuditEventsParams {
   limit?: number;
   kind?: string;
   agent_id?: string;
+  target_system?: string;
 }
 
 /** Error thrown when the API answers with a non-2xx status. */
@@ -394,14 +395,15 @@ export function sweepTimeouts(): Promise<SweepResult> {
 // Audit plane (append-only event store, I1)
 // ---------------------------------------------------------------------------
 
-export function listAuditEvents(params: AuditEventsParams = {}): Promise<StoredEvent[]> {
+export function listAuditEvents(params: AuditEventsParams = {}): Promise<AuditEvent[]> {
   // Backend wraps the list: {events: [...]}.
-  return request<{ events: StoredEvent[] }>(
+  return request<{ events: AuditEvent[] }>(
     withQuery("/audit/events", {
       from_seq: params.from_seq,
       limit: params.limit,
       kind: params.kind,
       agent_id: params.agent_id,
+      target_system: params.target_system,
     }),
     { method: "GET" },
   ).then((res) => res.events);
