@@ -37,7 +37,7 @@ const mockedSetActivePolicy = vi.mocked(client.setActivePolicy);
 // The real backend wraps payloads; the client is typed as bare arrays, so the
 // fixtures are passed through the mocked client exactly as the backend sends them.
 const catalogPayload = catalogFixture as unknown as ActionSpec[];
-const policiesPayload = policiesFixture as unknown as PolicyDocument[];
+const policiesPayload = policiesFixture as unknown as { versions: string[]; active: string | null };
 const activePolicy = activePolicyFixture as unknown as PolicyDocument;
 
 beforeEach(() => {

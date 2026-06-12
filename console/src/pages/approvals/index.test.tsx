@@ -167,7 +167,7 @@ describe("ApprovalsPage deny flow", () => {
 
 describe("ApprovalsPage sweep flow", () => {
   it("sweeps timeouts and reports the timed-out count and ids", async () => {
-    mockSweep.mockResolvedValue(sweepFixture as Record<string, unknown>);
+    mockSweep.mockResolvedValue(sweepFixture as { timed_out: string[] });
     render(<ApprovalsPage />);
     await screen.findByText("suspend_user", { exact: false });
 

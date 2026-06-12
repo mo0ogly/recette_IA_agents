@@ -1,6 +1,7 @@
 # AgentRail recette -- local + Docker lab targets.
 .PHONY: help install install-check validate run discovery report test gates \
-        api docker-build lab lab-down docker-test docker-gates
+        api docker-build lab lab-down docker-test docker-gates \
+        platform-lab platform-e2e platform-down console
 
 help:
 	@echo "Setup:"
@@ -20,6 +21,11 @@ help:
 	@echo "  make docker-test  run the test suite in the image"
 	@echo "  make docker-gates run the strict gates in the image"
 	@echo "  make lab-down     stop the lab"
+	@echo "Platform lab (gateway + lab mock + e2e):"
+	@echo "  make platform-lab  start lab-mock :8082 + api :8090 (docker)"
+	@echo "  make platform-e2e  run the end-to-end governed-flow recette"
+	@echo "  make platform-down stop everything"
+	@echo "  make console       run the approval console dev server (Vite)"
 
 # --- setup ---
 install:
@@ -69,3 +75,16 @@ docker-gates: docker-build
 
 lab-down:
 	docker compose down
+
+# --- platform lab (gateway + lab mock + e2e) ---
+platform-lab:
+	docker compose up -d lab-mock api
+
+platform-e2e:
+	docker compose run --rm e2e
+
+platform-down:
+	docker compose down
+
+console:
+	cd console && npm run dev

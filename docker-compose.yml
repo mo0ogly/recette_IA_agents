@@ -1,9 +1,11 @@
-# AgentRail recette discovery lab.
+# AgentRail recette discovery lab + governed-execution platform lab.
 #
 #   docker compose up discovery-mock        # start the mock Discovery :8081
 #   docker compose run --rm recette         # run the discovery recette over HTTP
 #   docker compose run --rm gates           # run the strict Python gates
 #   docker compose run --rm tests           # run the full test suite
+#   docker compose up -d lab-mock api       # start the platform lab (API :8090)
+#   docker compose run --rm e2e             # end-to-end governed-flow recette
 #
 # discovery-mock + recette use the lean "runtime" image; gates + tests use the
 # "audit" image (adds ruff/mypy/bandit/pytest + tests/ + scripts/). The mock is a
@@ -59,3 +61,84 @@ services:
       target: audit
     image: railgun-recette:audit
     command: python -m unittest discover -s tests
+
+  # --- governed-execution platform lab (L1) ---
+
+  # One-shot root chown: a fresh named volume mountpoint is root-owned, while
+  # the runtime image runs as the non-root 'recette' user (least privilege).
+  # The API service itself stays non-root.
+  platform-init:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    user: root
+    command: chown -R recette:recette /data
+    volumes:
+      - platform-data:/data
+
+  # Lab double of the 11 external systems (recette/lab) -- the only place the
+  # platform's side effects land (I5).
+  lab-mock:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    command: python -m recette.lab.mock_server
+    environment:
+      AGENTRAIL_LAB_PORT: "8082"
+    ports:
+      - "${LAB_HOST_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/healthz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # Gateway + Control/Audit Plane API. All state (event store, policies,
+  # agent config) lives on the platform-data volume so it survives restarts (I1).
+  api:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    command: python -m recette.api
+    depends_on:
+      lab-mock:
+        condition: service_healthy
+      platform-init:
+        condition: service_completed_successfully
+    environment:
+      AGENTRAIL_API_HOST: 0.0.0.0
+      AGENTRAIL_API_PORT: "8090"
+      AGENTRAIL_LAB_URL: http://lab-mock:8082
+      AGENTRAIL_EVENT_STORE_PATH: /data/events.db
+      AGENTRAIL_POLICIES_DIR: /data/policies
+      AGENTRAIL_CONFIG_PATH: /data/config.json
+    volumes:
+      - platform-data:/data
+    ports:
+      - "${API_HOST_PORT:-8090}:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # End-to-end governed-flow recette (tests/e2e) against the live api service.
+  e2e:
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      AGENTRAIL_E2E_API_URL: http://api:8090
+    command: python -m unittest tests.e2e.test_governed_flow -v
+
+volumes:
+  platform-data:

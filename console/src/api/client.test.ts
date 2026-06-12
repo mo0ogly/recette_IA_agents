@@ -30,7 +30,7 @@ describe("api client", () => {
   });
 
   it("listPendingApprovals GETs /approvals?state=pending and returns parsed JSON", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(okResponse(SAMPLE_PENDING));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ pending: SAMPLE_PENDING }));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await listPendingApprovals();

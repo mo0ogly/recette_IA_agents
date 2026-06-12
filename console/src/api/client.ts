@@ -114,10 +114,11 @@ export function listAiBackends(): Promise<AiBackend[]> {
 // ---------------------------------------------------------------------------
 
 export function getCatalog(targetSystem?: string): Promise<ActionSpec[]> {
-  return request<ActionSpec[]>(
-    withQuery("/catalog", { target_system: targetSystem }),
+  // Backend wraps the list: {actions: [...], count: N}.
+  return request<{ actions: ActionSpec[]; count: number }>(
+    withQuery("/catalog/actions", { target_system: targetSystem }),
     { method: "GET" },
-  );
+  ).then((res) => res.actions);
 }
 
 export function executeAction(req: ExecuteActionRequest): Promise<ActionOutcome> {
@@ -132,7 +133,10 @@ export function executeAction(req: ExecuteActionRequest): Promise<ActionOutcome>
 // ---------------------------------------------------------------------------
 
 export function listPendingApprovals(): Promise<PendingApproval[]> {
-  return request<PendingApproval[]>("/approvals?state=pending", { method: "GET" });
+  // Backend wraps the list: {pending: [...]}.
+  return request<{ pending: PendingApproval[] }>("/approvals?state=pending", {
+    method: "GET",
+  }).then((res) => res.pending);
 }
 
 export function approveAction(
@@ -157,9 +161,14 @@ export function denyAction(
   );
 }
 
-export function sweepTimeouts(): Promise<Record<string, unknown>> {
-  return request<Record<string, unknown>>("/approvals/sweep-timeouts", {
+export interface SweepResult {
+  timed_out: string[];
+}
+
+export function sweepTimeouts(): Promise<SweepResult> {
+  return request<SweepResult>("/approvals/sweep-timeouts", {
     method: "POST",
+    body: JSON.stringify({}),
   });
 }
 
@@ -168,7 +177,8 @@ export function sweepTimeouts(): Promise<Record<string, unknown>> {
 // ---------------------------------------------------------------------------
 
 export function listAuditEvents(params: AuditEventsParams = {}): Promise<StoredEvent[]> {
-  return request<StoredEvent[]>(
+  // Backend wraps the list: {events: [...]}.
+  return request<{ events: StoredEvent[] }>(
     withQuery("/audit/events", {
       from_seq: params.from_seq,
       limit: params.limit,
@@ -176,19 +186,24 @@ export function listAuditEvents(params: AuditEventsParams = {}): Promise<StoredE
       agent_id: params.agent_id,
     }),
     { method: "GET" },
-  );
+  ).then((res) => res.events);
 }
 
 export function verifyChain(): Promise<ChainReport> {
-  return request<ChainReport>("/audit/verify-chain", { method: "GET" });
+  return request<ChainReport>("/audit/verify", { method: "GET" });
 }
 
 // ---------------------------------------------------------------------------
 // Policies (versioned, I4: decisions record the policy version applied)
 // ---------------------------------------------------------------------------
 
-export function listPolicies(): Promise<PolicyDocument[]> {
-  return request<PolicyDocument[]>("/policies", { method: "GET" });
+export interface PolicyListing {
+  versions: string[];
+  active: string | null;
+}
+
+export function listPolicies(): Promise<PolicyListing> {
+  return request<PolicyListing>("/policies", { method: "GET" });
 }
 
 export function getActivePolicy(): Promise<PolicyDocument> {

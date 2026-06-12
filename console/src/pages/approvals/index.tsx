@@ -51,8 +51,8 @@ function unwrapPending(raw: unknown): PendingApproval[] {
 }
 
 /** Extracts the timed-out event ids from the sweep response. */
-function unwrapTimedOut(raw: Record<string, unknown>): string[] {
-  const value = raw["timed_out"];
+function unwrapTimedOut(raw: { timed_out?: unknown }): string[] {
+  const value = raw.timed_out;
   return Array.isArray(value) ? value.map(String) : [];
 }
 
