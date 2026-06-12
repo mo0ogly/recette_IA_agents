@@ -1,6 +1,8 @@
 {
   "name": "finance-payment-run",
   "description": "Monthly payment batch by the finance agent: refunds and invoice validation escalate; a marketing bot attempting a wire transfer is denied outright.",
+  "objective": "Contrast a privileged finance agent (sensitive payments held for approval) against an unprivileged bot whose financial actions are denied-by-default, all on the same governed path.",
+  "teaching": "The same action gets a different verdict by role, not by access right alone: a finance agent escalates, a marketing bot is denied. Sensitive payments never execute on the agent's sole decision; the audit chain stays intact.",
   "agents": [
     {
       "id": "camp-finance-admin",
@@ -26,7 +28,8 @@
       "action_type": "validate_invoice",
       "resource": "invoice/2026-0612",
       "payload": {"amount_cents": 1250000, "currency": "EUR"},
-      "expect": "escalate"
+      "expect": "escalate",
+      "rationale": "C2 payment validation by finance_admin -> escalate: parked pending human approval before money moves (I6)."
     },
     {
       "agent_id": "camp-finance-admin",
@@ -34,7 +37,8 @@
       "action_type": "trigger_refund",
       "resource": "charge/ch_889912",
       "payload": {"amount_cents": 4990, "currency": "EUR"},
-      "expect": "escalate"
+      "expect": "escalate",
+      "rationale": "C2 outgoing refund by finance_admin -> escalate: even a small refund is human-approved, no optimistic execution."
     },
     {
       "agent_id": "camp-finance-admin",
@@ -42,7 +46,8 @@
       "action_type": "launch_wire_transfer",
       "resource": "supplier/acme-services",
       "payload": {"amount_cents": 980000, "currency": "EUR"},
-      "expect": "escalate"
+      "expect": "escalate",
+      "rationale": "C1 wire transfer by finance_admin -> escalate: the high-impact action is routed to a human double-validation circuit, never agent-only."
     },
     {
       "agent_id": "camp-marketing-bot",
@@ -50,7 +55,8 @@
       "action_type": "launch_wire_transfer",
       "resource": "supplier/acme-services",
       "payload": {"amount_cents": 980000, "currency": "EUR"},
-      "expect": "deny"
+      "expect": "deny",
+      "rationale": "Same wire transfer by an unprivileged marketing_bot -> deny-by-default: no finance role, the action is refused and alerted, not escalated."
     },
     {
       "agent_id": "camp-marketing-bot",
@@ -58,7 +64,8 @@
       "action_type": "export_financial_data",
       "resource": "ledger/2026-q2",
       "payload": {},
-      "expect": "deny"
+      "expect": "deny",
+      "rationale": "C1 financial data export by an unprivileged role -> deny-by-default: exfiltration-shaped action blocked at the control plane (I2)."
     }
   ]
 }

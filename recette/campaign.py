@@ -54,6 +54,7 @@ class ActionResult:
     side_effect_hash: str | None
     expected_verdict: str | None
     matches_expectation: bool
+    rationale: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +70,7 @@ class ActionResult:
             "side_effect_hash": self.side_effect_hash,
             "expected_verdict": self.expected_verdict,
             "matches_expectation": self.matches_expectation,
+            "rationale": self.rationale,
         }
 
 
@@ -78,6 +80,8 @@ class CampaignReport:
     results: list[ActionResult] = field(default_factory=list)
     chain_ok: bool | None = None
     chain_checked: int | None = None
+    objective: str | None = None
+    teaching: str | None = None
 
     @property
     def counts(self) -> dict[str, int]:
@@ -101,6 +105,8 @@ class CampaignReport:
     def to_dict(self) -> dict:
         return {
             "name": self.name,
+            "objective": self.objective,
+            "teaching": self.teaching,
             "ok": self.ok,
             "counts": self.counts,
             "pending_event_ids": self.pending_event_ids,
@@ -115,6 +121,10 @@ def validate_campaign(doc: dict) -> None:
     """Structural validation -- fail fast before touching the API."""
     if not isinstance(doc.get("name"), str) or not doc["name"]:
         raise CampaignError("campaign needs a non-empty 'name'")
+    # Optional teaching fields (pure documentation, never reach the decision path).
+    for key in ("objective", "teaching"):
+        if key in doc and not isinstance(doc[key], str):
+            raise CampaignError(f"'{key}' must be a string when present")
     agents = doc.get("agents", [])
     if not isinstance(agents, list):
         raise CampaignError("'agents' must be a list")
@@ -131,6 +141,9 @@ def validate_campaign(doc: dict) -> None:
         expect = action.get("expect")
         if expect is not None and expect not in {"allow", "deny", "escalate"}:
             raise CampaignError(f"action #{i}: expect must be allow|deny|escalate")
+        rationale = action.get("rationale")
+        if rationale is not None and not isinstance(rationale, str):
+            raise CampaignError(f"action #{i}: 'rationale' must be a string when present")
 
 
 def load_campaign(path: Path | str) -> dict:
@@ -153,7 +166,11 @@ class CampaignRunner:
 
     def run(self, doc: dict) -> CampaignReport:
         validate_campaign(doc)
-        report = CampaignReport(name=doc["name"])
+        report = CampaignReport(
+            name=doc["name"],
+            objective=doc.get("objective"),
+            teaching=doc.get("teaching"),
+        )
         self._seed_agents(doc.get("agents", []))
         for i, action in enumerate(doc["actions"]):
             body = {
@@ -181,6 +198,7 @@ class CampaignRunner:
                     side_effect_hash=outcome.get("side_effect_hash"),
                     expected_verdict=expected,
                     matches_expectation=(expected is None or verdict == expected),
+                    rationale=action.get("rationale"),
                 )
             )
         verify = self._client.get("/audit/verify").json()  # type: ignore[attr-defined]
@@ -191,6 +209,8 @@ class CampaignRunner:
 
 def _render_report(report: CampaignReport) -> str:
     lines = [f"campaign: {report.name}"]
+    if report.objective:
+        lines.append(f"objective: {report.objective}")
     lines.append(
         "verdicts: "
         + ", ".join(f"{k}={v}" for k, v in sorted(report.counts.items()) if v or k != "allow")
@@ -202,11 +222,15 @@ def _render_report(report: CampaignReport) -> str:
             f"  [{mark}] #{r.index} {r.agent_id} {r.target_system}/{r.action_type}"
             f" -> {r.verdict}/{r.approval_state}{suffix}"
         )
+        if r.rationale:
+            lines.append(f"        why: {r.rationale}")
     if report.pending_event_ids:
         lines.append(f"pending approvals: {len(report.pending_event_ids)}")
         for event_id in report.pending_event_ids:
             lines.append(f"  {event_id}")
     lines.append(f"audit chain: {'intact' if report.chain_ok else 'BROKEN'}")
+    if report.teaching:
+        lines.append(f"teaching: {report.teaching}")
     lines.append(f"result: {'PASS' if report.ok else 'FAIL'}")
     return "\n".join(lines)
 
@@ -221,6 +245,8 @@ def _cmd_list(args: argparse.Namespace) -> int:
         try:
             doc = load_campaign(path)
             print(f"{path.name}: {doc['name']} ({len(doc['actions'])} actions)")
+            if doc.get("objective"):
+                print(f"    {doc['objective']}")
         except (CampaignError, json.JSONDecodeError) as exc:
             print(f"{path.name}: INVALID ({exc})")
     return 0
