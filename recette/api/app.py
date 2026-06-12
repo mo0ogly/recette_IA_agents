@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from ..platform.catalog import Catalog, load_catalog
 from ..platform.eventstore import EventStore, SqliteEventStore
@@ -31,6 +32,10 @@ from .runs import RunManager
 
 DEFAULT_EVENT_STORE_PATH = "data/agentrail.events.db"
 BASELINE_POLICY_VERSION = "v1"
+# Console (Vite) runs on a different origin than the API, so the browser
+# requires CORS. Origins are configurable (R5); the default covers the local
+# console on both loopback spellings. Never wildcard with credentials.
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 
 
 class RestartSafeIdGenerator:
@@ -67,6 +72,19 @@ def create_app(
     catalog: Catalog | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0")
+
+    cors_origins = [
+        origin.strip()
+        for origin in os.environ.get("AGENTRAIL_CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
+        if origin.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     cfg_store = config_store or ConfigStore()
     app.state.config_store = cfg_store
     app.state.run_manager = RunManager()
