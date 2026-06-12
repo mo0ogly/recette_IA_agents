@@ -79,9 +79,9 @@ describe("CatalogPage", () => {
 
   it("filters rows by target_system", async () => {
     render(<CatalogPage />);
-    await screen.findByTestId("catalog-count");
-
-    const allRows = screen.getAllByRole("row");
+    // catalog-count renders "Loading..." before the fetch resolves, so wait
+    // for the rows themselves (the count testid alone races the fetch).
+    const allRows = await screen.findAllByRole("row");
     expect(allRows).toHaveLength(1 + 118);
 
     fireEvent.change(screen.getByLabelText("Target system"), {
