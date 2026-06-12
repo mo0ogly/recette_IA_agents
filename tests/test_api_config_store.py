@@ -48,6 +48,13 @@ class TestConfigStore(unittest.TestCase):
                 {"id": "b1", "provider": "anthropic", "model": "x", "api_key": "sekret"}
             )
 
+    def test_add_ai_backend_rejects_password_fields(self) -> None:
+        for fname in ("password", "passwd"):
+            with self.assertRaises(ValueError, msg=f"field {fname!r} must be rejected"):
+                self.store.add_ai_backend(
+                    {"id": "b1", "provider": "anthropic", "model": "x", fname: "sekret"}
+                )
+
     def test_duplicate_id_rejected(self) -> None:
         self.store.add_ai_backend({"id": "b1", "provider": "openai", "model": "gpt"})
         with self.assertRaises(ValueError):
@@ -150,6 +157,19 @@ class ServerSectionTests(unittest.TestCase):
                     "token": "sekret",
                 }
             )
+
+    def test_server_password_fields_rejected(self) -> None:
+        for fname in ("password", "passwd"):
+            with self.assertRaises(ValueError, msg=f"field {fname!r} must be rejected"):
+                self.store.add_server(
+                    {
+                        "id": "gh-real",
+                        "system": "github",
+                        "mode": "declared_url",
+                        "base_url": "https://gh.example",
+                        fname: "sekret",
+                    }
+                )
 
     def test_update_unknown_server_raises(self) -> None:
         with self.assertRaises(UnknownServerError):

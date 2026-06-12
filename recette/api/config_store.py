@@ -12,8 +12,7 @@ import os
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
-_FORBIDDEN_BACKEND_FIELDS = {"api_key", "key", "token", "secret"}
-_FORBIDDEN_SERVER_FIELDS = {"api_key", "key", "token", "secret"}
+_FORBIDDEN_SECRET_FIELDS = {"api_key", "key", "token", "secret", "password", "passwd"}
 _RUNTIMES = {"lab", "real"}
 _SERVER_MODES = {"mock_local", "declared_url", "real_saas"}
 _SERVER_MODE_REQUIRED = {"mock_local": "port", "declared_url": "base_url", "real_saas": "owner"}
@@ -33,13 +32,13 @@ def _check_runtime(runtime: object) -> None:
 
 
 def _check_server(server: dict) -> None:
-    leaked = _FORBIDDEN_SERVER_FIELDS & set(server)
+    leaked = _FORBIDDEN_SECRET_FIELDS & set(server)
     if leaked:
         raise ValueError(f"secrets must not be stored (R8): drop {sorted(leaked)}")
-    for field in ("id", "system"):
-        value = server.get(field)
+    for fname in ("id", "system"):
+        value = server.get(fname)
         if not isinstance(value, str) or not value:
-            raise ValueError(f"server {field!r} must be a non-empty string")
+            raise ValueError(f"server {fname!r} must be a non-empty string")
     mode = server.get("mode")
     if mode not in _SERVER_MODES:
         raise ValueError(f"server mode must be one of {sorted(_SERVER_MODES)}")
@@ -117,7 +116,7 @@ class ConfigStore:
         return next((b for b in self.read()["ai_backends"] if b["id"] == backend_id), None)
 
     def add_ai_backend(self, backend: dict) -> dict:
-        leaked = _FORBIDDEN_BACKEND_FIELDS & set(backend)
+        leaked = _FORBIDDEN_SECRET_FIELDS & set(backend)
         if leaked:
             raise ValueError(f"secrets must not be stored (R8): drop {sorted(leaked)}")
         cfg = self.read()

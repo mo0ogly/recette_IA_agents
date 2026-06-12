@@ -255,15 +255,19 @@ class OpenAiCompatLlm(OpenAiLlm):
         client: _PostClient | None = None,
         api_key: str | None = None,
     ) -> None:
-        self._model = model
         if client is None:
-            # Normalize: callers may pass ".../v1"; paths below already start with /v1.
-            base = base_url.rstrip("/")
-            if base.endswith("/v1"):
-                base = base[: -len("/v1")]
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
-            client = StdlibHttpClient(base, headers=headers)
-        self._client = client
+            client = StdlibHttpClient(self._normalize_base_url(base_url), headers=headers)
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+    @staticmethod
+    def _normalize_base_url(base_url: str) -> str:
+        """Strip trailing slashes and a trailing "/v1": request paths already start with /v1."""
+        base = base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[: -len("/v1")]
+        return base
 
 
 # --- provider factory --------------------------------------------------------------------

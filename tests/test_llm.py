@@ -136,7 +136,7 @@ class TestOpenAi(unittest.TestCase):
                 os.environ["OPENAI_API_KEY"] = old
 
 
-class OpenAiCompatTests(unittest.TestCase):
+class TestOpenAiCompat(unittest.TestCase):
     def test_tool_call_parsed_from_openai_wire_format(self) -> None:
         payload = {
             "choices": [
@@ -167,11 +167,15 @@ class OpenAiCompatTests(unittest.TestCase):
         try:
             llm = OpenAiCompatLlm(model="qwen2.5", base_url="http://localhost:11434/v1")
             self.assertIsNotNone(llm)
-            # The "/v1" suffix is stripped: decide() paths already start with /v1.
-            self.assertEqual(llm._client.base_url, "http://localhost:11434")
         finally:
             if old is not None:
                 os.environ["OPENAI_API_KEY"] = old
+
+    def test_normalize_base_url_strips_v1_suffix(self) -> None:
+        # The "/v1" suffix is stripped: decide() paths already start with /v1.
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h"), "http://h")
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1"), "http://h")
+        self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1/"), "http://h")
 
     def test_base_url_v1_suffix_normalized(self) -> None:
         # ".../v1" and bare base must both end up posting to /v1/chat/completions
