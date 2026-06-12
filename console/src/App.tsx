@@ -1,22 +1,9 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 
-// Placeholder pages: real implementations arrive in Phase 2.
-
-function AgentsPage(): JSX.Element {
-  return <h1>Agents</h1>;
-}
-
-function CatalogPage(): JSX.Element {
-  return <h1>Catalog</h1>;
-}
-
-function ApprovalsPage(): JSX.Element {
-  return <h1>Approvals</h1>;
-}
-
-function AuditPage(): JSX.Element {
-  return <h1>Audit</h1>;
-}
+import AgentsPage from "./pages/agents";
+import ApprovalsPage from "./pages/approvals";
+import AuditPage from "./pages/audit";
+import CatalogPage from "./pages/catalog";
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? "nav-link nav-link-active" : "nav-link";
