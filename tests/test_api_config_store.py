@@ -81,6 +81,12 @@ class TestConfigStore(unittest.TestCase):
         with self.assertRaises(UnknownAgentError):
             self.store.update_agent("nope", {"goal": "x"})
 
+    def test_delete_unknown_agent_raises(self) -> None:
+        # Strict 404 semantics, mirroring delete_server (no silent idempotency).
+        with self.assertRaises(UnknownAgentError):
+            self.store.delete_agent("nope")
+        self.assertTrue(issubclass(UnknownAgentError, LookupError))
+
     def test_update_agent_rejects_bad_runtime_without_writing(self) -> None:
         self.store.add_agent(
             {

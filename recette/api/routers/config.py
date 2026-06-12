@@ -83,7 +83,11 @@ def update_agent(request: Request, agent_id: str, patch: dict[str, Any]) -> dict
 
 @router.delete("/agents/{agent_id}", status_code=204)
 def delete_agent(request: Request, agent_id: str) -> Response:
-    _store(request).delete_agent(agent_id)
+    # delete_agent raises on unknown id (aligned with delete_server).
+    try:
+        _store(request).delete_agent(agent_id)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(status_code=204)
 
 
@@ -160,7 +164,7 @@ def update_server(request: Request, server_id: str, patch: dict[str, Any]) -> di
 
 @router.delete("/servers/{server_id}", status_code=204)
 def delete_server(request: Request, server_id: str) -> Response:
-    # delete_server raises on unknown id (unlike the idempotent delete_agent).
+    # delete_server raises on unknown id (same strict 404 as delete_agent).
     try:
         _store(request).delete_server(server_id)
     except UnknownServerError as exc:

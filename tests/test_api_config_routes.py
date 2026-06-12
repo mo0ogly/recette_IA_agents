@@ -75,6 +75,10 @@ class TestConfigRoutes(unittest.TestCase):
         )
         self.assertEqual(self.client.delete("/config/agents/a1").status_code, 204)
 
+    def test_agent_delete_unknown_is_404(self) -> None:
+        # Strict 404 on unknown id, mirroring the server delete route.
+        self.assertEqual(self.client.delete("/config/agents/nope").status_code, 404)
+
     def test_servers_list_empty(self) -> None:
         self.assertEqual(self.client.get("/config/servers").json(), [])
 

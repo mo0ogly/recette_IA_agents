@@ -149,7 +149,10 @@ class ConfigStore:
 
     def delete_agent(self, agent_id: str) -> None:
         cfg = self.read()
-        cfg["agents"] = [a for a in cfg["agents"] if a["id"] != agent_id]
+        kept = [a for a in cfg["agents"] if a["id"] != agent_id]
+        if len(kept) == len(cfg["agents"]):
+            raise UnknownAgentError(f"no agent {agent_id!r}")
+        cfg["agents"] = kept
         self._write(cfg)
 
     # --- ai backends ---
