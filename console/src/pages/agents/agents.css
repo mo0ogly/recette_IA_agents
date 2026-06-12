@@ -169,6 +169,48 @@
   font-size: 0.78rem;
 }
 
+.agents-key-manage {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.agents-key-chip {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.5rem;
+  font-size: 0.74rem;
+  background-color: var(--badge-gray-bg, #e5e7eb);
+  color: var(--badge-gray-fg, #6b7280);
+}
+
+.agents-key-chip[data-key-configured="true"] {
+  background-color: var(--badge-green-bg, #dcfce7);
+  color: var(--badge-green-fg, #16a34a);
+}
+
+.agents-key-input {
+  width: 9rem;
+}
+
+.agents-key-saved {
+  color: var(--badge-green-fg, #16a34a);
+  font-size: 0.78rem;
+}
+
+.agents-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .agents-run-log {
   margin-top: 1.5rem;
 }

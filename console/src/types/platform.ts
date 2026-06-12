@@ -311,6 +311,12 @@ export interface AiBackend {
   model: string;
   /** Required when provider = openai_compat (Ollama, vLLM, LiteLLM proxies). */
   base_url?: string;
+  /**
+   * True when a key is resolvable for this backend: a per-backend secret is
+   * stored OR the provider env var is present (openai_compat always true).
+   * The key value is NEVER returned by the API; only this boolean (R8).
+   */
+  key_configured?: boolean;
 }
 
 /** Result of POST /config/ai-backends/{id}/test (always 200; ok discriminates). */

@@ -153,6 +153,29 @@ export function deleteAiBackend(id: string): Promise<void> {
   });
 }
 
+/** Store the per-backend API key (write-only, R8).
+ *
+ *  The key is SENT only: it is never read back from the API and never logged
+ *  here. Resolves with {configured: true}; rejects on 404 (unknown id) or
+ *  400 (empty/missing api_key). */
+export function setBackendSecret(
+  id: string,
+  apiKey: string,
+): Promise<{ configured: boolean }> {
+  return request<{ configured: boolean }>(
+    `/config/ai-backends/${encodeURIComponent(id)}/secret`,
+    { method: "PUT", body: JSON.stringify({ api_key: apiKey }) },
+  );
+}
+
+/** Remove the per-backend API key (R8). Resolves on 204; rejects on 404. */
+export function deleteBackendSecret(id: string): Promise<void> {
+  return request<void>(
+    `/config/ai-backends/${encodeURIComponent(id)}/secret`,
+    { method: "DELETE" },
+  );
+}
+
 /** Connectivity probe for an AI backend. Always resolves with the probe
  *  outcome (the endpoint answers 200 for both ok and failed probes); only
  *  an unknown id rejects (404). The key never transits here (R8). */
