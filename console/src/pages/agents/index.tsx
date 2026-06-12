@@ -3,22 +3,30 @@
  *
  * Lists agents (GET /config/agents), supports create / edit / delete, and
  * binds each agent to a configured AI backend (GET /config/ai-backends).
- * No secret field is ever displayed or submitted here (R8): credentials
- * belong to the backend proxies, never to this console.
+ * Each agent can be launched as a Lane B run (POST /runs); the live frames
+ * stream into the reusable LogConsole below the table. No secret field is
+ * ever displayed or submitted here (R8): credentials belong to the backend
+ * proxies, never to this console.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   createAgent,
   deleteAgent,
+  launchLaneB,
   listAgentActions,
   listAgents,
   listAiBackends,
   updateAgent,
 } from "../../api/client";
+import type { LaunchLaneBRequest } from "../../api/client";
 import type { AgentAction, AgentConfig, AiBackend } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import { LogConsole } from "../../components/LogConsole";
+import type { LogLine } from "../../components/LogConsole";
+import { useRunStream } from "../../hooks/useRunStream";
+import type { RunFrame } from "../../hooks/useRunStream";
 import AiBackendsPanel from "./AiBackendsPanel";
 import "./agents.css";
 
@@ -91,6 +99,48 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Compact one-line summary of a streamed lane_b frame. */
+function frameText(frame: RunFrame): string {
+  const d = frame.data;
+  switch (frame.type) {
+    case "start":
+      return `start (kind=${String(d.kind ?? "")})`;
+    case "step": {
+      const action = d.action as Record<string, unknown> | undefined;
+      const at = action
+        ? `${String(action.action_type)}@${String(action.target_system)}`
+        : "(no action)";
+      return `step #${String(d.index ?? "")}: ${at}`;
+    }
+    case "result": {
+      const actions = (d.actions as unknown[] | undefined) ?? [];
+      return `result: ${actions.length} action(s) recorded`;
+    }
+    case "error":
+      return `error: ${String(d.message ?? "")}`;
+    case "end":
+      return `end (status=${String(d.status ?? "")})`;
+    default:
+      return frame.type;
+  }
+}
+
+/** Map one streamed run frame to a displayable log line. */
+function frameToLogLine(frame: RunFrame, source: string): LogLine {
+  const failed = frame.type === "error" || frame.data.error !== undefined;
+  return {
+    seq: frame.seq,
+    level: failed ? "error" : "info",
+    source,
+    text: frameText(frame),
+  };
+}
+
+/** Mock brain when declared, or (legacy records) when no backend is bound. */
+function isMockAgent(agent: AgentConfig): boolean {
+  return agent.ai_mode === "mock" || (agent.ai_mode === undefined && !agent.ai_backend_id);
+}
+
 export default function AgentsPage(): JSX.Element {
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [backends, setBackends] = useState<AiBackend[]>([]);
@@ -100,6 +150,22 @@ export default function AgentsPage(): JSX.Element {
   // null means the form is in create mode; otherwise the id being edited.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AgentFormValues>(EMPTY_FORM);
+  const stream = useRunStream();
+  // Agent id of the current run; labels every line of the run log.
+  const [runSource, setRunSource] = useState("run");
+
+  const runLines = useMemo(() => {
+    const lines = stream.frames.map((frame) => frameToLogLine(frame, runSource));
+    if (stream.error !== null) {
+      lines.push({
+        seq: (stream.frames[stream.frames.length - 1]?.seq ?? 0) + 1,
+        level: "error",
+        source: runSource,
+        text: stream.error,
+      });
+    }
+    return lines;
+  }, [stream.frames, stream.error, runSource]);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -185,6 +251,17 @@ export default function AgentsPage(): JSX.Element {
     }
   }
 
+  async function handleRun(agent: AgentConfig): Promise<void> {
+    setRunSource(agent.id);
+    const body: LaunchLaneBRequest = { agent_id: agent.id };
+    if (isMockAgent(agent) && agent.scenario !== undefined) {
+      // A mock agent runs its stored scenario; a real-AI agent uses its
+      // bound ai_backend on the server side (key from env, R8).
+      body.stub_script = agent.scenario;
+    }
+    await stream.start(() => launchLaneB(body));
+  }
+
   // Distinct target systems offered by the catalog, and the actions of the
   // currently selected system (the picker is scoped to one system).
   const catalogSystems = Array.from(
@@ -239,6 +316,14 @@ export default function AgentsPage(): JSX.Element {
                   <div className="agents-form-actions">
                     <button
                       type="button"
+                      className="agents-btn agents-btn-primary"
+                      disabled={stream.running}
+                      onClick={() => void handleRun(agent)}
+                    >
+                      Run
+                    </button>
+                    <button
+                      type="button"
                       className="agents-btn"
                       onClick={() => startEdit(agent)}
                     >
@@ -258,6 +343,15 @@ export default function AgentsPage(): JSX.Element {
           )}
         </tbody>
       </table>
+
+      <section className="agents-run-log">
+        {stream.runId !== null && (
+          <p className="agents-run-status">
+            run {stream.runId} -- {stream.status}
+          </p>
+        )}
+        <LogConsole title="Run log" lines={runLines} />
+      </section>
 
       <form className="agents-form" onSubmit={(e) => void handleSubmit(e)}>
         <h2>{editingId === null ? "Create agent" : `Edit agent ${editingId}`}</h2>

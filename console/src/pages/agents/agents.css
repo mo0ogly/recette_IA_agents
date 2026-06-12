@@ -168,3 +168,14 @@
   color: var(--color-text-muted);
   font-size: 0.78rem;
 }
+
+.agents-run-log {
+  margin-top: 1.5rem;
+}
+
+.agents-run-status {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
