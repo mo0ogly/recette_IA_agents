@@ -73,7 +73,13 @@ Docker services (docker-compose.yml):
 | POST | `/policies` | publish a new version |
 | GET / POST | `/config/agents` | agent registry (identity source, see limitations) |
 | PUT / DELETE | `/config/agents/{id}` | update / remove an agent |
-| GET / POST / DELETE | `/config/ai-backends` | AI backend registry (no secrets stored, R8) |
+| GET / POST / DELETE | `/config/ai-backends` | AI backend registry (no secrets stored, R8); 8 providers: anthropic, openai, gemini, groq, mistral, deepseek, xai, openai_compat (`base_url`) |
+| POST | `/config/ai-backends/{id}/test` | connectivity probe (one minimal real call); always 200 with `{ok, latency_ms, error?}` -- fail-safe diagnostic, never a 500 |
+| GET / POST | `/config/servers` | server registry: `mock_local` (port), `declared_url` (base_url, lab wire contract), `real_saas` (no proxy yet) |
+| PUT / DELETE | `/config/servers/{id}` | update / remove a server entry |
+| POST | `/config/servers/{id}/start`, `/stop` | lifecycle of a `mock_local` lab server (ServerManager); `{"status": "down", "error": ...}` is a domain result, not a transport error |
+| GET | `/config/servers/{id}/status` | live status: process poll (`mock_local`), URL probe (`declared_url`), `n/a` (`real_saas`) |
+| GET | `/config/servers/{id}/log?after=N` | incremental tail of the server's JSONL access log (cursor `next`) |
 | GET | `/catalog/actions` | high-risk action catalog (verdicts + risk levels) |
 | GET | `/agents`, POST `/agents/register` | Lane B agent catalog |
 | POST | `/runs` | launch a run; `kind` = `lane_b` \| `discovery` \| `identification` \| `campaign` \| `replay` |
@@ -99,9 +105,15 @@ subscribers. First frame is always `start`, last is `end` with the final status.
 | `campaign` | (via `/campaigns/{id}/run`) | `agent_start` / `step` / `agent_done` per step, final `campaign_done`; one recording persisted per step |
 | `replay` | (via `/recordings/{id}/replay`) | `step` per replayed decision, `replay_result` with `matches_original` (I4) |
 
-`capability_scope` is the set of canonical actions an agent may call
-(`read_repo, list_repos, read_ci, open_issue, comment_issue, open_pr, merge_pr,
-push, manage_webhook, manage_release, trigger_ci`), not a system name.
+`capability_scope` is the set of catalog actions an agent may call (127
+actions across 12 systems, `GET /agent-actions`), not a system name. The 11
+canonical git actions (`read_repo` ... `trigger_ci`) are the github/gitlab
+subset.
+
+Per-agent target routing: an agent with a `server` binding executes through
+a `ProxyForge` (real HTTP to the resolved server, I5); without one it keeps
+the in-memory `LabForge`. A dangling or unsupported server reference fails
+the run -- never a silent fallback.
 
 ## Environment variables (R5)
 
@@ -117,6 +129,7 @@ push, manage_webhook, manage_release, trigger_ci`), not a system name.
 | `AGENTRAIL_RECORDINGS_DIR` | api (replayable recordings) | `data/recordings` | `/data/recordings` |
 | `AGENTRAIL_CORS_ORIGINS` | api (console cross-origin) | `http://localhost:5173,http://127.0.0.1:5173` | console origin(s) |
 | `AGENTRAIL_LAB_PORT` | lab-mock | `8082` | `8082` |
+| `AGENTRAIL_LAB_ACCESS_LOG` | lab-mock | unset (no log) | set by the ServerManager per managed server (`data/lab/{id}.access.jsonl`); one JSONL line `{event_id, target_system, action_type, resource, status}` per request -- the runtime capture surface for discovery |
 | `AGENTRAIL_E2E_API_URL` | e2e tests | unset (suite skipped) | `http://api:8090` |
 | `LAB_HOST_PORT` | compose port mapping | `8082` | host port for lab-mock |
 | `API_HOST_PORT` | compose port mapping | `8090` | host port for api |
