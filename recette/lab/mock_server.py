@@ -39,6 +39,22 @@ def _envelope_err(message: str) -> bytes:
     return json.dumps({"success": False, "error": message}, sort_keys=True).encode("utf-8")
 
 
+def _append_access_log(record: dict) -> None:
+    """Append one JSONL line when AGENTRAIL_LAB_ACCESS_LOG is set (R5).
+
+    The env var is read per request: cheap, and honors changes without a
+    restart. The server is threaded, but a single open(..., "a") followed by
+    one write() of one line is atomic enough for line-grained appends on
+    POSIX (O_APPEND), so concurrent handlers do not interleave partial lines.
+    No timestamp on purpose: the event_id already orders the trace (I4).
+    """
+    log_path = os.environ.get("AGENTRAIL_LAB_ACCESS_LOG")
+    if not log_path:
+        return
+    with open(log_path, "a", encoding="utf-8") as log_file:
+        log_file.write(json.dumps(record, sort_keys=True) + "\n")
+
+
 def dispatch(target_system: str, action_type: str, resource: str, payload: dict) -> dict | None:
     """Route to the domain handler. None when target or action is unknown."""
     module = _HANDLERS.get(target_system)
@@ -70,8 +86,9 @@ class _Handler(BaseHTTPRequestHandler):
         return parsed if isinstance(parsed, dict) else {}
 
     def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
-        if urlparse(self.path).path == "/healthz":
-            self._send(200, _envelope_ok({"status": "ok"}))
+        # /healthz kept as a legacy alias (documented in docs/runbooks/recette-sh.md).
+        if urlparse(self.path).path in ("/health", "/healthz"):
+            self._send(200, _envelope_ok({"status": "up", "systems": sorted(_HANDLERS)}))
             return
         self._send(404, _envelope_err("not found"))
 
@@ -85,18 +102,32 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             body = self._read_body()
         except json.JSONDecodeError:
-            self._send(400, _envelope_err("invalid JSON body"))
-            return
-        action_type = str(body.get("action_type", ""))
-        resource = str(body.get("resource", ""))
-        payload = body.get("payload")
-        result = dispatch(
-            target_system, action_type, resource, payload if isinstance(payload, dict) else {}
+            body = {}
+            status, response = 400, _envelope_err("invalid JSON body")
+        else:
+            action_type = str(body.get("action_type", ""))
+            resource = str(body.get("resource", ""))
+            payload = body.get("payload")
+            result = dispatch(
+                target_system, action_type, resource, payload if isinstance(payload, dict) else {}
+            )
+            if result is None:
+                status, response = 404, _envelope_err(
+                    f"unknown action {target_system}/{action_type}"
+                )
+            else:
+                status, response = 200, _envelope_ok(result)
+        # Log before sending so a client that has the response can read the line.
+        _append_access_log(
+            {
+                "event_id": body.get("event_id"),
+                "target_system": target_system,
+                "action_type": str(body.get("action_type", "")),
+                "resource": str(body.get("resource", "")),
+                "status": status,
+            }
         )
-        if result is None:
-            self._send(404, _envelope_err(f"unknown action {target_system}/{action_type}"))
-            return
-        self._send(200, _envelope_ok(result))
+        self._send(status, response)
 
 
 def main() -> None:
