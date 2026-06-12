@@ -24,6 +24,7 @@ yarn-error.log*
 
 # --- AgentRail local state ---
 docs/tracking/*.jsonl
+!docs/tracking/decision_log.jsonl
 
 # --- Claude local artifacts ---
 .claude/_archive_lia/

@@ -1,0 +1,1 @@
+{"date": "2026-06-12", "id": "U1-transport", "decision": "Track U real-time transport = WebSocket", "context": "U1 OPEN item (SSE recommended). Chosen WebSocket for a single bidirectional channel the console can grow into (interactive control later).", "supersedes": "MASTER plan SSE recommendation"}
