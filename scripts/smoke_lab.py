@@ -186,11 +186,17 @@ def main() -> int:
     parser.add_argument("--api", default="http://127.0.0.1:8090", help="base URL of the API")
     parser.add_argument("--server-port", type=int, default=9111)
     args = parser.parse_args()
+    api = args.api.rstrip("/")
     try:
-        run_smoke(args.api.rstrip("/"), args.server_port)
+        run_smoke(api, args.server_port)
     except SmokeFailure as failure:
         print(f"SMOKE FAIL: {failure}", file=sys.stderr)
         return 1
+    finally:
+        # Always remove the smoke-* fixtures on exit: against an API running
+        # on the default stores they would otherwise persist into the
+        # versioned config/agentrail.config.json.
+        _cleanup(api)
     return 0
 
 
