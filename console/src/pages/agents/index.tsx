@@ -185,6 +185,13 @@ export default function AgentsPage(): JSX.Element {
     }
   }
 
+  // Distinct target systems offered by the catalog, and the actions of the
+  // currently selected system (the picker is scoped to one system).
+  const catalogSystems = Array.from(
+    new Set(catalog.map((a) => a.target_system)),
+  ).sort();
+  const scopedActions = catalog.filter((a) => a.target_system === form.targetSystem);
+
   return (
     <div>
       <div className="page-head">
@@ -307,14 +314,19 @@ export default function AgentsPage(): JSX.Element {
         </div>
 
         <div className="agents-form-row">
-          <label htmlFor="agent-target-system">Target system</label>
-          <input
+          <label htmlFor="agent-target-system">Target system (en face)</label>
+          <select
             id="agent-target-system"
-            type="text"
-            placeholder="github, gitlab, ..."
             value={form.targetSystem}
             onChange={(e) => setField("targetSystem", e.target.value)}
-          />
+          >
+            <option value="">(choisir un systeme)</option>
+            {catalogSystems.map((sys) => (
+              <option key={sys} value={sys}>
+                {sys}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="agents-form-row">
@@ -329,17 +341,19 @@ export default function AgentsPage(): JSX.Element {
 
         <fieldset className="agents-actions-picker">
           <legend>
-            Actions de l'agent (catalogue) -- ce que l'agent fait
+            Actions de l'agent (catalogue {form.targetSystem || "..."}) -- ce que l'agent fait
             {form.actions.length > 0 ? ` (${form.actions.length})` : ""}
           </legend>
           <p className="agents-backends-note">
-            Coche les actions du catalogue. Elles definissent le scope ET le
-            scenario mock (1 action = 1 etape, dans l'ordre coche).
+            Coche les actions du catalogue du systeme cible. Elles definissent le
+            scope ET le scenario mock (1 action = 1 etape, dans l'ordre coche).
           </p>
-          {catalog.length === 0 ? (
-            <p className="agents-empty">Catalogue d'actions indisponible.</p>
+          {form.targetSystem === "" ? (
+            <p className="agents-empty">Choisis d'abord un target system.</p>
+          ) : scopedActions.length === 0 ? (
+            <p className="agents-empty">Aucune action pour {form.targetSystem}.</p>
           ) : (
-            catalog.map((a) => (
+            scopedActions.map((a) => (
               <label key={a.action} className="agents-action-row">
                 <input
                   type="checkbox"

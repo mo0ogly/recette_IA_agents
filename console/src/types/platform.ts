@@ -149,8 +149,9 @@ export interface RecordingMeta {
   steps: number;
 }
 
-/** One canonical agent action (what an agent can be made to do). */
+/** One executable agent action (what an agent can be made to do). */
 export interface AgentAction {
+  target_system: string;
   action: string;
   description: string;
   kind: "read" | "bounded_write" | "high_write";

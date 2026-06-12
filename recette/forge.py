@@ -14,7 +14,14 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from .events import ActionType, AgentAction, LogicalClock, TargetSystem, action_mode
+from .events import (
+    ActionType,
+    AgentAction,
+    LogicalClock,
+    TargetSystem,
+    action_mode,
+    mode_for_action,
+)
 
 
 @runtime_checkable
@@ -65,7 +72,7 @@ class LabForge:
             principal=principal,
             target_system=target_system,
             action_type=action_type,
-            mode=action_mode(ActionType(action_type)).value,
+            mode=mode_for_action(action_type).value,
             resource=resource,
             approved=approved,
             params=dict(params or {}),

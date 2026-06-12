@@ -56,8 +56,35 @@ ESCALATE_ACTIONS: frozenset[ActionType] = frozenset(
 
 
 def action_mode(action: ActionType) -> Mode:
-    """Return the read/write mode implied by an action type."""
+    """Return the read/write mode implied by a canonical git action type."""
     return Mode.READ if action in _READ_ACTIONS else Mode.WRITE
+
+
+# Read-only verbs for the broader multi-system action catalog (okta, finance,
+# slack, ...). A read does not mutate the target; an export reads/exfiltrates,
+# so it is classified read (no mutation), independently of its risk level.
+_READ_PREFIXES: tuple[str, ...] = (
+    "read_",
+    "list_",
+    "get_",
+    "view_",
+    "fetch_",
+    "scan_",
+    "describe_",
+    "export_",
+    "search_",
+    "download_",
+)
+
+
+def mode_for_action(action_type: str) -> Mode:
+    """Read/write mode for ANY action type. Uses the canonical git mapping when
+    the action is a known git action, else a read-prefix heuristic. Never raises
+    (unlike ``action_mode`` which requires an ``ActionType`` member)."""
+    try:
+        return action_mode(ActionType(action_type))
+    except ValueError:
+        return Mode.READ if action_type.startswith(_READ_PREFIXES) else Mode.WRITE
 
 
 class LogicalClock:

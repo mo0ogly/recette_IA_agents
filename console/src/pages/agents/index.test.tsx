@@ -33,8 +33,8 @@ import {
 import AgentsPage from "./index";
 
 const AGENT_ACTIONS = [
-  { action: "read_repo", description: "Read repository metadata (read-only).", kind: "read" },
-  { action: "open_pr", description: "Open a pull request (bounded write).", kind: "bounded_write" },
+  { target_system: "github", action: "read_repo", description: "Read repo (read-only).", kind: "read" },
+  { target_system: "github", action: "open_pr", description: "Open a PR (bounded write).", kind: "bounded_write" },
 ];
 
 const agents = agentsFixture as unknown as AgentConfig[];
@@ -92,9 +92,14 @@ describe("AgentsPage", () => {
 
     render(<AgentsPage />);
 
-    // Wait for the catalog checkboxes to render, then pick read_repo + open_pr.
-    const readRepo = await screen.findByRole("checkbox", { name: /read_repo/ });
-    fireEvent.click(readRepo);
+    // Wait for the catalog to load (the github option appears), then scope to it.
+    await screen.findByRole("option", { name: "github" });
+    fireEvent.change(screen.getByLabelText("Target system (en face)"), {
+      target: { value: "github" },
+    });
+
+    // Then pick read_repo + open_pr from that system's catalog.
+    fireEvent.click(await screen.findByRole("checkbox", { name: /read_repo/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /open_pr/ }));
 
     // "Id" labels both the agent form and the AI-backend form; the agent one is first.

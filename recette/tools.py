@@ -27,9 +27,7 @@ _ACTION_DESCRIPTIONS: dict[str, str] = {
     "trigger_ci": "Trigger a CI/CD pipeline run (high blast-radius write).",
 }
 
-_KNOWN_ACTIONS: frozenset[str] = frozenset(a.value for a in ActionType)
-
-# Coarse risk class per action, used to order and badge the action catalog.
+# Coarse risk class per canonical git action, used to order/badge the catalog.
 _ACTION_KIND: dict[str, str] = {
     "read_repo": "read",
     "list_repos": "read",
@@ -44,20 +42,77 @@ _ACTION_KIND: dict[str, str] = {
     "trigger_ci": "high_write",
 }
 
+# Target systems whose executable agent actions are the canonical git set
+# (the discovery corpus is built on these); other systems use the governance
+# catalog actions (okta, finance, ...), executed deterministically by the forge.
+_GIT_SYSTEMS: tuple[str, ...] = ("github", "gitlab")
+
+
+def _kind_for_spec(action_type: str, risk_level: str) -> str:
+    """Read/bounded_write/high_write class for a governance catalog action."""
+    from .events import Mode, mode_for_action
+
+    if mode_for_action(action_type) is Mode.READ:
+        return "read"
+    return "high_write" if risk_level in ("high", "critical") else "bounded_write"
+
+
+def _multi_system_catalog() -> list[dict[str, str]]:
+    """All executable agent actions across the 11 systems: the canonical git
+    actions for github/gitlab, plus the governance catalog for every other
+    system. Cached after first build (pure, deterministic)."""
+    from .platform.catalog import load_catalog
+
+    rows: list[dict[str, str]] = []
+    for system in _GIT_SYSTEMS:
+        for name, desc in _ACTION_DESCRIPTIONS.items():
+            rows.append(
+                {
+                    "target_system": system,
+                    "action": name,
+                    "description": desc,
+                    "kind": _ACTION_KIND.get(name, "bounded_write"),
+                }
+            )
+    for spec in load_catalog().all():
+        if spec.target_system in _GIT_SYSTEMS:
+            continue
+        rows.append(
+            {
+                "target_system": spec.target_system,
+                "action": spec.action_type,
+                "description": spec.description,
+                "kind": _kind_for_spec(spec.action_type, spec.risk_level),
+            }
+        )
+    return rows
+
+
+# Every action name the forge/tools accept: canonical git actions plus every
+# governance catalog action. Built once at import (pure data).
+def _known_actions() -> frozenset[str]:
+    names = {a.value for a in ActionType}
+    names.update(row["action"] for row in _multi_system_catalog())
+    return frozenset(names)
+
+
+_KNOWN_ACTIONS: frozenset[str] = _known_actions()
+
+# Description lookup spanning git + governance actions, for tool specs.
+_ALL_DESCRIPTIONS: dict[str, str] = {
+    **{row["action"]: row["description"] for row in _multi_system_catalog()},
+    **_ACTION_DESCRIPTIONS,
+}
+
 
 def agent_action_catalog() -> list[dict[str, str]]:
-    """The canonical agent-action catalog (what an agent can be made to do),
-    in a stable read -> bounded_write -> high_write order."""
+    """Executable agent-action catalog across the 11 systems, stable order
+    (by target_system, then read -> bounded_write -> high_write, then name)."""
     order = {"read": 0, "bounded_write": 1, "high_write": 2}
-    actions = [
-        {
-            "action": name,
-            "description": _ACTION_DESCRIPTIONS[name],
-            "kind": _ACTION_KIND.get(name, "bounded_write"),
-        }
-        for name in _ACTION_DESCRIPTIONS
-    ]
-    return sorted(actions, key=lambda a: (order.get(a["kind"], 1), a["action"]))
+    return sorted(
+        _multi_system_catalog(),
+        key=lambda a: (a["target_system"], order.get(a["kind"], 1), a["action"]),
+    )
 
 
 def tool_spec(action: str) -> ToolSpec:
@@ -66,7 +121,7 @@ def tool_spec(action: str) -> ToolSpec:
         raise ValueError(f"unknown action {action!r}")
     return ToolSpec(
         name=action,
-        description=_ACTION_DESCRIPTIONS.get(action, action),
+        description=_ALL_DESCRIPTIONS.get(action, action),
         parameters={
             "type": "object",
             "properties": {
