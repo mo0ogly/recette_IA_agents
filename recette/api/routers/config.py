@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Body, HTTPException, Request, Response
 
 from ...llm import Message, build_llm
 from ..config_store import UnknownAgentError, UnknownServerError
@@ -156,8 +156,16 @@ def delete_ai_backend(request: Request, backend_id: str) -> Response:
 
 
 @router.post("/ai-backends/{backend_id}/test")
-def test_ai_backend(request: Request, backend_id: str) -> dict:
-    """Connectivity probe: one minimal real call to the configured provider.
+def test_ai_backend(
+    request: Request, backend_id: str, body: dict | None = Body(default=None)
+) -> dict:
+    """Probe / free-text prompt: one real call to the configured provider.
+
+    The optional JSON body {"prompt": "..."} drives the call. When it is
+    absent or its "prompt" is empty/whitespace, the legacy connectivity
+    probe runs (system "connectivity probe", user "ping"). A non-empty
+    prompt switches to a concise-assistant system prompt and sends the
+    prompt as the user message. The model's text answer is always returned.
 
     Diagnostic path, NOT a decision path -- I4 does not apply to the
     wall-clock latency measured here. Failure mode is fail-safe: every
@@ -168,6 +176,20 @@ def test_ai_backend(request: Request, backend_id: str) -> dict:
     backend = _store(request).get_ai_backend(backend_id)
     if backend is None:
         raise HTTPException(status_code=404, detail=f"no ai_backend {backend_id!r}")
+    prompt = ""
+    if isinstance(body, dict):
+        raw_prompt = body.get("prompt")
+        if isinstance(raw_prompt, str) and raw_prompt.strip():
+            prompt = raw_prompt
+    if prompt:
+        system = (
+            "You are a helpful assistant for an AI-governance recette platform. "
+            "Answer concisely."
+        )
+        user_text = prompt
+    else:
+        system = "You are a connectivity probe. Reply with one word."
+        user_text = "ping"
     factory = getattr(request.app.state, "llm_factory", None) or build_llm
     # Per-backend secret first, then the provider's env-var fallback (R8). The
     # key is passed straight to the factory; it is never logged or returned.
@@ -181,15 +203,20 @@ def test_ai_backend(request: Request, backend_id: str) -> dict:
             api_key=api_key,
         )
         decision = llm.decide(
-            system="You are a connectivity probe. Reply with one word.",
-            history=[Message(role="user", content="ping")],
+            system=system,
+            history=[Message(role="user", content=user_text)],
             tools=[],
         )
     except Exception as exc:  # noqa: BLE001 -- fail-safe diagnostic boundary
         latency_ms = int((time.perf_counter() - t0) * 1000)
         return {"ok": False, "latency_ms": latency_ms, "error": str(exc)}
     latency_ms = int((time.perf_counter() - t0) * 1000)
-    return {"ok": True, "latency_ms": latency_ms, "kind": decision.kind}
+    return {
+        "ok": True,
+        "latency_ms": latency_ms,
+        "kind": decision.kind,
+        "text": decision.text,
+    }
 
 
 @router.put("/ai-backends/{backend_id}/secret")

@@ -268,6 +268,68 @@ class TestAiBackendConnectivityProbe(unittest.TestCase):
         self.assertFalse(body["ok"])
         self.assertIn("openai_compat requires base_url", body["error"])
 
+    def _capturing_factory(self, text: str, captured: dict):
+        """A factory whose StubLlm records the history it was asked to decide on."""
+
+        class _CapturingLlm(StubLlm):
+            def decide(self, *, system, history, tools):
+                captured["system"] = system
+                captured["history"] = list(history)
+                return super().decide(system=system, history=history, tools=tools)
+
+        def fake_factory(
+            provider: str,
+            model: str,
+            *,
+            client: object | None = None,
+            base_url: str | None = None,
+            api_key: str | None = None,
+        ):
+            return _CapturingLlm([LlmDecision(kind="final", text=text)])
+
+        return fake_factory
+
+    def test_no_body_returns_text_and_connectivity_default(self) -> None:
+        # POST with no body keeps the connectivity probe AND now returns text.
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+        captured: dict = {}
+        self.app.state.llm_factory = self._capturing_factory("answer-text", captured)
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["text"], "answer-text")
+        self.assertEqual(body["kind"], "final")
+        # Connectivity default user message stays "ping".
+        self.assertEqual(captured["history"][-1].content, "ping")
+
+    def test_custom_prompt_is_threaded_and_echoed(self) -> None:
+        # A non-empty prompt reaches the llm as the last user message; text echoes back.
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+        captured: dict = {}
+        self.app.state.llm_factory = self._capturing_factory("the model reply", captured)
+        r = self.client.post("/config/ai-backends/b1/test", json={"prompt": "what is 2+2"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["text"], "the model reply")
+        self.assertEqual(captured["history"][-1].content, "what is 2+2")
+        self.assertEqual(captured["history"][-1].role, "user")
+
+    def test_empty_prompt_falls_back_to_ping(self) -> None:
+        # An empty/whitespace prompt is treated as no prompt: connectivity ping.
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+        captured: dict = {}
+        self.app.state.llm_factory = self._capturing_factory("x", captured)
+        r = self.client.post("/config/ai-backends/b1/test", json={"prompt": "   "})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(captured["history"][-1].content, "ping")
+
+    def test_prompt_unknown_backend_is_404(self) -> None:
+        r = self.client.post("/config/ai-backends/nope/test", json={"prompt": "hi"})
+        self.assertEqual(r.status_code, 404)
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestAiBackendSecretRoutes(unittest.TestCase):
