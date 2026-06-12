@@ -1,0 +1,105 @@
+"""okta domain (W1 Identity / Access): catalog specs + lab handler tests.
+
+Ground truth: docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md, section W1.
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from recette.lab.domains.okta import handle
+from recette.platform.catalog import load_catalog
+from recette.platform.catalog.domains.okta import ACTIONS, TARGET_SYSTEM
+from recette.platform.catalog.model import RiskLevel
+from recette.platform.events import PolicyVerdict
+
+ESC = PolicyVerdict.ESCALATE
+DENY = PolicyVerdict.DENY
+
+# (action_type, verdict_privileged, verdict_default, risk_level) -- W1 table, literal.
+W1_TABLE: tuple[tuple[str, PolicyVerdict, PolicyVerdict, RiskLevel], ...] = (
+    ("suspend_user", ESC, DENY, RiskLevel.HIGH),
+    ("delete_user", ESC, DENY, RiskLevel.CRITICAL),
+    ("reset_password", ESC, DENY, RiskLevel.HIGH),
+    ("modify_user_roles", ESC, DENY, RiskLevel.HIGH),
+    ("add_user_to_admin_group", ESC, DENY, RiskLevel.CRITICAL),
+    ("create_api_key", ESC, DENY, RiskLevel.HIGH),
+    ("revoke_api_key", ESC, DENY, RiskLevel.MEDIUM),
+    ("generate_long_lived_token", ESC, DENY, RiskLevel.CRITICAL),
+    ("modify_mfa_policy", ESC, DENY, RiskLevel.CRITICAL),
+    ("disable_sso", DENY, DENY, RiskLevel.CRITICAL),
+    ("add_oauth_app", ESC, DENY, RiskLevel.HIGH),
+    ("modify_oauth_scopes", ESC, DENY, RiskLevel.HIGH),
+    ("invite_external_user", ESC, DENY, RiskLevel.HIGH),
+)
+
+
+class TestOktaCatalog(unittest.TestCase):
+    def test_target_system(self) -> None:
+        self.assertEqual(TARGET_SYSTEM, "okta")
+        for spec in ACTIONS:
+            self.assertEqual(spec.target_system, "okta")
+
+    def test_exactly_13_specs(self) -> None:
+        self.assertEqual(len(ACTIONS), 13)
+        self.assertEqual(len(W1_TABLE), 13)
+
+    def test_specs_match_w1_table_literally(self) -> None:
+        by_action = {spec.action_type: spec for spec in ACTIONS}
+        self.assertEqual(len(by_action), 13, "duplicate action_type in ACTIONS")
+        for action_type, verdict_priv, verdict_def, risk in W1_TABLE:
+            with self.subTest(action_type=action_type):
+                spec = by_action.get(action_type)
+                self.assertIsNotNone(spec, f"missing action {action_type!r}")
+                assert spec is not None
+                self.assertIs(spec.verdict_privileged, verdict_priv)
+                self.assertIs(spec.verdict_default, verdict_def)
+                self.assertIs(spec.risk_level, risk)
+
+    def test_privileged_roles_convention(self) -> None:
+        for spec in ACTIONS:
+            with self.subTest(action_type=spec.action_type):
+                if spec.verdict_privileged is ESC:
+                    self.assertEqual(spec.privileged_roles, ("identity_admin",))
+                else:
+                    self.assertEqual(spec.privileged_roles, ())
+
+    def test_descriptions_present(self) -> None:
+        for spec in ACTIONS:
+            self.assertTrue(spec.description, f"empty description for {spec.action_type!r}")
+
+
+class TestOktaLabHandler(unittest.TestCase):
+    def test_handler_covers_every_cataloged_action(self) -> None:
+        for spec in ACTIONS:
+            with self.subTest(action_type=spec.action_type):
+                response = handle(spec.action_type, "user:u-001", {"reason": "recette"})
+                self.assertIsInstance(response, dict)
+                assert response is not None
+                self.assertEqual(response["action"], spec.action_type)
+                self.assertEqual(response["resource"], "user:u-001")
+                self.assertEqual(response["status"], "simulated")
+                self.assertEqual(len(response["result_id"]), 12)
+
+    def test_handler_is_deterministic(self) -> None:
+        for spec in ACTIONS:
+            with self.subTest(action_type=spec.action_type):
+                a = handle(spec.action_type, "user:u-002", {"b": 2, "a": 1})
+                b = handle(spec.action_type, "user:u-002", {"b": 2, "a": 1})
+                self.assertEqual(a, b)
+
+    def test_unknown_action_returns_none(self) -> None:
+        self.assertIsNone(handle("unknown_action", "user:u-001", {}))
+
+
+class TestCatalogIntegration(unittest.TestCase):
+    def test_load_catalog_contains_13_okta_actions(self) -> None:
+        catalog = load_catalog()
+        okta_specs = [spec for spec in catalog.all() if spec.target_system == "okta"]
+        self.assertEqual(len(okta_specs), 13)
+        for action_type, _, _, _ in W1_TABLE:
+            self.assertIsNotNone(catalog.get("okta", action_type))
+
+
+if __name__ == "__main__":
+    unittest.main()
