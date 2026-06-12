@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 export type HelpTopicKey =
   | "cockpit"
+  | "recette"
   | "agents"
   | "catalog"
   | "approvals"
@@ -70,6 +71,41 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Une fois les agents lances, l'equipe discovery passe son outil dessus
           (onglet Discovery) et l'on compare au ground-truth : repere ? distingue
           a quoi il se connecte ?
+        </p>
+      </>
+    ),
+  },
+  recette: {
+    title: "Aide — Recette",
+    summary:
+      "Lancer la recette discovery / identification sur le corpus et lire le verdict vs ground-truth.",
+    body: (
+      <>
+        <p>
+          C'est ici que la boucle se ferme. Le cockpit produit des agents ;
+          cette page passe les <strong>outils a recetter</strong> sur le corpus
+          de reference et compare au <strong>ground-truth</strong>.
+        </p>
+        <h3>Discovery</h3>
+        <p>
+          Lance l'outil discovery sur le corpus de repos, par surface (github,
+          gitlab, temporal, openapi, mcp). Pour chaque surface on lit :
+          total, <code>passed</code>, faux positifs, faux negatifs, et le
+          verdict global. La recette verifie des proprietes invariantes
+          (detection, count/dedup, couverture, cible, determinisme), pas les
+          valeurs opaques.
+        </p>
+        <h3>Identification</h3>
+        <p>
+          Lance l'outil identification sur le corpus d'agents (corrects ET
+          incorrects). Pour chaque agent on compare le verdict predit au verdict
+          attendu (correct / incorrect). Le taux de detection et le compte de
+          faux positifs / negatifs mesurent si l'outil sait dire oui ET non.
+        </p>
+        <p>
+          Les <code>ReferenceAdapter</code> fournis sont l'oracle de reference
+          (offline). Un vrai outil se branche en implementant le meme protocole
+          d'adaptateur.
         </p>
       </>
     ),

@@ -11,7 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   createAgent,
+  createAiBackend,
   deleteAgent,
+  deleteAiBackend,
   listAgents,
   listAiBackends,
   updateAgent,
@@ -99,6 +101,8 @@ export default function AgentsPage(): JSX.Element {
   // null means the form is in create mode; otherwise the id being edited.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AgentFormValues>(EMPTY_FORM);
+  // AI backend creation form (the AI behind an agent). No secret here (R8).
+  const [backendForm, setBackendForm] = useState({ id: "", provider: "", model: "" });
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -152,6 +156,38 @@ export default function AgentsPage(): JSX.Element {
         await updateAgent(editingId, payload);
       }
       cancelEdit();
+      await refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  async function handleCreateBackend(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const id = backendForm.id.trim();
+    if (id.length === 0) {
+      setError("AI backend id is required.");
+      return;
+    }
+    try {
+      await createAiBackend({
+        id,
+        provider: backendForm.provider.trim(),
+        model: backendForm.model.trim(),
+      });
+      setBackendForm({ id: "", provider: "", model: "" });
+      await refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  async function handleDeleteBackend(id: string): Promise<void> {
+    if (!window.confirm(`Delete AI backend "${id}"?`)) {
+      return;
+    }
+    try {
+      await deleteAiBackend(id);
       await refresh();
     } catch (err) {
       setError(errorMessage(err));
@@ -369,6 +405,89 @@ export default function AgentsPage(): JSX.Element {
           )}
         </div>
       </form>
+
+      <section className="agents-backends">
+        <h2>AI backends (the AI behind agents)</h2>
+        <p className="agents-backends-note">
+          Provider + model only. The provider key is never stored here; it is
+          resolved from the environment at run time (R8).
+        </p>
+        <table className="agents-table">
+          <thead>
+            <tr>
+              <th>Id</th>
+              <th>Provider</th>
+              <th>Model</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {backends.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="agents-empty">
+                  No AI backends configured.
+                </td>
+              </tr>
+            ) : (
+              backends.map((backend) => (
+                <tr key={backend.id}>
+                  <td>{backend.id}</td>
+                  <td>{backend.provider}</td>
+                  <td>{backend.model}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="agents-btn agents-btn-danger"
+                      onClick={() => void handleDeleteBackend(backend.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        <form className="agents-form" onSubmit={(e) => void handleCreateBackend(e)}>
+          <h2>Create AI backend</h2>
+          <div className="agents-form-row">
+            <label htmlFor="backend-id">Id</label>
+            <input
+              id="backend-id"
+              type="text"
+              value={backendForm.id}
+              onChange={(e) => setBackendForm((p) => ({ ...p, id: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="agents-form-row">
+            <label htmlFor="backend-provider">Provider</label>
+            <input
+              id="backend-provider"
+              type="text"
+              placeholder="anthropic, openai, stub, ..."
+              value={backendForm.provider}
+              onChange={(e) => setBackendForm((p) => ({ ...p, provider: e.target.value }))}
+            />
+          </div>
+          <div className="agents-form-row">
+            <label htmlFor="backend-model">Model</label>
+            <input
+              id="backend-model"
+              type="text"
+              placeholder="claude-opus-4-8, ..."
+              value={backendForm.model}
+              onChange={(e) => setBackendForm((p) => ({ ...p, model: e.target.value }))}
+            />
+          </div>
+          <div className="agents-form-actions">
+            <button type="submit" className="agents-btn agents-btn-primary">
+              Create backend
+            </button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }
