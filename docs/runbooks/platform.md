@@ -120,7 +120,25 @@ Docker services (docker-compose.yml):
 
 ## How to run
 
-Docker lab (build happens on first use):
+### Via `recette.sh` (recommended for local dev)
+
+The simplest path -- starts the lab mock + API with the full platform wiring,
+auto-picks a free port if 8090 is taken, and exposes the console and campaigns:
+
+```
+./recette.sh platform up
+./recette.sh console start
+./recette.sh campaign run identity-offboarding --json
+./recette.sh platform status
+./recette.sh platform down
+./recette.sh platform purge
+```
+
+The resolved API port is persisted in `.run/api.port`; console and campaign
+commands read it automatically. See
+[recette-sh.md](recette-sh.md) for the full menu and command reference.
+
+### Docker lab (build happens on first use)
 
 ```
 make platform-lab
