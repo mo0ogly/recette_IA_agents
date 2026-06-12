@@ -19,13 +19,22 @@ vi.mock("../../api/client", () => ({
   updateAgent: vi.fn(),
   deleteAgent: vi.fn(),
   listAiBackends: vi.fn(),
+  createAiBackend: vi.fn(),
+  deleteAiBackend: vi.fn(),
+  listAgentActions: vi.fn(),
 }));
 
 import {
+  listAgentActions,
   listAgents,
   listAiBackends,
 } from "../../api/client";
 import AgentsPage from "./index";
+
+const AGENT_ACTIONS = [
+  { action: "read_repo", description: "Read repository metadata (read-only).", kind: "read" },
+  { action: "open_pr", description: "Open a pull request (bounded write).", kind: "bounded_write" },
+];
 
 const agents = agentsFixture as unknown as AgentConfig[];
 const backends = backendsFixture as unknown as AiBackend[];
@@ -38,6 +47,7 @@ describe("AgentsPage", () => {
   it("renders agents and backends from the real fixture payloads", async () => {
     vi.mocked(listAgents).mockResolvedValue(agents);
     vi.mocked(listAiBackends).mockResolvedValue(backends);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
 
     render(<AgentsPage />);
 
@@ -47,8 +57,8 @@ describe("AgentsPage", () => {
     // "github" appears in both the target and the capability-scope columns.
     expect(screen.getAllByText("github").length).toBeGreaterThanOrEqual(1);
 
-    // The AI backend select offers backend-1 plus the empty option.
-    const backendSelect = screen.getByLabelText("AI backend");
+    // The agent's AI backend select offers backend-1 plus the empty option.
+    const backendSelect = screen.getByLabelText(/AI backend \(/);
     const options = within(backendSelect).getAllByRole("option");
     expect(options.map((o) => (o as HTMLOptionElement).value)).toContain(
       "backend-1",

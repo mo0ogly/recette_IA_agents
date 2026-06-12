@@ -22,6 +22,7 @@ from ..platform.proxy.protocol import ExternalSystemProxy
 from .campaign_store import CampaignStore, RecordingStore
 from .config_store import ConfigStore
 from .routers import actions as actions_router
+from .routers import agent_actions as agent_actions_router
 from .routers import approvals as approvals_router
 from .routers import audit as audit_router
 from .routers import campaigns as campaigns_router
@@ -142,4 +143,5 @@ def create_app(
     app.include_router(audit_router.router)
     app.include_router(catalog_actions_router.router)
     app.include_router(campaigns_router.router)
+    app.include_router(agent_actions_router.router)
     return app

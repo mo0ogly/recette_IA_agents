@@ -51,6 +51,24 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
     return {"run_id": run.id, "status": run.status}
 
 
+@router.get("")
+def list_runs(request: Request) -> dict:
+    """All runs with their status and originating agent (for the dashboard)."""
+    runs = request.app.state.run_manager.list()
+    return {
+        "runs": [
+            {
+                "id": r.id,
+                "kind": r.kind,
+                "status": r.status,
+                "agent_id": r.params.get("agent_id"),
+                "error": r.error,
+            }
+            for r in runs
+        ]
+    }
+
+
 @router.get("/{run_id}")
 def get_run(request: Request, run_id: str) -> dict:
     run = request.app.state.run_manager.get(run_id)

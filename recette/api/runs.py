@@ -48,6 +48,10 @@ class RunManager:
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
 
+    def list(self) -> list[Run]:
+        """All runs, newest first (insertion order is launch order)."""
+        return list(reversed(self._runs.values()))
+
     def request_stop(self, run_id: str) -> bool:
         run = self._runs.get(run_id)
         if run is None:

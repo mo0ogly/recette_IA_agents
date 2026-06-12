@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 
 export type HelpTopicKey =
+  | "dashboard"
   | "cockpit"
   | "recette"
   | "campaigns"
@@ -28,6 +29,42 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
+  dashboard: {
+    title: "Aide — Tableau de bord",
+    summary:
+      "Vue de controle : statut de chaque agent et les deux axes mock/reel en un coup d'oeil.",
+    body: (
+      <>
+        <p>
+          Le tableau de bord liste tous les agents de recette et permet de les
+          <strong> lancer / arreter</strong> et de voir leur <strong>statut</strong>{" "}
+          en direct (rafraichi toutes les 2s).
+        </p>
+        <h3>Les deux axes mock / reel</h3>
+        <ul>
+          <li>
+            <strong>IA</strong> : <code>IA reelle</code> (un vrai LLM decide les
+            actions, via l'ai_backend lie, cle en env R8) ou <code>Mock</code>
+            (scenario scripte, deterministe, zero cle).
+          </li>
+          <li>
+            <strong>En face (cible)</strong> : <code>Reelle</code> (vrai serveur)
+            ou <code>Simulee (lab)</code> (plateforme simulee, zero effet de bord).
+          </li>
+        </ul>
+        <p>
+          Les deux se reglent par agent dans l'onglet Agents (champ ai_mode pour
+          l'IA, runtime pour la cible). Le pastille verte = un run actif
+          (pending/running) ; sinon le dernier resultat (completed/failed/stopped)
+          ou inactif.
+        </p>
+        <p>
+          Pour le detail des actions d'un lancement (flux pas a pas), ouvrir
+          l'onglet Cockpit.
+        </p>
+      </>
+    ),
+  },
   cockpit: {
     title: "Aide — Cockpit",
     summary:

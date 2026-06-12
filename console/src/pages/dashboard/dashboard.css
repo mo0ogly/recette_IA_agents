@@ -1,0 +1,133 @@
+/* Dashboard: agent control board. Reuses .pill from index.css. */
+
+.dash-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.dash-summary {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.dash-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  min-width: 92px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.dash-num-active {
+  color: var(--badge-green-fg);
+}
+
+.dash-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dash-table th,
+.dash-table td {
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.dash-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dash-agent strong {
+  font-size: 0.95rem;
+}
+
+.dash-goal {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.dash-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.dash-table button {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-stop {
+  background-color: var(--color-surface) !important;
+  color: var(--badge-red-fg) !important;
+  border-color: var(--badge-red-fg) !important;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+}
+
+.dot-on {
+  background-color: #2f9e44;
+  box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.18);
+}
+
+.dot-off {
+  background-color: var(--color-border);
+}
+
+.pill-mock {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.pill-warn {
+  background-color: var(--badge-orange-bg);
+  color: var(--badge-orange-fg);
+}
+
+.dash-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 0.75rem;
+}

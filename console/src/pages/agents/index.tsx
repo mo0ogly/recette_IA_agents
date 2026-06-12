@@ -14,11 +14,12 @@ import {
   createAiBackend,
   deleteAgent,
   deleteAiBackend,
+  listAgentActions,
   listAgents,
   listAiBackends,
   updateAgent,
 } from "../../api/client";
-import type { AgentConfig, AiBackend } from "../../types/platform";
+import type { AgentAction, AgentConfig, AiBackend } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
 import "./agents.css";
 
@@ -26,49 +27,49 @@ import "./agents.css";
 interface AgentFormValues {
   id: string;
   runtime: "lab" | "real";
+  aiMode: "mock" | "real";
   principal: string;
   targetSystem: string;
   goal: string;
-  role: string;
-  capabilityScope: string;
-  systemPrompt: string;
-  model: string;
+  actions: string[];
   aiBackendId: string;
 }
 
 const EMPTY_FORM: AgentFormValues = {
   id: "",
   runtime: "lab",
+  aiMode: "mock",
   principal: "",
   targetSystem: "",
   goal: "",
-  role: "",
-  capabilityScope: "",
-  systemPrompt: "",
-  model: "",
+  actions: [],
   aiBackendId: "",
 };
 
-/** Parse the comma-separated capability scope into a clean string array. */
-function parseCapabilityScope(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+/** Turn a list of chosen catalog actions into a deterministic mock scenario
+ *  (one tool_call per action, then a final step). */
+function scenarioFromActions(actions: string[]): Array<Record<string, unknown>> {
+  const steps: Array<Record<string, unknown>> = actions.map((action) => ({
+    kind: "tool_call",
+    tool_name: action,
+    tool_args: { resource: "acme/x" },
+  }));
+  steps.push({ kind: "final", text: "done" });
+  return steps;
 }
 
-/** Build the API payload from the form; empty optional fields are omitted. */
+/** Build the API payload from the form; empty optional fields are omitted.
+ *  The chosen catalog actions drive both capability_scope and the mock scenario. */
 function toAgentConfig(values: AgentFormValues, id: string): AgentConfig {
   return {
     id,
     runtime: values.runtime,
+    ai_mode: values.aiMode,
     principal: values.principal.trim() || undefined,
     target_system: values.targetSystem.trim() || undefined,
     goal: values.goal.trim() || undefined,
-    role: values.role.trim() || undefined,
-    capability_scope: parseCapabilityScope(values.capabilityScope),
-    system_prompt: values.systemPrompt.trim() || undefined,
-    model: values.model.trim() || undefined,
+    capability_scope: values.actions,
+    scenario: scenarioFromActions(values.actions),
     ai_backend_id: values.aiBackendId || undefined,
   };
 }
@@ -78,13 +79,11 @@ function toFormValues(agent: AgentConfig): AgentFormValues {
   return {
     id: agent.id,
     runtime: agent.runtime,
+    aiMode: agent.ai_mode ?? (agent.ai_backend_id ? "real" : "mock"),
     principal: agent.principal ?? "",
     targetSystem: agent.target_system ?? "",
     goal: agent.goal ?? "",
-    role: agent.role ?? "",
-    capabilityScope: (agent.capability_scope ?? []).join(", "),
-    systemPrompt: agent.system_prompt ?? "",
-    model: agent.model ?? "",
+    actions: agent.capability_scope ?? [],
     aiBackendId: agent.ai_backend_id ?? "",
   };
 }
@@ -96,6 +95,7 @@ function errorMessage(err: unknown): string {
 export default function AgentsPage(): JSX.Element {
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [backends, setBackends] = useState<AiBackend[]>([]);
+  const [catalog, setCatalog] = useState<AgentAction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // null means the form is in create mode; otherwise the id being edited.
@@ -106,12 +106,14 @@ export default function AgentsPage(): JSX.Element {
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      const [agentList, backendList] = await Promise.all([
+      const [agentList, backendList, actionList] = await Promise.all([
         listAgents(),
         listAiBackends(),
+        listAgentActions(),
       ]);
       setAgents(agentList);
       setBackends(backendList);
+      setCatalog(actionList);
       setError(null);
     } catch (err) {
       setError(errorMessage(err));
@@ -129,6 +131,15 @@ export default function AgentsPage(): JSX.Element {
     value: AgentFormValues[K],
   ): void {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleAction(action: string): void {
+    setForm((prev) => ({
+      ...prev,
+      actions: prev.actions.includes(action)
+        ? prev.actions.filter((a) => a !== action)
+        : [...prev.actions, action],
+    }));
   }
 
   function startEdit(agent: AgentConfig): void {
@@ -293,7 +304,7 @@ export default function AgentsPage(): JSX.Element {
         )}
 
         <div className="agents-form-row">
-          <label htmlFor="agent-runtime">Runtime</label>
+          <label htmlFor="agent-runtime">Cible (en face)</label>
           <select
             id="agent-runtime"
             value={form.runtime}
@@ -301,8 +312,22 @@ export default function AgentsPage(): JSX.Element {
               setField("runtime", e.target.value === "real" ? "real" : "lab")
             }
           >
-            <option value="lab">lab</option>
-            <option value="real">real</option>
+            <option value="lab">Plateforme simulee (lab)</option>
+            <option value="real">Serveur reel</option>
+          </select>
+        </div>
+
+        <div className="agents-form-row">
+          <label htmlFor="agent-ai-mode">IA derriere</label>
+          <select
+            id="agent-ai-mode"
+            value={form.aiMode}
+            onChange={(e) =>
+              setField("aiMode", e.target.value === "real" ? "real" : "mock")
+            }
+          >
+            <option value="mock">Mock (scenario scripte)</option>
+            <option value="real">IA reelle (ai_backend)</option>
           </select>
         </div>
 
@@ -337,49 +362,37 @@ export default function AgentsPage(): JSX.Element {
           />
         </div>
 
-        <div className="agents-form-row">
-          <label htmlFor="agent-role">Role (governance, optional)</label>
-          <input
-            id="agent-role"
-            type="text"
-            value={form.role}
-            onChange={(e) => setField("role", e.target.value)}
-          />
-        </div>
+        <fieldset className="agents-actions-picker">
+          <legend>
+            Actions de l'agent (catalogue) -- ce que l'agent fait
+            {form.actions.length > 0 ? ` (${form.actions.length})` : ""}
+          </legend>
+          <p className="agents-backends-note">
+            Coche les actions du catalogue. Elles definissent le scope ET le
+            scenario mock (1 action = 1 etape, dans l'ordre coche).
+          </p>
+          {catalog.length === 0 ? (
+            <p className="agents-empty">Catalogue d'actions indisponible.</p>
+          ) : (
+            catalog.map((a) => (
+              <label key={a.action} className="agents-action-row">
+                <input
+                  type="checkbox"
+                  checked={form.actions.includes(a.action)}
+                  onChange={() => toggleAction(a.action)}
+                />
+                <code>{a.action}</code>
+                <span className={`pill pill-${a.kind}`}>{a.kind}</span>
+                <span className="agents-action-desc">{a.description}</span>
+              </label>
+            ))
+          )}
+        </fieldset>
 
         <div className="agents-form-row">
-          <label htmlFor="agent-capability-scope">
-            Capability scope (comma-separated)
+          <label htmlFor="agent-ai-backend">
+            AI backend {form.aiMode === "real" ? "(requis)" : "(si IA reelle)"}
           </label>
-          <input
-            id="agent-capability-scope"
-            type="text"
-            value={form.capabilityScope}
-            onChange={(e) => setField("capabilityScope", e.target.value)}
-          />
-        </div>
-
-        <div className="agents-form-row">
-          <label htmlFor="agent-system-prompt">System prompt</label>
-          <textarea
-            id="agent-system-prompt"
-            value={form.systemPrompt}
-            onChange={(e) => setField("systemPrompt", e.target.value)}
-          />
-        </div>
-
-        <div className="agents-form-row">
-          <label htmlFor="agent-model">Model</label>
-          <input
-            id="agent-model"
-            type="text"
-            value={form.model}
-            onChange={(e) => setField("model", e.target.value)}
-          />
-        </div>
-
-        <div className="agents-form-row">
-          <label htmlFor="agent-ai-backend">AI backend</label>
           <select
             id="agent-ai-backend"
             value={form.aiBackendId}

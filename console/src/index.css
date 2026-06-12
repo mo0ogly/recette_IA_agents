@@ -299,3 +299,61 @@ h1 {
   letter-spacing: 0.06em;
   align-self: center;
 }
+
+/* Agent-action catalog picker (Agents page) */
+.agents-actions-picker {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  margin: 0.85rem 0;
+}
+
+.agents-actions-picker legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+.agents-action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+}
+
+.agents-action-row code {
+  min-width: 8.5rem;
+  font-weight: 600;
+}
+
+.agents-action-desc {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+/* Shared pill (used by dashboard, recette, agents) */
+.pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Action risk-class pills */
+.pill-read {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.pill-bounded_write {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.pill-high_write {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}

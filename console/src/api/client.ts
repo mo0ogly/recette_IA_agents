@@ -10,6 +10,7 @@
 import type {
   ActionOutcome,
   ActionSpec,
+  AgentAction,
   AgentConfig,
   AiBackend,
   Campaign,
@@ -20,6 +21,7 @@ import type {
   RunEvent,
   RunHandle,
   RunInfo,
+  RunSummary,
   StoredEvent,
 } from "../types/platform";
 
@@ -119,6 +121,13 @@ export function listAiBackends(): Promise<AiBackend[]> {
   return request<AiBackend[]>("/config/ai-backends", { method: "GET" });
 }
 
+export function listAgentActions(): Promise<AgentAction[]> {
+  // Backend wraps the list: {actions, count}.
+  return request<{ actions: AgentAction[]; count: number }>("/agent-actions", {
+    method: "GET",
+  }).then((r) => r.actions);
+}
+
 export function createAiBackend(backend: AiBackend): Promise<AiBackend> {
   return request<AiBackend>("/config/ai-backends", {
     method: "POST",
@@ -162,6 +171,12 @@ export function launchRunner(
     method: "POST",
     body: JSON.stringify({ kind, params }),
   });
+}
+
+export function listRuns(): Promise<RunSummary[]> {
+  return request<{ runs: RunSummary[] }>("/runs", { method: "GET" }).then(
+    (r) => r.runs,
+  );
 }
 
 export function getRun(runId: string): Promise<RunInfo> {

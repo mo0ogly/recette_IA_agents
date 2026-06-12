@@ -29,6 +29,36 @@ _ACTION_DESCRIPTIONS: dict[str, str] = {
 
 _KNOWN_ACTIONS: frozenset[str] = frozenset(a.value for a in ActionType)
 
+# Coarse risk class per action, used to order and badge the action catalog.
+_ACTION_KIND: dict[str, str] = {
+    "read_repo": "read",
+    "list_repos": "read",
+    "read_ci": "read",
+    "open_issue": "bounded_write",
+    "comment_issue": "bounded_write",
+    "open_pr": "bounded_write",
+    "merge_pr": "high_write",
+    "push": "high_write",
+    "manage_webhook": "high_write",
+    "manage_release": "high_write",
+    "trigger_ci": "high_write",
+}
+
+
+def agent_action_catalog() -> list[dict[str, str]]:
+    """The canonical agent-action catalog (what an agent can be made to do),
+    in a stable read -> bounded_write -> high_write order."""
+    order = {"read": 0, "bounded_write": 1, "high_write": 2}
+    actions = [
+        {
+            "action": name,
+            "description": _ACTION_DESCRIPTIONS[name],
+            "kind": _ACTION_KIND.get(name, "bounded_write"),
+        }
+        for name in _ACTION_DESCRIPTIONS
+    ]
+    return sorted(actions, key=lambda a: (order.get(a["kind"], 1), a["action"]))
+
 
 def tool_spec(action: str) -> ToolSpec:
     """The ToolSpec for one canonical action (a 'resource' target + free-form params)."""

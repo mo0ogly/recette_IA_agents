@@ -73,7 +73,10 @@ export interface ChainReport {
 /** Configuration of a registered agent. */
 export interface AgentConfig {
   id: string;
+  /** Target side: "lab" = simulated platform, "real" = real server. */
   runtime: "lab" | "real";
+  /** Brain: "mock" = scripted scenario, "real" = live AI (ai_backend). */
+  ai_mode?: "mock" | "real";
   /** Identity the agent presents to the target system (Lane B). */
   principal?: string;
   /** External system the agent acts against (e.g. github, gitlab). */
@@ -81,8 +84,10 @@ export interface AgentConfig {
   /** Natural-language objective handed to the agent loop. */
   goal?: string;
   capability_scope?: string[];
-  /** Bound AI backend (the AI behind the agent). Empty when run as a mock. */
+  /** Bound AI backend (the AI behind the agent). Used when ai_mode = real. */
   ai_backend_id?: string;
+  /** Scripted decisions used when ai_mode = mock. */
+  scenario?: Array<Record<string, unknown>>;
   role?: string;
   system_prompt?: string;
   model?: string;
@@ -102,6 +107,15 @@ export interface RunInfo {
   id: string;
   kind: RunKind;
   status: RunStatus;
+  error: string | null;
+}
+
+/** A run row for the dashboard: status keyed back to its originating agent. */
+export interface RunSummary {
+  id: string;
+  kind: string;
+  status: RunStatus;
+  agent_id: string | null;
   error: string | null;
 }
 
@@ -132,6 +146,13 @@ export interface RecordingMeta {
   goal: string;
   provider: string;
   steps: number;
+}
+
+/** One canonical agent action (what an agent can be made to do). */
+export interface AgentAction {
+  action: string;
+  description: string;
+  kind: "read" | "bounded_write" | "high_write";
 }
 
 /** A configured AI backend an agent can be bound to. */
