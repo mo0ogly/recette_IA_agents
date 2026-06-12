@@ -18,10 +18,51 @@ from ..discovery_harness import (
 )
 from ..harness import discover_agent_dirs
 from ..harness import run_agent as run_ident_agent
+from ..lane_b import run_agent as run_lane_b_agent
+from ..llm import LlmBackend, LlmDecision, StubLlm
 from ..scorecard import Scorecard
 
 Emit = Callable[[str, dict], None]
 ShouldStop = Callable[[], bool]
+
+
+def make_lane_b_runner(
+    agent_cfg: dict, llm: LlmBackend
+) -> Callable[[dict, Emit, ShouldStop], None]:
+    def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
+        result = run_lane_b_agent(
+            agent_id=agent_cfg["id"],
+            principal=agent_cfg["principal"],
+            target_system=agent_cfg["target_system"],
+            goal=agent_cfg["goal"],
+            capability_scope=agent_cfg["capability_scope"],
+            llm=llm,
+            on_step=lambda i, step: emit("step", {"index": i, "action": step.action}),
+            should_stop=should_stop,
+        )
+        emit(
+            "result",
+            {
+                "actions": [a.to_dict() for a in result.actions],
+                "recording": result.recording.to_dict(),
+            },
+        )
+
+    return runner
+
+
+def build_stub_llm(script: list[dict]) -> StubLlm:
+    return StubLlm(
+        [
+            LlmDecision(
+                kind=d["kind"],
+                tool_name=d.get("tool_name"),
+                tool_args=d.get("tool_args", {}) or {},
+                text=d.get("text", ""),
+            )
+            for d in script
+        ]
+    )
 
 
 def identification_runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
