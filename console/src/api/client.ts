@@ -15,11 +15,19 @@ import type {
   ChainReport,
   PendingApproval,
   PolicyDocument,
+  RunEvent,
+  RunHandle,
+  RunInfo,
   StoredEvent,
 } from "../types/platform";
 
 const API_BASE_URL: string =
   import.meta.env.VITE_AGENTRAIL_API_URL ?? "http://localhost:8080";
+
+/** WebSocket base derived from the API base (http -> ws, https -> wss). */
+function wsBaseUrl(): string {
+  return API_BASE_URL.replace(/^http/, "ws");
+}
 
 /** Request body for executing an action through the gateway. */
 export interface ExecuteActionRequest {
@@ -107,6 +115,73 @@ export function deleteAgent(id: string): Promise<void> {
 
 export function listAiBackends(): Promise<AiBackend[]> {
   return request<AiBackend[]>("/config/ai-backends", { method: "GET" });
+}
+
+export function createAiBackend(backend: AiBackend): Promise<AiBackend> {
+  return request<AiBackend>("/config/ai-backends", {
+    method: "POST",
+    body: JSON.stringify(backend),
+  });
+}
+
+export function deleteAiBackend(id: string): Promise<void> {
+  return request<void>(`/config/ai-backends/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Runs: launch / inspect / stop agents and recette runners
+// ---------------------------------------------------------------------------
+
+/** Body to launch a Lane B agent. Provide stub_script to run it as a mock,
+ *  otherwise the agent's bound ai_backend_id drives a live LLM (key from env). */
+export interface LaunchLaneBRequest {
+  agent_id: string;
+  stub_script?: Array<Record<string, unknown>>;
+}
+
+export function launchLaneB(req: LaunchLaneBRequest): Promise<RunHandle> {
+  const params: Record<string, unknown> = { agent_id: req.agent_id };
+  if (req.stub_script !== undefined) {
+    params.stub_script = req.stub_script;
+  }
+  return request<RunHandle>("/runs", {
+    method: "POST",
+    body: JSON.stringify({ kind: "lane_b", params }),
+  });
+}
+
+export function launchRunner(
+  kind: "discovery" | "identification",
+  params: Record<string, unknown> = {},
+): Promise<RunHandle> {
+  return request<RunHandle>("/runs", {
+    method: "POST",
+    body: JSON.stringify({ kind, params }),
+  });
+}
+
+export function getRun(runId: string): Promise<RunInfo> {
+  return request<RunInfo>(`/runs/${encodeURIComponent(runId)}`, { method: "GET" });
+}
+
+export function getRunEvents(runId: string): Promise<RunEvent[]> {
+  return request<RunEvent[]>(`/runs/${encodeURIComponent(runId)}/events`, {
+    method: "GET",
+  });
+}
+
+export function stopRun(runId: string): Promise<{ stopped: boolean }> {
+  return request<{ stopped: boolean }>(
+    `/runs/${encodeURIComponent(runId)}/stop`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+/** Open the live event WebSocket for a run. Caller owns close(). */
+export function openRunSocket(runId: string): WebSocket {
+  return new WebSocket(`${wsBaseUrl()}/runs/${encodeURIComponent(runId)}/ws`);
 }
 
 // ---------------------------------------------------------------------------

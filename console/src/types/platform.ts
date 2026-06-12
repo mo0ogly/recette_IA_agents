@@ -74,11 +74,41 @@ export interface ChainReport {
 export interface AgentConfig {
   id: string;
   runtime: "lab" | "real";
-  role?: string;
+  /** Identity the agent presents to the target system (Lane B). */
+  principal?: string;
+  /** External system the agent acts against (e.g. github, gitlab). */
+  target_system?: string;
+  /** Natural-language objective handed to the agent loop. */
+  goal?: string;
   capability_scope?: string[];
+  /** Bound AI backend (the AI behind the agent). Empty when run as a mock. */
+  ai_backend_id?: string;
+  role?: string;
   system_prompt?: string;
   model?: string;
-  ai_backend_id?: string;
+}
+
+/** A launched agent run (Lane B) or a recette runner (discovery/identification). */
+export type RunKind = "lane_b" | "discovery" | "identification";
+
+export type RunStatus = "pending" | "running" | "stopped" | "done" | "error";
+
+export interface RunHandle {
+  run_id: string;
+  status: RunStatus;
+}
+
+export interface RunInfo {
+  id: string;
+  kind: RunKind;
+  status: RunStatus;
+  error: string | null;
+}
+
+/** One frame streamed over the run WebSocket (or returned by /events). */
+export interface RunEvent {
+  type: string;
+  [key: string]: unknown;
 }
 
 /** A configured AI backend an agent can be bound to. */

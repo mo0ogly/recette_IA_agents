@@ -9,7 +9,12 @@
 
 import type { ReactNode } from "react";
 
-export type HelpTopicKey = "agents" | "catalog" | "approvals" | "audit";
+export type HelpTopicKey =
+  | "cockpit"
+  | "agents"
+  | "catalog"
+  | "approvals"
+  | "audit";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -21,6 +26,54 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
+  cockpit: {
+    title: "Aide — Cockpit",
+    summary:
+      "Lancer, observer et arreter les agents de test que l'outil discovery doit reperer.",
+    body: (
+      <>
+        <p>
+          Cette plateforme est la <strong>recette de l'outil discovery</strong>,
+          pas l'outil lui-meme. Le cockpit produit les <strong>sujets de
+          test</strong> : des agents que l'on lance pour verifier que l'outil
+          discovery sait les reperer et comprendre a quoi ils se connectent.
+        </p>
+        <h3>La boucle</h3>
+        <ul>
+          <li>
+            <strong>Configurer</strong> un agent (onglet Agents) : identite,
+            systeme cible, but, scope, et l'IA derriere (ai_backend).
+          </li>
+          <li>
+            <strong>Choisir le type</strong> : <code>mock</code> (script
+            deterministe, zero cle, zero effet de bord) ou <code>IA reelle</code>{" "}
+            (le backend lie pilote un vrai LLM, cle resolue en env, R8).
+          </li>
+          <li>
+            <strong>Lancer</strong> : l'agent execute sa boucle decide -&gt; agit
+            contre la cible. Le flux live affiche chaque etape et action.
+          </li>
+          <li>
+            <strong>Arreter</strong> : l'arret est cooperatif, l'agent stoppe a
+            la prochaine etape.
+          </li>
+        </ul>
+        <h3>Mock ou IA reelle</h3>
+        <p>
+          Le mock rejoue un script de decisions (reproductible, ideal pour des
+          campagnes de recette stables). L'IA reelle laisse un vrai modele
+          decider ses actions : utile pour eprouver le discovery sur des
+          comportements non scriptes. Les deux produisent le meme journal
+          d'actions, donc les memes signaux a reperer.
+        </p>
+        <p>
+          Une fois les agents lances, l'equipe discovery passe son outil dessus
+          (onglet Discovery) et l'on compare au ground-truth : repere ? distingue
+          a quoi il se connecte ?
+        </p>
+      </>
+    ),
+  },
   agents: {
     title: "Aide — Agents",
     summary:

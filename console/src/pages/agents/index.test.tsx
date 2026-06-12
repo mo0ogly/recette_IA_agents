@@ -41,11 +41,11 @@ describe("AgentsPage", () => {
 
     render(<AgentsPage />);
 
-    // Agent row fields from the captured fixture.
-    expect(await screen.findByText("agent-admin")).toBeInTheDocument();
-    expect(screen.getByText("identity_admin")).toBeInTheDocument();
-    expect(screen.getByText("claude-opus-4-8")).toBeInTheDocument();
-    expect(screen.getByText("okta")).toBeInTheDocument();
+    // Agent row fields from the captured fixture (Lane B test agent).
+    expect(await screen.findByText("gh-pr-bot")).toBeInTheDocument();
+    expect(screen.getByText("open a pull request on acme/x")).toBeInTheDocument();
+    // "github" appears in both the target and the capability-scope columns.
+    expect(screen.getAllByText("github").length).toBeGreaterThanOrEqual(1);
 
     // The AI backend select offers backend-1 plus the empty option.
     const backendSelect = screen.getByLabelText("AI backend");

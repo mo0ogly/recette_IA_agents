@@ -1,1 +1,1 @@
-[{"id":"agent-admin","runtime":"lab","role":"identity_admin","capability_scope":["okta"],"system_prompt":"You are the identity operations agent.","model":"claude-opus-4-8","ai_backend_id":"backend-1"}]
+[{"id":"gh-pr-bot","runtime":"lab","principal":"bot@acme","target_system":"github","goal":"open a pull request on acme/x","capability_scope":["github"],"ai_backend_id":"backend-1"}]

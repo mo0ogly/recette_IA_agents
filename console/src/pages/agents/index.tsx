@@ -24,6 +24,9 @@ import "./agents.css";
 interface AgentFormValues {
   id: string;
   runtime: "lab" | "real";
+  principal: string;
+  targetSystem: string;
+  goal: string;
   role: string;
   capabilityScope: string;
   systemPrompt: string;
@@ -34,6 +37,9 @@ interface AgentFormValues {
 const EMPTY_FORM: AgentFormValues = {
   id: "",
   runtime: "lab",
+  principal: "",
+  targetSystem: "",
+  goal: "",
   role: "",
   capabilityScope: "",
   systemPrompt: "",
@@ -54,6 +60,9 @@ function toAgentConfig(values: AgentFormValues, id: string): AgentConfig {
   return {
     id,
     runtime: values.runtime,
+    principal: values.principal.trim() || undefined,
+    target_system: values.targetSystem.trim() || undefined,
+    goal: values.goal.trim() || undefined,
     role: values.role.trim() || undefined,
     capability_scope: parseCapabilityScope(values.capabilityScope),
     system_prompt: values.systemPrompt.trim() || undefined,
@@ -67,6 +76,9 @@ function toFormValues(agent: AgentConfig): AgentFormValues {
   return {
     id: agent.id,
     runtime: agent.runtime,
+    principal: agent.principal ?? "",
+    targetSystem: agent.target_system ?? "",
+    goal: agent.goal ?? "",
     role: agent.role ?? "",
     capabilityScope: (agent.capability_scope ?? []).join(", "),
     systemPrompt: agent.system_prompt ?? "",
@@ -179,8 +191,8 @@ export default function AgentsPage(): JSX.Element {
           <tr>
             <th>Id</th>
             <th>Runtime</th>
-            <th>Role</th>
-            <th>Model</th>
+            <th>Target</th>
+            <th>Goal</th>
             <th>AI backend</th>
             <th>Capability scope</th>
             <th>Actions</th>
@@ -200,8 +212,8 @@ export default function AgentsPage(): JSX.Element {
                 <td>
                   <span className="agents-runtime">{agent.runtime}</span>
                 </td>
-                <td>{agent.role ?? ""}</td>
-                <td>{agent.model ?? ""}</td>
+                <td>{agent.target_system ?? ""}</td>
+                <td>{agent.goal ?? ""}</td>
                 <td>{agent.ai_backend_id ?? ""}</td>
                 <td>{(agent.capability_scope ?? []).join(", ")}</td>
                 <td>
@@ -259,7 +271,38 @@ export default function AgentsPage(): JSX.Element {
         </div>
 
         <div className="agents-form-row">
-          <label htmlFor="agent-role">Role</label>
+          <label htmlFor="agent-principal">Principal (identity)</label>
+          <input
+            id="agent-principal"
+            type="text"
+            value={form.principal}
+            onChange={(e) => setField("principal", e.target.value)}
+          />
+        </div>
+
+        <div className="agents-form-row">
+          <label htmlFor="agent-target-system">Target system</label>
+          <input
+            id="agent-target-system"
+            type="text"
+            placeholder="github, gitlab, ..."
+            value={form.targetSystem}
+            onChange={(e) => setField("targetSystem", e.target.value)}
+          />
+        </div>
+
+        <div className="agents-form-row">
+          <label htmlFor="agent-goal">Goal</label>
+          <input
+            id="agent-goal"
+            type="text"
+            value={form.goal}
+            onChange={(e) => setField("goal", e.target.value)}
+          />
+        </div>
+
+        <div className="agents-form-row">
+          <label htmlFor="agent-role">Role (governance, optional)</label>
           <input
             id="agent-role"
             type="text"

@@ -4,6 +4,7 @@ import AgentsPage from "./pages/agents";
 import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
+import CockpitPage from "./pages/cockpit";
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? "nav-link nav-link-active" : "nav-link";
@@ -13,11 +14,15 @@ export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="app-title">AgentRail Console</span>
+        <span className="app-title">AgentRail Recette</span>
         <nav className="app-nav">
+          <NavLink to="/cockpit" className={navLinkClass}>
+            Cockpit
+          </NavLink>
           <NavLink to="/agents" className={navLinkClass}>
             Agents
           </NavLink>
+          <span className="nav-sep">Gouvernance (mock)</span>
           <NavLink to="/catalog" className={navLinkClass}>
             Catalog
           </NavLink>
@@ -31,7 +36,8 @@ export default function App(): JSX.Element {
       </header>
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<Navigate to="/agents" replace />} />
+          <Route path="/" element={<Navigate to="/cockpit" replace />} />
+          <Route path="/cockpit" element={<CockpitPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
