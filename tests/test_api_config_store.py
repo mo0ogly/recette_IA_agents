@@ -293,3 +293,65 @@ class ServerSectionTests(unittest.TestCase):
         )
         self.assertEqual(self.store.read()["servers"], [])
         self.assertEqual(self.store.list_servers(), [])
+
+    def test_update_switching_mode_purges_old_mode_field(self) -> None:
+        # mock_local carries a port; switching to declared_url must drop the
+        # now-irrelevant port so the stored entry has no stale target field.
+        self.store.add_server(
+            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        merged = self.store.update_server(
+            "s1", {"mode": "declared_url", "base_url": "http://h"}
+        )
+        self.assertNotIn("port", merged)
+        self.assertNotIn("port", self.store.get_server("s1"))
+        self.assertEqual(merged["base_url"], "http://h")
+
+    def test_update_null_value_removes_key(self) -> None:
+        # A JSON null in the patch clears the key rather than storing null.
+        self.store.add_server(
+            {
+                "id": "s1",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": "http://h",
+                "auth_env": "GH_TOKEN",
+            }
+        )
+        merged = self.store.update_server("s1", {"auth_env": None})
+        self.assertNotIn("auth_env", merged)
+        self.assertNotIn("auth_env", self.store.get_server("s1"))
+
+    def test_update_null_cannot_remove_required_field(self) -> None:
+        # Clearing the current mode's required field leaves an invalid entry.
+        self.store.add_server(
+            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        with self.assertRaises(ValueError):
+            self.store.update_server("s1", {"port": None})
+        # the bad patch must not have been persisted
+        self.assertEqual(self.store.get_server("s1")["port"], 9101)
+
+    def test_update_normal_field_does_not_drop_other_keys(self) -> None:
+        # A plain field update must not remove unrelated keys.
+        self.store.add_server(
+            {
+                "id": "s1",
+                "system": "github",
+                "mode": "mock_local",
+                "port": 9101,
+                "label": "primary",
+            }
+        )
+        merged = self.store.update_server("s1", {"label": "secondary"})
+        self.assertEqual(merged["port"], 9101)
+        self.assertEqual(merged["label"], "secondary")
+
+    def test_update_switching_mode_without_new_required_field_raises(self) -> None:
+        self.store.add_server(
+            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
+        )
+        with self.assertRaises(ValueError):
+            self.store.update_server("s1", {"mode": "real_saas"})
+        # the bad patch must not have been persisted
+        self.assertEqual(self.store.get_server("s1")["mode"], "mock_local")

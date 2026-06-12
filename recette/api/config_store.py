@@ -192,7 +192,23 @@ class ConfigStore:
         cfg = self.read()
         for i, s in enumerate(cfg["servers"]):
             if s["id"] == server_id:
-                merged = {**s, **patch}
+                # Merge-patch semantics: a None value clears the key (it is not
+                # stored as null); any other value sets it.
+                merged = {**s}
+                for key, value in patch.items():
+                    if value is None:
+                        merged.pop(key, None)
+                    else:
+                        merged[key] = value
+                # Switching mode strips the target fields of OTHER modes so no
+                # stale field (e.g. a residual port after mock_local ->
+                # declared_url) survives. A field explicitly set in this patch
+                # is never stripped.
+                if "mode" in patch and patch["mode"] != s.get("mode"):
+                    keep = _SERVER_MODE_REQUIRED.get(merged.get("mode"))
+                    for field in set(_SERVER_MODE_REQUIRED.values()):
+                        if field != keep and field not in patch:
+                            merged.pop(field, None)
                 _check_server(merged)  # reject bad input before mutating/writing
                 cfg["servers"][i] = merged
                 self._write(cfg)
