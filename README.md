@@ -28,6 +28,10 @@ en cas de serveur bloque : `./recette.sh platform purge`.
 Guide complet du menu et de l'application :
 [docs/runbooks/recette-sh.md](docs/runbooks/recette-sh.md).
 
+**Documentation de fond** (raison d'etre, architecture, diagrammes, types
+d'agents en detail, chemin d'execution gouverne) :
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Composants
 
 | Composant | Description | Doc |
