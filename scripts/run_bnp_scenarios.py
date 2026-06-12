@@ -24,10 +24,11 @@ import argparse
 import sys
 import tempfile
 from pathlib import Path
+from typing import cast
 
 from recette.api.app import create_app
 from recette.api.config_store import ConfigStore
-from recette.campaign import CampaignRunner, load_campaign
+from recette.campaign import CampaignRunner, HttpClient, load_campaign
 from recette.platform.catalog import Catalog, load_catalog
 from recette.platform.catalog.model import ActionSpec, RiskLevel
 from recette.platform.events import PolicyVerdict
@@ -69,22 +70,57 @@ def _deny_spec(target: str, action: str, risk: RiskLevel, description: str) -> A
 
 # BNP actions absent from the 11 committed domains (added in memory only).
 EXTRA_SPECS: tuple[ActionSpec, ...] = (
-    _esc_spec("okta", "revoke_long_lived_token", RiskLevel.HIGH, "identity_admin",
-              "Revoke a long-lived token (defensive containment)."),
-    _deny_spec("okta", "assume_delegation", RiskLevel.CRITICAL,
-               "Act on behalf of another agent via delegation."),
-    _esc_spec("cloud", "isolate_host", RiskLevel.HIGH, "cloud_admin",
-              "Network-isolate a host (incident containment)."),
-    _esc_spec("github", "read_cicd_secrets", RiskLevel.HIGH, "devops_admin",
-              "Read a secret from the CI/CD environment."),
-    _esc_spec("mcp", "invoke_tool", RiskLevel.HIGH, "mcp_admin",
-              "Invoke a tool exposed by an MCP server."),
-    _esc_spec("finance", "freeze_operation", RiskLevel.HIGH, "finance_admin",
-              "Temporarily freeze a financial operation (fraud hold)."),
-    _esc_spec("comms", "notify_customer", RiskLevel.MEDIUM, "comms_admin",
-              "Notify a customer via an authenticated channel."),
-    _esc_spec("compliance", "open_kyc_review", RiskLevel.MEDIUM, "compliance_admin",
-              "Open a KYC compliance review workflow."),
+    _esc_spec(
+        "okta",
+        "revoke_long_lived_token",
+        RiskLevel.HIGH,
+        "identity_admin",
+        "Revoke a long-lived token (defensive containment).",
+    ),
+    _deny_spec(
+        "okta",
+        "assume_delegation",
+        RiskLevel.CRITICAL,
+        "Act on behalf of another agent via delegation.",
+    ),
+    _esc_spec(
+        "cloud",
+        "isolate_host",
+        RiskLevel.HIGH,
+        "cloud_admin",
+        "Network-isolate a host (incident containment).",
+    ),
+    _esc_spec(
+        "github",
+        "read_cicd_secrets",
+        RiskLevel.HIGH,
+        "devops_admin",
+        "Read a secret from the CI/CD environment.",
+    ),
+    _esc_spec(
+        "mcp", "invoke_tool", RiskLevel.HIGH, "mcp_admin", "Invoke a tool exposed by an MCP server."
+    ),
+    _esc_spec(
+        "finance",
+        "freeze_operation",
+        RiskLevel.HIGH,
+        "finance_admin",
+        "Temporarily freeze a financial operation (fraud hold).",
+    ),
+    _esc_spec(
+        "comms",
+        "notify_customer",
+        RiskLevel.MEDIUM,
+        "comms_admin",
+        "Notify a customer via an authenticated channel.",
+    ),
+    _esc_spec(
+        "compliance",
+        "open_kyc_review",
+        RiskLevel.MEDIUM,
+        "compliance_admin",
+        "Open a KYC compliance review workflow.",
+    ),
 )
 
 # Contextual grants: (target, action, role) -> verdict for the scenario roles.
@@ -93,16 +129,26 @@ EXTRA_RULES: tuple[tuple[str, str, str, PolicyVerdict, RiskLevel], ...] = (
     ("okta", "revoke_api_key", "soc_agent", PolicyVerdict.ALLOW, RiskLevel.HIGH),
     ("okta", "revoke_long_lived_token", "soc_agent", PolicyVerdict.ALLOW, RiskLevel.HIGH),
     ("cloud", "isolate_host", "soc_agent", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
-    ("support_desk", "export_customer_conversations", "support_agent",
-     PolicyVerdict.ESCALATE, RiskLevel.HIGH),
+    (
+        "support_desk",
+        "export_customer_conversations",
+        "support_agent",
+        PolicyVerdict.ESCALATE,
+        RiskLevel.HIGH,
+    ),
     ("mcp", "invoke_tool", "mcp_agent", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
     ("github", "read_cicd_secrets", "mcp_agent", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
     ("github", "deploy_production", "devops_agent", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
     ("okta", "add_user_to_admin_group", "scoped_agent", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
     ("okta", "create_api_key", "integration_admin", PolicyVerdict.ALLOW, RiskLevel.HIGH),
     ("okta", "modify_oauth_scopes", "integration_admin", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
-    ("okta", "generate_long_lived_token", "integration_admin",
-     PolicyVerdict.ESCALATE, RiskLevel.HIGH),
+    (
+        "okta",
+        "generate_long_lived_token",
+        "integration_admin",
+        PolicyVerdict.ESCALATE,
+        RiskLevel.HIGH,
+    ),
     ("finance", "freeze_operation", "fraud_monitor", PolicyVerdict.ESCALATE, RiskLevel.HIGH),
     ("comms", "notify_customer", "fraud_monitor", PolicyVerdict.ALLOW, RiskLevel.MEDIUM),
     ("compliance", "open_kyc_review", "kyc_agent", PolicyVerdict.ALLOW, RiskLevel.MEDIUM),
@@ -165,7 +211,10 @@ def main(argv: list[str] | None = None) -> int:
             catalog=catalog,
         )
         client = TestClient(app)
-        runner = CampaignRunner(client)
+        # TestClient's post() carries extra httpx kwargs, so it does not match
+        # the HttpClient Protocol structurally; the runner only uses the
+        # shared (path, json=...) subset, which TestClient honors at runtime.
+        runner = CampaignRunner(cast(HttpClient, client))
 
         files = sorted(Path(args.dir).glob("*.campaign.json"))
         if not files:
