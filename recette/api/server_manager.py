@@ -56,7 +56,8 @@ class ServerManager:
         if not server_id:
             raise ValueError("server entry requires a non-empty 'id'")
         port = server.get("port")
-        if not isinstance(port, int):
+        # bool is an int subclass: reject it explicitly (same rule as config_store).
+        if not isinstance(port, int) or isinstance(port, bool):
             raise ValueError(f"mock_local server {server_id!r} requires an integer 'port'")
 
         probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

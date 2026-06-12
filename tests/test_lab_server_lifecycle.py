@@ -213,6 +213,58 @@ class ServerManagerTests(unittest.TestCase):
         path = self.manager.access_log_path("s1")
         self.assertTrue(path.as_posix().endswith("data/lab/s1.access.jsonl"))
 
+    def test_start_requires_a_non_empty_id(self) -> None:
+        no_id = {"mode": "mock_local", "port": 9101}
+        empty_id = {"id": "", "mode": "mock_local", "port": 9101}
+        for entry in (no_id, empty_id):
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                self.manager.start(entry)
+
+    def test_start_rejects_non_integer_port(self) -> None:
+        # bool is an int subclass in Python: it must be rejected too.
+        for bad_port in ("9101", None, 9.5, True):
+            with self.subTest(port=bad_port), self.assertRaises(ValueError):
+                self.manager.start({"id": "x", "mode": "mock_local", "port": bad_port})
+
+    def test_status_detects_an_externally_died_process(self) -> None:
+        port = _free_port()
+        self.assertEqual(
+            self.manager.start({"id": "s1", "mode": "mock_local", "port": port}), {"status": "up"}
+        )
+        proc = self.manager._procs["s1"]
+        proc.kill()
+        proc.wait(timeout=5)
+        self.assertEqual(self.manager.status("s1"), "down")
+
+    def test_manager_started_server_writes_its_access_log(self) -> None:
+        """The manager injects AGENTRAIL_LAB_ACCESS_LOG: traffic to a managed
+        server lands in {base_dir}/{id}.access.jsonl (runtime capture trace)."""
+        port = _free_port()
+        self.assertEqual(
+            self.manager.start({"id": "s1", "mode": "mock_local", "port": port}), {"status": "up"}
+        )
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/github/execute",
+            data=json.dumps(
+                {
+                    "event_id": "e1",
+                    "action_type": "delete_repository",
+                    "resource": "acme/x",
+                    "payload": {},
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            self.assertEqual(response.status, 200)
+        lines = self.manager.access_log_path("s1").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 1)
+        record = json.loads(lines[0])
+        self.assertEqual(record["event_id"], "e1")
+        self.assertEqual(record["target_system"], "github")
+        self.assertEqual(record["status"], 200)
+
 
 if __name__ == "__main__":
     unittest.main()

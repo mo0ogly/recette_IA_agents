@@ -11,6 +11,8 @@ from collections.abc import Iterator
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from ...platform.eventstore.protocol import StoredEvent
+
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
@@ -43,7 +45,7 @@ def list_events(
 
 
 def _matches(
-    event: object,
+    event: StoredEvent,
     *,
     from_seq: int,
     agent_id: str | None,
