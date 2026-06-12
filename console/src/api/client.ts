@@ -59,6 +59,7 @@ export interface AuditEventsParams {
   kind?: string;
   agent_id?: string;
   target_system?: string;
+  event_id?: string;
 }
 
 /** Error thrown when the API answers with a non-2xx status. */
@@ -408,6 +409,7 @@ export function listAuditEvents(params: AuditEventsParams = {}): Promise<AuditEv
       kind: params.kind,
       agent_id: params.agent_id,
       target_system: params.target_system,
+      event_id: params.event_id,
     }),
     { method: "GET" },
   ).then((res) => res.events);

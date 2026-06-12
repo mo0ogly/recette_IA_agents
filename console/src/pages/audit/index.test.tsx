@@ -8,6 +8,8 @@
  */
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { RenderResult } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listAuditEvents, verifyChain } from "../../api/client";
@@ -41,12 +43,31 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** Probe that records the current path + query into a ref for assertions. */
+function LocationProbe({ sink }: { sink: { current: string } }): null {
+  const location = useLocation();
+  sink.current = `${location.pathname}${location.search}`;
+  return null;
+}
+
+/** Render the page at a given URL, exposing the current location for assertions. */
+function renderAt(initialEntry: string): RenderResult & { location: () => string } {
+  const sink = { current: initialEntry };
+  const result = render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <AuditPage />
+      <LocationProbe sink={sink} />
+    </MemoryRouter>,
+  );
+  return Object.assign(result, { location: () => sink.current });
+}
+
 describe("AuditPage", () => {
   it("shows the chain-intact banner and one row per captured event kind", async () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
 
     const banner = await screen.findByText("Chain intact (4 events verified)");
     expect(banner).toHaveClass("banner-ok");
@@ -64,7 +85,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
     await screen.findByText("Chain intact (4 events verified)");
 
     const table = within(screen.getByRole("table"));
@@ -82,7 +103,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    const { container } = render(<AuditPage />);
+    const { container } = renderAt("/audit");
     await screen.findByText("Chain intact (4 events verified)");
 
     const table = within(screen.getByRole("table"));
@@ -102,7 +123,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(bareEvents);
 
-    render(<AuditPage />);
+    renderAt("/audit");
     await screen.findByText("Chain intact (4 events verified)");
 
     const table = within(screen.getByRole("table"));
@@ -118,7 +139,7 @@ describe("AuditPage", () => {
     });
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
 
     const banner = await screen.findByText(/Chain broken at seq 2/);
     expect(banner).toHaveClass("banner-broken");
@@ -130,7 +151,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockRejectedValue(new Error("network down"));
 
-    render(<AuditPage />);
+    renderAt("/audit");
 
     const banner = await screen.findByText(/Failed to load audit events: network down/);
     expect(banner).toHaveClass("banner-broken");
@@ -142,7 +163,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockRejectedValue(new Error("verify endpoint unreachable"));
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
 
     const banner = await screen.findByText(
       /Chain verification failed: verify endpoint unreachable/,
@@ -156,7 +177,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
     await screen.findByText("Chain intact (4 events verified)");
     expect(mockListAuditEvents).toHaveBeenCalledWith({});
 
@@ -180,7 +201,7 @@ describe("AuditPage", () => {
     mockVerifyChain.mockResolvedValue(chainOk);
     mockListAuditEvents.mockResolvedValue(envelope);
 
-    render(<AuditPage />);
+    renderAt("/audit");
     await screen.findByText("Chain intact (4 events verified)");
 
     fireEvent.change(screen.getByLabelText("Target system"), {
@@ -191,5 +212,34 @@ describe("AuditPage", () => {
     expect(
       await screen.findByText("No audit events match the current filters."),
     ).toBeInTheDocument();
+  });
+
+  it("honors ?event_id= in the URL: fetches with it and shows an active-filter chip", async () => {
+    mockVerifyChain.mockResolvedValue(chainOk);
+    mockListAuditEvents.mockResolvedValue(envelope);
+
+    renderAt("/audit?event_id=EV000000000000000001000001");
+    await screen.findByText("Chain intact (4 events verified)");
+
+    expect(mockListAuditEvents).toHaveBeenCalledWith({
+      event_id: "EV000000000000000001000001",
+    });
+    const chip = screen.getByTestId("audit-event-id-filter");
+    expect(chip).toHaveTextContent("event_id: EV000000000000000001000001");
+  });
+
+  it("clears the event_id filter: navigates to /audit without the param", async () => {
+    mockVerifyChain.mockResolvedValue(chainOk);
+    mockListAuditEvents.mockResolvedValue(envelope);
+
+    const view = renderAt("/audit?event_id=EV000000000000000001000001");
+    await screen.findByText("Chain intact (4 events verified)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear event_id filter" }));
+
+    await waitFor(() => {
+      expect(view.location()).toBe("/audit");
+    });
+    expect(screen.queryByTestId("audit-event-id-filter")).not.toBeInTheDocument();
   });
 });

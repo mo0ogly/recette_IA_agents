@@ -118,3 +118,28 @@
 .audit-empty {
   color: var(--color-text-muted);
 }
+
+.audit-active-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: 0.8rem;
+}
+
+.audit-active-filter-clear {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.audit-active-filter-clear:hover {
+  color: var(--color-text);
+}

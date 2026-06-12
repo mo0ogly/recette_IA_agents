@@ -16,6 +16,7 @@
  */
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import type { AuditEventsParams } from "../../api/client";
 import { listAuditEvents, verifyChain } from "../../api/client";
@@ -124,8 +125,18 @@ export default function AuditPage(): JSX.Element {
   const [agentFilter, setAgentFilter] = useState<string>("");
   const [targetFilter, setTargetFilter] = useState<string>("");
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A deep link from the verdicts evidence list lands here as ?event_id=...
+  // (an empty value is treated as no filter).
+  const eventIdFilter = searchParams.get("event_id") ?? "";
+
   const load = useCallback(
-    async (kind: string, agentId: string, targetSystem: string): Promise<void> => {
+    async (
+      kind: string,
+      agentId: string,
+      targetSystem: string,
+      eventId: string,
+    ): Promise<void> => {
       setLoading(true);
       const params: AuditEventsParams = {};
       if (kind !== "all") {
@@ -133,6 +144,9 @@ export default function AuditPage(): JSX.Element {
       }
       if (agentId.length > 0) {
         params.agent_id = agentId;
+      }
+      if (eventId.length > 0) {
+        params.event_id = eventId;
       }
       // Failures are isolated: a broken verify call still leaves the event
       // table usable, and vice versa. Each failure gets its own banner.
@@ -167,12 +181,24 @@ export default function AuditPage(): JSX.Element {
   );
 
   useEffect(() => {
-    void load("all", "", "");
-  }, [load]);
+    // Reload on mount and whenever the URL event_id filter changes (deep link
+    // from the verdicts evidence list, or the Clear button below). The form
+    // filters keep their current values; the event_id comes from the URL.
+    void load(kindFilter, agentFilter.trim(), targetFilter.trim(), eventIdFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form filters are
+    // applied explicitly via the Apply button, not on every keystroke.
+  }, [load, eventIdFilter]);
 
   function handleApply(submitEvent: React.FormEvent<HTMLFormElement>): void {
     submitEvent.preventDefault();
-    void load(kindFilter, agentFilter.trim(), targetFilter.trim());
+    void load(kindFilter, agentFilter.trim(), targetFilter.trim(), eventIdFilter);
+  }
+
+  function clearEventIdFilter(): void {
+    // Drop only the event_id param; keep the operator on /audit.
+    const next = new URLSearchParams(searchParams);
+    next.delete("event_id");
+    setSearchParams(next);
   }
 
   return (
@@ -201,6 +227,20 @@ export default function AuditPage(): JSX.Element {
       {eventsError !== null && (
         <div className="banner banner-broken" role="alert">
           Failed to load audit events: {eventsError}
+        </div>
+      )}
+
+      {eventIdFilter.length > 0 && (
+        <div className="audit-active-filter" data-testid="audit-event-id-filter">
+          <span className="mono">event_id: {eventIdFilter}</span>
+          <button
+            type="button"
+            className="audit-active-filter-clear"
+            aria-label="Clear event_id filter"
+            onClick={clearEventIdFilter}
+          >
+            clear
+          </button>
         </div>
       )}
 
