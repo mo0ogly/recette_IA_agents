@@ -223,6 +223,32 @@ class TestPlatformApi(unittest.TestCase):
         ).json()["events"]
         self.assertEqual(drop, [])
 
+    def test_audit_events_tail_returns_last_n(self) -> None:
+        # 5 governed flows -> at least 5 audited events on the store.
+        for _ in range(5):
+            self._execute("agent-admin", "list_users")
+        events = self.client.get("/audit/events").json()["events"]
+        self.assertGreaterEqual(len(events), 5)
+
+        # tail=3 returns the LAST 3 by seq (not the first 3), still ascending.
+        tail = self.client.get("/audit/events", params={"tail": 3}).json()["events"]
+        self.assertEqual([e["seq"] for e in tail], [e["seq"] for e in events[-3:]])
+
+        # tail composes with filters: last 2 of the kind-filtered set.
+        executed = self.client.get(
+            "/audit/events", params={"kind": "action_executed"}
+        ).json()["events"]
+        tail_executed = self.client.get(
+            "/audit/events", params={"kind": "action_executed", "tail": 2}
+        ).json()["events"]
+        self.assertEqual(
+            [e["seq"] for e in tail_executed], [e["seq"] for e in executed[-2:]]
+        )
+
+    def test_audit_events_tail_and_limit_conflict_is_400(self) -> None:
+        resp = self.client.get("/audit/events", params={"tail": 3, "limit": 3})
+        self.assertEqual(resp.status_code, 400, resp.text)
+
     def test_audit_export_jsonl(self) -> None:
         self._execute("agent-admin", "list_users")
         self._execute("agent-bot", "suspend_user")

@@ -289,6 +289,8 @@ export default function CockpitPage(): JSX.Element {
           title="Platform audit"
           lines={audit.events.map(auditEventToLogLine)}
           onClear={audit.clear}
+          stalled={audit.stalled}
+          droppedCount={audit.droppedCount}
         />
       </section>
     </div>

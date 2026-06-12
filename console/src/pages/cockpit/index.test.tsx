@@ -7,7 +7,7 @@
  * renders every audited platform event in the "Platform audit" LogConsole.
  */
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import auditFixture from "../../hooks/__fixtures__/auditEvents.fixture.json";
 import linesFixture from "../../components/__fixtures__/logLines.fixture.json";
@@ -55,9 +55,11 @@ describe("CockpitPage", () => {
     for (const line of fixtureLines) {
       expect(await screen.findByText(line.text)).toBeInTheDocument();
     }
-    // The tail is unfiltered: the first poll starts at the beginning.
+    // The tail is unfiltered: the first poll starts at the beginning with a
+    // bounded backfill (only the last maxEvents matter to a live tail).
     expect(listAuditEvents).toHaveBeenCalledWith({
       from_seq: 0,
+      tail: 2000,
       agent_id: undefined,
       target_system: undefined,
       kind: undefined,
@@ -71,5 +73,32 @@ describe("CockpitPage", () => {
     const requested = fixtureLines.find((l) => l.text.startsWith("action_requested"));
     const infoRow = screen.getByText(requested!.text).closest(".logc-line");
     expect(infoRow).toHaveAttribute("data-level", "info");
+  });
+
+  it("surfaces the stalled badge after consecutive audit poll failures", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(listAgents).mockResolvedValue([]);
+      vi.mocked(listAiBackends).mockResolvedValue([]);
+      vi.mocked(listAuditEvents).mockRejectedValue(new Error("backend down"));
+
+      render(<CockpitPage />);
+      expect(screen.queryByText("stalled")).not.toBeInTheDocument();
+
+      // Default interval 1500 ms: poll at t=0, 1500, 3000 -> third failure.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+      expect(screen.getByText("stalled")).toBeInTheDocument();
+
+      // First successful poll clears the badge.
+      vi.mocked(listAuditEvents).mockResolvedValue([]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(screen.queryByText("stalled")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

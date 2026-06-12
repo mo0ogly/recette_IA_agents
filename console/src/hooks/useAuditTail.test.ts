@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listAuditEvents } from "../api/client";
 import type { AuditEvent } from "../types/platform";
 import auditFixture from "./__fixtures__/auditEvents.fixture.json";
-import { useAuditTail } from "./useAuditTail";
+import { STALL_THRESHOLD, useAuditTail } from "./useAuditTail";
 
 vi.mock("../api/client", () => ({
   listAuditEvents: vi.fn(),
@@ -25,6 +25,19 @@ const mockListAuditEvents = vi.mocked(listAuditEvents);
 // mocked client resolves with the bare array (the client contract).
 const fixtureEvents = (auditFixture as unknown as { events: AuditEvent[] }).events;
 const lastSeq = fixtureEvents[fixtureEvents.length - 1].seq;
+
+/** Synthetic event for buffer-bound tests (shape mirrors the fixture contract). */
+function makeEvent(seq: number): AuditEvent {
+  return {
+    seq,
+    event_id: `EVsynth${seq}`,
+    schema_version: "2.0",
+    kind: "action_executed",
+    payload: { agent_id: "synth-bot", target_system: "okta" },
+    prev_hash: `hash${seq - 1}`,
+    hash: `hash${seq}`,
+  };
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -168,5 +181,126 @@ describe("useAuditTail", () => {
     });
     expect(mockListAuditEvents.mock.calls[1][0]).toMatchObject({ from_seq: lastSeq + 1 });
     expect(result.current.events).toHaveLength(0);
+  });
+
+  it("backfills the first poll with tail=maxEvents, then drops the param", async () => {
+    mockListAuditEvents.mockResolvedValueOnce(fixtureEvents).mockResolvedValue([]);
+
+    renderHook(() => useAuditTail({ intervalMs: 1000, maxEvents: 500 }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockListAuditEvents.mock.calls[0][0]).toMatchObject({ from_seq: 0, tail: 500 });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    // Cursor advanced: the incremental poll must not re-bound the window.
+    expect(mockListAuditEvents.mock.calls[1][0]).toMatchObject({
+      from_seq: lastSeq + 1,
+      tail: undefined,
+    });
+  });
+
+  it("bounds the buffer to maxEvents and counts evicted events", async () => {
+    mockListAuditEvents
+      .mockResolvedValueOnce([makeEvent(1), makeEvent(2), makeEvent(3)])
+      .mockResolvedValueOnce([makeEvent(4), makeEvent(5)])
+      .mockResolvedValue([]);
+
+    const { result } = renderHook(() => useAuditTail({ intervalMs: 1000, maxEvents: 4 }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.events).toHaveLength(3);
+    expect(result.current.droppedCount).toBe(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    // 5 accumulated, bound 4: the oldest event is evicted and counted.
+    expect(result.current.events.map((e) => e.seq)).toEqual([2, 3, 4, 5]);
+    expect(result.current.droppedCount).toBe(1);
+
+    // clear() resets the dropped counter with the emptied buffer.
+    act(() => {
+      result.current.clear();
+    });
+    expect(result.current.events).toHaveLength(0);
+    expect(result.current.droppedCount).toBe(0);
+  });
+
+  it("reports stalled after consecutive failures and recovers on success", async () => {
+    mockListAuditEvents.mockRejectedValue(new Error("backend down"));
+
+    const { result } = renderHook(() => useAuditTail({ intervalMs: 1000 }));
+
+    // One failure short of the threshold: not stalled yet.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync((STALL_THRESHOLD - 2) * 1000);
+    });
+    expect(result.current.stalled).toBe(false);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(result.current.stalled).toBe(true);
+
+    // First success (even an empty page) clears the stall.
+    mockListAuditEvents.mockResolvedValue([]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(result.current.stalled).toBe(false);
+  });
+
+  it("does not warn when unmounted while the backend is failing", async () => {
+    mockListAuditEvents.mockRejectedValue(new Error("backend down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { unmount } = renderHook(() => useAuditTail({ intervalMs: 1000 }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("resets cursor, buffer and counters when a filter changes", async () => {
+    mockListAuditEvents.mockResolvedValueOnce(fixtureEvents).mockResolvedValue([]);
+
+    const { result, rerender } = renderHook(
+      ({ kind }: { kind?: string }) => useAuditTail({ intervalMs: 1000, kind }),
+      { initialProps: { kind: undefined as string | undefined } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.events).toHaveLength(fixtureEvents.length);
+
+    mockListAuditEvents.mockClear();
+    mockListAuditEvents.mockResolvedValue([]);
+    act(() => {
+      rerender({ kind: "action_denied" });
+    });
+
+    // Events accumulated under the previous filter are gone immediately.
+    expect(result.current.events).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // The new filter restarts from scratch with a bounded backfill.
+    expect(mockListAuditEvents.mock.calls[0][0]).toMatchObject({
+      from_seq: 0,
+      kind: "action_denied",
+      tail: 2000,
+    });
   });
 });

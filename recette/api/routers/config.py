@@ -25,6 +25,10 @@ router = APIRouter(prefix="/config", tags=["config"])
 # slow upstream must not pin the worker (R5: keep the knob in one place).
 _PROBE_TIMEOUT_S = 2.0
 
+# Module-level singleton so the Body() call is not evaluated per-signature
+# (ruff B008); FastAPI resolves it identically.
+_OPTIONAL_JSON_BODY = Body(default=None)
+
 # Single source of truth (R5): provider -> env var holding its API key (R8).
 # Mirrors the ENV_KEY constants on the provider classes in recette.llm.
 # openai_compat is absent on purpose: its key is optional (keyless local
@@ -157,7 +161,7 @@ def delete_ai_backend(request: Request, backend_id: str) -> Response:
 
 @router.post("/ai-backends/{backend_id}/test")
 def test_ai_backend(
-    request: Request, backend_id: str, body: dict | None = Body(default=None)
+    request: Request, backend_id: str, body: dict | None = _OPTIONAL_JSON_BODY
 ) -> dict:
     """Probe / free-text prompt: one real call to the configured provider.
 
@@ -183,8 +187,7 @@ def test_ai_backend(
             prompt = raw_prompt
     if prompt:
         system = (
-            "You are a helpful assistant for an AI-governance recette platform. "
-            "Answer concisely."
+            "You are a helpful assistant for an AI-governance recette platform. Answer concisely."
         )
         user_text = prompt
     else:

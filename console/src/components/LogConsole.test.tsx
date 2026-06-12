@@ -97,11 +97,12 @@ describe("LogConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     rerender(<LogConsole title="t" lines={[...fixtureLines, errorLine]} />);
-    // Frozen: the line added while paused is not shown.
+    // Frozen: the line added while paused is not shown, but it is counted on
+    // the Resume button (counted by seq, robust to upstream eviction).
     expect(document.querySelectorAll(".logc-line")).toHaveLength(fixtureLines.length);
     expect(screen.queryByText(errorLine.text)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resume (+1)" }));
     expect(document.querySelectorAll(".logc-line")).toHaveLength(fixtureLines.length + 1);
     expect(screen.getByText(errorLine.text)).toBeInTheDocument();
   });
@@ -132,5 +133,45 @@ describe("LogConsole", () => {
     render(<LogConsole title="t" lines={fixtureLines} onClear={onClear} />);
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it("filters lines by level, AND-combined with the substring filter", () => {
+    // Fixture: seq 1 warn (action_denied), seq 2 info, seq 3 warn; plus one error.
+    render(<LogConsole title="t" lines={[...fixtureLines, errorLine]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "warn" }));
+    const warnRows = document.querySelectorAll(".logc-line");
+    expect(warnRows).toHaveLength(2);
+    expect(screen.queryByText(errorLine.text)).not.toBeInTheDocument();
+
+    // Substring narrows WITHIN the level selection (AND, not OR).
+    fireEvent.change(screen.getByPlaceholderText("filter"), {
+      target: { value: "action_denied" },
+    });
+    expect(document.querySelectorAll(".logc-line")).toHaveLength(1);
+
+    // Back to all levels: the substring filter alone applies again.
+    fireEvent.click(screen.getByRole("button", { name: "all" }));
+    expect(document.querySelectorAll(".logc-line")).toHaveLength(1);
+  });
+
+  it("shows the stalled badge only when the feed is stalled", () => {
+    const { rerender } = render(
+      <LogConsole title="t" lines={fixtureLines} stalled={false} />,
+    );
+    expect(screen.queryByText("stalled")).not.toBeInTheDocument();
+
+    rerender(<LogConsole title="t" lines={fixtureLines} stalled={true} />);
+    expect(screen.getByText("stalled")).toBeInTheDocument();
+  });
+
+  it("shows the dropped notice only when lines were evicted upstream", () => {
+    const { rerender } = render(
+      <LogConsole title="t" lines={fixtureLines} droppedCount={0} />,
+    );
+    expect(screen.queryByText(/dropped/)).not.toBeInTheDocument();
+
+    rerender(<LogConsole title="t" lines={fixtureLines} droppedCount={42} />);
+    expect(screen.getByText("42 dropped")).toBeInTheDocument();
   });
 });

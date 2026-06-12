@@ -37,10 +37,13 @@ class InMemoryEventStore:
         seq: int = 0,
         *,
         limit: int | None = None,
+        tail: int | None = None,
         agent_id: str | None = None,
         target_system: str | None = None,
         kind: str | None = None,
     ) -> list[StoredEvent]:
+        if limit is not None and tail is not None:
+            raise ValueError("limit and tail are mutually exclusive")
         out = []
         for e in self._events:
             if e.seq < seq:
@@ -54,6 +57,9 @@ class InMemoryEventStore:
             out.append(e)
             if limit is not None and len(out) >= limit:
                 break
+        if tail is not None:
+            # Last n of the filtered set, still ascending (live-tail backfill).
+            return out[-tail:] if tail > 0 else []
         return out
 
     def get_by_event_id(self, event_id: str) -> StoredEvent | None:

@@ -2,9 +2,12 @@
  * LogConsole -- reusable presentational log window (dark, monospace).
  *
  * Pure component: the caller owns the lines (e.g. from useAuditTail).
- * Features: substring filter, pause (freezes a snapshot, resume shows
- * everything), copy of the visible lines, autoscroll to the bottom unless
- * the user scrolled up, line count badge, empty state.
+ * Features: substring filter, per-level filter (AND-combined with the
+ * substring), pause (freezes a snapshot; a badge counts the lines that
+ * arrived since), copy of the visible lines, autoscroll to the bottom unless
+ * the user scrolled up, line count badge, empty state. Optional props
+ * surface the feed health: `stalled` (the tail lost its backend) and
+ * `droppedCount` (oldest lines evicted by a bounded buffer).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,10 +25,18 @@ export interface LogConsoleProps {
   title: string;
   lines: LogLine[];
   onClear?: () => void;
+  /** True when the feed lost its backend (e.g. consecutive poll failures). */
+  stalled?: boolean;
+  /** Oldest lines evicted upstream by a bounded buffer (0 hides the notice). */
+  droppedCount?: number;
 }
 
 /** Pixels from the bottom under which autoscroll stays engaged. */
 const AUTOSCROLL_SLACK_PX = 24;
+
+/** Level filter values: "all" or one exact line level. */
+const LEVELS = ["all", "info", "warn", "error"] as const;
+type LevelFilter = (typeof LEVELS)[number];
 
 /**
  * Map one audited event to a displayable log line.
@@ -76,8 +87,15 @@ export function auditEventToLogLine(e: AuditEvent): LogLine {
   };
 }
 
-export function LogConsole({ title, lines, onClear }: LogConsoleProps): JSX.Element {
+export function LogConsole({
+  title,
+  lines,
+  onClear,
+  stalled = false,
+  droppedCount = 0,
+}: LogConsoleProps): JSX.Element {
   const [filter, setFilter] = useState("");
+  const [level, setLevel] = useState<LevelFilter>("all");
   const [frozen, setFrozen] = useState<LogLine[] | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
@@ -85,16 +103,32 @@ export function LogConsole({ title, lines, onClear }: LogConsoleProps): JSX.Elem
   const paused = frozen !== null;
   const base = frozen ?? lines;
 
+  // Lines that arrived since the pause snapshot. Counted by seq, not by
+  // length delta: a bounded upstream buffer may evict old lines while
+  // paused, which would understate a length-based count.
+  const newWhilePaused = useMemo(() => {
+    if (frozen === null) {
+      return 0;
+    }
+    const lastFrozenSeq = frozen.length > 0 ? frozen[frozen.length - 1].seq : 0;
+    return lines.filter((l) => l.seq > lastFrozenSeq).length;
+  }, [frozen, lines]);
+
+  // Level filter and substring filter combine with AND.
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    if (needle.length === 0) {
-      return base;
-    }
-    return base.filter(
-      (l) =>
-        l.text.toLowerCase().includes(needle) || l.source.toLowerCase().includes(needle),
-    );
-  }, [base, filter]);
+    return base.filter((l) => {
+      if (level !== "all" && l.level !== level) {
+        return false;
+      }
+      if (needle.length === 0) {
+        return true;
+      }
+      return (
+        l.text.toLowerCase().includes(needle) || l.source.toLowerCase().includes(needle)
+      );
+    });
+  }, [base, filter, level]);
 
   useEffect(() => {
     const el = bodyRef.current;
@@ -126,6 +160,32 @@ export function LogConsole({ title, lines, onClear }: LogConsoleProps): JSX.Elem
       <header className="logc-header">
         <span className="logc-title">{title}</span>
         <span className="logc-count">{visible.length} lines</span>
+        {stalled && (
+          <span className="logc-stalled" title="The feed stopped answering; retrying.">
+            stalled
+          </span>
+        )}
+        {droppedCount > 0 && (
+          <span
+            className="logc-dropped"
+            title="Oldest lines evicted by the bounded buffer."
+          >
+            {droppedCount} dropped
+          </span>
+        )}
+        <span className="logc-levels" role="group" aria-label="level filter">
+          {LEVELS.map((l) => (
+            <button
+              key={l}
+              type="button"
+              className="logc-chip"
+              data-active={level === l}
+              onClick={() => setLevel(l)}
+            >
+              {l}
+            </button>
+          ))}
+        </span>
         <input
           className="logc-filter"
           type="text"
@@ -134,7 +194,7 @@ export function LogConsole({ title, lines, onClear }: LogConsoleProps): JSX.Elem
           onChange={(e) => setFilter(e.target.value)}
         />
         <button type="button" className="logc-btn" onClick={togglePause}>
-          {paused ? "Resume" : "Pause"}
+          {paused ? `Resume${newWhilePaused > 0 ? ` (+${newWhilePaused})` : ""}` : "Pause"}
         </button>
         <button type="button" className="logc-btn" onClick={copyVisible}>
           Copy

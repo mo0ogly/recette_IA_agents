@@ -92,10 +92,13 @@ class SqliteEventStore:
         seq: int = 0,
         *,
         limit: int | None = None,
+        tail: int | None = None,
         agent_id: str | None = None,
         target_system: str | None = None,
         kind: str | None = None,
     ) -> list[StoredEvent]:
+        if limit is not None and tail is not None:
+            raise ValueError("limit and tail are mutually exclusive")
         query = (
             "SELECT seq, event_id, schema_version, kind, payload, prev_hash, hash"
             " FROM events WHERE seq >= ?"
@@ -111,10 +114,16 @@ class SqliteEventStore:
         if target_system is not None:
             query += " AND json_extract(payload, '$.target_system') = ?"
             params.append(target_system)
-        query += " ORDER BY seq ASC"
-        if limit is not None:
-            query += " LIMIT ?"
-            params.append(limit)
+        if tail is not None:
+            # Last n of the filtered set, returned ascending: pick them via a
+            # DESC LIMIT subquery, then restore the replay order (I4).
+            query = f"SELECT * FROM ({query} ORDER BY seq DESC LIMIT ?) ORDER BY seq ASC"
+            params.append(max(tail, 0))
+        else:
+            query += " ORDER BY seq ASC"
+            if limit is not None:
+                query += " LIMIT ?"
+                params.append(limit)
         with self._lock:
             rows = self._conn.execute(query, params).fetchall()
         return [self._row_to_event(r) for r in rows]

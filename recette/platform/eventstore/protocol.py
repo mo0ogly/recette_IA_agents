@@ -59,10 +59,18 @@ class EventStore(Protocol):
         seq: int = 0,
         *,
         limit: int | None = None,
+        tail: int | None = None,
         agent_id: str | None = None,
         target_system: str | None = None,
         kind: str | None = None,
-    ) -> list[StoredEvent]: ...
+    ) -> list[StoredEvent]:
+        """Read filtered events ordered by seq ascending.
+
+        ``limit`` keeps the FIRST n of the filtered set; ``tail`` keeps the
+        LAST n (still returned ascending -- backfill for live tails). The two
+        are mutually exclusive: passing both raises ValueError.
+        """
+        ...
 
     def get_by_event_id(self, event_id: str) -> StoredEvent | None: ...
 

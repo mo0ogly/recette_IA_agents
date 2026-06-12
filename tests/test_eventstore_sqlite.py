@@ -82,6 +82,30 @@ class TestSqliteEventStore(unittest.TestCase):
         self.assertIsNotNone(self.store.get_by_event_id("EV2"))
         self.assertIsNone(self.store.get_by_event_id("missing"))
 
+    def test_tail_returns_last_n_ascending(self) -> None:
+        for i in range(10):
+            self.store.append(
+                event_id=f"EV{i}",
+                kind="action_executed" if i % 2 == 0 else "action_denied",
+                payload={"n": i},
+                schema_version="2.0",
+            )
+        # Last 5 of the whole log, still ascending by seq (I4 replay order).
+        tail = self.store.read_from(tail=5)
+        self.assertEqual([e.seq for e in tail], [6, 7, 8, 9, 10])
+        # tail composes with filters: last 2 of the filtered set.
+        denied = self.store.read_from(tail=2, kind="action_denied")
+        self.assertEqual([e.payload["n"] for e in denied], [7, 9])
+        # tail larger than the log returns everything.
+        self.assertEqual(len(self.store.read_from(tail=100)), 10)
+        # tail=0 returns nothing.
+        self.assertEqual(self.store.read_from(tail=0), [])
+
+    def test_limit_and_tail_are_mutually_exclusive(self) -> None:
+        self.store.append(event_id="EV1", kind="action_denied", payload={}, schema_version="2.0")
+        with self.assertRaises(ValueError):
+            self.store.read_from(limit=1, tail=1)
+
     def test_duplicate_event_id_rejected(self) -> None:
         self.store.append(event_id="EV1", kind="action_denied", payload={}, schema_version="2.0")
         with self.assertRaises(sqlite3.IntegrityError):

@@ -377,6 +377,8 @@ export default function VerdictsPage(): JSX.Element {
           title="Audit log (live)"
           lines={audit.events.map(auditEventToLogLine)}
           onClear={audit.clear}
+          stalled={audit.stalled}
+          droppedCount={audit.droppedCount}
         />
       </div>
     </section>

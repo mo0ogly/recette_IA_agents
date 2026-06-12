@@ -1,4 +1,4 @@
-import { listPendingApprovals, ApiError } from "./client";
+import { listAuditEvents, listPendingApprovals, ApiError } from "./client";
 import type { PendingApproval } from "../types/platform";
 
 const SAMPLE_PENDING: PendingApproval[] = [
@@ -41,6 +41,19 @@ describe("api client", () => {
       expect.objectContaining({ method: "GET" }),
     );
     expect(result).toEqual(SAMPLE_PENDING);
+  });
+
+  it("listAuditEvents serializes the tail param and unwraps the events envelope", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ events: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listAuditEvents({ from_seq: 0, tail: 2000 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/audit/events?from_seq=0&tail=2000",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(result).toEqual([]);
   });
 
   it("throws an error carrying the status when the response is not ok", async () => {
