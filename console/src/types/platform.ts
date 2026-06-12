@@ -174,6 +174,49 @@ export interface AiBackend {
   model: string;
 }
 
+/** How a target server is reached: local mock process, declared URL, or SaaS. */
+export type ServerMode = "mock_local" | "declared_url" | "real_saas";
+
+/** Live status of a server: process/probe result, or n/a (real_saas). */
+export type ServerStatus = "up" | "down" | "n/a";
+
+/** A configured target server agents act against (GET/POST /config/servers). */
+export interface ServerEntry {
+  id: string;
+  /** External system the server emulates or hosts (e.g. github, gitlab). */
+  system: string;
+  mode: ServerMode;
+  /** Required when mode = mock_local: local port of the mock process. */
+  port?: number;
+  /** Required when mode = declared_url: base URL of the declared server. */
+  base_url?: string;
+  /** Required when mode = real_saas: org/owner on the SaaS platform. */
+  owner?: string;
+  /** Name of the env var holding the credential (never the secret itself, R8). */
+  auth_env?: string;
+}
+
+/** Result of a start/stop lifecycle call; error explains a "down" outcome. */
+export interface ServerLifecycleResult {
+  status: ServerStatus;
+  error?: string;
+}
+
+/** One entry of a server's JSONL access log. */
+export interface ServerLogLine {
+  event_id: string;
+  target_system: string;
+  action_type: string;
+  resource: string;
+  status: number;
+}
+
+/** Incremental tail of a server access log; next is the cursor to pass back. */
+export interface ServerLogTail {
+  lines: ServerLogLine[];
+  next: number;
+}
+
 /** One rule of a policy document. */
 export interface PolicyRule {
   rule_id: string;

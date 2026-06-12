@@ -1,0 +1,12 @@
+{
+    "lines": [
+        {
+            "action_type": "delete_repository",
+            "event_id": "e1",
+            "resource": "acme/x",
+            "status": 200,
+            "target_system": "github"
+        }
+    ],
+    "next": 1
+}

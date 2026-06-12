@@ -23,6 +23,10 @@ import type {
   RunHandle,
   RunInfo,
   RunSummary,
+  ServerEntry,
+  ServerLifecycleResult,
+  ServerLogTail,
+  ServerStatus,
   StoredEvent,
 } from "../types/platform";
 
@@ -140,6 +144,62 @@ export function deleteAiBackend(id: string): Promise<void> {
   return request<void>(`/config/ai-backends/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+// ---------------------------------------------------------------------------
+// Servers (/config/servers): target servers + mock_local lifecycle + log tail
+// ---------------------------------------------------------------------------
+
+export function listServers(): Promise<ServerEntry[]> {
+  return request<ServerEntry[]>("/config/servers", { method: "GET" });
+}
+
+export function createServer(server: ServerEntry): Promise<ServerEntry> {
+  return request<ServerEntry>("/config/servers", {
+    method: "POST",
+    body: JSON.stringify(server),
+  });
+}
+
+export function updateServer(id: string, server: ServerEntry): Promise<ServerEntry> {
+  return request<ServerEntry>(`/config/servers/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(server),
+  });
+}
+
+export function deleteServer(id: string): Promise<void> {
+  return request<void>(`/config/servers/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function startServer(id: string): Promise<ServerLifecycleResult> {
+  return request<ServerLifecycleResult>(
+    `/config/servers/${encodeURIComponent(id)}/start`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export function stopServer(id: string): Promise<ServerLifecycleResult> {
+  return request<ServerLifecycleResult>(
+    `/config/servers/${encodeURIComponent(id)}/stop`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export function getServerStatus(id: string): Promise<{ status: ServerStatus }> {
+  return request<{ status: ServerStatus }>(
+    `/config/servers/${encodeURIComponent(id)}/status`,
+    { method: "GET" },
+  );
+}
+
+export function getServerLog(id: string, after = 0): Promise<ServerLogTail> {
+  return request<ServerLogTail>(
+    withQuery(`/config/servers/${encodeURIComponent(id)}/log`, { after }),
+    { method: "GET" },
+  );
 }
 
 // ---------------------------------------------------------------------------

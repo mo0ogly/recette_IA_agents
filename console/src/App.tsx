@@ -8,6 +8,7 @@ import CampaignsPage from "./pages/campaigns";
 import CockpitPage from "./pages/cockpit";
 import DashboardPage from "./pages/dashboard";
 import RecettePage from "./pages/recette";
+import ServersPage from "./pages/servers";
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? "nav-link nav-link-active" : "nav-link";
@@ -34,6 +35,9 @@ export default function App(): JSX.Element {
           <NavLink to="/agents" className={navLinkClass}>
             Agents
           </NavLink>
+          <NavLink to="/servers" className={navLinkClass}>
+            Servers
+          </NavLink>
           <span className="nav-sep">Gouvernance (mock)</span>
           <NavLink to="/catalog" className={navLinkClass}>
             Catalog
@@ -54,6 +58,7 @@ export default function App(): JSX.Element {
           <Route path="/recette" element={<RecettePage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/servers" element={<ServersPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />

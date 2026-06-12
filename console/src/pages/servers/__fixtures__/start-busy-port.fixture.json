@@ -1,0 +1,4 @@
+{
+    "status": "down",
+    "error": "port 9102 already in use: [Errno 98] Address already in use"
+}
