@@ -55,6 +55,23 @@ class RunManager:
         run._stop.set()
         return True
 
+    async def subscribe(self, run: Run) -> asyncio.Queue[dict]:
+        """Attach an asyncio queue, replaying buffered frames; registers the loop once."""
+        queue: asyncio.Queue[dict] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        with run._lock:
+            if run._loop is None:
+                run._loop = loop
+            for frame in run.events:  # replay buffer for a late subscriber
+                queue.put_nowait(frame)
+            run._subscribers.append(queue)
+        return queue
+
+    def unsubscribe(self, run: Run, queue: asyncio.Queue[dict]) -> None:
+        with run._lock:
+            if queue in run._subscribers:
+                run._subscribers.remove(queue)
+
     def _emit(self, run: Run, type_: str, data: dict) -> None:
         with run._lock:
             frame = {"seq": run._seq, "type": type_, "data": data}

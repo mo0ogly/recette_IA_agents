@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 from ..runners import discovery_runner, identification_runner
 
@@ -52,3 +52,24 @@ def stop_run(request: Request, run_id: str) -> dict:
     if not ok:
         raise HTTPException(status_code=404, detail="no such run")
     return {"stopped": True}
+
+
+@router.websocket("/{run_id}/ws")
+async def run_ws(websocket: WebSocket, run_id: str) -> None:
+    mgr = websocket.app.state.run_manager
+    run = mgr.get(run_id)
+    if run is None:
+        await websocket.close(code=4404)
+        return
+    await websocket.accept()
+    queue = await mgr.subscribe(run)
+    try:
+        while True:
+            frame = await queue.get()
+            await websocket.send_json(frame)
+            if frame["type"] == "end":
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        mgr.unsubscribe(run, queue)
