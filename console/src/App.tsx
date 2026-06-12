@@ -9,6 +9,7 @@ import CockpitPage from "./pages/cockpit";
 import DashboardPage from "./pages/dashboard";
 import RecettePage from "./pages/recette";
 import ServersPage from "./pages/servers";
+import VerdictsPage from "./pages/verdicts";
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return isActive ? "nav-link nav-link-active" : "nav-link";
@@ -31,6 +32,9 @@ export default function App(): JSX.Element {
           </NavLink>
           <NavLink to="/campaigns" className={navLinkClass}>
             Campagnes
+          </NavLink>
+          <NavLink to="/verdicts" className={navLinkClass}>
+            Verdicts
           </NavLink>
           <NavLink to="/agents" className={navLinkClass}>
             Agents
@@ -57,6 +61,7 @@ export default function App(): JSX.Element {
           <Route path="/cockpit" element={<CockpitPage />} />
           <Route path="/recette" element={<RecettePage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/catalog" element={<CatalogPage />} />

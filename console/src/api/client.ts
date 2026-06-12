@@ -29,6 +29,10 @@ import type {
   ServerLifecycleResult,
   ServerLogTail,
   ServerStatus,
+  VerdictJudgement,
+  VerdictScorecard,
+  VerdictSubmission,
+  VerdictSubmissionRequest,
 } from "../types/platform";
 
 const API_BASE_URL: string =
@@ -411,6 +415,40 @@ export function listAuditEvents(params: AuditEventsParams = {}): Promise<AuditEv
 
 export function verifyChain(): Promise<ChainReport> {
   return request<ChainReport>("/audit/verify", { method: "GET" });
+}
+
+// ---------------------------------------------------------------------------
+// Verdicts: external tool results judged against stored ground truth
+// ---------------------------------------------------------------------------
+
+/** Resolve to null when the expected-absent case answers 404 (no submission yet). */
+async function nullOn404<T>(promise: Promise<T>): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/** Latest judged submission, or null when no tool has submitted yet (404). */
+export function getVerdicts(): Promise<VerdictSubmission | null> {
+  return nullOn404(request<VerdictSubmission>("/verdicts", { method: "GET" }));
+}
+
+/** Aggregates over the latest submission, or null when none exists (404). */
+export function getVerdictScorecard(): Promise<VerdictScorecard | null> {
+  return nullOn404(request<VerdictScorecard>("/verdicts/scorecard", { method: "GET" }));
+}
+
+/** Submit tool results; the API judges them against each agent's ground truth. */
+export function postVerdicts(body: VerdictSubmissionRequest): Promise<VerdictJudgement> {
+  return request<VerdictJudgement>("/verdicts", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 // ---------------------------------------------------------------------------

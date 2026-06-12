@@ -141,6 +141,82 @@ export interface AgentConfig {
   role?: string;
   system_prompt?: string;
   model?: string;
+  /** Optional ground truth the verdict judge compares tool results against. */
+  ground_truth?: GroundTruth;
+}
+
+/** The four correctness dimensions judged by the identification recette. */
+export type VerdictDimension = "identity" | "capabilities" | "policy" | "behavior";
+
+/**
+ * Ground truth optionally attached to an agent (POST /config/agents).
+ * Partial blocks are allowed: the verdict judge only checks declared fields.
+ */
+export interface GroundTruth {
+  detectable?: boolean;
+  expected_verdict?: "correct" | "incorrect";
+  expected_identity?: string;
+  dimensions?: Partial<Record<VerdictDimension, boolean>>;
+}
+
+/** One result submitted by an external discovery/identification tool. */
+export interface VerdictResult {
+  agent_id: string;
+  detected?: boolean;
+  verdict?: string;
+  identity?: string;
+  dimensions?: Partial<Record<VerdictDimension, boolean>>;
+}
+
+/** Request body of POST /verdicts. */
+export interface VerdictSubmissionRequest {
+  tool: string;
+  results: VerdictResult[];
+}
+
+export type JudgedStatus = "PASS" | "FAIL" | "SKIP";
+
+/**
+ * One judged entry of a verdict submission: the API's comparison of a tool
+ * result against the agent's stored ground truth. checks/expected/observed/
+ * evidence_event_ids are absent on SKIP and unknown-agent FAIL entries.
+ */
+export interface JudgedEntry {
+  agent_id: string | null;
+  status: JudgedStatus;
+  checks?: Record<string, boolean>;
+  expected?: Record<string, unknown>;
+  observed?: Record<string, unknown>;
+  evidence_event_ids?: string[];
+  error?: string;
+}
+
+/** Latest persisted verdict submission (GET /verdicts; 404 when none). */
+export interface VerdictSubmission {
+  tool: string | null;
+  results: VerdictResult[];
+  judged: JudgedEntry[];
+  submitted_seq: number;
+}
+
+/** Response of POST /verdicts. */
+export interface VerdictJudgement {
+  judged: JudgedEntry[];
+  submitted_seq: number;
+}
+
+/**
+ * Aggregates over the latest judged submission (GET /verdicts/scorecard).
+ * Rates are fractions in [0, 1]; null when no agent carries the check.
+ */
+export interface VerdictScorecard {
+  total: number;
+  passed: number;
+  skipped: number;
+  detection_rate: number | null;
+  accuracy_by_dimension: Record<VerdictDimension, number | null>;
+  false_positives: number;
+  false_negatives: number;
 }
 
 /** A launched agent run (Lane B) or a recette runner (discovery/identification). */

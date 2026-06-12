@@ -1,0 +1,223 @@
+/* Verdicts page styles (tool submissions judged against ground truth). */
+
+.verdict-error-banner {
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid #e4b6ba;
+}
+
+.verdict-scorecard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.verdict-scorecard-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.verdict-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-bg);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.verdict-stat-label {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verdict-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.verdict-chip[data-status="PASS"] {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.verdict-chip[data-status="FAIL"] {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+.verdict-chip[data-status="SKIP"] {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.verdict-empty {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+}
+
+.verdict-empty-title {
+  font-weight: 600;
+  margin-top: 0;
+}
+
+.verdict-curl {
+  margin: 0.5rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 4px;
+  background-color: #22272d;
+  color: #e6e9ec;
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.verdict-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.verdict-upload-error {
+  color: var(--badge-red-fg);
+  font-weight: 500;
+}
+
+.verdict-table-title {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.verdict-subtle {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.verdict-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  margin-bottom: 1rem;
+}
+
+.verdict-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.verdict-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.verdict-row {
+  cursor: pointer;
+}
+
+.verdict-row:hover {
+  background-color: var(--color-bg);
+}
+
+.verdict-detail-row td {
+  background-color: var(--color-bg);
+}
+
+.verdict-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.verdict-detail h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.verdict-detail-checks {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.verdict-detail-checks ul,
+.verdict-detail-evidence ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.verdict-check-failed {
+  color: var(--badge-red-fg);
+  font-weight: 600;
+}
+
+.verdict-check-passed {
+  color: var(--badge-green-fg);
+}
+
+.verdict-detail-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.verdict-detail-json {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.verdict-detail-json pre {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  background-color: #22272d;
+  color: #e6e9ec;
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+.verdict-evidence-link {
+  color: var(--color-accent);
+}
+
+.verdict-log {
+  margin-top: 1rem;
+}

@@ -1,0 +1,93 @@
+{
+    "tool": "identification-tool-v1",
+    "results": [
+        {
+            "agent_id": "gt-full",
+            "detected": true,
+            "verdict": "correct",
+            "dimensions": {
+                "identity": true,
+                "capabilities": true,
+                "policy": true,
+                "behavior": true
+            }
+        },
+        {
+            "agent_id": "gt-undetectable",
+            "detected": true
+        },
+        {
+            "agent_id": "no-gt",
+            "detected": true
+        },
+        {
+            "agent_id": "ghost-agent",
+            "detected": false
+        }
+    ],
+    "judged": [
+        {
+            "agent_id": "gt-full",
+            "status": "PASS",
+            "checks": {
+                "detected": true,
+                "verdict": true,
+                "dimension:identity": true,
+                "dimension:capabilities": true,
+                "dimension:policy": true,
+                "dimension:behavior": true
+            },
+            "expected": {
+                "detectable": true,
+                "expected_verdict": "correct",
+                "dimensions": {
+                    "identity": true,
+                    "capabilities": true,
+                    "policy": true,
+                    "behavior": true
+                }
+            },
+            "observed": {
+                "agent_id": "gt-full",
+                "detected": true,
+                "verdict": "correct",
+                "dimensions": {
+                    "identity": true,
+                    "capabilities": true,
+                    "policy": true,
+                    "behavior": true
+                }
+            },
+            "evidence_event_ids": [
+                "EV000000000000000001000002"
+            ]
+        },
+        {
+            "agent_id": "gt-undetectable",
+            "status": "FAIL",
+            "checks": {
+                "detected": false
+            },
+            "expected": {
+                "detectable": false
+            },
+            "observed": {
+                "agent_id": "gt-undetectable",
+                "detected": true
+            },
+            "evidence_event_ids": [
+                "EV000000000000000001000001"
+            ]
+        },
+        {
+            "agent_id": "no-gt",
+            "status": "SKIP"
+        },
+        {
+            "agent_id": "ghost-agent",
+            "status": "FAIL",
+            "error": "unknown agent"
+        }
+    ],
+    "submitted_seq": 2
+}

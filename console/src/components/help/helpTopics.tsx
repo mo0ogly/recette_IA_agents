@@ -14,6 +14,7 @@ export type HelpTopicKey =
   | "cockpit"
   | "recette"
   | "campaigns"
+  | "verdicts"
   | "agents"
   | "servers"
   | "catalog"
@@ -180,6 +181,66 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           determinisme (meme entree -&gt; meme sortie) ; <code>DIVERGENT</code>
           signale une source de non-determinisme a corriger. C'est ce qui rend une
           campagne de recette stable et reproductible dans le temps.
+        </p>
+      </>
+    ),
+  },
+  verdicts: {
+    title: "Aide — Verdicts",
+    summary:
+      "Juger les resultats des outils discovery / identification contre le ground-truth des agents.",
+    body: (
+      <>
+        <p>
+          Cette page ferme la boucle de recette cote <strong>outils
+          externes</strong>. Un outil (discovery ou identification) soumet ses
+          resultats ; la plateforme les compare au <strong>ground-truth</strong>{" "}
+          declare sur chaque agent (champ <code>ground_truth</code> de l'onglet
+          Agents) et rend un statut par agent.
+        </p>
+        <h3>Statuts</h3>
+        <ul>
+          <li>
+            <strong>PASS</strong> : toutes les verifications declarees par le
+            ground-truth correspondent au resultat soumis.
+          </li>
+          <li>
+            <strong>FAIL</strong> : au moins une verification diverge (ex.
+            detecte alors que non detectable = faux positif), ou l'agent soumis
+            est inconnu de la plateforme.
+          </li>
+          <li>
+            <strong>SKIP</strong> : l'agent ne declare aucun ground-truth, rien
+            n'est jugeable (jamais PASS par vacuite).
+          </li>
+        </ul>
+        <h3>Scorecard</h3>
+        <p>
+          Le bandeau agrege la derniere soumission : total / passes / ignores,
+          taux de detection, exactitude par dimension (identite, capacites,
+          policy, comportement — <code>n/a</code> quand aucun agent ne porte la
+          dimension), faux positifs et faux negatifs. Les taux sont des
+          fractions deterministes (I4), calculees uniquement sur les agents qui
+          declarent la verification.
+        </p>
+        <h3>Soumettre des resultats</h3>
+        <ul>
+          <li>
+            <strong>HTTP</strong> : l'outil POSTe sur <code>/verdicts</code> un
+            corps <code>{"{tool, results: [...]}"}</code> (un resultat par
+            agent : <code>detected</code>, <code>verdict</code>,{" "}
+            <code>identity</code>, <code>dimensions</code>).
+          </li>
+          <li>
+            <strong>Upload</strong> : deposer le meme JSON via la zone d'upload
+            de la page ; il est valide cote client puis soumis tel quel.
+          </li>
+        </ul>
+        <p>
+          Chaque ligne se deplie : verifications passees / echouees, attendu vs
+          observe, et les <strong>evenements de preuve</strong> (les evenements
+          d'audit de l'agent au moment de la soumission), relies au journal
+          d'audit immuable (I1).
         </p>
       </>
     ),
