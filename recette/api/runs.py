@@ -1,7 +1,7 @@
 """U1 RunManager: in-memory runs executed in worker threads, emitting event frames.
 
 A run's frames are buffered on the Run (so a late WebSocket subscriber can replay them)
-and pushed live to any attached asyncio subscriber queues (the WS bridge, Task 7).
+and pushed live to any attached asyncio subscriber queues (the WebSocket bridge).
 Run ids are uuid4 — operational identifiers, not recette ground-truth artifacts.
 """
 
