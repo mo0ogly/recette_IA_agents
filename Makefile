@@ -1,6 +1,6 @@
 # AgentRail recette -- local + Docker lab targets.
 .PHONY: help install install-check validate run discovery report test gates \
-        docker-build lab lab-down docker-test docker-gates
+        api docker-build lab lab-down docker-test docker-gates
 
 help:
 	@echo "Setup:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make report       aggregate report (identification + all discovery surfaces)"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
+	@echo "  make api          run the Track U API (uvicorn, needs the [api] extra)"
 	@echo "Docker lab:"
 	@echo "  make docker-build build the lab image"
 	@echo "  make lab          run discovery recette over HTTP vs the mock :8081"
@@ -49,6 +50,9 @@ gates:
 	.venv-pyaudit/bin/mypy recette
 	.venv-pyaudit/bin/bandit -q -r recette --severity-level medium
 	@echo "gates: PASS"
+
+api:
+	python3 -m recette.api
 
 # --- docker lab ---
 docker-build:

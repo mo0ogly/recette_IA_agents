@@ -61,6 +61,33 @@ class TestAgentLoop(unittest.TestCase):
         )
         self.assertEqual(len(result.actions), 3)
 
+    def test_on_step_called_per_recorded_step(self):
+        seen = []
+        run_agent(
+            agent_id="a1",
+            principal="p",
+            target_system="github",
+            goal="g",
+            capability_scope=["read_repo", "open_pr"],
+            llm=_script(),
+            on_step=lambda i, step: seen.append((i, step.action is not None)),
+        )
+        # 2 tool-call steps (action) + 1 final step (no action)
+        self.assertEqual(seen, [(0, True), (1, True), (2, False)])
+
+    def test_should_stop_halts_before_next_step(self):
+        result = run_agent(
+            agent_id="a1",
+            principal="p",
+            target_system="github",
+            goal="g",
+            capability_scope=["read_repo", "open_pr"],
+            llm=_script(),
+            should_stop=lambda: True,  # stop before the very first step
+        )
+        self.assertEqual(result.actions, [])
+        self.assertEqual(result.recording.steps, [])
+
 
 class TestReplay(unittest.TestCase):
     def test_replay_reproduces_identical_actions(self):

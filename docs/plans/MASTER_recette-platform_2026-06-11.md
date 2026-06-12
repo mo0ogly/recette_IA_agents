@@ -244,7 +244,8 @@ debug view of what each agent does, and a configuration area for agents + AIs.
 This sits ON TOP of the existing recette (it drives the same corpus + harness + forge),
 it does not replace the CLI.
 
-### U1 -- Recette API layer  [TODO]  (prerequisite for the UI)
+### U1 -- Recette API layer  [DONE 2026-06-12]  (prerequisite for the UI)
+Shipped: FastAPI app (recette/api/) — /health, config CRUD, catalog, runs (launch/inspect/stop/events), WebSocket live stream, Lane B run wiring (stub+live), /agents/register; transport = WebSocket; secrets via env (R8); lab default. 8 api test modules; gates green.
 - A backend API (FastAPI, Python -- matches the recette package) exposing:
   list/register agents (corpus), launch a run (replay a scenario against lab or real
   forge), stop a run, stream events (SSE/WebSocket), fetch logs + scorecards, config CRUD.
@@ -274,7 +275,6 @@ DoD: create/edit an agent + an AI backend from the UI; config round-trips and va
 - **Agent execution model** -- RESOLVED: **hybrid two-lane** (section 0bis). Lane A drives
   the scorecards (deterministic); Lane B drives live LLM agents in the console (recorded).
 - **API backend** -- RESOLVED: **FastAPI (Python)**, reuses the recette package directly.
-- **Real-time transport** -- OPEN: SSE (recommended, one-way event streaming) vs WebSocket
-  (only if interactive control needs it). Decide at U1.
+- **Real-time transport** -- RESOLVED 2026-06-12: WebSocket (see docs/tracking/decision_log.jsonl).
 - **Scope/timing** -- RESOLVED: start Track U after M3 (one real non-GitHub surface exists)
   and once U1 (the FastAPI layer) is in place.
