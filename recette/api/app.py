@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from .config_store import ConfigStore
+from .routers import catalog as catalog_router
 from .routers import config as config_router
 
 
@@ -20,4 +21,5 @@ def create_app(*, config_store: ConfigStore | None = None) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(config_router.router)
+    app.include_router(catalog_router.router)
     return app
