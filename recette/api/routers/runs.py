@@ -40,7 +40,8 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
             llm = build_llm(backend["provider"], backend["model"])  # live; key from env (R8)
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b", params)
-        mgr.start(run, make_lane_b_runner(agent_cfg, llm))
+        # config_store carries the server registry for per-agent proxy routing (I5).
+        mgr.start(run, make_lane_b_runner(agent_cfg, llm, config_store=store))
         return {"run_id": run.id, "status": run.status}
     runner = _RUNNERS.get(kind) if isinstance(kind, str) else None
     if runner is None:

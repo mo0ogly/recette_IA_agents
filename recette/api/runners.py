@@ -16,15 +16,115 @@ from ..discovery_harness import (
     discover_repo_dirs,
     run_discovery_recette,
 )
+from ..events import AgentAction, LogicalClock, Mode, mode_for_action
+from ..forge import GitForge, LabForge
 from ..harness import discover_agent_dirs
 from ..harness import run_agent as run_ident_agent
 from ..lane_b import run_agent as run_lane_b_agent
 from ..llm import LlmBackend, LlmDecision, StubLlm
+from ..platform.catalog.model import RISK_SCORE, RiskLevel
+from ..platform.events import PlatformActionEvent
+from ..platform.proxy.lab_proxy import LabHttpProxy
+from ..platform.proxy.protocol import ExternalSystemProxy
+from ..platform.proxy.router import resolve_proxy
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
 
 Emit = Callable[[str, dict], None]
 ShouldStop = Callable[[], bool]
+
+
+class ProxyForge:
+    """GitForge adapter that executes every action through an ExternalSystemProxy (I5).
+
+    Used when an agent is bound to a server entry: each tool call becomes a
+    PlatformActionEvent shipped over the lab wire format to the agent's
+    server. event_id/timestamp are derived from a sequence + LogicalClock
+    (deterministic, I4). risk fields are transport metadata only here --
+    governance risk scoring stays in the gateway decision path.
+
+    Failure mode (fail-safe): a transport error or non-success envelope
+    raises RuntimeError, which fails the run. The action is never recorded
+    as executed and execution never silently falls back to another target.
+    """
+
+    def __init__(self, proxy: ExternalSystemProxy, clock: LogicalClock | None = None) -> None:
+        self._proxy = proxy
+        self._clock = clock or LogicalClock()
+        self._log: list[AgentAction] = []
+        self._seq = 0
+
+    def execute(
+        self,
+        *,
+        agent_id: str,
+        principal: str,
+        target_system: str,
+        action_type: str,
+        resource: str,
+        approved: bool = False,
+        params: dict | None = None,
+    ) -> AgentAction:
+        self._seq += 1
+        timestamp = self._clock.tick()
+        mode = mode_for_action(action_type)
+        risk_level = RiskLevel.LOW if mode is Mode.READ else RiskLevel.HIGH
+        event = PlatformActionEvent(
+            event_id=f"evt-{self._seq:04d}",
+            timestamp=timestamp,
+            agent_id=agent_id,
+            capability_scope=(),  # scope enforcement lives in the tool registry/gateway
+            role="",
+            action_type=action_type,
+            target_system=target_system,
+            resource=resource,
+            payload=dict(params or {}),
+            risk_score=RISK_SCORE[risk_level],
+            risk_level=str(risk_level),
+        )
+        result = self._proxy.execute(event)
+        if not result.ok:
+            raise RuntimeError(
+                f"proxy execution failed for {action_type} on {resource!r}: "
+                f"{result.error or f'HTTP {result.status_code}'}"
+            )
+        action = AgentAction(
+            event_id=event.event_id,
+            seq=self._seq,
+            timestamp=timestamp,
+            agent_id=agent_id,
+            principal=principal,
+            target_system=target_system,
+            action_type=action_type,
+            mode=mode.value,
+            resource=resource,
+            approved=approved,
+            params=dict(params or {}),
+        )
+        self._log.append(action)
+        return action
+
+    @property
+    def action_log(self) -> list[AgentAction]:
+        return list(self._log)
+
+
+def forge_for_agent(
+    agent_cfg: dict, servers: list[dict], default_proxy: ExternalSystemProxy | None = None
+) -> GitForge:
+    """Forge for one run. An agent without a ``server`` binding keeps the
+    historical in-memory LabForge; an agent bound to a server executes
+    through the proxy resolved from the server registry (I5).
+
+    Raises ValueError on a dangling or unsupported server reference
+    (fail-safe: the run must fail, never execute against the wrong target).
+    """
+    if not agent_cfg.get("server"):
+        return LabForge()
+    # The default is never returned here (the agent has a server), but
+    # resolve_proxy's contract requires the actual default proxy.
+    proxy = resolve_proxy(agent_cfg, servers, default_proxy or LabHttpProxy())
+    return ProxyForge(proxy)
 
 
 def _scope_from_recording(recording: Recording) -> list[str]:
@@ -40,9 +140,15 @@ def _scope_from_recording(recording: Recording) -> list[str]:
 
 
 def make_lane_b_runner(
-    agent_cfg: dict, llm: LlmBackend
+    agent_cfg: dict, llm: LlmBackend, *, config_store: object | None = None
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
+        # Proxy resolution happens inside the runner so a dangling server
+        # reference surfaces as an explicit run failure (status=failed +
+        # error frame via RunManager), never as an API crash and never as
+        # a silent fallback to the wrong execution target (I5 fail-safe).
+        servers = config_store.list_servers() if config_store is not None else []  # type: ignore[attr-defined]
+        forge = forge_for_agent(agent_cfg, servers)
         result = run_lane_b_agent(
             agent_id=agent_cfg["id"],
             principal=agent_cfg["principal"],
@@ -50,6 +156,7 @@ def make_lane_b_runner(
             goal=agent_cfg["goal"],
             capability_scope=agent_cfg["capability_scope"],
             llm=llm,
+            forge=forge,
             on_step=lambda i, step: emit("step", {"index": i, "action": step.action}),
             should_stop=should_stop,
         )
@@ -91,7 +198,8 @@ def make_campaign_runner(
                 emit("step_error", {"index": idx, "agent_id": agent_id, "message": "unknown agent"})
                 continue
             missing = [
-                k for k in ("principal", "target_system", "goal", "capability_scope")
+                k
+                for k in ("principal", "target_system", "goal", "capability_scope")
                 if not agent_cfg.get(k)
             ]
             if missing:
@@ -126,6 +234,16 @@ def make_campaign_runner(
                 provider = backend["provider"]
                 model = backend["model"]
                 llm = build_llm(provider, model)  # live; key from env (R8)
+            try:
+                # Per-agent proxy routing (I5): a dangling server reference
+                # fails this step explicitly, never falls back to the default.
+                forge = forge_for_agent(
+                    agent_cfg,
+                    config_store.list_servers(),  # type: ignore[attr-defined]
+                )
+            except ValueError as exc:
+                emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})
+                continue
             emit("agent_start", {"index": idx, "agent_id": agent_id, "provider": provider})
             result = run_lane_b_agent(
                 agent_id=agent_cfg["id"],
@@ -134,6 +252,7 @@ def make_campaign_runner(
                 goal=agent_cfg["goal"],
                 capability_scope=agent_cfg["capability_scope"],
                 llm=llm,
+                forge=forge,
                 provider=provider,
                 model=model,
                 on_step=_lane_b_step_emit(emit, agent_id),
