@@ -14,8 +14,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createCampaign,
   deleteCampaign,
+  instantiateTemplate,
   listAgents,
   listCampaigns,
+  listCampaignTemplates,
   listRecordings,
   listRuns,
   replayRecording,
@@ -25,6 +27,7 @@ import { useRunStream } from "../../hooks/useRunStream";
 import type {
   AgentConfig,
   Campaign,
+  CampaignTemplate,
   RecordingMeta,
   RunSummary,
 } from "../../types/platform";
@@ -65,6 +68,7 @@ export default function CampaignsPage(): JSX.Element {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
+  const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,14 +81,16 @@ export default function CampaignsPage(): JSX.Element {
 
   const refresh = useCallback(async () => {
     try {
-      const [c, a, r] = await Promise.all([
+      const [c, a, r, t] = await Promise.all([
         listCampaigns(),
         listAgents(),
         listRecordings(),
+        listCampaignTemplates(),
       ]);
       setCampaigns(c);
       setAgents(a);
       setRecordings(r);
+      setTemplates(t);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -140,6 +146,18 @@ export default function CampaignsPage(): JSX.Element {
     }
   }, [newId, newDesc, picked, refresh]);
 
+  const instantiate = useCallback(
+    async (id: string) => {
+      try {
+        await instantiateTemplate(id);
+        await refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [refresh],
+  );
+
   const remove = useCallback(
     async (id: string) => {
       if (!window.confirm(`Supprimer la campagne "${id}" ?`)) {
@@ -184,6 +202,52 @@ export default function CampaignsPage(): JSX.Element {
           {error}
         </div>
       )}
+
+      <section className="panel camp-templates">
+        <h2>Modeles de campagnes (par agent et usage)</h2>
+        <p className="camp-desc">
+          Un clic instancie l'agent mock et la campagne prets a lancer. Profil :
+          legit (autorise), suspect (depassement), destructif (irreversible).
+        </p>
+        <table className="camp-table">
+          <thead>
+            <tr>
+              <th>Campagne</th>
+              <th>Systeme</th>
+              <th>Profil</th>
+              <th>Actions</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {templates.map((t) => {
+              const exists = campaigns.some((c) => c.id === t.id);
+              return (
+                <tr key={t.id}>
+                  <td>
+                    <strong>{t.title}</strong>
+                    <div className="camp-mono camp-desc">{t.id}</div>
+                  </td>
+                  <td className="camp-mono">{t.target_system}</td>
+                  <td>
+                    <span className={`pill pill-profile-${t.profile}`}>{t.profile}</span>
+                  </td>
+                  <td className="camp-mono">{t.actions.join(", ")}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => void instantiate(t.id)}
+                      disabled={exists}
+                    >
+                      {exists ? "Instancie" : "Instancier"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
 
       <div className="camp-grid">
         <section className="panel">

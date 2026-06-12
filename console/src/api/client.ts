@@ -14,6 +14,7 @@ import type {
   AgentConfig,
   AiBackend,
   Campaign,
+  CampaignTemplate,
   ChainReport,
   PendingApproval,
   PolicyDocument,
@@ -220,6 +221,19 @@ export function createCampaign(campaign: Campaign): Promise<Campaign> {
 
 export function deleteCampaign(id: string): Promise<void> {
   return request<void>(`/campaigns/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function listCampaignTemplates(): Promise<CampaignTemplate[]> {
+  return request<{ templates: CampaignTemplate[] }>("/campaign-templates", {
+    method: "GET",
+  }).then((r) => r.templates);
+}
+
+export function instantiateTemplate(id: string): Promise<Campaign> {
+  return request<Campaign>(
+    `/campaign-templates/${encodeURIComponent(id)}/instantiate`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 export function runCampaign(id: string): Promise<RunHandle> {

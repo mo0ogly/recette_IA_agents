@@ -139,6 +139,16 @@ export interface Campaign {
   steps: CampaignStep[];
 }
 
+/** A predefined campaign template, named by agent profile + usage. */
+export interface CampaignTemplate {
+  id: string;
+  title: string;
+  profile: "legit" | "suspect" | "destructive";
+  target_system: string;
+  actions: string[];
+  agent_id: string;
+}
+
 /** Summary of a persisted, replayable recording. */
 export interface RecordingMeta {
   recording_id: string;

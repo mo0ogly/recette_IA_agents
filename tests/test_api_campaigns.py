@@ -99,3 +99,29 @@ class TestCampaignRoutes(unittest.TestCase):
 
     def test_replay_unknown_recording_404(self) -> None:
         self.assertEqual(self.client.post("/recordings/nope/replay").status_code, 404)
+
+    def test_templates_listed_and_instantiate_seeds_agent_and_campaign(self) -> None:
+        templates = self.client.get("/campaign-templates").json()["templates"]
+        self.assertTrue(len(templates) >= 10)
+        tid = "finance-wire-fraud"
+        self.assertIn(tid, [t["id"] for t in templates])
+
+        # Instantiate seeds the mock agent and the campaign.
+        self.assertEqual(
+            self.client.post(f"/campaign-templates/{tid}/instantiate").status_code, 201
+        )
+        self.assertIn(tid, [c["id"] for c in self.client.get("/campaigns").json()["campaigns"]])
+        agent = self.client.get("/config/agents").json()
+        self.assertIn(f"{tid}-agent", [a["id"] for a in agent])
+
+        # The instantiated mock campaign runs its scenario end to end.
+        run_id = self.client.post(f"/campaigns/{tid}/run").json()["run_id"]
+        self.assertEqual(_wait_terminal(self.client, run_id)["status"], "completed")
+        events = self.client.get(f"/runs/{run_id}/events").json()
+        steps = [e["data"]["action"]["action_type"] for e in events if e["type"] == "step" and e["data"].get("action")]
+        self.assertIn("launch_wire_transfer", steps)
+
+    def test_instantiate_unknown_template_404(self) -> None:
+        self.assertEqual(
+            self.client.post("/campaign-templates/nope/instantiate").status_code, 404
+        )

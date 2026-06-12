@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..campaign_store import UnknownCampaignError, UnknownRecordingError
+from ..campaign_templates import get_template, instantiate, list_templates
 from ..runners import make_campaign_runner, make_replay_runner
 
 router = APIRouter(tags=["campaigns"])
@@ -29,6 +30,23 @@ def _recordings(request: Request):  # type: ignore[no-untyped-def]
 @router.get("/campaigns")
 def list_campaigns(request: Request) -> dict:
     return {"campaigns": _campaigns(request).list()}
+
+
+@router.get("/campaign-templates")
+def campaign_templates() -> dict:
+    """Predefined campaign templates, named by agent profile + usage."""
+    return {"templates": list_templates()}
+
+
+@router.post("/campaign-templates/{template_id}/instantiate", status_code=201)
+def instantiate_template(request: Request, template_id: str) -> dict:
+    template = get_template(template_id)
+    if template is None:
+        raise HTTPException(status_code=404, detail="no such template")
+    try:
+        return instantiate(template, request.app.state.config_store, _campaigns(request))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/campaigns", status_code=201)

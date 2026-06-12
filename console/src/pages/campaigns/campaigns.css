@@ -186,3 +186,21 @@
 .dot-off {
   background-color: var(--color-border);
 }
+
+.camp-templates {
+  margin-bottom: 1.25rem;
+}
+
+/* Campaign profile pills */
+.pill-profile-legit {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+.pill-profile-suspect {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+.pill-profile-destructive {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
