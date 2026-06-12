@@ -167,12 +167,30 @@ export interface AgentAction {
   kind: "read" | "bounded_write" | "high_write";
 }
 
+/** Providers supported by the platform LLM factory (recette/llm.py). */
+export type AiProvider =
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "groq"
+  | "mistral"
+  | "deepseek"
+  | "xai"
+  | "openai_compat";
+
 /** A configured AI backend an agent can be bound to. */
 export interface AiBackend {
   id: string;
-  provider: string;
+  provider: AiProvider;
   model: string;
+  /** Required when provider = openai_compat (Ollama, vLLM, LiteLLM proxies). */
+  base_url?: string;
 }
+
+/** Result of POST /config/ai-backends/{id}/test (always 200; ok discriminates). */
+export type BackendTestResult =
+  | { ok: true; latency_ms: number; kind: string }
+  | { ok: false; latency_ms: number; error: string };
 
 /** How a target server is reached: local mock process, declared URL, or SaaS. */
 export type ServerMode = "mock_local" | "declared_url" | "real_saas";

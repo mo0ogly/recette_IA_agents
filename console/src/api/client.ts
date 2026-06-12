@@ -13,6 +13,7 @@ import type {
   AgentAction,
   AgentConfig,
   AiBackend,
+  BackendTestResult,
   Campaign,
   CampaignTemplate,
   ChainReport,
@@ -144,6 +145,16 @@ export function deleteAiBackend(id: string): Promise<void> {
   return request<void>(`/config/ai-backends/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+/** Connectivity probe for an AI backend. Always resolves with the probe
+ *  outcome (the endpoint answers 200 for both ok and failed probes); only
+ *  an unknown id rejects (404). The key never transits here (R8). */
+export function testAiBackend(id: string): Promise<BackendTestResult> {
+  return request<BackendTestResult>(
+    `/config/ai-backends/${encodeURIComponent(id)}/test`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 // ---------------------------------------------------------------------------
