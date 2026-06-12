@@ -1,5 +1,5 @@
 # AgentRail recette -- local + Docker lab targets.
-.PHONY: help install install-check validate run discovery report test gates \
+.PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console
 
@@ -49,6 +49,9 @@ report:
 
 test:
 	python3 -m unittest discover -s tests
+
+smoke:
+	./recette.sh smoke
 
 gates:
 	.venv-pyaudit/bin/ruff check recette tests scripts

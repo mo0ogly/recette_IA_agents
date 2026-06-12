@@ -15,6 +15,7 @@ set -euo pipefail
 #   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
+#   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
 #   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
 # Auteur : Fabrice Pizzi - ANSSI
@@ -30,6 +31,7 @@ STATUS_SH="${CICD_DIR}/status.sh"
 CHECKS_SH="${CICD_DIR}/checks.sh"
 GIT_SH="${CICD_DIR}/git.sh"
 PLATFORM_SH="${CICD_DIR}/platform.sh"
+SMOKE_SH="${CICD_DIR}/smoke.sh"
 
 show_menu() {
     hdr "AgentRail recette - gestion"
@@ -120,6 +122,7 @@ case "${cmd}" in
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
     test|gates|report|validate|run|discovery)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
+    smoke)                             "${SMOKE_SH}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
         sed -n '4,19p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;

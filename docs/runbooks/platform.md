@@ -222,6 +222,30 @@ Exit 0 = `SMOKE PASS` (all six steps asserted). Re-runnable back to back: the
 script deletes its own fixture entities (`smoke-*`) up front and reads the
 access log from a cursor, so prior runs never pollute the assertions.
 
+Shorthand (starts the API if needed, then runs the lab smoke):
+
+```
+./recette.sh smoke
+make smoke
+```
+
+Browser smoke (closes the chain console -> API -> mock server -> replay in a
+real Chromium): drives the actual UI -- /servers Start->up, /campaigns
+Lancer->completed, /servers Stop->down, recording visible, Replay->completed
+(I4). Needs a running console pointed at the API and the chromium browser
+(`python3.11 -m playwright install chromium`):
+
+```
+VITE_AGENTRAIL_API_URL=http://127.0.0.1:8090 npm --prefix console run dev -- --port 5173 --strictPort
+python3.11 scripts/smoke_console.py --console http://localhost:5173 --api http://127.0.0.1:8090 --server-port 9131
+```
+
+The console origin must be in the API CORS allow-list (`AGENTRAIL_CORS_ORIGINS`,
+default `localhost:5173` + `127.0.0.1:5173`); a non-default console port needs
+that port added or the browser fetch is blocked. Uses the Python Playwright
+bindings (system python3.11 here; the [api] venv has fastapi but not
+playwright).
+
 State persistence: the docker lab keeps the event store, policies and agent
 config on the `platform-data` named volume. `make platform-down` keeps it;
 `docker compose down -v` wipes it (fresh hash chain, empty inbox).
