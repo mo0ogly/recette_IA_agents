@@ -1,7 +1,7 @@
 # Plan : High-risk action catalog -- corpus expansion (multi-domain)
 
 Date : 2026-06-12
-Status : EN_COURS
+Status : TERMINE (vague 1 : plateforme gouvernee + console + lab -- voir Resultat)
 Invariants concernes : I2 (mediation Control Plane), I3 (identite), I6 (blocage sur approbation), I4 (replay)
 
 ## Objectif
@@ -221,7 +221,33 @@ Legende verdict : DENY = jamais autorise pour ce role | ESC = escalate (approbat
   (approbation), un role non habilite -> deny. Le ground-truth precise par agent.
 
 ## Ecarts et replanification
-- (a remplir)
+- Scope pivote en cours de cadrage (choix utilisateur) : pas seulement un corpus de
+  recette, mais des CAPACITES PLATEFORME REELLES (gateway, policy, approbations,
+  event store), une console UX (parametrage IA par agent + policy + inbox + audit)
+  et un lab simule en face. Le volet "agents de test corpus" (W1-W11 DoD initiale)
+  reste un follow-up.
+- ESC vs DENY/ESC encodes identiquement (role privilegie -> escalate, autres -> deny) ;
+  la nuance est portee par privileged_roles et le ground-truth par agent.
 
 ## Resultat
-- (a remplir)
+Vague 1 livree le 2026-06-12 (commits a258423..0756ce0) :
+- recette/platform/ : PlatformActionEvent v2, Gateway (I2, fail-safe deny), policy
+  engine pur deny-by-default + PolicyStore versionne append-only, approbations I6
+  (state machine + fold du log, timeout = input capture), SqliteEventStore
+  INSERT-only + triggers I1 + hash chain + WAL, LabHttpProxy I5 (side_effect_hash).
+- Catalogue 118 actions / 11 target_systems (okta, github, crm, finance,
+  data_platform, slack, support_desk, cloud, hris, legal_dms, product_cms),
+  1 module par domaine, tests table-litterale anti-drift.
+- recette/lab/ : mock server generique :8082 + 11 handlers purs deterministes.
+- API FastAPI : /actions/execute, /approvals (inbox, approve/deny, sweep),
+  /policies (publish/activate), /audit (events, verify), /catalog/actions.
+- console/ React+TS : pages agents (parametrage IA), catalog+policy editor,
+  approval inbox, audit trail ; fixtures R16 capturees sur backend reel ;
+  41 tests vitest verts.
+- Docker lab (lab-mock, api, e2e) + e2e 9 etapes prouve 2x en docker.
+- Gates : 292 tests Python OK, ruff/mypy/bandit clean, tsc/vitest/build clean.
+Limitations documentees (docs/runbooks/platform.md) : I3 partiel (identite via
+config store, pas de liaison crypto), approbations = placeholder Temporal,
+risk_score = mapping statique. Follow-ups : corpus d'agents de test par domaine,
+migration legacy ESCALATE_ACTIONS vers le policy engine, smoke Playwright console,
+amendement CLAUDE.md (scope plateforme valide utilisateur).
