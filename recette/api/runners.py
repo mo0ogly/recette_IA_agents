@@ -102,8 +102,19 @@ def make_campaign_runner(
                 continue
             provider = "stub"
             model = ""
-            if step.get("stub_script") is not None:
-                llm: LlmBackend = build_stub_llm(step["stub_script"])
+            # A step can override the script; otherwise a mock agent runs its
+            # stored scenario, and a real-AI agent uses its bound ai_backend.
+            stub = step.get("stub_script")
+            if stub is None and agent_cfg.get("ai_mode", "mock") != "real":
+                stub = agent_cfg.get("scenario")
+            if stub:
+                llm: LlmBackend = build_stub_llm(stub)
+            elif agent_cfg.get("ai_mode", "mock") != "real":
+                emit(
+                    "step_error",
+                    {"index": idx, "agent_id": agent_id, "message": "mock agent has no scenario"},
+                )
+                continue
             else:
                 backend = config_store.get_ai_backend(agent_cfg.get("ai_backend_id", ""))  # type: ignore[attr-defined]
                 if backend is None:

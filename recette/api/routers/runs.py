@@ -62,6 +62,7 @@ def list_runs(request: Request) -> dict:
                 "kind": r.kind,
                 "status": r.status,
                 "agent_id": r.params.get("agent_id"),
+                "campaign_id": r.params.get("campaign_id"),
                 "error": r.error,
             }
             for r in runs

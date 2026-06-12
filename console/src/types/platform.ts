@@ -116,6 +116,7 @@ export interface RunSummary {
   kind: string;
   status: RunStatus;
   agent_id: string | null;
+  campaign_id: string | null;
   error: string | null;
 }
 

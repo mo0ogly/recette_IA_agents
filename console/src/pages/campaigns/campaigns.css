@@ -128,3 +128,61 @@
   max-height: 40vh;
   overflow-y: auto;
 }
+
+.camp-desc {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Run console (dark log window) */
+.camp-console {
+  background-color: #1b1f24;
+  color: #d7dde3;
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+
+.camp-console-empty {
+  color: #7a828c;
+  font-style: italic;
+}
+
+.camp-cline {
+  white-space: pre-wrap;
+}
+
+.camp-cseq {
+  color: #6b7785;
+  margin-right: 0.75rem;
+}
+
+.camp-agent_start { color: #7fb2ff; }
+.camp-step { color: #d7dde3; }
+.camp-agent_done { color: #74d99f; }
+.camp-campaign_done { color: #74d99f; font-weight: 700; }
+.camp-step_error,
+.camp-error { color: #ff9a9a; }
+.camp-end { color: #74d99f; }
+.camp-replay_result { color: #ffd479; font-weight: 700; }
+
+/* status dot (shared look with dashboard) */
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+}
+.dot-on {
+  background-color: #2f9e44;
+  box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.18);
+}
+.dot-off {
+  background-color: var(--color-border);
+}
