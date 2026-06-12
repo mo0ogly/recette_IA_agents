@@ -8,6 +8,7 @@ from typing import Any
 
 from recette.llm import (
     AnthropicLlm,
+    GeminiLlm,
     GroqLlm,
     LlmDecision,
     Message,
@@ -203,6 +204,61 @@ class TestGroq(unittest.TestCase):
         self.assertEqual(out.kind, "final")
         self.assertEqual(out.text, "ok")
         self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestGemini(unittest.TestCase):
+    def test_parses_function_call(self) -> None:
+        payload = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"functionCall": {"name": "read_repo", "args": {"resource": "acme/x"}}}
+                        ]
+                    }
+                }
+            ]
+        }
+        client = _StubClient(payload)
+        llm = GeminiLlm(model="gemini-2.0-flash", client=client)
+        out = llm.decide(
+            system="be an agent",
+            history=[Message(role="user", content="go")],
+            tools=TOOLS,
+        )
+        self.assertTrue(out.is_tool_call)
+        self.assertEqual(out.tool_name, "read_repo")
+        self.assertEqual(out.tool_args, {"resource": "acme/x"})
+        self.assertEqual(client.last_path, "/v1beta/models/gemini-2.0-flash:generateContent")
+        assert client.last_body is not None
+        self.assertEqual(
+            client.last_body["system_instruction"], {"parts": [{"text": "be an agent"}]}
+        )
+        declarations = client.last_body["tools"][0]["functionDeclarations"]
+        self.assertEqual(declarations[0]["name"], "read_repo")
+        self.assertEqual(client.last_body["contents"][0]["role"], "user")
+
+    def test_parses_text_answer(self) -> None:
+        payload = {"candidates": [{"content": {"parts": [{"text": "done"}]}}]}
+        client = _StubClient(payload)
+        out = GeminiLlm(model="m", client=client).decide(system="s", history=[], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "done")
+
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("GEMINI_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError):
+                GeminiLlm(model="gemini-2.0-flash")
+        finally:
+            if old is not None:
+                os.environ["GEMINI_API_KEY"] = old
+
+    def test_empty_candidates_yield_empty_final(self) -> None:
+        client = _StubClient({"candidates": []})
+        out = GeminiLlm(model="m", client=client).decide(system="s", history=[], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "")
 
 
 class TestFactory(unittest.TestCase):
