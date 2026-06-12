@@ -5,7 +5,9 @@ server registry (``{"id", "system", "mode", ...}``). resolve_proxy() picks
 the ExternalSystemProxy a run must execute through:
 
 - no ``server`` field (or empty) -> the provided default proxy;
-- ``mock_local``   -> LabHttpProxy("http://localhost:{port}");
+- ``mock_local``   -> LabHttpProxy("http://127.0.0.1:{port}"). The literal
+  loopback IP matches ServerManager, which binds and health-checks 127.0.0.1;
+  "localhost" may resolve to ::1 first and miss the bound IPv4 socket;
 - ``declared_url`` -> LabHttpProxy(base_url). The lab wire format
   (``POST /{target_system}/execute`` returning the ``{"success", "data"}``
   envelope) is the contract: a declared server MUST speak it;
@@ -52,7 +54,7 @@ def resolve_proxy(
         port = server.get("port")
         if not isinstance(port, int) or isinstance(port, bool):
             raise ValueError(f"server {server_id!r} (mock_local) requires an integer 'port'")
-        return LabHttpProxy(f"http://localhost:{port}")
+        return LabHttpProxy(f"http://127.0.0.1:{port}")
     if mode == "declared_url":
         base_url = server.get("base_url")
         if not isinstance(base_url, str) or not base_url:

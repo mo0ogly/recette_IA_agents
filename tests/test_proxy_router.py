@@ -46,12 +46,15 @@ class ProxyRouterTests(unittest.TestCase):
         resolved = resolve_proxy(agent, SERVERS, self.default)
         self.assertIs(resolved, self.default)
 
-    def test_mock_local_routes_to_localhost_port(self) -> None:
+    def test_mock_local_routes_to_loopback_ip_matching_server_manager(self) -> None:
+        # ServerManager binds and health-checks 127.0.0.1 explicitly; the proxy
+        # base must use the same literal IP (not "localhost", which may resolve
+        # to ::1 first on some hosts and miss the bound IPv4 socket).
         agent = {"id": "a1", "target_system": "github", "server": "gh-mock"}
         resolved = resolve_proxy(agent, SERVERS, self.default)
         self.assertIsInstance(resolved, LabHttpProxy)
         self.assertIsNot(resolved, self.default)
-        self.assertEqual(_base_url(resolved), "http://localhost:9101")
+        self.assertEqual(_base_url(resolved), "http://127.0.0.1:9101")
 
     def test_declared_url_routes_to_base_url(self) -> None:
         agent = {"id": "a2", "target_system": "gitlab", "server": "gl-lab"}
