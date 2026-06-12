@@ -4,6 +4,7 @@ import AgentsPage from "./pages/agents";
 import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
+import CampaignsPage from "./pages/campaigns";
 import CockpitPage from "./pages/cockpit";
 import RecettePage from "./pages/recette";
 
@@ -22,6 +23,9 @@ export default function App(): JSX.Element {
           </NavLink>
           <NavLink to="/recette" className={navLinkClass}>
             Recette
+          </NavLink>
+          <NavLink to="/campaigns" className={navLinkClass}>
+            Campagnes
           </NavLink>
           <NavLink to="/agents" className={navLinkClass}>
             Agents
@@ -43,6 +47,7 @@ export default function App(): JSX.Element {
           <Route path="/" element={<Navigate to="/cockpit" replace />} />
           <Route path="/cockpit" element={<CockpitPage />} />
           <Route path="/recette" element={<RecettePage />} />
+          <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />

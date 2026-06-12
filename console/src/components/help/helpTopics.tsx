@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 export type HelpTopicKey =
   | "cockpit"
   | "recette"
+  | "campaigns"
   | "agents"
   | "catalog"
   | "approvals"
@@ -106,6 +107,41 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Les <code>ReferenceAdapter</code> fournis sont l'oracle de reference
           (offline). Un vrai outil se branche en implementant le meme protocole
           d'adaptateur.
+        </p>
+      </>
+    ),
+  },
+  campaigns: {
+    title: "Aide — Campagnes",
+    summary:
+      "Jeux d'agents persistes, lances a la demande, avec replay deterministe (I4).",
+    body: (
+      <>
+        <p>
+          Une <strong>campagne</strong> est un ensemble ordonne et persiste de
+          lancements d'agents que l'equipe discovery rejoue a la demande. Chaque
+          execution passe par le vrai chemin (cockpit), diffuse son flux live, et
+          enregistre <strong>un enregistrement par etape</strong>.
+        </p>
+        <h3>Creer / lancer</h3>
+        <ul>
+          <li>
+            Choisir un id, une description, et les agents (les etapes, dans
+            l'ordre). Par defaut chaque etape utilise le mode de l'agent (mock si
+            aucun ai_backend lie).
+          </li>
+          <li>
+            <strong>Lancer</strong> execute toutes les etapes a la suite et
+            persiste les enregistrements.
+          </li>
+        </ul>
+        <h3>Replay (I4)</h3>
+        <p>
+          Un enregistrement rejoue les decisions exactes de l'agent et compare le
+          journal d'actions au journal d'origine. <code>IDENTIQUE</code> prouve le
+          determinisme (meme entree -&gt; meme sortie) ; <code>DIVERGENT</code>
+          signale une source de non-determinisme a corriger. C'est ce qui rend une
+          campagne de recette stable et reproductible dans le temps.
         </p>
       </>
     ),

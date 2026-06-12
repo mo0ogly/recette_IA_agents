@@ -12,9 +12,11 @@ import type {
   ActionSpec,
   AgentConfig,
   AiBackend,
+  Campaign,
   ChainReport,
   PendingApproval,
   PolicyDocument,
+  RecordingMeta,
   RunEvent,
   RunHandle,
   RunInfo,
@@ -182,6 +184,47 @@ export function stopRun(runId: string): Promise<{ stopped: boolean }> {
 /** Open the live event WebSocket for a run. Caller owns close(). */
 export function openRunSocket(runId: string): WebSocket {
   return new WebSocket(`${wsBaseUrl()}/runs/${encodeURIComponent(runId)}/ws`);
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns + replayable recordings
+// ---------------------------------------------------------------------------
+
+export function listCampaigns(): Promise<Campaign[]> {
+  return request<{ campaigns: Campaign[] }>("/campaigns", { method: "GET" }).then(
+    (r) => r.campaigns,
+  );
+}
+
+export function createCampaign(campaign: Campaign): Promise<Campaign> {
+  return request<Campaign>("/campaigns", {
+    method: "POST",
+    body: JSON.stringify(campaign),
+  });
+}
+
+export function deleteCampaign(id: string): Promise<void> {
+  return request<void>(`/campaigns/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function runCampaign(id: string): Promise<RunHandle> {
+  return request<RunHandle>(`/campaigns/${encodeURIComponent(id)}/run`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function listRecordings(): Promise<RecordingMeta[]> {
+  return request<{ recordings: RecordingMeta[] }>("/recordings", {
+    method: "GET",
+  }).then((r) => r.recordings);
+}
+
+export function replayRecording(recordingId: string): Promise<RunHandle> {
+  return request<RunHandle>(
+    `/recordings/${encodeURIComponent(recordingId)}/replay`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 // ---------------------------------------------------------------------------

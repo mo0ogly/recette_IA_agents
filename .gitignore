@@ -60,3 +60,7 @@ venv/
 data/agentrail.events.db
 data/agentrail.events.db-shm
 data/agentrail.events.db-wal
+
+# Runtime campaign + recording artifacts
+config/campaigns.json
+data/recordings/

@@ -19,10 +19,12 @@ from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
+from .campaign_store import CampaignStore, RecordingStore
 from .config_store import ConfigStore
 from .routers import actions as actions_router
 from .routers import approvals as approvals_router
 from .routers import audit as audit_router
+from .routers import campaigns as campaigns_router
 from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
@@ -70,6 +72,8 @@ def create_app(
     policy_store: PolicyStore | None = None,
     proxy: ExternalSystemProxy | None = None,
     catalog: Catalog | None = None,
+    campaign_store: CampaignStore | None = None,
+    recording_store: RecordingStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0")
 
@@ -112,6 +116,10 @@ def create_app(
     app.state.event_store = events
     app.state.policy_store = policies
     app.state.catalog = action_catalog
+    app.state.campaign_store = campaign_store if campaign_store is not None else CampaignStore()
+    app.state.recording_store = (
+        recording_store if recording_store is not None else RecordingStore()
+    )
     app.state.gateway = Gateway(
         catalog=action_catalog,
         policy_store=policies,
@@ -133,4 +141,5 @@ def create_app(
     app.include_router(approvals_router.router)
     app.include_router(audit_router.router)
     app.include_router(catalog_actions_router.router)
+    app.include_router(campaigns_router.router)
     return app

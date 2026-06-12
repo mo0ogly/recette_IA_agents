@@ -111,6 +111,29 @@ export interface RunEvent {
   [key: string]: unknown;
 }
 
+/** One step of a campaign: an agent launch, optionally as a scripted mock. */
+export interface CampaignStep {
+  agent_id: string;
+  stub_script?: Array<Record<string, unknown>>;
+}
+
+/** A persisted, ordered set of agent launches run on demand. */
+export interface Campaign {
+  id: string;
+  description: string;
+  steps: CampaignStep[];
+}
+
+/** Summary of a persisted, replayable recording. */
+export interface RecordingMeta {
+  recording_id: string;
+  agent_id: string;
+  target_system: string;
+  goal: string;
+  provider: string;
+  steps: number;
+}
+
 /** A configured AI backend an agent can be bound to. */
 export interface AiBackend {
   id: string;
