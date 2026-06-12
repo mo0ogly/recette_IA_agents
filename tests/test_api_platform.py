@@ -191,6 +191,38 @@ class TestPlatformApi(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["checked"], len(events))
 
+    def test_audit_events_filter_by_event_id(self) -> None:
+        self._execute("agent-admin", "list_users")
+        self._execute("agent-bot", "suspend_user")
+        events = self.client.get("/audit/events").json()["events"]
+        self.assertGreater(len(events), 1)
+        known = events[0]["event_id"]
+
+        # A known event_id returns exactly that one event.
+        single = self.client.get(
+            "/audit/events", params={"event_id": known}
+        ).json()["events"]
+        self.assertEqual([e["event_id"] for e in single], [known])
+
+        # An unknown event_id returns an empty list (no error, read-only I1).
+        unknown = self.client.get(
+            "/audit/events", params={"event_id": "EVnope"}
+        ).json()["events"]
+        self.assertEqual(unknown, [])
+
+        # event_id combines with other filters: a matching kind keeps the event,
+        # a non-matching kind filters it out.
+        kind = events[0]["kind"]
+        keep = self.client.get(
+            "/audit/events", params={"event_id": known, "kind": kind}
+        ).json()["events"]
+        self.assertEqual([e["event_id"] for e in keep], [known])
+        drop = self.client.get(
+            "/audit/events",
+            params={"event_id": known, "kind": "platform_error"},
+        ).json()["events"]
+        self.assertEqual(drop, [])
+
     def test_audit_export_jsonl(self) -> None:
         self._execute("agent-admin", "list_users")
         self._execute("agent-bot", "suspend_user")
