@@ -501,13 +501,23 @@ quadrantChart
 | Secrets | aucun | cle API lue de l'environnement au moment du run (R8 : jamais stockee) |
 | Usage recette | fabriquer des comportements EXACTS (la verite connue) | verifier que discovery detecte aussi un agent vraiment agentique |
 
-### Axe 2 -- la cible "en face" : `runtime = lab | real`
+### Axe 2 -- la cible "en face" : `runtime` declare + binding `server` effectif
 
-| | `lab` | `real` |
+Deux champs distincts portent cet axe :
+
+- **`runtime = lab | real`** : l'INTENTION declaree de l'agent (validee par le
+  ConfigStore). C'est ce que le tableau de bord affiche ("cible simulee /
+  reelle").
+- **`server = <id du registre>`** (optionnel) : le CABLAGE effectif du run
+  vers une entree du registre de serveurs (section 4.1). Sans binding,
+  l'agent garde le `LabForge` in-memory historique.
+
+| Cible effective | Implementation | Effets de bord |
 |---|---|---|
-| Implementation | `LabForge` en memoire + serveur mock :8082 (12 domaines) | `RealForge` + SDKs reels (`[real]` : PyGithub, python-gitlab) |
-| Effets de bord | zero | reels -- writes bloques par defaut (`enable_writes`), orgs/repos de test dedies uniquement |
-| Usage recette | tout le quotidien (reproductible, I4/I5) | validation finale optionnelle |
+| *(pas de binding)* | `LabForge` en memoire | zero ; reproductible (I4/I5), le quotidien |
+| `server -> mock_local` | `ProxyForge` -> lab mock :8082, vrai HTTP, access log JSONL | zero (handlers deterministes), mais trafic reseau OBSERVABLE -- le terrain de captation runtime |
+| `server -> declared_url` | `ProxyForge` -> serveur tiers parlant le contrat wire du lab | selon le serveur declare |
+| `server -> real_saas` / `RealForge` | pas de proxy real-SaaS encore (run FAIL fail-safe) ; cote CLI, `RealForge` + SDKs `[real]`, writes bloques par defaut (`enable_writes`) | reels -- orgs/repos de test dedies uniquement, validation finale |
 
 ### 6.1 Agents du corpus identification (`corpus/agents/`)
 
