@@ -68,3 +68,6 @@ data/recordings/
 # Runtime verdict submissions + lab access logs (regenerated at runtime)
 data/verdicts.json
 data/lab/
+
+# Per-backend AI API keys (R8: secrets, never committed)
+data/backend_secrets.json
