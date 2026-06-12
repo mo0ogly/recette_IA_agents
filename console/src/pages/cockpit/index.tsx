@@ -20,6 +20,8 @@ import {
 } from "../../api/client";
 import type { AgentConfig, AiBackend } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
+import { useAuditTail } from "../../hooks/useAuditTail";
 import "./cockpit.css";
 
 type Mode = "mock" | "real";
@@ -74,6 +76,8 @@ export default function CockpitPage(): JSX.Element {
   const [runStatus, setRunStatus] = useState<string>("");
   const [frames, setFrames] = useState<LiveFrame[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
+  // Unfiltered tail of the platform audit log while the page is mounted (I1).
+  const audit = useAuditTail();
 
   const loadConfig = useCallback(async () => {
     setError(null);
@@ -279,6 +283,14 @@ export default function CockpitPage(): JSX.Element {
           )}
         </section>
       </div>
+
+      <section className="cockpit-audit">
+        <LogConsole
+          title="Platform audit"
+          lines={audit.events.map(auditEventToLogLine)}
+          onClear={audit.clear}
+        />
+      </section>
     </div>
   );
 }

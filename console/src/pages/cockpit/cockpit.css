@@ -149,3 +149,8 @@
   background-color: var(--badge-green-bg);
   color: var(--badge-green-fg);
 }
+
+/* Global platform audit console below the launch/live grid. */
+.cockpit-audit {
+  margin-top: 1.5rem;
+}
