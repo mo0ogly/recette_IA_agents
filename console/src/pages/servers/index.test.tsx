@@ -179,16 +179,41 @@ describe("ServersPage", () => {
 
     const panel = await screen.findByTestId("server-log-gh-mock");
     expect(getServerLog).toHaveBeenCalledWith("gh-mock", 0);
+    // The panel is the reusable LogConsole, titled per server.
+    expect(within(panel).getByText("Access log (gh-mock)")).toBeInTheDocument();
     // Fields of the captured log line (the tail loads asynchronously).
     await waitFor(() => expect(panel.textContent).toContain("delete_repository"));
     expect(panel.textContent).toContain("e1");
     expect(panel.textContent).toContain("github");
     expect(panel.textContent).toContain("acme/x");
     expect(panel.textContent).toContain("200");
+    // A 2xx access-log entry renders as an info-level line.
+    const infoLine = within(panel).getByText(/e1 delete_repository/).closest(".logc-line");
+    expect(infoLine).toHaveAttribute("data-level", "info");
 
     // Toggle off removes the panel.
     fireEvent.click(within(await rowOf("gh-mock")).getByRole("button", { name: "Hide log" }));
     expect(screen.queryByTestId("server-log-gh-mock")).not.toBeInTheDocument();
+  });
+
+  it("renders a 4xx access-log entry as an error-level line", async () => {
+    mockHappyList();
+    // Derived from the captured tail fixture: same line shape, denied status.
+    const deniedTail: ServerLogTail = {
+      lines: [{ ...logTail.lines[0], event_id: "e2", status: 403 }],
+      next: 2,
+    };
+    vi.mocked(getServerLog).mockResolvedValue(deniedTail);
+
+    render(<ServersPage />);
+
+    const row = await rowOf("gh-mock");
+    await within(row).findByText("up");
+    fireEvent.click(within(row).getByRole("button", { name: "View log" }));
+
+    const panel = await screen.findByTestId("server-log-gh-mock");
+    const line = await within(panel).findByText(/e2 delete_repository acme\/x 403/);
+    expect(line.closest(".logc-line")).toHaveAttribute("data-level", "error");
   });
 
   it("shows mode-dependent form fields (port vs base_url vs owner)", async () => {

@@ -2,9 +2,9 @@
  * Servers page: target servers agents act against (GET /config/servers).
  *
  * Lists servers with a live status dot, supports create / edit / delete,
- * starts and stops mock_local servers, and tails each server's access log.
- * Credentials are referenced by env var name only (auth_env, R8): no secret
- * is ever displayed or submitted here.
+ * starts and stops mock_local servers, and tails each server's access log
+ * into the reusable LogConsole. Credentials are referenced by env var name
+ * only (auth_env, R8): no secret is ever displayed or submitted here.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -27,9 +27,11 @@ import type {
   ServerStatus,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import { LogConsole } from "../../components/LogConsole";
+import type { LogLine } from "../../components/LogConsole";
 import "./servers.css";
 
-/** Incremental poll period of an open log panel (swapped for LogConsole later). */
+/** Incremental poll period of an open log panel. */
 const LOG_POLL_INTERVAL_MS = 2000;
 
 const MODE_LABELS: Record<ServerMode, string> = {
@@ -163,15 +165,31 @@ function dotClass(status: ServerStatus | undefined): string {
   }
 }
 
-/** Minimal incremental tail of one server's access log (swappable: a richer
- *  reusable LogConsole component replaces this panel in a later task). */
+/** Map one accumulated access-log entry to a displayable log line.
+ *  HTTP status >= 400 (denied / failed proxy call) is error-level. */
+function serverLogToLogLine(line: ServerLogLine, index: number): LogLine {
+  return {
+    seq: index + 1,
+    level: line.status >= 400 ? "error" : "info",
+    source: line.target_system,
+    text: `${line.event_id} ${line.action_type} ${line.resource} ${line.status}`,
+  };
+}
+
+/** Incremental tail of one server's access log into the reusable LogConsole. */
 function ServerLogPanel({ serverId }: { serverId: string }): JSX.Element {
   const [lines, setLines] = useState<ServerLogLine[]>([]);
   const cursorRef = useRef(0);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     async function poll(): Promise<void> {
+      if (busyRef.current) {
+        // A previous poll is still in flight: skip this tick (no overlap).
+        return;
+      }
+      busyRef.current = true;
       try {
         const tail = await getServerLog(serverId, cursorRef.current);
         if (cancelled) {
@@ -183,6 +201,8 @@ function ServerLogPanel({ serverId }: { serverId: string }): JSX.Element {
         }
       } catch {
         // Best-effort tail: a failed poll is retried on the next tick.
+      } finally {
+        busyRef.current = false;
       }
     }
     void poll();
@@ -194,16 +214,12 @@ function ServerLogPanel({ serverId }: { serverId: string }): JSX.Element {
   }, [serverId]);
 
   return (
-    <pre className="servers-log-panel" data-testid={`server-log-${serverId}`}>
-      {lines.length === 0
-        ? "No access log entries yet."
-        : lines
-            .map(
-              (l) =>
-                `${l.event_id}  ${l.target_system}  ${l.action_type}  ${l.resource}  ${l.status}`,
-            )
-            .join("\n")}
-    </pre>
+    <div className="servers-log-panel" data-testid={`server-log-${serverId}`}>
+      <LogConsole
+        title={`Access log (${serverId})`}
+        lines={lines.map(serverLogToLogLine)}
+      />
+    </div>
   );
 }
 
