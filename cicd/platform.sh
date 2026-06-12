@@ -147,6 +147,45 @@ platform_down() {
     ok "plateforme arretee"
 }
 
+platform_purge() {
+    # Kill EVERY local web server belonging to THIS repo (and only this repo):
+    # recette.api uvicorn instances, lab mocks, vite dev servers -- including
+    # strays whose pid files were lost. Never touches docker containers or
+    # any process outside the repo.
+    hdr "PURGE serveurs locaux du projet"
+    platform_down || true
+    local patterns=(
+        "python -m recette.api"
+        "python -m recette.lab.mock_server"
+        "${CONSOLE_DIR}.*vite"
+    )
+    local found=0
+    local pat pid args
+    for pat in "${patterns[@]}"; do
+        while IFS= read -r pid; do
+            [ -n "${pid}" ] || continue
+            args="$(ps -p "${pid}" -o args= 2>/dev/null || true)"
+            # Only processes anchored in this repo (venv path or console dir).
+            case "${args}" in
+                *"${REPO_ROOT}"*)
+                    echo "  kill ${pid}: ${args:0:90}"
+                    kill "${pid}" 2>/dev/null || true
+                    found=$((found + 1))
+                    ;;
+            esac
+        done < <(pgrep -f "${pat}" 2>/dev/null || true)
+    done
+    rm -f "${API_PID_FILE}" "${LAB_PID_FILE}" "${CONSOLE_PID_FILE}" "${API_PORT_FILE}"
+    if [ "${found}" -eq 0 ]; then
+        ok "aucun serveur residuel"
+    else
+        sleep 1
+        ok "${found} processus arretes, pid files nettoyes"
+    fi
+    info "ports encore ecoutes (pour verification) :"
+    ss -ltn 2>/dev/null | awk 'NR>1 {print "   " $4}' | grep -E ":(80[0-9]{2}|5173)$" || echo "   (aucun port projet)"
+}
+
 platform_status() {
     hdr "PLATEFORME GOUVERNEE"
     local pid
@@ -298,6 +337,7 @@ case "${cmd}" in
     down)      platform_down ;;
     restart)   platform_down; platform_up ;;
     status)    platform_status ;;
+    purge)     platform_purge ;;
     console)
         sub="${1:-status}"; shift || true
         case "${sub}" in

@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./recette.sh logs [svc]|shell [svc]         # docker lab
 #   ./recette.sh status                         # full snapshot
 #   ./recette.sh api start|stop|restart|status|logs
-#   ./recette.sh platform up|down|restart|status     # lab mock + API gouvernee
+#   ./recette.sh platform up|down|restart|status|purge   # lab mock + API gouvernee
 #   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
@@ -63,6 +63,8 @@ show_menu() {
     echo -e "  ${BOLD}Campagnes${NC}"
     echo -e "  ${GREEN}23)${NC} Lister les campagnes"
     echo -e "  ${GREEN}24)${NC} Lancer une campagne"
+    echo -e "  ${BOLD}Nettoyage${NC}"
+    echo -e "  ${GREEN}25)${NC} Purger les serveurs web locaux (API, lab, console)"
     echo
     echo -e "   ${GREEN}0)${NC} Quitter"
     echo
@@ -98,6 +100,7 @@ menu_loop() {
             22) "${PLATFORM_SH}" console stop ;;
             23) "${PLATFORM_SH}" campaign list ;;
             24) "${PLATFORM_SH}" campaign menu ;;
+            25) "${PLATFORM_SH}" purge ;;
             0|q|Q) info "Bye"; exit 0 ;;
             *)  warn "choix invalide" ;;
         esac
