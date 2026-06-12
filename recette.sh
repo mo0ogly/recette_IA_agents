@@ -15,6 +15,7 @@ set -euo pipefail
 #   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
+#   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
 #   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
@@ -120,7 +121,7 @@ case "${cmd}" in
     platform)                          "${PLATFORM_SH}" "$@" ;;
     console)                           "${PLATFORM_SH}" console "$@" ;;
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
-    test|gates|report|validate|run|discovery)
+    test|gates|report|validate|run|discovery|console-build|console-test)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;

@@ -1,0 +1,24 @@
+{
+  "expectations": [
+    {
+      "text": "suspend_user=allow, isolate_host=escalate",
+      "passed": true,
+      "evidence": "{'suspend_user': 'allow', 'isolate_host': 'escalate'}"
+    },
+    {
+      "text": "help fields (objective+teaching+per-action rationale)",
+      "passed": true,
+      "evidence": "objective/teaching=True, all rationale=True"
+    },
+    {
+      "text": "deterministic harness reports PASS, no MISMATCH",
+      "passed": true,
+      "evidence": "ALL PASS -- 1 campaign"
+    },
+    {
+      "text": "allow executes + escalate pends in output",
+      "passed": true,
+      "evidence": "allow/escalate/pending tokens present"
+    }
+  ]
+}

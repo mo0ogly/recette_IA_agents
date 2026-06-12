@@ -29,6 +29,10 @@ export interface LogConsoleProps {
   stalled?: boolean;
   /** Oldest lines evicted upstream by a bounded buffer (0 hides the notice). */
   droppedCount?: number;
+  /** When set, lines become clickable (e.g. to inspect the event elsewhere). */
+  onLineClick?: (seq: number) => void;
+  /** seq of the line to highlight as selected (pairs with onLineClick). */
+  selectedSeq?: number | null;
 }
 
 /** Pixels from the bottom under which autoscroll stays engaged. */
@@ -93,6 +97,8 @@ export function LogConsole({
   onClear,
   stalled = false,
   droppedCount = 0,
+  onLineClick,
+  selectedSeq = null,
 }: LogConsoleProps): JSX.Element {
   const [filter, setFilter] = useState("");
   const [level, setLevel] = useState<LevelFilter>("all");
@@ -210,7 +216,14 @@ export function LogConsole({
           <div className="logc-empty">no log lines</div>
         ) : (
           visible.map((line) => (
-            <div className="logc-line" data-level={line.level} key={line.seq}>
+            <div
+              className="logc-line"
+              data-level={line.level}
+              data-selected={selectedSeq === line.seq || undefined}
+              data-clickable={onLineClick !== undefined || undefined}
+              key={line.seq}
+              onClick={onLineClick === undefined ? undefined : () => onLineClick(line.seq)}
+            >
               <span className="logc-seq">{line.seq}</span>
               <span className="logc-source">{line.source}</span>
               <span className="logc-text">{line.text}</span>

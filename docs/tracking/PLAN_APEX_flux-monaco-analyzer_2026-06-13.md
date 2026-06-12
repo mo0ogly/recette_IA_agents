@@ -43,20 +43,26 @@ immutable, I1); recette mode = blocking gates per react-recette.
 - [ ] S0 INIT (BLOCKED, needs exec): `cd console && npm install @monaco-editor/react monaco-editor`
       then vite build green pre-flight. Also close cycle flux-tail-v2 gates
       (make gates, tsc, vitest) BEFORE building on top of it.
-- [ ] S1 FluxAnalyzer component (`console/src/components/FluxAnalyzer.tsx`):
+- [x] S1 FluxAnalyzer component (`console/src/components/FluxAnalyzer.tsx`):
+      WRITTEN 2026-06-13 (compile pending S0). + FluxAnalyzer.css + tests
+      (pure fluxAnalyzerContent + mocked-editor render-and-assert).
       lazy `React.lazy` Monaco wrapper, read-only, JSON language, dark theme
       consistent with LogConsole; props: events (AuditEvent[]), selectedSeq,
       mode "event"|"stream". R16: fixture = existing auditEvents.fixture.json;
       render-and-assert test with Monaco mocked (jsdom cannot run the real
       editor -- mock @monaco-editor/react with a textarea stub, assert the
       serialized JSON content + props).
-- [ ] S2 page `/flux` (`console/src/pages/flux/index.tsx`): useAuditTail
+- [x] S2 page `/flux`: WRITTEN 2026-06-13 (compile pending S0). index.tsx +
+      flux.css + index.test.tsx (5 cases incl. deep links); LogConsole gained
+      onLineClick/selectedSeq (+ test); client gained auditExportUrl().
+      Original spec: useAuditTail
       (agent filter select fed from listAgents), LogConsole on the left with
       line click -> select seq, FluxAnalyzer right, follow toggle, export
       button -> /audit/export.jsonl. Route + nav entry. Tests: render with
       fixture, click line -> analyzer shows that event JSON.
-- [ ] S3 wiring polish: deep-link ?agent_id= and ?seq= (mirror audit page
-      ?event_id= pattern), HelpModal entry if pattern exists for other pages.
+- [x] S3 wiring: route /flux + nav "Flux" in App.tsx; deep links ?agent_id=
+      and ?seq= implemented in S2 directly. HelpModal entry: deferred to the
+      PDCA pass (queued by user) with the rest of the polish.
 - [ ] S4 (optional, only if needed during build) backend: GET /audit/events
       already covers needs; no change expected. Confirm during S2.
 - [ ] S5 RECETTE (blocking): tsc, vite build (chunk-size check for lazy

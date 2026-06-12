@@ -165,6 +165,26 @@ describe("LogConsole", () => {
     expect(screen.getByText("stalled")).toBeInTheDocument();
   });
 
+  it("clicking a line reports its seq and the selected line is highlighted", () => {
+    const onLineClick = vi.fn();
+    render(
+      <LogConsole
+        title="t"
+        lines={fixtureLines}
+        onLineClick={onLineClick}
+        selectedSeq={fixtureLines[1].seq}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(fixtureLines[0].text));
+    expect(onLineClick).toHaveBeenCalledWith(fixtureLines[0].seq);
+
+    const selected = screen.getByText(fixtureLines[1].text).closest(".logc-line");
+    expect(selected).toHaveAttribute("data-selected", "true");
+    const unselected = screen.getByText(fixtureLines[0].text).closest(".logc-line");
+    expect(unselected).not.toHaveAttribute("data-selected");
+  });
+
   it("shows the dropped notice only when lines were evicted upstream", () => {
     const { rerender } = render(
       <LogConsole title="t" lines={fixtureLines} droppedCount={0} />,

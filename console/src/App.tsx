@@ -7,6 +7,7 @@ import CatalogPage from "./pages/catalog";
 import CampaignsPage from "./pages/campaigns";
 import CockpitPage from "./pages/cockpit";
 import DashboardPage from "./pages/dashboard";
+import FluxPage from "./pages/flux";
 import RecettePage from "./pages/recette";
 import ServersPage from "./pages/servers";
 import VerdictsPage from "./pages/verdicts";
@@ -26,6 +27,9 @@ export default function App(): JSX.Element {
           </NavLink>
           <NavLink to="/cockpit" className={navLinkClass}>
             Cockpit
+          </NavLink>
+          <NavLink to="/flux" className={navLinkClass}>
+            Flux
           </NavLink>
           <NavLink to="/recette" className={navLinkClass}>
             Recette
@@ -59,6 +63,7 @@ export default function App(): JSX.Element {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/cockpit" element={<CockpitPage />} />
+          <Route path="/flux" element={<FluxPage />} />
           <Route path="/recette" element={<RecettePage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/verdicts" element={<VerdictsPage />} />

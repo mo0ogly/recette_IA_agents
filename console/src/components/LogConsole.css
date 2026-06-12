@@ -113,6 +113,18 @@
   white-space: pre-wrap;
 }
 
+.logc-line[data-clickable="true"] {
+  cursor: pointer;
+}
+
+.logc-line[data-clickable="true"]:hover {
+  background-color: #242a31;
+}
+
+.logc-line[data-selected="true"] {
+  background-color: #2b3440;
+}
+
 .logc-seq {
   color: #6b7785;
   margin-right: 0.75rem;

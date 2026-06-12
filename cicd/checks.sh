@@ -4,6 +4,7 @@ set -euo pipefail
 # checks.sh - run the recette test / gate / report suites
 #
 # Usage: checks.sh test|gates|report|validate|run|discovery [--docker]
+#        checks.sh console-build|console-test          (React console, local only)
 #   default runs locally (.venv); --docker runs inside the lab image.
 # ===========================================================================
 
@@ -23,6 +24,11 @@ run_local() {
         run)       ( cd "${REPO_ROOT}" && "$(py)" -m recette run ) ;;
         discovery) ( cd "${REPO_ROOT}" \
                      && "$(py)" -m recette discovery --adapter reference ) ;;
+        console-build) ( cd "${REPO_ROOT}/console" \
+                         && node node_modules/.bin/tsc --noEmit \
+                         && node node_modules/.bin/vite build ) ;;
+        console-test)  ( cd "${REPO_ROOT}/console" \
+                         && node node_modules/.bin/vitest run ) ;;
         *) err "cible inconnue: ${target}"; exit 1 ;;
     esac
 }
