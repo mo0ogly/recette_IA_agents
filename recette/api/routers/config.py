@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from ..config_store import UnknownAgentError
+
 router = APIRouter(prefix="/config", tags=["config"])
 
 
@@ -30,8 +32,10 @@ def create_agent(request: Request, agent: dict[str, Any]) -> dict:
 def update_agent(request: Request, agent_id: str, patch: dict[str, Any]) -> dict:
     try:
         return _store(request).update_agent(agent_id, patch)
-    except ValueError as exc:
+    except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/agents/{agent_id}", status_code=204)

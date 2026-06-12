@@ -68,3 +68,19 @@ class TestConfigRoutes(unittest.TestCase):
             self.client.put("/config/agents/nope", json={"goal": "x"}).status_code, 404
         )
         self.assertEqual(self.client.delete("/config/agents/a1").status_code, 204)
+
+    def test_update_bad_runtime_is_400_not_404(self) -> None:
+        self.client.post(
+            "/config/agents",
+            json={
+                "id": "a1",
+                "principal": "p",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": [],
+                "ai_backend_id": "b1",
+                "runtime": "lab",
+            },
+        )
+        r = self.client.put("/config/agents/a1", json={"runtime": "bogus"})
+        self.assertEqual(r.status_code, 400)

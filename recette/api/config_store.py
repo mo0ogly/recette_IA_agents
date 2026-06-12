@@ -16,6 +16,15 @@ _FORBIDDEN_BACKEND_FIELDS = {"api_key", "key", "token", "secret"}
 _RUNTIMES = {"lab", "real"}
 
 
+class UnknownAgentError(LookupError):
+    """Raised when an agent id is not found (maps to HTTP 404, distinct from bad input)."""
+
+
+def _check_runtime(runtime: object) -> None:
+    if runtime not in _RUNTIMES:
+        raise ValueError(f"runtime must be one of {_RUNTIMES}")
+
+
 def _default() -> dict:
     return {"schema_version": SCHEMA_VERSION, "agents": [], "ai_backends": []}
 
@@ -51,8 +60,7 @@ class ConfigStore:
         return next((a for a in self.read()["agents"] if a["id"] == agent_id), None)
 
     def add_agent(self, agent: dict) -> dict:
-        if agent.get("runtime") not in _RUNTIMES:
-            raise ValueError(f"runtime must be one of {_RUNTIMES}")
+        _check_runtime(agent.get("runtime"))
         cfg = self.read()
         if any(a["id"] == agent["id"] for a in cfg["agents"]):
             raise ValueError(f"agent id {agent['id']!r} already exists")
@@ -61,13 +69,15 @@ class ConfigStore:
         return agent
 
     def update_agent(self, agent_id: str, patch: dict) -> dict:
+        if "runtime" in patch:
+            _check_runtime(patch["runtime"])  # reject bad input before mutating/writing
         cfg = self.read()
         for a in cfg["agents"]:
             if a["id"] == agent_id:
                 a.update(patch)
                 self._write(cfg)
                 return a
-        raise ValueError(f"no agent {agent_id!r}")
+        raise UnknownAgentError(f"no agent {agent_id!r}")
 
     def delete_agent(self, agent_id: str) -> None:
         cfg = self.read()
