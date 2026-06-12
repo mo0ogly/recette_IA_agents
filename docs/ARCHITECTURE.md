@@ -88,7 +88,7 @@ flowchart TB
 
   subgraph ENGINE["Moteur recette (recette/)"]
     LANEB["lane_b.run_agent<br/>boucle decide -> act"]
-    LLM["LlmBackend<br/>StubLlm / ReplayLlm / Anthropic / OpenAI"]
+    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>8 providers live (cle env, R8)"]
     FORGE["GitForge<br/>LabForge (defaut) / RealForge"]
     REC["Recording<br/>artefact rejouable (I4)"]
     HARN["Harnais + Scorecards<br/>harness.py, discovery_harness.py"]
