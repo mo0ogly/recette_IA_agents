@@ -11,6 +11,7 @@ Backends:
   client -- no API key, no network. Keys come from env (R8): ANTHROPIC_API_KEY / OPENAI_API_KEY.
 - OpenAiCompatLlm -- OpenAI wire format against a configurable base_url (Ollama, vLLM,
   LiteLLM proxies); API key optional for local keyless servers.
+- GroqLlm -- Groq cloud, OpenAI wire format at api.groq.com. Key: GROQ_API_KEY.
 
 ReplayLlm (deterministic replay of a recorded run) lands with the recorder in LB4.
 """
@@ -268,6 +269,26 @@ class OpenAiCompatLlm(OpenAiLlm):
         if base.endswith("/v1"):
             base = base[: -len("/v1")]
         return base
+
+
+# --- Groq --------------------------------------------------------------------------------
+
+
+class GroqLlm(OpenAiLlm):
+    """Groq cloud backend -- OpenAI wire format at api.groq.com. Key: GROQ_API_KEY."""
+
+    BASE_URL = "https://api.groq.com/openai"
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            key = api_key or os.environ.get("GROQ_API_KEY")
+            if not key:
+                raise RuntimeError("GROQ_API_KEY not set (or pass client/api_key)")
+            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
 
 
 # --- provider factory --------------------------------------------------------------------

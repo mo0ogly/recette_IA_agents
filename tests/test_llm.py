@@ -8,6 +8,7 @@ from typing import Any
 
 from recette.llm import (
     AnthropicLlm,
+    GroqLlm,
     LlmDecision,
     Message,
     OpenAiCompatLlm,
@@ -182,6 +183,25 @@ class TestOpenAiCompat(unittest.TestCase):
         client = _StubClient({"choices": []})
         llm = OpenAiCompatLlm(model="m", base_url="http://h:1/v1", client=client)
         llm.decide(system="s", history=[], tools=[])
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+
+
+class TestGroq(unittest.TestCase):
+    def test_requires_key_when_no_client(self) -> None:
+        old = os.environ.pop("GROQ_API_KEY", None)
+        try:
+            with self.assertRaises(RuntimeError):
+                GroqLlm(model="llama-3.3-70b-versatile")
+        finally:
+            if old is not None:
+                os.environ["GROQ_API_KEY"] = old
+
+    def test_decide_uses_openai_wire_format(self) -> None:
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = GroqLlm(model="llama-3.3-70b-versatile", client=client)
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(out.kind, "final")
+        self.assertEqual(out.text, "ok")
         self.assertEqual(client.last_path, "/v1/chat/completions")
 
 
