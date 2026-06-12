@@ -211,6 +211,17 @@ AGENTRAIL_E2E_API_URL=http://127.0.0.1:8090 python3 -m unittest tests.e2e.test_g
 The e2e suite is opt-in: without `AGENTRAIL_E2E_API_URL` all of its tests are
 skipped, so the normal `make test` suite stays offline-green.
 
+Agent+server e2e smoke (managed mock server, bound agent, campaign, access-log
+capture, deterministic replay) against any running API:
+
+```
+python3 scripts/smoke_lab.py --api http://127.0.0.1:8090 --server-port 9111
+```
+
+Exit 0 = `SMOKE PASS` (all six steps asserted). Re-runnable back to back: the
+script deletes its own fixture entities (`smoke-*`) up front and reads the
+access log from a cursor, so prior runs never pollute the assertions.
+
 State persistence: the docker lab keeps the event store, policies and agent
 config on the `platform-data` named volume. `make platform-down` keeps it;
 `docker compose down -v` wipes it (fresh hash chain, empty inbox).
