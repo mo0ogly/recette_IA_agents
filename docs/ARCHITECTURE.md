@@ -221,30 +221,50 @@ flowchart LR
     A1["Agent mock<br/>scenario stocke"]
     A2["Agent IA reelle<br/>ai_backend + cle env"]
   end
+  ROUTE{"binding server<br/>de l'agent ?"}
+  REG["Registre de serveurs (config)<br/>mock_local / declared_url / real_saas"]
   subgraph SRV["Serveurs en face"]
     direction TB
     LF["LabForge<br/>in-memory, in-process"]
-    LAB["Lab mock :8082<br/>POST /target_system/execute<br/>12 domaines deterministes"]
-    REAL["SaaS reels<br/>GitHub / GitLab via RealForge<br/>writes bloques par defaut"]
+    LAB["Lab mock :8082 (mock_local)<br/>POST /system/execute<br/>access log JSONL + /health"]
+    DECL["Serveur declare (declared_url)<br/>meme contrat wire que le lab"]
+    REAL["SaaS reels (real_saas)<br/>pas de proxy encore : run FAIL<br/>jamais de fallback (I5)"]
   end
   subgraph DPLANE["Discovery / Enrichment Plane"]
     DM["Mock discovery :8081<br/>sources / scan-runs / risks"]
     DR["Service discovery REEL<br/>du collegue (http_adapter)"]
   end
-  A1 -->|"execute(action)"| LF
-  A2 -->|"execute(action)"| LF
+  A1 --> ROUTE
+  A2 --> ROUTE
+  ROUTE -->|"aucun"| LF
+  ROUTE -->|"server=id"| REG
+  REG -->|"ProxyForge, vrai HTTP"| LAB
+  REG -->|"ProxyForge, vrai HTTP"| DECL
+  REG -.->|"ValueError"| REAL
   GW2["Gateway gouvernee<br/>(section 8)"] -->|"proxy I5, HTTP"| LAB
-  A2 -.->|"runtime real"| REAL
   HARN2["Harnais discovery"] -->|"memes routes REST"| DM
   HARN2 -->|"AGENTRAIL_DISCOVERY_URL"| DR
 ```
 
-Trois "en face" possibles pour un agent, choisis par config (`runtime`,
-chemin gouverne ou non) ; et deux implementations interchangeables du plan
-discovery -- le mock :8081 repond exactement ce qu'un scanner correct DOIT
-repondre (adosse a l'oracle `ReferenceSourceScanAdapter`), le service reel se
-branche par la meme interface REST (`recette/http_adapter.py`, URL et token
-par env).
+Le "en face" d'un agent est choisi par le **registre de serveurs** du
+ConfigStore (`servers[]`, trois modes) et le champ `server` de l'agent :
+
+| Mode du serveur | Implementation | Comportement |
+|---|---|---|
+| *(pas de binding)* | `LabForge` in-memory | historique, in-process, aucun trafic reseau |
+| `mock_local` | `ProxyForge` -> lab mock sur le port declare | **vrai trafic HTTP** observable, cycle de vie pilote par le `ServerManager` (start/stop/status/log via l'API) |
+| `declared_url` | `ProxyForge` -> `base_url` fourni | n'importe quel serveur parlant le contrat wire du lab (`POST /{target_system}/execute`, envelope `{success, data}`) |
+| `real_saas` | aucune (pas encore de proxy real-SaaS) | `ValueError` -> le run ECHOUE ; jamais de repli silencieux vers un autre proxy (I5) |
+
+Regle fail-safe de routage (`recette/platform/proxy/router.py`) : une
+reference de serveur pendante ou un mode inconnu fait ECHOUER le run --
+executer les effets de bord contre le mauvais systeme serait une violation
+I5, donc aucun fallback par defaut.
+
+Cote plan discovery, deux implementations interchangeables : le mock :8081
+repond exactement ce qu'un scanner correct DOIT repondre (adosse a l'oracle
+`ReferenceSourceScanAdapter`), le service reel se branche par la meme
+interface REST (`recette/http_adapter.py`, URL et token par env).
 
 ### 4.2 Les trois points de captation d'un agent
 
@@ -282,7 +302,7 @@ flowchart TB
 | Point de captation | Ce que discovery peut en deduire | Ce que la recette fournit comme terrain | Verifie par |
 |---|---|---|---|
 | **Statique (source)** : scan du repo avant que l'agent tourne | identite declaree, `target_system`, capabilities declarees, surface CI/CD (permissions larges = bump de risque) | 20 sources sur 5 surfaces (`corpus/repos`, `gitlab`, `temporal`, `openapi`, `manifests`), dont 5 vrais negatifs `no-agent` | `python -m recette discovery` -- detection, dedup, couverture des actions, ordre de risque, determinisme |
-| **Runtime (serveur)** : observer ce qui arrive sur le systeme cible | identite REELLEMENT utilisee (principal/token), actions reelles, ressources touchees, frequence | agents lancables a la demande (cockpit, campagnes) contre le lab :8082 ; 17 templates gradues legit/suspect/destructive | signaux `api_traffic` + `credential_usage` du `ReferenceDiscoveryAdapter` : un agent est detectable des sa PREMIERE action observable |
+| **Runtime (serveur)** : observer ce qui arrive sur le systeme cible | identite REELLEMENT utilisee (principal/token), actions reelles, ressources touchees, frequence | agents lancables a la demande (cockpit, campagnes) contre le lab :8082 ; **access log JSONL cote serveur** (`AGENTRAIL_LAB_ACCESS_LOG` : une ligne `{event_id, target_system, action_type, resource, status}` par requete recue -- la matiere brute qu'un sniffer/collecteur discovery consommerait) ; 17 templates gradues legit/suspect/destructive | signaux `api_traffic` + `credential_usage` du `ReferenceDiscoveryAdapter` : un agent est detectable des sa PREMIERE action observable |
 | **Evenementiel (audit)** : consommer le flux/log d'evenements | la totalite : ecart declare/reel, approbations manquantes (I6), spam, hash des effets de bord | recordings persistes par campagne + event store hash-chaine du chemin gouverne | signal `event_stream` ; replay `IDENTIQUE` prouve que la trace consommee est fidele |
 
 ### 4.3 Du signal capte au verdict : mapping vers les 4 dimensions
