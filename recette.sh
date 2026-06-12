@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ===========================================================================
+# recette.sh - single entry point to manage the AgentRail recette platform
+#
+# Interactive menu:
+#   ./recette.sh
+#
+# CLI (non-interactive) - delegates to the cicd/ sub-programs:
+#   ./recette.sh up|down|restart|rebuild|ps     # docker lab
+#   ./recette.sh logs [svc]|shell [svc]         # docker lab
+#   ./recette.sh status                         # full snapshot
+#   ./recette.sh api start|stop|restart|status|logs
+#   ./recette.sh test|gates|report|validate|run|discovery [--docker]
+#
+# Auteur : Fabrice Pizzi - ANSSI
+# ===========================================================================
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CICD_DIR="${ROOT}/cicd"
+source "${CICD_DIR}/lib/common.sh"
+
+DOCKER_SH="${CICD_DIR}/docker.sh"
+API_SH="${CICD_DIR}/api.sh"
+STATUS_SH="${CICD_DIR}/status.sh"
+CHECKS_SH="${CICD_DIR}/checks.sh"
+
+show_menu() {
+    hdr "AgentRail recette - gestion"
+    echo -e "  ${BOLD}Docker lab${NC}"
+    echo -e "   ${GREEN}1)${NC} Statut global"
+    echo -e "   ${GREEN}2)${NC} Demarrer le lab (up)"
+    echo -e "   ${GREEN}3)${NC} Arreter le lab (down)"
+    echo -e "   ${GREEN}4)${NC} Redemarrer le lab"
+    echo -e "   ${GREEN}5)${NC} Rebuild image"
+    echo -e "   ${GREEN}6)${NC} Logs lab"
+    echo -e "  ${BOLD}API Track U${NC}"
+    echo -e "   ${GREEN}7)${NC} API start"
+    echo -e "   ${GREEN}8)${NC} API stop"
+    echo -e "   ${GREEN}9)${NC} API statut"
+    echo -e "  ${BOLD}Checks${NC}"
+    echo -e "  ${GREEN}10)${NC} Tests (local)"
+    echo -e "  ${GREEN}11)${NC} Gates (local)"
+    echo -e "  ${GREEN}12)${NC} Report (local)"
+    echo -e "  ${GREEN}13)${NC} Tests (docker)"
+    echo
+    echo -e "   ${GREEN}0)${NC} Quitter"
+    echo
+    echo -n "  Choix : "
+}
+
+menu_loop() {
+    while true; do
+        show_menu
+        local c; read -r c
+        case "${c}" in
+            1)  "${STATUS_SH}" ;;
+            2)  "${DOCKER_SH}" up ;;
+            3)  "${DOCKER_SH}" down ;;
+            4)  "${DOCKER_SH}" restart ;;
+            5)  "${DOCKER_SH}" rebuild ;;
+            6)  "${DOCKER_SH}" logs ;;
+            7)  "${API_SH}" start ;;
+            8)  "${API_SH}" stop ;;
+            9)  "${API_SH}" status ;;
+            10) "${CHECKS_SH}" test ;;
+            11) "${CHECKS_SH}" gates ;;
+            12) "${CHECKS_SH}" report ;;
+            13) "${CHECKS_SH}" test --docker ;;
+            0|q|Q) info "Bye"; exit 0 ;;
+            *)  warn "choix invalide" ;;
+        esac
+        echo; read -rp "  Entree pour continuer..." _
+    done
+}
+
+cmd="${1:-menu}"; shift || true
+case "${cmd}" in
+    menu)                              menu_loop ;;
+    up|down|restart|rebuild|ps|logs|shell)
+                                       "${DOCKER_SH}" "${cmd}" "$@" ;;
+    status)                            "${STATUS_SH}" ;;
+    api)                               "${API_SH}" "$@" ;;
+    test|gates|report|validate|run|discovery)
+                                       "${CHECKS_SH}" "${cmd}" "$@" ;;
+    -h|--help|help)
+        sed -n '4,28p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+    *)  err "commande inconnue: ${cmd}"; \
+        echo "  voir: ./recette.sh --help"; exit 1 ;;
+esac

@@ -52,3 +52,6 @@ venv/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+
+# recette.sh runtime state (API pid/logs)
+.run/
