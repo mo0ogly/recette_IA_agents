@@ -1,0 +1,75 @@
+/**
+ * R16 contract tests for the Agents page.
+ *
+ * Fixtures in __fixtures__/ were captured from the real backend
+ * (recette.api running locally), not invented. The api client module is
+ * mocked so the page renders against the exact payload shape the backend
+ * returns.
+ */
+
+import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentConfig, AiBackend } from "../../types/platform";
+import agentsFixture from "./__fixtures__/agents.fixture.json";
+import backendsFixture from "./__fixtures__/ai-backends.fixture.json";
+
+vi.mock("../../api/client", () => ({
+  listAgents: vi.fn(),
+  createAgent: vi.fn(),
+  updateAgent: vi.fn(),
+  deleteAgent: vi.fn(),
+  listAiBackends: vi.fn(),
+}));
+
+import {
+  listAgents,
+  listAiBackends,
+} from "../../api/client";
+import AgentsPage from "./index";
+
+const agents = agentsFixture as unknown as AgentConfig[];
+const backends = backendsFixture as unknown as AiBackend[];
+
+describe("AgentsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders agents and backends from the real fixture payloads", async () => {
+    vi.mocked(listAgents).mockResolvedValue(agents);
+    vi.mocked(listAiBackends).mockResolvedValue(backends);
+
+    render(<AgentsPage />);
+
+    // Agent row fields from the captured fixture.
+    expect(await screen.findByText("agent-admin")).toBeInTheDocument();
+    expect(screen.getByText("identity_admin")).toBeInTheDocument();
+    expect(screen.getByText("claude-opus-4-8")).toBeInTheDocument();
+    expect(screen.getByText("okta")).toBeInTheDocument();
+
+    // The AI backend select offers backend-1 plus the empty option.
+    const backendSelect = screen.getByLabelText("AI backend");
+    const options = within(backendSelect).getAllByRole("option");
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toContain(
+      "backend-1",
+    );
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toContain("");
+
+    // No error banner on the happy path.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows an error banner when the agents API call fails", async () => {
+    vi.mocked(listAgents).mockRejectedValue(
+      new Error("API request failed (500) on /config/agents: boom"),
+    );
+    vi.mocked(listAiBackends).mockResolvedValue(backends);
+
+    render(<AgentsPage />);
+
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent(
+      "API request failed (500) on /config/agents: boom",
+    );
+  });
+});
