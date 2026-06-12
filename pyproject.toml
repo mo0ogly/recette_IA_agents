@@ -46,8 +46,8 @@ recette = "recette.__main__:main"
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["recette", "recette.api"]
+[tool.setuptools.packages.find]
+include = ["recette*"]
 
 [tool.ruff]
 line-length = 100

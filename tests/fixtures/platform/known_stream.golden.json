@@ -1,0 +1,185 @@
+[
+  {
+    "event_id": "01HF7YAT010000000000000001",
+    "hash": "c0851b776ab523dc52e10a3c4caaa55cf90061d82990ba55f7970b87690439d1",
+    "kind": "action_executed",
+    "payload": {
+      "action_type": "list_users",
+      "agent_id": "agent-admin",
+      "approval_state": "none",
+      "capability_scope": [
+        "okta"
+      ],
+      "correlates_event_id": null,
+      "event_id": "01HF7YAT010000000000000001",
+      "extra": {},
+      "payload": {},
+      "policy_decision": {
+        "policy_version": "v-replay",
+        "rule_id": "okta.list_users.identity_admin",
+        "verdict": "allow"
+      },
+      "resource": "org/acme",
+      "risk_level": "low",
+      "risk_score": 1,
+      "role": "identity_admin",
+      "schema_version": "2.0",
+      "side_effect_hash": "2bf366aa970795309776ab0e71aed59213b84ef71a94953e0d5cce50d17bd51e",
+      "target_system": "okta",
+      "timestamp": "2026-06-12T08:00:00Z"
+    },
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "schema_version": "2.0",
+    "seq": 1
+  },
+  {
+    "event_id": "01HF7YAT020000000000000002",
+    "hash": "a952670f46005d634e9eb59cd0d388fe44f82192a94a39549551a416dd3fd868",
+    "kind": "action_requested",
+    "payload": {
+      "action_type": "suspend_user",
+      "agent_id": "agent-admin",
+      "approval_state": "pending",
+      "capability_scope": [
+        "okta"
+      ],
+      "correlates_event_id": null,
+      "event_id": "01HF7YAT020000000000000002",
+      "extra": {},
+      "payload": {
+        "reason": "offboarding"
+      },
+      "policy_decision": {
+        "policy_version": "v-replay",
+        "rule_id": "okta.suspend_user.identity_admin",
+        "verdict": "escalate"
+      },
+      "resource": "user/jdoe",
+      "risk_level": "high",
+      "risk_score": 3,
+      "role": "identity_admin",
+      "schema_version": "2.0",
+      "side_effect_hash": null,
+      "target_system": "okta",
+      "timestamp": "2026-06-12T08:01:00Z"
+    },
+    "prev_hash": "c0851b776ab523dc52e10a3c4caaa55cf90061d82990ba55f7970b87690439d1",
+    "schema_version": "2.0",
+    "seq": 2
+  },
+  {
+    "event_id": "01HF7YAT030000000000000003",
+    "hash": "4f2b5b4ad224369445509116546e18aaf73c8113029ae762a34797556e571432",
+    "kind": "action_denied",
+    "payload": {
+      "action_type": "suspend_user",
+      "agent_id": "agent-bot",
+      "approval_state": "none",
+      "capability_scope": [],
+      "correlates_event_id": null,
+      "event_id": "01HF7YAT030000000000000003",
+      "extra": {},
+      "payload": {},
+      "policy_decision": {
+        "policy_version": "v-replay",
+        "rule_id": null,
+        "verdict": "deny"
+      },
+      "resource": "user/jdoe",
+      "risk_level": "high",
+      "risk_score": 3,
+      "role": "marketing_bot",
+      "schema_version": "2.0",
+      "side_effect_hash": null,
+      "target_system": "okta",
+      "timestamp": "2026-06-12T08:02:00Z"
+    },
+    "prev_hash": "a952670f46005d634e9eb59cd0d388fe44f82192a94a39549551a416dd3fd868",
+    "schema_version": "2.0",
+    "seq": 3
+  },
+  {
+    "event_id": "01HF7YAT040000000000000004",
+    "hash": "e301dc5a31e2630e1415688f8f3f9ad7537cac318afdb3a7aba6046f0be5c4cf",
+    "kind": "action_denied",
+    "payload": {
+      "action_type": "delete_logs",
+      "agent_id": "agent-admin",
+      "approval_state": "none",
+      "capability_scope": [
+        "okta"
+      ],
+      "correlates_event_id": null,
+      "event_id": "01HF7YAT040000000000000004",
+      "extra": {},
+      "payload": {},
+      "policy_decision": {
+        "policy_version": "v-replay",
+        "rule_id": null,
+        "verdict": "deny"
+      },
+      "resource": "logs/2026-06",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "role": "identity_admin",
+      "schema_version": "2.0",
+      "side_effect_hash": null,
+      "target_system": "data_platform",
+      "timestamp": "2026-06-12T08:03:00Z"
+    },
+    "prev_hash": "4f2b5b4ad224369445509116546e18aaf73c8113029ae762a34797556e571432",
+    "schema_version": "2.0",
+    "seq": 4
+  },
+  {
+    "event_id": "01HF7YAT050000000000000005",
+    "hash": "5cbfc9e9b368d6888896619ac451d82ec74232b5be4f6b7cb1f0b53bb681c7f7",
+    "kind": "action_denied",
+    "payload": {
+      "action_type": "list_users",
+      "agent_id": "ghost",
+      "approval_state": "none",
+      "capability_scope": [],
+      "correlates_event_id": null,
+      "event_id": "01HF7YAT050000000000000005",
+      "extra": {
+        "deny_reason": "unknown agent identity"
+      },
+      "payload": {},
+      "policy_decision": {
+        "policy_version": "",
+        "rule_id": null,
+        "verdict": "deny"
+      },
+      "resource": "org/acme",
+      "risk_level": "low",
+      "risk_score": 1,
+      "role": "",
+      "schema_version": "2.0",
+      "side_effect_hash": null,
+      "target_system": "okta",
+      "timestamp": "2026-06-12T08:04:00Z"
+    },
+    "prev_hash": "e301dc5a31e2630e1415688f8f3f9ad7537cac318afdb3a7aba6046f0be5c4cf",
+    "schema_version": "2.0",
+    "seq": 5
+  },
+  {
+    "event_id": "01HF7YAT060000000000000006",
+    "hash": "eb82e46bc0e7de099e2d82ade9a763e88040aa61288b00c9b176900b023f98c8",
+    "kind": "approval_resolved",
+    "payload": {
+      "action_type": "suspend_user",
+      "agent_id": "agent-admin",
+      "approval_state": "timeout",
+      "approver": "system:timeout-sweep",
+      "correlates_event_id": "01HF7YAT020000000000000002",
+      "reason": "approval timeout after 3600s",
+      "schema_version": "2.0",
+      "target_system": "okta"
+    },
+    "prev_hash": "5cbfc9e9b368d6888896619ac451d82ec74232b5be4f6b7cb1f0b53bb681c7f7",
+    "schema_version": "2.0",
+    "seq": 6
+  }
+]
