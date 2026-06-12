@@ -269,6 +269,105 @@ class TestAiBackendConnectivityProbe(unittest.TestCase):
         self.assertIn("openai_compat requires base_url", body["error"])
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class TestAiBackendSecretRoutes(unittest.TestCase):
+    """PUT/DELETE /config/ai-backends/{id}/secret + key_configured in listing (R8)."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        store = ConfigStore(Path(self.tmp.name) / "cfg.json")
+        self.secrets = BackendSecretStore(Path(self.tmp.name) / "secrets.json")
+        self.app = create_app(config_store=store, secret_store=self.secrets)
+        self.client = TestClient(self.app)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _add_backend(self, backend_id: str = "b1", provider: str = "anthropic") -> None:
+        r = self.client.post(
+            "/config/ai-backends",
+            json={"id": backend_id, "provider": provider, "model": "m"},
+        )
+        self.assertEqual(r.status_code, 201)
+
+    def _backend_entry(self, backend_id: str) -> dict:
+        entries = self.client.get("/config/ai-backends").json()
+        return next(e for e in entries if e["id"] == backend_id)
+
+    def test_put_sets_secret(self) -> None:
+        self._add_backend()
+        r = self.client.put("/config/ai-backends/b1/secret", json={"api_key": "sk-xyz"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {"configured": True})
+        self.assertTrue(self.secrets.is_configured("b1"))
+        self.assertTrue(self._backend_entry("b1")["key_configured"])
+
+    def test_put_never_echoes_key(self) -> None:
+        self._add_backend()
+        r = self.client.put("/config/ai-backends/b1/secret", json={"api_key": "sk-secret-value"})
+        self.assertNotIn("sk-secret-value", r.text)
+
+    def test_put_empty_api_key_is_400(self) -> None:
+        self._add_backend()
+        r = self.client.put("/config/ai-backends/b1/secret", json={"api_key": "  "})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(self.secrets.is_configured("b1"))
+
+    def test_put_missing_api_key_is_400(self) -> None:
+        self._add_backend()
+        r = self.client.put("/config/ai-backends/b1/secret", json={})
+        self.assertEqual(r.status_code, 400)
+
+    def test_put_unknown_backend_is_404(self) -> None:
+        r = self.client.put("/config/ai-backends/nope/secret", json={"api_key": "k"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(self.secrets.is_configured("nope"))
+
+    def test_delete_removes_secret(self) -> None:
+        self._add_backend()
+        self.client.put("/config/ai-backends/b1/secret", json={"api_key": "k"})
+        r = self.client.delete("/config/ai-backends/b1/secret")
+        self.assertEqual(r.status_code, 204)
+        self.assertFalse(self.secrets.is_configured("b1"))
+
+    def test_delete_unknown_backend_is_404(self) -> None:
+        r = self.client.delete("/config/ai-backends/nope/secret")
+        self.assertEqual(r.status_code, 404)
+
+    def test_key_configured_reflects_env_fallback(self) -> None:
+        # No store secret, but the provider env var present -> key_configured.
+        self._add_backend("b1", provider="anthropic")
+        old = os.environ.get("ANTHROPIC_API_KEY")
+        os.environ["ANTHROPIC_API_KEY"] = "env-key"
+        try:
+            self.assertTrue(self._backend_entry("b1")["key_configured"])
+        finally:
+            if old is None:
+                os.environ.pop("ANTHROPIC_API_KEY", None)
+            else:
+                os.environ["ANTHROPIC_API_KEY"] = old
+
+    def test_key_configured_false_without_secret_or_env(self) -> None:
+        self._add_backend("b1", provider="anthropic")
+        old = os.environ.pop("ANTHROPIC_API_KEY", None)
+        try:
+            self.assertFalse(self._backend_entry("b1")["key_configured"])
+        finally:
+            if old is not None:
+                os.environ["ANTHROPIC_API_KEY"] = old
+
+    def test_openai_compat_always_key_configured(self) -> None:
+        # openai_compat key is optional (keyless local servers) -> always true.
+        self._add_backend("b1", provider="openai_compat")
+        self.assertTrue(self._backend_entry("b1")["key_configured"])
+
+    def test_listing_never_contains_key_value(self) -> None:
+        self._add_backend()
+        self.client.put("/config/ai-backends/b1/secret", json={"api_key": "sk-do-not-leak"})
+        r = self.client.get("/config/ai-backends")
+        self.assertNotIn("sk-do-not-leak", r.text)
+
+
 class _FakeServerManager:
     """Test double for app.state.server_manager: records calls, canned results.
 

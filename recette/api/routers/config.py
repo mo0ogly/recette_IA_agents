@@ -8,6 +8,7 @@ network failure to {"status": "down"} -- it never raises to the client.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -24,9 +25,39 @@ router = APIRouter(prefix="/config", tags=["config"])
 # slow upstream must not pin the worker (R5: keep the knob in one place).
 _PROBE_TIMEOUT_S = 2.0
 
+# Single source of truth (R5): provider -> env var holding its API key (R8).
+# Mirrors the ENV_KEY constants on the provider classes in recette.llm.
+# openai_compat is absent on purpose: its key is optional (keyless local
+# servers), so its key is always considered configured.
+_PROVIDER_ENV_KEY = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "xai": "XAI_API_KEY",
+}
+
+
+def _key_configured(provider: str, backend_id: str, secret_store: Any) -> bool:
+    """True if a key is resolvable: per-backend secret first, then the
+    provider's env-var fallback. openai_compat needs no key, so it is always
+    considered configured. The key value is never read or returned here."""
+    if secret_store.is_configured(backend_id):
+        return True
+    if provider == "openai_compat":
+        return True
+    env_key = _PROVIDER_ENV_KEY.get(provider)
+    return bool(env_key and os.environ.get(env_key))
+
 
 def _store(request: Request):
     return request.app.state.config_store
+
+
+def _secrets(request: Request):
+    return request.app.state.secret_store
 
 
 def _manager(request: Request):
@@ -93,7 +124,21 @@ def delete_agent(request: Request, agent_id: str) -> Response:
 
 @router.get("/ai-backends")
 def list_ai_backends(request: Request) -> list[dict]:
-    return _store(request).read()["ai_backends"]
+    """List backends, each enriched with key_configured (R8).
+
+    key_configured is a boolean only -- the key value is NEVER included.
+    It is true when a per-backend secret is stored OR the provider's env
+    var is present (or the provider is openai_compat, key optional).
+    """
+    secret_store = _secrets(request)
+    out: list[dict] = []
+    for backend in _store(request).read()["ai_backends"]:
+        entry = dict(backend)
+        entry["key_configured"] = _key_configured(
+            backend.get("provider", ""), backend.get("id", ""), secret_store
+        )
+        out.append(entry)
+    return out
 
 
 @router.post("/ai-backends", status_code=201)
@@ -145,6 +190,30 @@ def test_ai_backend(request: Request, backend_id: str) -> dict:
         return {"ok": False, "latency_ms": latency_ms, "error": str(exc)}
     latency_ms = int((time.perf_counter() - t0) * 1000)
     return {"ok": True, "latency_ms": latency_ms, "kind": decision.kind}
+
+
+@router.put("/ai-backends/{backend_id}/secret")
+def set_ai_backend_secret(request: Request, backend_id: str, body: dict[str, Any]) -> dict:
+    """Store the per-backend API key (R8). The key is never echoed back.
+
+    404 if the backend id is unknown; 400 if api_key is missing/empty.
+    """
+    if _store(request).get_ai_backend(backend_id) is None:
+        raise HTTPException(status_code=404, detail=f"no ai_backend {backend_id!r}")
+    api_key = body.get("api_key")
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise HTTPException(status_code=400, detail="api_key is required")
+    _secrets(request).set_secret(backend_id, api_key)
+    return {"configured": True}
+
+
+@router.delete("/ai-backends/{backend_id}/secret", status_code=204)
+def delete_ai_backend_secret(request: Request, backend_id: str) -> Response:
+    """Remove the per-backend API key (R8). 404 if the backend is unknown."""
+    if _store(request).get_ai_backend(backend_id) is None:
+        raise HTTPException(status_code=404, detail=f"no ai_backend {backend_id!r}")
+    _secrets(request).delete_secret(backend_id)
+    return Response(status_code=204)
 
 
 @router.get("/servers")
