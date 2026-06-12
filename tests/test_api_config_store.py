@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from recette.api.config_store import ConfigStore
+from recette.api.config_store import ConfigStore, UnknownAgentError
 
 
 class TestConfigStore(unittest.TestCase):
@@ -69,3 +69,24 @@ class TestConfigStore(unittest.TestCase):
         self.assertEqual(self.store.get_agent("a1")["goal"], "g2")
         self.store.delete_agent("a1")
         self.assertIsNone(self.store.get_agent("a1"))
+
+    def test_update_unknown_agent_raises_unknown_agent_error(self) -> None:
+        with self.assertRaises(UnknownAgentError):
+            self.store.update_agent("nope", {"goal": "x"})
+
+    def test_update_agent_rejects_bad_runtime_without_writing(self) -> None:
+        self.store.add_agent(
+            {
+                "id": "a1",
+                "principal": "p",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": [],
+                "ai_backend_id": "b1",
+                "runtime": "lab",
+            }
+        )
+        with self.assertRaises(ValueError):
+            self.store.update_agent("a1", {"runtime": "bogus"})
+        # the bad patch must not have been persisted
+        self.assertEqual(self.store.get_agent("a1")["runtime"], "lab")
