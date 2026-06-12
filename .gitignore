@@ -55,3 +55,8 @@ venv/
 
 # recette.sh runtime state (API pid/logs)
 .run/
+
+# Runtime event store (append-only state, regenerated at runtime)
+data/agentrail.events.db
+data/agentrail.events.db-shm
+data/agentrail.events.db-wal
