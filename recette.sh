@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./recette.sh status                         # full snapshot
 #   ./recette.sh api start|stop|restart|status|logs
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
+#   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
 # Auteur : Fabrice Pizzi - ANSSI
 # ===========================================================================
@@ -24,6 +25,7 @@ DOCKER_SH="${CICD_DIR}/docker.sh"
 API_SH="${CICD_DIR}/api.sh"
 STATUS_SH="${CICD_DIR}/status.sh"
 CHECKS_SH="${CICD_DIR}/checks.sh"
+GIT_SH="${CICD_DIR}/git.sh"
 
 show_menu() {
     hdr "AgentRail recette - gestion"
@@ -43,6 +45,11 @@ show_menu() {
     echo -e "  ${GREEN}11)${NC} Gates (local)"
     echo -e "  ${GREEN}12)${NC} Report (local)"
     echo -e "  ${GREEN}13)${NC} Tests (docker)"
+    echo -e "  ${BOLD}Git${NC}"
+    echo -e "  ${GREEN}14)${NC} Git statut"
+    echo -e "  ${GREEN}15)${NC} Git pull"
+    echo -e "  ${GREEN}16)${NC} Git push"
+    echo -e "  ${GREEN}17)${NC} Git sync (fetch + etat)"
     echo
     echo -e "   ${GREEN}0)${NC} Quitter"
     echo
@@ -67,6 +74,10 @@ menu_loop() {
             11) "${CHECKS_SH}" gates ;;
             12) "${CHECKS_SH}" report ;;
             13) "${CHECKS_SH}" test --docker ;;
+            14) "${GIT_SH}" status ;;
+            15) "${GIT_SH}" pull ;;
+            16) "${GIT_SH}" push ;;
+            17) "${GIT_SH}" sync ;;
             0|q|Q) info "Bye"; exit 0 ;;
             *)  warn "choix invalide" ;;
         esac
@@ -83,8 +94,9 @@ case "${cmd}" in
     api)                               "${API_SH}" "$@" ;;
     test|gates|report|validate|run|discovery)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
+    git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
-        sed -n '4,28p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+        sed -n '4,16p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
     *)  err "commande inconnue: ${cmd}"; \
         echo "  voir: ./recette.sh --help"; exit 1 ;;
 esac
