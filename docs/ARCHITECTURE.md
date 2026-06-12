@@ -6,6 +6,8 @@
 
 Date : 2026-06-12
 Verifie contre le code (R13) : `recette/`, `corpus/`, `console/src/`.
+Diagrammes generes depuis `scripts/diagrams/architecture.py`
+(`python3 scripts/gen_diagrams.py --write|--check|--render`, voir section 10).
 
 ---
 
@@ -24,6 +26,7 @@ Deux outils sont sous test :
 | **Discovery** | "Sait-il REPERER un agent IA et comprendre a quoi il se connecte ?" | `corpus/repos|gitlab|temporal|openapi|manifests` + `python -m recette discovery` |
 | **Identification / evaluation** | "Sait-il JUGER si un agent est correct (4 dimensions) ?" | `corpus/agents/` + `python -m recette run` |
 
+<!-- mermaid:context-recette (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 flowchart LR
   subgraph RECETTE["Plateforme de recette (ce repo)"]
@@ -65,6 +68,7 @@ gabarit de ce qu'un vrai outil doit produire.
 
 ## 2. Vue d'ensemble des composants
 
+<!-- mermaid:components (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 flowchart TB
   subgraph CONSOLE["Console React (console/, :5173)"]
@@ -109,12 +113,12 @@ Trois couches, trois responsabilites :
 1. **Console** (`console/`, React + Vite + TS) : le poste de pilotage de
    l'equipe discovery. Six onglets recette ; les pages gouvernance (Catalog,
    Approvals, Audit), separees dans la nav, exposent le chemin d'execution
-   gouverne de la section 7 (catalogue policy, inbox d'approbations I6,
+   gouverne de la section 8 (catalogue policy, inbox d'approbations I6,
    piste d'audit I1).
 2. **API** (`recette/api/`) : FastAPI optionnel (extra `[api]`). Expose la
    config des agents, le lancement/arret des runs, les campagnes, les
    enregistrements, le catalogue d'actions -- plus les routes du chemin
-   gouverne (section 7) : `/actions/execute`, `/policies`, `/approvals`,
+   gouverne (section 8) : `/actions/execute`, `/policies`, `/approvals`,
    `/audit`. Tout l'etat persistant est en JSON atomique sous `config/` et
    `data/` (chemins surchargeables par env, R5), sauf l'event store gouverne
    (SQLite append-only).
@@ -124,6 +128,7 @@ Trois couches, trois responsabilites :
 
 ### Flux d'un run (cycle de vie)
 
+<!-- mermaid:run-lifecycle (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 stateDiagram-v2
   [*] --> pending : POST /runs
@@ -200,9 +205,128 @@ exact) : le contrat reste stable quand l'outil evolue.
 
 ---
 
-## 4. Le moteur d'execution : Lane A, Lane B, replay
+## 4. Architecture agents <-> serveurs : ou le moteur discovery capte un agent
 
-### 4.1 Deux lanes
+La question centrale du produit : **comment le moteur discovery AgentRail
+peut-il reperer un agent IA et comprendre ce qu'il fait ?** La recette y
+repond en construisant, pour chaque point de captation possible, un terrain
+de test a verite connue.
+
+### 4.1 Topologie agents <-> serveurs dans le lab
+
+<!-- mermaid:lab-topology (generated: scripts/diagrams/architecture.py) -->
+```mermaid
+flowchart LR
+  subgraph AGENTS["Agents (Lane B)"]
+    A1["Agent mock<br/>scenario stocke"]
+    A2["Agent IA reelle<br/>ai_backend + cle env"]
+  end
+  subgraph SRV["Serveurs en face"]
+    direction TB
+    LF["LabForge<br/>in-memory, in-process"]
+    LAB["Lab mock :8082<br/>POST /target_system/execute<br/>12 domaines deterministes"]
+    REAL["SaaS reels<br/>GitHub / GitLab via RealForge<br/>writes bloques par defaut"]
+  end
+  subgraph DPLANE["Discovery / Enrichment Plane"]
+    DM["Mock discovery :8081<br/>sources / scan-runs / risks"]
+    DR["Service discovery REEL<br/>du collegue (http_adapter)"]
+  end
+  A1 -->|"execute(action)"| LF
+  A2 -->|"execute(action)"| LF
+  GW2["Gateway gouvernee<br/>(section 8)"] -->|"proxy I5, HTTP"| LAB
+  A2 -.->|"runtime real"| REAL
+  HARN2["Harnais discovery"] -->|"memes routes REST"| DM
+  HARN2 -->|"AGENTRAIL_DISCOVERY_URL"| DR
+```
+
+Trois "en face" possibles pour un agent, choisis par config (`runtime`,
+chemin gouverne ou non) ; et deux implementations interchangeables du plan
+discovery -- le mock :8081 repond exactement ce qu'un scanner correct DOIT
+repondre (adosse a l'oracle `ReferenceSourceScanAdapter`), le service reel se
+branche par la meme interface REST (`recette/http_adapter.py`, URL et token
+par env).
+
+### 4.2 Les trois points de captation d'un agent
+
+Un agent IA est observable a trois moments. La recette fournit du
+ground-truth pour chacun :
+
+<!-- mermaid:capture-points (generated: scripts/diagrams/architecture.py) -->
+```mermaid
+flowchart TB
+  subgraph T1["1. AVANT execution -- surface statique (source)"]
+    SRC["Repo / artefact publie"]
+    S1["manifest .agentrail/manifest.json"]
+    S2["code : import du SDK github/gitlab"]
+    S3["temporalio : @activity.defn (AST)"]
+    S4["openapi.json : operationId"]
+    S5["manifest MCP"]
+    SRC --- S1 & S2 & S3 & S4 & S5
+  end
+  subgraph T2["2. PENDANT execution -- surface runtime (serveur/reseau)"]
+    W1["trafic API vers le systeme cible"]
+    W2["usage de credentials : QUEL principal,<br/>QUEL token appelle"]
+    W3["frequence / pattern d'appels"]
+  end
+  subgraph T3["3. APRES / EN CONTINU -- surface evenementielle (audit)"]
+    E1["action-log ordonne (AgentAction)"]
+    E2["recordings rejouables (I4)"]
+    E3["event store gouverne :<br/>policy_decision, approval_state,<br/>side_effect_hash (I1)"]
+  end
+  DISCO2["Moteur discovery"]
+  T1 -->|"identite + capabilities DECLAREES"| DISCO2
+  T2 -->|"identite + actions REELLES"| DISCO2
+  T3 -->|"comportement complet, rejouable"| DISCO2
+```
+
+| Point de captation | Ce que discovery peut en deduire | Ce que la recette fournit comme terrain | Verifie par |
+|---|---|---|---|
+| **Statique (source)** : scan du repo avant que l'agent tourne | identite declaree, `target_system`, capabilities declarees, surface CI/CD (permissions larges = bump de risque) | 20 sources sur 5 surfaces (`corpus/repos`, `gitlab`, `temporal`, `openapi`, `manifests`), dont 5 vrais negatifs `no-agent` | `python -m recette discovery` -- detection, dedup, couverture des actions, ordre de risque, determinisme |
+| **Runtime (serveur)** : observer ce qui arrive sur le systeme cible | identite REELLEMENT utilisee (principal/token), actions reelles, ressources touchees, frequence | agents lancables a la demande (cockpit, campagnes) contre le lab :8082 ; 17 templates gradues legit/suspect/destructive | signaux `api_traffic` + `credential_usage` du `ReferenceDiscoveryAdapter` : un agent est detectable des sa PREMIERE action observable |
+| **Evenementiel (audit)** : consommer le flux/log d'evenements | la totalite : ecart declare/reel, approbations manquantes (I6), spam, hash des effets de bord | recordings persistes par campagne + event store hash-chaine du chemin gouverne | signal `event_stream` ; replay `IDENTIQUE` prouve que la trace consommee est fidele |
+
+### 4.3 Du signal capte au verdict : mapping vers les 4 dimensions
+
+La captation croisee est ce qui rend l'identification possible -- chaque
+dimension compare DEUX points de captation :
+
+<!-- mermaid:capture-to-dimensions (generated: scripts/diagrams/architecture.py) -->
+```mermaid
+flowchart LR
+  DECL["DECLARE<br/>(captation statique :<br/>manifest, scope, principal)"]
+  OBS["OBSERVE<br/>(captation runtime + audit :<br/>actions, principal reel, approbations)"]
+  DECL -->|"principal declare vs principal observe"| D1["Dim 1 : Identite (I3)"]
+  DECL -->|"scope declare vs actions observees"| D2["Dim 2 : Capabilities"]
+  OBS -->|"actions escalate avec/sans approved"| D3["Dim 3 : Policy (I6)"]
+  OBS -->|"frequence, repetition, hors-role"| D4["Dim 4 : Comportement"]
+  D1 & D2 & D3 & D4 --> V["Verdict correct/incorrect<br/>vs ground-truth"]
+```
+
+Exemples concrets du corpus :
+
+- `gh-identity-spoof` : le manifest declare `acme-issue-triager[bot]`, le
+  trafic runtime montre un autre principal -> seule la captation CROISEE
+  statique+runtime revele l'usurpation. Un scanner qui ne lit que le repo ne
+  la voit pas ; un sniffer qui ne lit que le reseau ne sait pas ce qui etait
+  declare.
+- `gh-readonly-overreach` : manifest read-only, mais des writes sur le fil ->
+  l'ecart declare/reel EST le signal.
+- `gh-unapproved-merge` : visible uniquement sur la surface evenementielle
+  (l'action `merge_pr` passe sans `approved=true`) -- le trafic brut semble
+  legitime.
+- `*-no-agent` : rien a capter nulle part ; un moteur qui "detecte" quand
+  meme produit un faux positif, et la recette le mesure.
+
+C'est le coeur du design du corpus : **chaque agent incorrect est invisible
+depuis au moins un point de captation et visible depuis un autre** -- un
+moteur discovery qui ne croise pas les surfaces echoue mecaniquement sur une
+partie du corpus, et le scorecard le montre dimension par dimension.
+
+---
+
+## 5. Le moteur d'execution : Lane A, Lane B, replay
+
+### 5.1 Deux lanes
 
 | | Lane A (scenario) | Lane B (agentique) |
 |---|---|---|
@@ -214,8 +338,9 @@ Les deux produisent le meme artefact : un **action-log ordonne d'`AgentAction`**
 C'est ce qui rend le corpus homogene : un run Lane B enregistre, rejoue et
 verifie, est promouvable en golden Lane A (`recette/promote.py`).
 
-### 4.2 La boucle Lane B
+### 5.2 La boucle Lane B
 
+<!-- mermaid:lane-b-loop (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 sequenceDiagram
   participant C as Console / campagne
@@ -258,8 +383,9 @@ Points structurants :
   d'une sequence (`evt-0001`...). Donne le meme backend (Stub/Replay), un run
   est byte-identique.
 
-### 4.3 AgentAction : l'evenement canonique de la recette
+### 5.3 AgentAction : l'evenement canonique de la recette
 
+<!-- mermaid:agent-action-model (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 classDiagram
   class AgentAction {
@@ -301,8 +427,9 @@ prefixe (`read_`, `list_`, `export_`...) pour les 9 autres systemes. Un
 `export_` est un read (pas de mutation) meme si son risque est eleve --
 le risque et le mode sont deux axes distincts.
 
-### 4.4 Enregistrement et replay (I4)
+### 5.4 Enregistrement et replay (I4)
 
+<!-- mermaid:record-replay (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 sequenceDiagram
   participant RUN as Run live (IA reelle ou mock)
@@ -324,11 +451,12 @@ en golden) ; `DIVERGENT` signale une source de non-determinisme a corriger.
 
 ---
 
-## 5. Types d'agents en detail
+## 6. Types d'agents en detail
 
 Un agent de la plateforme se decrit par **deux axes orthogonaux** plus son
 contenu (scope + scenario/goal) :
 
+<!-- mermaid:agent-axes (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 quadrantChart
   title Les deux axes d'un agent de recette
@@ -361,7 +489,7 @@ quadrantChart
 | Effets de bord | zero | reels -- writes bloques par defaut (`enable_writes`), orgs/repos de test dedies uniquement |
 | Usage recette | tout le quotidien (reproductible, I4/I5) | validation finale optionnelle |
 
-### 5.1 Agents du corpus identification (`corpus/agents/`)
+### 6.1 Agents du corpus identification (`corpus/agents/`)
 
 10 agents action-log, GitHub et GitLab, **orthogonalite stricte** : un agent
 incorrect casse exactement UNE dimension, les 3 autres restent conformes
@@ -384,7 +512,7 @@ Couverture : chaque `violation_type` existe sur GitHub ET GitLab, plus au
 moins un correct par forge -- l'identification est mesurable par dimension et
 par plateforme.
 
-### 5.2 Agents du corpus discovery (5 surfaces x 4 roles)
+### 6.2 Agents du corpus discovery (5 surfaces x 4 roles)
 
 20 repos/sources, meme grille sur chaque surface :
 
@@ -398,7 +526,7 @@ par plateforme.
 Le `no-agent` est aussi important que les positifs : sans lui, on ne mesure
 pas les faux positifs du scanner.
 
-### 5.3 Agents de campagne (17 templates, 3 profils, 12 systemes)
+### 6.3 Agents de campagne (17 templates, 3 profils, 12 systemes)
 
 Les templates (`recette/api/campaign_templates.py`) sont des agents mock
 prets a l'emploi, nommes par usage, qui couvrent le catalogue multi-systemes.
@@ -414,7 +542,7 @@ Les profils donnent a la recette des cas gradues : un bon outil discovery doit
 classer `legit < suspect < destructive` en risque relatif, et un bon outil
 d'identification doit accepter les `legit` et refuser les deux autres.
 
-### 5.4 Catalogue d'actions : 127 actions / 12 systemes
+### 6.4 Catalogue d'actions : 127 actions / 12 systemes
 
 Source de verite : `recette.tools.agent_action_catalog()`. Chaque action porte
 `target_system`, `action`, `description`, `kind` (`read` | `bounded_write` |
@@ -441,12 +569,13 @@ le lab via les handlers deterministes de `recette/lab/domains/`.
 
 ---
 
-## 6. Campagnes : le format d'exploitation de la recette
+## 7. Campagnes : le format d'exploitation de la recette
 
 Une **campagne** est un ensemble persiste et ordonne de lancements d'agents,
 declenche a la demande. C'est l'unite de travail de l'equipe discovery :
 "rejouer le scenario fraude-finance pendant que je teste mon scanner".
 
+<!-- mermaid:campaign-flow (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 sequenceDiagram
   participant U as Equipe discovery
@@ -480,7 +609,7 @@ confronter l'outil discovery a une activite passee.
 
 ---
 
-## 7. Le chemin d'execution gouverne (plan transverse, integre en avance de phase)
+## 8. Le chemin d'execution gouverne (plan transverse, integre en avance de phase)
 
 > Issu du plan "Plateforme d'execution gouvernee -- 118 actions sensibles /
 > 11 domaines" (`docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md`).
@@ -490,23 +619,24 @@ confronter l'outil discovery a une activite passee.
 > gouverne en face d'eux. Implemente dans `recette/platform/` et les routers
 > `/actions`, `/policies`, `/approvals`, `/audit`.
 
+<!-- mermaid:governed-path (generated: scripts/diagrams/architecture.py) -->
 ```mermaid
 flowchart TB
   AGENT["Agent / console / curl"] --> GW
   subgraph CONTROL["Control Plane"]
     GW["Gateway (gateway.py)<br/>resolve agent -> normalize -><br/>PlatformActionEvent"]
     POL["Policy Engine (policy/)<br/>decide(event, policy) PURE<br/>deny-by-default, versions"]
-    APP["Approvals (approvals/)<br/>state machine evenementielle<br/>pending -> approved/denied/timeout"]
+    APP["Approvals (approvals/)<br/>state machine<br/>pending->approved/denied/timeout"]
     GW --> POL
     POL -->|"escalate"| APP
   end
   subgraph DATA["Data Plane"]
-    PROXY["ExternalSystemProxy (proxy/)<br/>seul detenteur du contact externe<br/>produit side_effect_hash"]
+    PROXY["ExternalSystemProxy (proxy/)<br/>seul contact externe<br/>produit side_effect_hash"]
     LAB2["Lab mock :8082<br/>12 domaines, handlers purs"]
     PROXY --> LAB2
   end
   subgraph AUDIT["Audit Plane"]
-    ES["EventStore SQLite (eventstore/)<br/>INSERT-only + triggers anti-UPDATE/DELETE<br/>hash chain prev_hash, WAL"]
+    ES["EventStore SQLite<br/>INSERT-only, triggers anti-UPDATE/DELETE<br/>hash chain, WAL"]
   end
   POL -->|"allow / approved"| PROXY
   POL -->|"deny"| ES
@@ -553,7 +683,7 @@ de juger uniquement des action-logs fabriques.
 
 ---
 
-## 8. Determinisme et fail-safe : les regles qui tiennent tout
+## 9. Determinisme et fail-safe : les regles qui tiennent tout
 
 | Regle | Application concrete dans ce repo |
 |---|---|
@@ -566,7 +696,7 @@ de juger uniquement des action-logs fabriques.
 
 ---
 
-## 9. Carte des documents
+## 10. Carte des documents
 
 | Document | Contenu |
 |---|---|
@@ -579,3 +709,16 @@ de juger uniquement des action-logs fabriques.
 | `corpus/README.md` | conventions du corpus, schemas, validation |
 | `console/README.md` | console : onglets, build, tests |
 | `.claude/rules/recette-corpus.md` | regles normatives du corpus (4 dimensions, orthogonalite) |
+| `scripts/diagrams/architecture.py` | source des diagrammes mermaid de ce document (un marqueur par bloc) |
+
+### Mise a jour des diagrammes
+
+Les blocs mermaid de ce document sont GENERES. Ne pas les editer a la main :
+
+```
+python3 scripts/gen_diagrams.py --list     # noms des 12 diagrammes
+# editer scripts/diagrams/architecture.py
+python3 scripts/gen_diagrams.py --write    # re-injecte dans ce fichier
+python3 scripts/gen_diagrams.py --check    # gate de derive (librarian / CI)
+python3 scripts/gen_diagrams.py --render   # validation rendu via mmdc
+```
