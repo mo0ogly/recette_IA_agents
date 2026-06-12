@@ -211,7 +211,10 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
           ...prev,
           [id]: { phase: "ok", latencyMs: result.latency_ms, text },
         }));
-        appendCall("info", id, `backend ${id} answered in ${result.latency_ms} ms`);
+        // Surface the full exchange in the "Provider calls" console: the prompt
+        // sent and the model's answer, so the operator reads responses there too.
+        appendCall("info", id, `ask> ${prompt}`);
+        appendCall("info", id, `${text} (${result.latency_ms} ms)`);
       } else {
         setAsks((prev) => ({
           ...prev,

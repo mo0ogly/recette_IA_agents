@@ -351,6 +351,12 @@ describe("AiBackendsPanel", () => {
     expect(answer).toHaveAttribute("data-status", "ok");
     expect(answer).toHaveTextContent("4");
     expect(answer).toHaveTextContent("141 ms");
+
+    // The prompt and the model answer are also surfaced in the "Provider
+    // calls" console so responses are readable in one place.
+    const console = screen.getByText("Provider calls").closest("section") as HTMLElement;
+    expect(within(console).getByText(/ask> what is 2\+2/)).toBeInTheDocument();
+    expect(within(console).getByText(/^4 \(141 ms\)$/)).toBeInTheDocument();
   });
 
   it("ask: an error response renders in the red error area", async () => {
