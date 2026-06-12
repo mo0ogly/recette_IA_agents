@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""End-to-end lab smoke: agent bound to a managed mock server, over real HTTP.
+
+Drives a RUNNING recette API (python -m recette.api) through the exact
+console flow and asserts every capture point:
+
+  1. register + start a mock_local server (ServerManager subprocess)
+  2. register a mock agent BOUND to that server (ProxyForge route, I5)
+  3. create + run a one-step campaign, wait for completion
+  4. assert the server's JSONL access log saw every action (runtime capture)
+  5. replay the persisted recording, assert matches_original (I4)
+  6. stop the server, assert status down
+
+Stdlib only. Exit 0 = all assertions passed, exit 1 = failure (fail-safe:
+any unexpected state aborts immediately). Re-runnable: fixture entities are
+deleted up front if a previous run left them behind.
+
+Usage:
+    python3 scripts/smoke_lab.py [--api http://127.0.0.1:8090] [--server-port 9111]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+
+SERVER_ID = "smoke-gh-lab"
+AGENT_ID = "smoke-e2e-bot"
+CAMPAIGN_ID = "smoke-e2e-camp"
+ACTIONS = ("read_repo", "open_pr")
+POLL_TRIES = 100
+POLL_INTERVAL_S = 0.1
+
+
+class SmokeFailure(AssertionError):
+    """One smoke assertion failed; the message carries the evidence."""
+
+
+def _request(method: str, url: str, body: dict | None = None) -> tuple[int, dict | list]:
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    request = urllib.request.Request(
+        url, data=data, headers={"Content-Type": "application/json"}, method=method
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            raw = response.read().decode("utf-8")
+            return response.status, json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as error:
+        raw = error.read().decode("utf-8")
+        return error.code, json.loads(raw) if raw else {}
+
+
+def _expect(condition: bool, message: str) -> None:
+    if not condition:
+        raise SmokeFailure(message)
+
+
+def _cleanup(api: str) -> None:
+    """Best-effort removal of leftover fixture entities from a prior run."""
+    _request("POST", f"{api}/config/servers/{SERVER_ID}/stop")
+    for method, path in (
+        ("DELETE", f"/campaigns/{CAMPAIGN_ID}"),
+        ("DELETE", f"/config/agents/{AGENT_ID}"),
+        ("DELETE", f"/config/servers/{SERVER_ID}"),
+    ):
+        _request(method, f"{api}{path}")
+
+
+def _wait_terminal(api: str, run_id: str) -> dict:
+    for _ in range(POLL_TRIES):
+        status, body = _request("GET", f"{api}/runs/{run_id}")
+        _expect(status == 200, f"GET /runs/{run_id} -> {status}")
+        assert isinstance(body, dict)
+        if body["status"] in {"completed", "failed", "stopped"}:
+            return body
+        time.sleep(POLL_INTERVAL_S)
+    raise SmokeFailure(f"run {run_id} did not terminate")
+
+
+def run_smoke(api: str, server_port: int) -> None:
+    status, body = _request("GET", f"{api}/health")
+    _expect(status == 200, f"API not reachable at {api} (GET /health -> {status})")
+    _cleanup(api)
+
+    # 1. Managed mock server: register + start + live status.
+    status, _ = _request(
+        "POST",
+        f"{api}/config/servers",
+        {"id": SERVER_ID, "system": "github", "mode": "mock_local", "port": server_port},
+    )
+    _expect(status == 201, f"create server -> {status}")
+    status, body = _request("POST", f"{api}/config/servers/{SERVER_ID}/start")
+    assert isinstance(body, dict)
+    _expect(
+        status == 200 and body.get("status") == "up",
+        f"start server -> {status} {body} (port {server_port} busy?)",
+    )
+    print(f"[1/6] server {SERVER_ID} up on port {server_port}")
+
+    # 2. Mock agent BOUND to the server (every action must go through it).
+    status, _ = _request(
+        "POST",
+        f"{api}/config/agents",
+        {
+            "id": AGENT_ID,
+            "runtime": "lab",
+            "ai_mode": "mock",
+            "principal": "smoke@acme",
+            "target_system": "github",
+            "goal": "smoke: inventory one repo then open a PR",
+            "capability_scope": list(ACTIONS),
+            "server": SERVER_ID,
+            "scenario": [
+                {"kind": "tool_call", "tool_name": action, "tool_args": {"resource": "acme/x"}}
+                for action in ACTIONS
+            ]
+            + [{"kind": "final", "text": "done"}],
+        },
+    )
+    _expect(status == 201, f"create agent -> {status}")
+    print(f"[2/6] agent {AGENT_ID} bound to {SERVER_ID}")
+
+    # 3. Campaign run to completion.
+    status, _ = _request(
+        "POST",
+        f"{api}/campaigns",
+        {"id": CAMPAIGN_ID, "description": "e2e lab smoke", "steps": [{"agent_id": AGENT_ID}]},
+    )
+    _expect(status == 201, f"create campaign -> {status}")
+    status, body = _request("POST", f"{api}/campaigns/{CAMPAIGN_ID}/run")
+    assert isinstance(body, dict)
+    _expect(status == 201, f"run campaign -> {status}")
+    run = _wait_terminal(api, body["run_id"])
+    _expect(run["status"] == "completed", f"campaign run ended {run}")
+    print(f"[3/6] campaign {CAMPAIGN_ID} completed")
+
+    # 4. Runtime capture: the server's access log saw every action, in order.
+    status, body = _request("GET", f"{api}/config/servers/{SERVER_ID}/log?after=0")
+    assert isinstance(body, dict)
+    _expect(status == 200, f"server log -> {status}")
+    logged = [(line["action_type"], line["status"]) for line in body["lines"]]
+    _expect(
+        logged == [(action, 200) for action in ACTIONS],
+        f"access log mismatch: {logged}",
+    )
+    print(f"[4/6] access log captured {len(logged)} actions: {[a for a, _ in logged]}")
+
+    # 5. Deterministic replay of the persisted recording (I4).
+    recording_id = f"{CAMPAIGN_ID}.00.{AGENT_ID}"
+    status, body = _request("POST", f"{api}/recordings/{recording_id}/replay")
+    assert isinstance(body, dict)
+    _expect(status == 201, f"replay -> {status}")
+    replay_run = _wait_terminal(api, body["run_id"])
+    _expect(replay_run["status"] == "completed", f"replay run ended {replay_run}")
+    status, events = _request("GET", f"{api}/runs/{body['run_id']}/events")
+    assert isinstance(events, list)
+    result = next(e for e in events if e["type"] == "replay_result")
+    _expect(result["data"]["matches_original"] is True, "replay diverged from original (I4)")
+    replayed = [a["action_type"] for a in result["data"]["actions"]]
+    _expect(replayed == list(ACTIONS), f"replayed actions mismatch: {replayed}")
+    print(f"[5/6] replay {recording_id} matches_original=True")
+
+    # 6. Stop: status flips down, idempotent.
+    status, body = _request("POST", f"{api}/config/servers/{SERVER_ID}/stop")
+    assert isinstance(body, dict)
+    _expect(status == 200 and body.get("status") == "down", f"stop -> {status} {body}")
+    status, body = _request("GET", f"{api}/config/servers/{SERVER_ID}/status")
+    assert isinstance(body, dict)
+    _expect(body.get("status") == "down", f"status after stop -> {body}")
+    print(f"[6/6] server {SERVER_ID} stopped")
+    print("SMOKE PASS")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--api", default="http://127.0.0.1:8090", help="base URL of the API")
+    parser.add_argument("--server-port", type=int, default=9111)
+    args = parser.parse_args()
+    try:
+        run_smoke(args.api.rstrip("/"), args.server_port)
+    except SmokeFailure as failure:
+        print(f"SMOKE FAIL: {failure}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

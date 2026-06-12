@@ -226,6 +226,18 @@ class ServerManagerTests(unittest.TestCase):
             with self.subTest(port=bad_port), self.assertRaises(ValueError):
                 self.manager.start({"id": "x", "mode": "mock_local", "port": bad_port})
 
+    def test_immediate_restart_on_same_port_succeeds(self) -> None:
+        """Regression: the start() preflight probe must not refuse a port that
+        only holds TIME_WAIT leftovers from the server just stopped (the probe
+        binds with SO_REUSEADDR, matching http.server semantics)."""
+        port = _free_port()
+        entry = {"id": "s1", "mode": "mock_local", "port": port}
+        self.assertEqual(self.manager.start(entry), {"status": "up"})
+        self._health_status(port)  # leave at least one closed connection behind
+        self.assertEqual(self.manager.stop("s1"), {"status": "down"})
+        self.assertEqual(self.manager.start(entry), {"status": "up"})
+        self.assertEqual(self.manager.status("s1"), "up")
+
     def test_status_detects_an_externally_died_process(self) -> None:
         port = _free_port()
         self.assertEqual(

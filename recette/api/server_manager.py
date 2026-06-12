@@ -61,6 +61,11 @@ class ServerManager:
             raise ValueError(f"mock_local server {server_id!r} requires an integer 'port'")
 
         probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # SO_REUSEADDR matches the mock server's own bind semantics
+        # (http.server sets allow_reuse_address): an immediate stop->start on
+        # the same port must not fail on TIME_WAIT leftovers, while a live
+        # listener still yields EADDRINUSE.
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             probe.bind(("127.0.0.1", port))
         except OSError as exc:
