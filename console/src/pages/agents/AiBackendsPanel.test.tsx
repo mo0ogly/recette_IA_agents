@@ -5,6 +5,11 @@
  * (recette.api running locally against /config/ai-backends/{id}/test),
  * not invented. The api client module is mocked so the panel renders
  * against the exact payload shape the backend returns.
+ *
+ * aiBackendTest.ok / aiBackendTest.prompt were captured from a real Groq
+ * call (backend "groq-llama", model llama-3.3-70b-versatile) on 2026-06-13:
+ * the no-prompt probe answered {"text":"pong"}, the prompt "what is 2+2"
+ * answered {"text":"4"}. The provider key never appears in any payload (R8).
  */
 
 import {
@@ -22,6 +27,7 @@ import aiBackendsKeysetFixture from "./__fixtures__/aiBackends.keyset.fixture.js
 import setSecretFixture from "./__fixtures__/setSecret.fixture.json";
 import testOkFixture from "./__fixtures__/aiBackendTest.ok.fixture.json";
 import testErrorFixture from "./__fixtures__/aiBackendTest.error.fixture.json";
+import testPromptFixture from "./__fixtures__/aiBackendTest.prompt.fixture.json";
 
 vi.mock("../../api/client", () => ({
   createAiBackend: vi.fn(),
@@ -45,6 +51,7 @@ const backendsKeyset = aiBackendsKeysetFixture as unknown as AiBackend[];
 const setSecretResult = setSecretFixture as { configured: boolean };
 const testOk = testOkFixture as unknown as BackendTestResult;
 const testError = testErrorFixture as unknown as BackendTestResult;
+const testPrompt = testPromptFixture as unknown as BackendTestResult;
 
 const ALL_PROVIDERS = [
   "anthropic",
@@ -96,7 +103,7 @@ describe("AiBackendsPanel", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Test" }));
 
-    expect(await within(row).findByText("17 ms")).toBeInTheDocument();
+    expect(await within(row).findByText("116 ms")).toBeInTheDocument();
     expect(within(row).getByTestId("backend-test-status")).toHaveAttribute(
       "data-status",
       "ok",
@@ -105,7 +112,7 @@ describe("AiBackendsPanel", () => {
 
     // The probe outcome is appended to the console as an info-level line.
     const line = screen
-      .getByText("backend backend-1 ok in 17 ms")
+      .getByText("backend backend-1 ok in 116 ms")
       .closest(".logc-line");
     expect(line).toHaveAttribute("data-level", "info");
   });
@@ -323,5 +330,57 @@ describe("AiBackendsPanel", () => {
 
     expect(deleteBackendSecret).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it("ask: typing a prompt and clicking Ask sends it and renders the answer", async () => {
+    vi.mocked(testAiBackend).mockResolvedValue(testPrompt);
+    renderPanel();
+
+    const row = screen.getByText("backend-1").closest("tr") as HTMLTableRowElement;
+    const input = within(row).getByLabelText(
+      "Ask the model behind backend-1",
+    ) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "what is 2+2" } });
+    fireEvent.click(within(row).getByRole("button", { name: "Ask" }));
+
+    // The prompt is threaded to the client unchanged.
+    expect(testAiBackend).toHaveBeenCalledWith("backend-1", "what is 2+2");
+
+    // The model's answer ("4") is rendered in the response area.
+    const answer = await within(row).findByTestId("backend-ask-answer");
+    expect(answer).toHaveAttribute("data-status", "ok");
+    expect(answer).toHaveTextContent("4");
+    expect(answer).toHaveTextContent("141 ms");
+  });
+
+  it("ask: an error response renders in the red error area", async () => {
+    vi.mocked(testAiBackend).mockResolvedValue(testError);
+    renderPanel();
+
+    const row = screen.getByText("backend-1").closest("tr") as HTMLTableRowElement;
+    fireEvent.change(
+      within(row).getByLabelText("Ask the model behind backend-1"),
+      { target: { value: "hello" } },
+    );
+    fireEvent.click(within(row).getByRole("button", { name: "Ask" }));
+
+    const answer = await within(row).findByTestId("backend-ask-answer");
+    expect(answer).toHaveAttribute("data-status", "error");
+    expect(answer).toHaveTextContent(/GEMINI_API_KEY not set/);
+    expect(answer.className).toContain("agents-ask-error");
+  });
+
+  it("ask: the Ask button is disabled while the prompt input is empty", () => {
+    renderPanel();
+
+    const row = screen.getByText("backend-1").closest("tr") as HTMLTableRowElement;
+    const ask = within(row).getByRole("button", { name: "Ask" });
+    expect(ask).toBeDisabled();
+
+    fireEvent.change(
+      within(row).getByLabelText("Ask the model behind backend-1"),
+      { target: { value: "hi" } },
+    );
+    expect(ask).not.toBeDisabled();
   });
 });

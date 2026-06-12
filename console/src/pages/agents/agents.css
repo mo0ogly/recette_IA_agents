@@ -211,6 +211,53 @@
   border: 0;
 }
 
+.agents-ask {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.agents-ask-input {
+  width: 13rem;
+}
+
+.agents-ask-spinner {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.agents-ask-answer {
+  flex-basis: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.agents-ask-text {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  max-width: 22rem;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: var(--badge-gray-bg, #e5e7eb);
+  border-radius: 0.4rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.agents-ask-error {
+  color: var(--badge-red-fg);
+}
+
+.agents-ask-latency {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
 .agents-run-log {
   margin-top: 1.5rem;
 }

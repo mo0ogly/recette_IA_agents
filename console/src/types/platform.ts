@@ -319,9 +319,12 @@ export interface AiBackend {
   key_configured?: boolean;
 }
 
-/** Result of POST /config/ai-backends/{id}/test (always 200; ok discriminates). */
+/** Result of POST /config/ai-backends/{id}/test (always 200; ok discriminates).
+ *  text is the model's answer (the connectivity ping word, or the reply to a
+ *  free-text prompt). It is present on every ok outcome; optional for forward
+ *  compatibility with older payloads. The provider key never appears here (R8). */
 export type BackendTestResult =
-  | { ok: true; latency_ms: number; kind: string }
+  | { ok: true; latency_ms: number; kind: string; text?: string }
   | { ok: false; latency_ms: number; error: string };
 
 /** How a target server is reached: local mock process, declared URL, or SaaS. */

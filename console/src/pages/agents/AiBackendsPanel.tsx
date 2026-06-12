@@ -55,6 +55,12 @@ type TestState =
   | { phase: "ok"; latencyMs: number }
   | { phase: "error"; latencyMs: number; error: string };
 
+/** Per-backend free-text prompt outcome (the "Ask the AI" affordance). */
+type AskState =
+  | { phase: "asking" }
+  | { phase: "ok"; latencyMs: number; text: string }
+  | { phase: "error"; latencyMs: number; error: string };
+
 function statusOf(state: TestState | undefined): "untested" | "ok" | "error" {
   if (state === undefined || state.phase === "testing") {
     return "untested";
@@ -66,6 +72,9 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
   const { backends, onChanged, onError } = props;
   const [form, setForm] = useState(EMPTY);
   const [tests, setTests] = useState<Record<string, TestState>>({});
+  // Per-backend free-text prompt draft and its last answer, keyed by backend id.
+  const [askDrafts, setAskDrafts] = useState<Record<string, string>>({});
+  const [asks, setAsks] = useState<Record<string, AskState>>({});
   // Per-backend draft key, keyed by backend id. Holds the in-flight value only:
   // it is cleared immediately after a successful save and never persisted or
   // logged (R8: the key is write-only from the console).
@@ -187,6 +196,43 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     }
   }
 
+  async function handleAsk(id: string): Promise<void> {
+    const prompt = (askDrafts[id] ?? "").trim();
+    if (prompt.length === 0) {
+      // Empty input is blocked client-side: the Ask button is disabled too.
+      return;
+    }
+    setAsks((prev) => ({ ...prev, [id]: { phase: "asking" } }));
+    try {
+      const result = await testAiBackend(id, prompt);
+      if (result.ok) {
+        const text = result.text ?? "";
+        setAsks((prev) => ({
+          ...prev,
+          [id]: { phase: "ok", latencyMs: result.latency_ms, text },
+        }));
+        appendCall("info", id, `backend ${id} answered in ${result.latency_ms} ms`);
+      } else {
+        setAsks((prev) => ({
+          ...prev,
+          [id]: { phase: "error", latencyMs: result.latency_ms, error: result.error },
+        }));
+        appendCall(
+          "error",
+          id,
+          `backend ${id} ask failed in ${result.latency_ms} ms: ${result.error}`,
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAsks((prev) => ({
+        ...prev,
+        [id]: { phase: "error", latencyMs: 0, error: message },
+      }));
+      appendCall("error", id, `backend ${id} ask failed: ${message}`);
+    }
+  }
+
   function renderKeyCell(backend: AiBackend): JSX.Element {
     const id = backend.id;
     const configured = backend.key_configured === true;
@@ -236,6 +282,59 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
           <span className="agents-key-saved" data-testid="backend-key-saved">
             saved
           </span>
+        )}
+      </div>
+    );
+  }
+
+  function renderAskCell(id: string): JSX.Element {
+    const state = asks[id];
+    const draft = askDrafts[id] ?? "";
+    const asking = state?.phase === "asking";
+    const inputId = `backend-ask-${id}`;
+    return (
+      <div className="agents-ask" data-testid="backend-ask">
+        <label className="agents-visually-hidden" htmlFor={inputId}>
+          {`Ask the model behind ${id}`}
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          className="agents-ask-input"
+          placeholder="Ask the model something..."
+          value={draft}
+          onChange={(e) =>
+            setAskDrafts((prev) => ({ ...prev, [id]: e.target.value }))
+          }
+        />
+        <button
+          type="button"
+          className="agents-btn"
+          disabled={draft.trim().length === 0 || asking}
+          onClick={() => void handleAsk(id)}
+        >
+          Ask
+        </button>
+        {asking && <span className="agents-ask-spinner">asking...</span>}
+        {state?.phase === "ok" && (
+          <div
+            className="agents-ask-answer"
+            data-testid="backend-ask-answer"
+            data-status="ok"
+          >
+            <pre className="agents-ask-text">{state.text}</pre>
+            <span className="agents-ask-latency">{state.latencyMs} ms</span>
+          </div>
+        )}
+        {state?.phase === "error" && (
+          <div
+            className="agents-ask-answer agents-ask-error"
+            data-testid="backend-ask-answer"
+            data-status="error"
+          >
+            <span>{state.error}</span>
+            <span className="agents-ask-latency">{state.latencyMs} ms</span>
+          </div>
         )}
       </div>
     );
@@ -306,6 +405,7 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
                   <span className="agents-key-hint">
                     Test uses the stored key (or the provider env var).
                   </span>
+                  {renderAskCell(backend.id)}
                 </td>
                 <td>
                   <button

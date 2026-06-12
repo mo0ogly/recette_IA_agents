@@ -56,6 +56,8 @@ export interface ExecuteActionRequest {
 export interface AuditEventsParams {
   from_seq?: number;
   limit?: number;
+  /** Keep only the LAST n filtered events (live-tail backfill). Mutually exclusive with limit. */
+  tail?: number;
   kind?: string;
   agent_id?: string;
   target_system?: string;
@@ -176,13 +178,18 @@ export function deleteBackendSecret(id: string): Promise<void> {
   );
 }
 
-/** Connectivity probe for an AI backend. Always resolves with the probe
- *  outcome (the endpoint answers 200 for both ok and failed probes); only
- *  an unknown id rejects (404). The key never transits here (R8). */
-export function testAiBackend(id: string): Promise<BackendTestResult> {
+/** Test an AI backend. Without a prompt this is the connectivity probe (one
+ *  word back); with a non-empty prompt the model answers it. Always resolves
+ *  with the outcome (the endpoint answers 200 for both ok and failed calls);
+ *  only an unknown id rejects (404). The key never transits here (R8). */
+export function testAiBackend(
+  id: string,
+  prompt?: string,
+): Promise<BackendTestResult> {
+  const body = prompt !== undefined ? { prompt } : {};
   return request<BackendTestResult>(
     `/config/ai-backends/${encodeURIComponent(id)}/test`,
-    { method: "POST", body: JSON.stringify({}) },
+    { method: "POST", body: JSON.stringify(body) },
   );
 }
 
@@ -429,6 +436,7 @@ export function listAuditEvents(params: AuditEventsParams = {}): Promise<AuditEv
     withQuery("/audit/events", {
       from_seq: params.from_seq,
       limit: params.limit,
+      tail: params.tail,
       kind: params.kind,
       agent_id: params.agent_id,
       target_system: params.target_system,
