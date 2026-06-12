@@ -271,5 +271,101 @@ class TestVerdictsApi(unittest.TestCase):
         self.assertEqual(history.json(), [])
 
 
+class TestVerdictScorecard(unittest.TestCase):
+    """GET /verdicts/scorecard aggregates over the latest judged submission."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        tmp = Path(self._tmp.name)
+        self.app = create_app(
+            config_store=ConfigStore(tmp / "config.json"),
+            event_store=InMemoryEventStore(),
+            policy_store=PolicyStore(tmp / "policies"),
+            proxy=StubProxy(),
+            catalog=Catalog(SPECS),
+            verdict_store=VerdictStore(tmp / "verdicts.json"),
+        )
+        self.client = TestClient(self.app)
+        for agent in (
+            # PASS: full ground truth, matching result.
+            {"id": "agent-pass", "runtime": "lab", "ground_truth": FULL_GROUND_TRUTH},
+            # FAIL false negative: detectable but the tool reports detected=false.
+            {
+                "id": "agent-fn",
+                "runtime": "lab",
+                "ground_truth": {"detectable": True, "dimensions": {"identity": True}},
+            },
+            # FAIL false positive: not detectable but the tool reports detected=true.
+            {"id": "agent-fp", "runtime": "lab", "ground_truth": {"detectable": False}},
+            # SKIP: no ground truth declared.
+            {"id": "agent-skip", "runtime": "lab"},
+        ):
+            resp = self.client.post("/config/agents", json=agent)
+            self.assertEqual(resp.status_code, 201, resp.text)
+
+    def _submit_four_agents(self) -> None:
+        resp = self.client.post(
+            "/verdicts",
+            json={
+                "tool": "discovery-v1",
+                "results": [
+                    {"agent_id": "agent-pass", **MATCHING_RESULT},
+                    {
+                        "agent_id": "agent-fn",
+                        "detected": False,
+                        "dimensions": {"identity": False},
+                    },
+                    {"agent_id": "agent-fp", "detected": True},
+                    {"agent_id": "agent-skip", "detected": True},
+                ],
+            },
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(
+            [e["status"] for e in resp.json()["judged"]], ["PASS", "FAIL", "FAIL", "SKIP"]
+        )
+
+    def test_scorecard_aggregates_every_field(self) -> None:
+        self._submit_four_agents()
+        resp = self.client.get("/verdicts/scorecard")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        self.assertEqual(body["total"], 4)
+        self.assertEqual(body["passed"], 1)
+        self.assertEqual(body["skipped"], 1)
+        # 3 agents carry a detected-check; only agent-pass matched.
+        self.assertEqual(body["detection_rate"], round(1 / 3, 4))
+        # identity checked on agent-pass (ok) and agent-fn (miss); the other
+        # 3 dimensions only on agent-pass (ok).
+        self.assertEqual(
+            body["accuracy_by_dimension"],
+            {"identity": 0.5, "capabilities": 1.0, "policy": 1.0, "behavior": 1.0},
+        )
+        self.assertEqual(body["false_positives"], 1)
+        self.assertEqual(body["false_negatives"], 1)
+
+    def test_scorecard_null_rates_when_no_checks(self) -> None:
+        self.client.post(
+            "/verdicts",
+            json={"tool": "t", "results": [{"agent_id": "agent-skip", "detected": True}]},
+        )
+        body = self.client.get("/verdicts/scorecard").json()
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["passed"], 0)
+        self.assertEqual(body["skipped"], 1)
+        self.assertIsNone(body["detection_rate"])
+        self.assertEqual(
+            body["accuracy_by_dimension"],
+            {"identity": None, "capabilities": None, "policy": None, "behavior": None},
+        )
+        self.assertEqual(body["false_positives"], 0)
+        self.assertEqual(body["false_negatives"], 0)
+
+    def test_scorecard_404_when_no_submission(self) -> None:
+        resp = self.client.get("/verdicts/scorecard")
+        self.assertEqual(resp.status_code, 404, resp.text)
+
+
 if __name__ == "__main__":
     unittest.main()

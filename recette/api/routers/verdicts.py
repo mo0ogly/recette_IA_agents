@@ -21,6 +21,15 @@ from ..verdict_store import judge
 
 router = APIRouter(prefix="/verdicts", tags=["verdicts"])
 
+_DIMENSIONS = ("identity", "capabilities", "policy", "behavior")
+
+
+def _rate(hits: int, n: int) -> float | None:
+    """Plain fraction rounded to 4 decimals; null when nothing was checked."""
+    if n == 0:
+        return None
+    return round(hits / n, 4)
+
 
 def _judge_one(request: Request, result: object) -> dict:
     if not isinstance(result, dict):
@@ -71,3 +80,48 @@ def latest_submission(request: Request) -> dict:
 @router.get("/history")
 def submission_history(request: Request) -> list[dict]:
     return request.app.state.verdict_store.history()
+
+
+@router.get("/scorecard")
+def scorecard(request: Request) -> dict:
+    """Deterministic aggregates over the latest judged submission (I4).
+
+    Rates are plain fractions over the agents that actually carry the check
+    (round(x, 4)); null when no agent carries it. FP/FN are detection-axis
+    counters read from the persisted expected/observed pairs: FP = tool said
+    detected on a ground-truth non-detectable agent, FN = the reverse.
+    """
+    latest = request.app.state.verdict_store.latest()
+    if latest is None:
+        raise HTTPException(status_code=404, detail="no verdict submission yet")
+    judged = latest.get("judged") or []
+
+    detected_checks: list[bool] = []
+    dimension_checks: dict[str, list[bool]] = {dim: [] for dim in _DIMENSIONS}
+    false_positives = 0
+    false_negatives = 0
+    for entry in judged:
+        checks = entry.get("checks") or {}
+        if "detected" in checks:
+            detected_checks.append(bool(checks["detected"]))
+        for dim in _DIMENSIONS:
+            if f"dimension:{dim}" in checks:
+                dimension_checks[dim].append(bool(checks[f"dimension:{dim}"]))
+        expected = entry.get("expected") or {}
+        observed = entry.get("observed") or {}
+        if expected.get("detectable") is False and observed.get("detected") is True:
+            false_positives += 1
+        if expected.get("detectable") is True and observed.get("detected") is False:
+            false_negatives += 1
+
+    return {
+        "total": len(judged),
+        "passed": sum(1 for e in judged if e.get("status") == "PASS"),
+        "skipped": sum(1 for e in judged if e.get("status") == "SKIP"),
+        "detection_rate": _rate(sum(detected_checks), len(detected_checks)),
+        "accuracy_by_dimension": {
+            dim: _rate(sum(values), len(values)) for dim, values in dimension_checks.items()
+        },
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
+    }
