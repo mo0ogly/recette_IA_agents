@@ -76,7 +76,32 @@ Docker services (docker-compose.yml):
 | GET / POST / DELETE | `/config/ai-backends` | AI backend registry (no secrets stored, R8) |
 | GET | `/catalog/actions` | high-risk action catalog (verdicts + risk levels) |
 | GET | `/agents`, POST `/agents/register` | Lane B agent catalog |
-| POST | `/runs`, GET `/runs/{id}`, `/runs/{id}/events`, POST `/runs/{id}/stop` | Lane B runs |
+| POST | `/runs` | launch a run; `kind` = `lane_b` \| `discovery` \| `identification` \| `campaign` \| `replay` |
+| GET | `/runs/{id}`, `/runs/{id}/events`, WS `/runs/{id}/ws` | run status, buffered frames, live frame stream |
+| POST | `/runs/{id}/stop` | cooperative stop |
+| GET / POST | `/campaigns` | list / create a persisted campaign (ordered agent launches) |
+| GET / DELETE | `/campaigns/{id}` | one campaign / remove it |
+| POST | `/campaigns/{id}/run` | run the campaign; streams via the run WebSocket, persists one recording per step |
+| GET | `/recordings`, `/recordings/{id}` | list / fetch replayable recordings |
+| POST | `/recordings/{id}/replay` | deterministically replay a recording (I4); the `replay_result` frame reports `matches_original` |
+
+## Run kinds and frames
+
+Every run is executed in a worker thread by the RunManager and emits frames
+`{seq, type, data}` buffered on the run and pushed live to WebSocket
+subscribers. First frame is always `start`, last is `end` with the final status.
+
+| Kind | Body params | Domain frames |
+|------|-------------|---------------|
+| `lane_b` | `agent_id`, optional `stub_script` (mock; else the agent's `ai_backend` drives a live LLM, key from env, R8) | `step` (per agent action), `result` (recorded actions) |
+| `discovery` | optional `surface` (default all) | `scorecard` per surface (total/passed/false_positives/false_negatives/all_passed) |
+| `identification` | none | `agent_result` per agent (predicted vs expected verdict), final `scorecard` (+ detection_rate) |
+| `campaign` | (via `/campaigns/{id}/run`) | `agent_start` / `step` / `agent_done` per step, final `campaign_done`; one recording persisted per step |
+| `replay` | (via `/recordings/{id}/replay`) | `step` per replayed decision, `replay_result` with `matches_original` (I4) |
+
+`capability_scope` is the set of canonical actions an agent may call
+(`read_repo, list_repos, read_ci, open_issue, comment_issue, open_pr, merge_pr,
+push, manage_webhook, manage_release, trigger_ci`), not a system name.
 
 ## Environment variables (R5)
 
@@ -88,6 +113,9 @@ Docker services (docker-compose.yml):
 | `AGENTRAIL_EVENT_STORE_PATH` | api (audit) | `data/agentrail.events.db` | `/data/events.db` |
 | `AGENTRAIL_POLICIES_DIR` | api (policy store) | `config/policies` | `/data/policies` |
 | `AGENTRAIL_CONFIG_PATH` | api (agent/backend config) | `config/agentrail.config.json` | `/data/config.json` |
+| `AGENTRAIL_CAMPAIGNS_PATH` | api (campaign catalogue) | `config/campaigns.json` | `/data/campaigns.json` |
+| `AGENTRAIL_RECORDINGS_DIR` | api (replayable recordings) | `data/recordings` | `/data/recordings` |
+| `AGENTRAIL_CORS_ORIGINS` | api (console cross-origin) | `http://localhost:5173,http://127.0.0.1:5173` | console origin(s) |
 | `AGENTRAIL_LAB_PORT` | lab-mock | `8082` | `8082` |
 | `AGENTRAIL_E2E_API_URL` | e2e tests | unset (suite skipped) | `http://api:8090` |
 | `LAB_HOST_PORT` | compose port mapping | `8082` | host port for lab-mock |

@@ -20,8 +20,21 @@ helpers communs dans `cicd/lib/common.sh`.
 
 ## 1. Qu'est-ce que l'application ?
 
-AgentRail recette valide une couche de **gouvernance runtime des actions
-d'agents IA**. Un agent ne touche jamais un systeme externe sans :
+C'est une **plateforme de recette des outils discovery et identification**
+d'AgentRail -- PAS ces outils eux-memes. Elle produit les sujets de test
+(des agents qu'on configure, lance, arrete) et mesure si l'outil discovery les
+repere et si l'identification rend le bon verdict, par comparaison au
+ground-truth. Le cockpit (`http://localhost:5173`) pilote tout : configurer des
+agents (mock ou IA reelle), les lancer / arreter, faire des campagnes
+persistees avec replay deterministe (I4), scorer discovery + identification.
+
+Les briques de **gouvernance** ci-dessous (gateway, policy, approbations,
+audit) sont la plateforme cible, presente ici en **mock** (onglets secondaires) ;
+elles servent de contexte de reference, pas de chemin de recette courant.
+
+### Gouvernance runtime (mock, reference)
+
+Un agent ne touche jamais un systeme externe sans :
 
 1. une **identite** resolue (I3),
 2. une **decision de policy** `allow | deny | escalate` (I2, deny-by-default),
@@ -78,16 +91,29 @@ habilite, `deny` sinon ; quelques actions sont `deny` absolu pour tous, ex.
 `delete_kms_key`, `send_message_as_executive`, `delete_evidence_item`) et un
 niveau de risque (low/medium/high/critical).
 
-### La console UX (React/Vite, dossier `console/`)
+### Le cockpit UX (React/Vite, dossier `console/`)
 
-Quatre pages, branchees directement sur l'API :
+Le cockpit produit les **sujets de test** que les outils discovery /
+identification doivent reperer et juger. Ce n'est PAS l'outil discovery.
+Six onglets, branches directement sur l'API. Detail : [console/README.md](../../console/README.md).
 
-| Page | Role |
-|------|------|
-| **Agents** | parametrage IA derriere chaque agent : modele, system prompt, capability_scope, role, ai-backend |
-| **Catalog** | les 118 actions + editeur de policy (verdict par regle, publication d'une nouvelle version, activation) |
-| **Approvals** | inbox des approbations en attente (I6) : approuver / refuser, sweep des timeouts |
-| **Audit** | journal d'evenements immuable, statut de la chaine de hash, filtres, payload deplie |
+| Onglet | Role |
+|--------|------|
+| **Cockpit** | choisir un agent, mode mock (script deterministe) ou IA reelle (ai_backend, cle env), le lancer, suivre le flux live, l'arreter |
+| **Recette** | lancer discovery + identification sur le corpus -> scorecard detecte/distingue vs ground-truth (par surface / par agent) |
+| **Campagnes** | jeux d'agents persistes lances a la demande ; flux live ; enregistrements rejouables avec verdict IDENTIQUE/DIVERGENT (replay deterministe, I4) |
+| **Agents** | definir chaque agent (principal, target_system, goal, capability_scope = actions canoniques, ai_backend) + CRUD des ai-backends (provider+model, zero secret R8) |
+| **Catalog** (gouvernance mock) | les 118 actions + editeur de policy |
+| **Approvals** (gouvernance mock) | inbox des approbations (I6) |
+| **Audit** (gouvernance mock) | journal immuable + chaine de hash |
+
+Chaque onglet porte une modale `? Aide` detaillee. Les onglets Catalog /
+Approvals / Audit sont la plateforme de gouvernance (mock), gardes en
+secondaire, pas le chemin de recette discovery.
+
+`capability_scope` = liste des **actions canoniques** que l'agent peut appeler
+(`read_repo, list_repos, read_ci, open_issue, comment_issue, open_pr, merge_pr,
+push, manage_webhook, manage_release, trigger_ci`), pas un nom de systeme.
 
 ### Les campagnes (`recette/campaign.py`, dossier `campaigns/`)
 
@@ -210,12 +236,24 @@ ou un chemin ; `--json` ecrit le rapport dans `.run/campaigns/`.
 ```
 ./recette.sh platform up
 ./recette.sh console start
-./recette.sh campaign run identity-offboarding --json
 ```
 
-Puis ouvrir `http://localhost:5173`, onglet **Approvals** : 3 actions en
-attente. Approuver `suspend_user` -> l'action s'execute via le proxy,
-`executed: true` + `side_effect_hash`, visible dans l'onglet **Audit**.
+Puis ouvrir `http://localhost:5173` (onglet **Cockpit**) :
+1. onglet **Agents** : creer un agent (id, principal, target_system, goal,
+   capability_scope = actions canoniques) ; optionnellement un ai-backend.
+2. onglet **Cockpit** : choisir l'agent, mode **mock**, **Lancer** -> le flux
+   live affiche chaque etape (`step read_repo -> github`), puis `end completed`.
+3. onglet **Recette** : **Lancer discovery** et **Lancer identification** ->
+   scorecards detecte/distingue vs ground-truth.
+4. onglet **Campagnes** : creer une campagne (cocher des agents), **Lancer**,
+   puis **Replay** sur un enregistrement -> verdict IDENTIQUE (determinisme I4).
+
+> Deux notions de "campagne" coexistent : l'onglet **Campagnes** du cockpit
+> (campagnes de recette discovery, agents Lane B persistes + replay, via l'API
+> `/campaigns`) et la CLI `./recette.sh campaign` (anciennes campagnes de
+> gouvernance = actions allow/deny/escalate, `campaigns/*.campaign.json`).
+> La premiere est le chemin courant ; la seconde est conservee pour la
+> plateforme de gouvernance (mock).
 
 A la fin :
 
