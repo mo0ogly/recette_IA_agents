@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ..llm import build_llm
 from ..platform.catalog import Catalog, load_catalog
 from ..platform.eventstore import EventStore, SqliteEventStore
 from ..platform.gateway import AgentResolver, Gateway
@@ -104,6 +105,8 @@ def create_app(
     app.state.config_store = cfg_store
     app.state.run_manager = RunManager()
     app.state.server_manager = ServerManager()
+    # Connectivity-probe factory; tests override it with a stub (no key/network).
+    app.state.llm_factory = build_llm
 
     if event_store is not None:
         events: EventStore = event_store

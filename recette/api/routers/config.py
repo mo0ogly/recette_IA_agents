@@ -8,12 +8,14 @@ network failure to {"status": "down"} -- it never raises to the client.
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from ...llm import Message, build_llm
 from ..config_store import UnknownAgentError, UnknownServerError
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -102,6 +104,35 @@ def create_ai_backend(request: Request, backend: dict[str, Any]) -> dict:
 def delete_ai_backend(request: Request, backend_id: str) -> Response:
     _store(request).delete_ai_backend(backend_id)
     return Response(status_code=204)
+
+
+@router.post("/ai-backends/{backend_id}/test")
+def test_ai_backend(request: Request, backend_id: str) -> dict:
+    """Connectivity probe: one minimal real call to the configured provider.
+
+    Diagnostic path, NOT a decision path -- I4 does not apply to the
+    wall-clock latency measured here. Failure mode is fail-safe: every
+    error (missing key, network failure, bad base_url...) maps to
+    {"ok": false, "latency_ms": ..., "error": ...}; exceptions never
+    leak to the client as a 500. Unknown backend id is the only 404.
+    """
+    backend = _store(request).get_ai_backend(backend_id)
+    if backend is None:
+        raise HTTPException(status_code=404, detail=f"no ai_backend {backend_id!r}")
+    factory = getattr(request.app.state, "llm_factory", None) or build_llm
+    t0 = time.perf_counter()
+    try:
+        llm = factory(backend["provider"], backend["model"], base_url=backend.get("base_url"))
+        decision = llm.decide(
+            system="You are a connectivity probe. Reply with one word.",
+            history=[Message(role="user", content="ping")],
+            tools=[],
+        )
+    except Exception as exc:  # noqa: BLE001 -- fail-safe diagnostic boundary
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        return {"ok": False, "latency_ms": latency_ms, "error": str(exc)}
+    latency_ms = int((time.perf_counter() - t0) * 1000)
+    return {"ok": True, "latency_ms": latency_ms, "kind": decision.kind}
 
 
 @router.get("/servers")

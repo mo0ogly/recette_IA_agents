@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import http.server
 import json
+import os
 import socket
 import tempfile
 import threading
@@ -15,6 +16,7 @@ try:
 
     from recette.api.app import create_app
     from recette.api.config_store import ConfigStore
+    from recette.llm import LlmDecision, StubLlm
 
     _HAS_FASTAPI = True
 except ImportError:  # pragma: no cover
@@ -149,6 +151,68 @@ class TestConfigRoutes(unittest.TestCase):
         )
         r = self.client.put("/config/agents/a1", json={"runtime": "bogus"})
         self.assertEqual(r.status_code, 400)
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class TestAiBackendConnectivityProbe(unittest.TestCase):
+    """POST /config/ai-backends/{id}/test: diagnostic probe, 200 always (404 on unknown id)."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        store = ConfigStore(Path(self.tmp.name) / "cfg.json")
+        self.app = create_app(config_store=store)
+        self.client = TestClient(self.app)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _add_backend(self, backend: dict) -> None:
+        r = self.client.post("/config/ai-backends", json=backend)
+        self.assertEqual(r.status_code, 201)
+
+    def test_ok_true_with_stub_factory(self) -> None:
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+
+        def factory(provider: str, model: str, *, base_url: str | None = None) -> StubLlm:
+            return StubLlm([LlmDecision(kind="final", text="pong")])
+
+        self.app.state.llm_factory = factory
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["ok"])
+        self.assertIsInstance(body["latency_ms"], int)
+        self.assertGreaterEqual(body["latency_ms"], 0)
+        self.assertEqual(body["kind"], "final")
+
+    def test_missing_key_is_ok_false_not_500(self) -> None:
+        # Default factory (build_llm): constructing GeminiLlm without a key
+        # raises RuntimeError -- the probe maps it to ok=false, never a 500.
+        self._add_backend({"id": "b1", "provider": "gemini", "model": "m"})
+        old = os.environ.pop("GEMINI_API_KEY", None)
+        try:
+            r = self.client.post("/config/ai-backends/b1/test")
+        finally:
+            if old is not None:
+                os.environ["GEMINI_API_KEY"] = old
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["ok"])
+        self.assertIsInstance(body["latency_ms"], int)
+        self.assertIn("GEMINI_API_KEY", body["error"])
+
+    def test_unknown_backend_is_404(self) -> None:
+        r = self.client.post("/config/ai-backends/nope/test")
+        self.assertEqual(r.status_code, 404)
+
+    def test_factory_value_error_is_ok_false(self) -> None:
+        # e.g. openai_compat without base_url raises ValueError in build_llm.
+        self._add_backend({"id": "b1", "provider": "openai_compat", "model": "m"})
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertFalse(body["ok"])
+        self.assertIn("openai_compat requires base_url", body["error"])
 
 
 class _FakeServerManager:
