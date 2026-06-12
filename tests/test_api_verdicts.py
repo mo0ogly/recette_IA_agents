@@ -11,9 +11,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+try:
+    from fastapi.testclient import TestClient
 
-from recette.api.app import create_app
+    from recette.api.app import create_app
+
+    _HAS_FASTAPI = True
+except ImportError:  # pragma: no cover - exercised only without the [api] extra
+    _HAS_FASTAPI = False
+
 from recette.api.config_store import ConfigStore
 from recette.api.verdict_store import VerdictStore, judge
 from recette.platform.catalog import Catalog
@@ -98,9 +104,7 @@ class TestJudge(unittest.TestCase):
         result = {"dimensions": {"identity": True, "policy": False, "behavior": False}}
         verdict = judge(ground_truth, result, [])
         self.assertEqual(verdict["status"], "PASS")
-        self.assertEqual(
-            verdict["checks"], {"dimension:identity": True, "dimension:policy": True}
-        )
+        self.assertEqual(verdict["checks"], {"dimension:identity": True, "dimension:policy": True})
 
     def test_missing_result_field_fails_the_check(self) -> None:
         verdict = judge({"expected_identity": "bot@acme"}, {}, [])
@@ -116,12 +120,17 @@ class TestVerdictStore(unittest.TestCase):
             self.assertEqual(store.history(), [])
             store.append({"tool": "t1", "judged": []})
             store.append({"tool": "t2", "judged": []})
-            self.assertEqual(store.latest()["tool"], "t2")
+            latest = store.latest()
+            assert latest is not None
+            self.assertEqual(latest["tool"], "t2")
             self.assertEqual([s["tool"] for s in store.history()], ["t1", "t2"])
             # a fresh store over the same file sees the same submissions
-            self.assertEqual(VerdictStore(Path(tmp) / "verdicts.json").latest()["tool"], "t2")
+            reread = VerdictStore(Path(tmp) / "verdicts.json").latest()
+            assert reread is not None
+            self.assertEqual(reread["tool"], "t2")
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestVerdictsApi(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -210,10 +219,8 @@ class TestVerdictsApi(unittest.TestCase):
         self.assertEqual(entry["error"], "unknown agent")
 
     def test_agent_without_ground_truth_is_skip(self) -> None:
-        resp = self.client.post(
-            "/verdicts",
-            json={"tool": "discovery-v1", "results": [{"agent_id": "agent-nogt", "detected": True}]},
-        )
+        results = [{"agent_id": "agent-nogt", "detected": True}]
+        resp = self.client.post("/verdicts", json={"tool": "discovery-v1", "results": results})
         self.assertEqual(resp.status_code, 200, resp.text)
         entry = resp.json()["judged"][0]
         self.assertEqual(entry["agent_id"], "agent-nogt")
@@ -271,6 +278,7 @@ class TestVerdictsApi(unittest.TestCase):
         self.assertEqual(history.json(), [])
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestVerdictScorecard(unittest.TestCase):
     """GET /verdicts/scorecard aggregates over the latest judged submission."""
 

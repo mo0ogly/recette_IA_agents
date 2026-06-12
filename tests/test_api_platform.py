@@ -12,9 +12,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+try:
+    from fastapi.testclient import TestClient
 
-from recette.api.app import create_app
+    from recette.api.app import create_app
+
+    _HAS_FASTAPI = True
+except ImportError:  # pragma: no cover - exercised only without the [api] extra
+    _HAS_FASTAPI = False
+
 from recette.api.config_store import ConfigStore
 from recette.platform.catalog import Catalog
 from recette.platform.catalog.model import ActionSpec, RiskLevel
@@ -79,6 +85,7 @@ class StubProxy:
         )
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestPlatformApi(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()

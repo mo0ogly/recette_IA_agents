@@ -303,12 +303,8 @@ class ServerSectionTests(unittest.TestCase):
     def test_update_switching_mode_purges_old_mode_field(self) -> None:
         # mock_local carries a port; switching to declared_url must drop the
         # now-irrelevant port so the stored entry has no stale target field.
-        self.store.add_server(
-            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
-        )
-        merged = self.store.update_server(
-            "s1", {"mode": "declared_url", "base_url": "http://h"}
-        )
+        self.store.add_server({"id": "s1", "system": "github", "mode": "mock_local", "port": 9101})
+        merged = self.store.update_server("s1", {"mode": "declared_url", "base_url": "http://h"})
         self.assertNotIn("port", merged)
         self.assertNotIn("port", self.store.get_server("s1"))
         self.assertEqual(merged["base_url"], "http://h")
@@ -330,9 +326,7 @@ class ServerSectionTests(unittest.TestCase):
 
     def test_update_null_cannot_remove_required_field(self) -> None:
         # Clearing the current mode's required field leaves an invalid entry.
-        self.store.add_server(
-            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
-        )
+        self.store.add_server({"id": "s1", "system": "github", "mode": "mock_local", "port": 9101})
         with self.assertRaises(ValueError):
             self.store.update_server("s1", {"port": None})
         # the bad patch must not have been persisted
@@ -354,9 +348,7 @@ class ServerSectionTests(unittest.TestCase):
         self.assertEqual(merged["label"], "secondary")
 
     def test_update_switching_mode_without_new_required_field_raises(self) -> None:
-        self.store.add_server(
-            {"id": "s1", "system": "github", "mode": "mock_local", "port": 9101}
-        )
+        self.store.add_server({"id": "s1", "system": "github", "mode": "mock_local", "port": 9101})
         with self.assertRaises(ValueError):
             self.store.update_server("s1", {"mode": "real_saas"})
         # the bad patch must not have been persisted

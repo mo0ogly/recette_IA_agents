@@ -125,9 +125,7 @@ class TestConfigRoutes(unittest.TestCase):
         )
         r = self.client.put("/config/servers/s1", json={"mode": "bogus"})
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(
-            self.client.get("/config/servers").json()[0]["mode"], "mock_local"
-        )
+        self.assertEqual(self.client.get("/config/servers").json()[0]["mode"], "mock_local")
 
     def test_server_delete_then_gone(self) -> None:
         self.client.post(
@@ -281,9 +279,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
         self.assertEqual(r.status_code, 201)
 
     def _add_mock_server(self, server_id: str = "srv") -> None:
-        self._add_server(
-            {"id": server_id, "system": "github", "mode": "mock_local", "port": 9101}
-        )
+        self._add_server({"id": server_id, "system": "github", "mode": "mock_local", "port": 9101})
 
     def _serve_http(self, status_code: int) -> int:
         """Local HTTP server on an ephemeral port answering every GET."""
@@ -339,9 +335,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
         }
         r = self.client.post("/config/servers/srv/start")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(
-            r.json(), {"status": "down", "error": "port 9101 already in use"}
-        )
+        self.assertEqual(r.json(), {"status": "down", "error": "port 9101 already in use"})
 
     # --- stop ---
     def test_stop_ok(self) -> None:
@@ -412,9 +406,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
         self.assertEqual(r.json(), {"status": "down"})
 
     def test_status_real_saas_is_not_applicable(self) -> None:
-        self._add_server(
-            {"id": "saas", "system": "github", "mode": "real_saas", "owner": "acme"}
-        )
+        self._add_server({"id": "saas", "system": "github", "mode": "real_saas", "owner": "acme"})
         r = self.client.get("/config/servers/saas/status")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {"status": "n/a"})
@@ -433,9 +425,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
     def test_log_full_read(self) -> None:
         self._add_mock_server()
         entries = [{"seq": 1, "path": "/health"}, {"seq": 2, "path": "/repos"}]
-        self.log_path.write_text(
-            "".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8"
-        )
+        self.log_path.write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
         r = self.client.get("/config/servers/srv/log")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {"lines": entries, "next": 2})
@@ -443,9 +433,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
     def test_log_incremental_read_after_n(self) -> None:
         self._add_mock_server()
         entries = [{"seq": i} for i in range(1, 5)]
-        self.log_path.write_text(
-            "".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8"
-        )
+        self.log_path.write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
         r = self.client.get("/config/servers/srv/log?after=2")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {"lines": [{"seq": 3}, {"seq": 4}], "next": 4})

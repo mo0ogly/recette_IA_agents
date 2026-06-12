@@ -184,9 +184,9 @@ class TestLaneBRun(unittest.TestCase):
 
             def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
                 received.append(self.path)
-                payload = json.dumps(
-                    {"choices": [{"message": {"content": "done"}}]}
-                ).encode("utf-8")
+                payload = json.dumps({"choices": [{"message": {"content": "done"}}]}).encode(
+                    "utf-8"
+                )
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))

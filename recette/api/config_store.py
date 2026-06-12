@@ -58,9 +58,7 @@ def _check_ground_truth(ground_truth: object) -> None:
             raise ValueError("ground_truth 'dimensions' must be a dict")
         unknown_dims = set(dimensions) - _GROUND_TRUTH_DIMENSIONS
         if unknown_dims:
-            raise ValueError(
-                f"ground_truth dimensions has unknown keys: {sorted(unknown_dims)}"
-            )
+            raise ValueError(f"ground_truth dimensions has unknown keys: {sorted(unknown_dims)}")
         for dim, expected in dimensions.items():
             if not isinstance(expected, bool):
                 raise ValueError(f"ground_truth dimension {dim!r} must be a boolean")
@@ -208,7 +206,7 @@ class ConfigStore:
                 # declared_url) survives. A field explicitly set in this patch
                 # is never stripped.
                 if "mode" in patch and patch["mode"] != s.get("mode"):
-                    keep = _SERVER_MODE_REQUIRED.get(merged.get("mode"))
+                    keep = _SERVER_MODE_REQUIRED.get(merged.get("mode") or "")
                     for field in set(_SERVER_MODE_REQUIRED.values()):
                         if field != keep and field not in patch:
                             merged.pop(field, None)

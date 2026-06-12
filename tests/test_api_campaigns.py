@@ -73,7 +73,8 @@ class TestCampaignRoutes(unittest.TestCase):
             },
         )
         self.assertEqual(created.status_code, 201)
-        self.assertIn("camp-pr", [c["id"] for c in self.client.get("/campaigns").json()["campaigns"]])
+        campaigns = self.client.get("/campaigns").json()["campaigns"]
+        self.assertIn("camp-pr", [c["id"] for c in campaigns])
 
         # Run it; one recording is persisted.
         run_id = self.client.post("/campaigns/camp-pr/run").json()["run_id"]
@@ -105,9 +106,9 @@ class TestCampaignRoutes(unittest.TestCase):
 
             def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
                 received.append(self.path)
-                payload = json.dumps(
-                    {"choices": [{"message": {"content": "done"}}]}
-                ).encode("utf-8")
+                payload = json.dumps({"choices": [{"message": {"content": "done"}}]}).encode(
+                    "utf-8"
+                )
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
@@ -164,7 +165,8 @@ class TestCampaignRoutes(unittest.TestCase):
         self.assertEqual(self.client.post("/campaigns/nope/run").status_code, 404)
 
     def test_create_duplicate_400(self) -> None:
-        body = {"id": "dup", "description": "", "steps": [{"agent_id": "gh-pr-bot", "stub_script": _STUB}]}
+        steps = [{"agent_id": "gh-pr-bot", "stub_script": _STUB}]
+        body = {"id": "dup", "description": "", "steps": steps}
         self.assertEqual(self.client.post("/campaigns", json=body).status_code, 201)
         self.assertEqual(self.client.post("/campaigns", json=body).status_code, 400)
 
@@ -189,10 +191,12 @@ class TestCampaignRoutes(unittest.TestCase):
         run_id = self.client.post(f"/campaigns/{tid}/run").json()["run_id"]
         self.assertEqual(_wait_terminal(self.client, run_id)["status"], "completed")
         events = self.client.get(f"/runs/{run_id}/events").json()
-        steps = [e["data"]["action"]["action_type"] for e in events if e["type"] == "step" and e["data"].get("action")]
+        steps = [
+            e["data"]["action"]["action_type"]
+            for e in events
+            if e["type"] == "step" and e["data"].get("action")
+        ]
         self.assertIn("launch_wire_transfer", steps)
 
     def test_instantiate_unknown_template_404(self) -> None:
-        self.assertEqual(
-            self.client.post("/campaign-templates/nope/instantiate").status_code, 404
-        )
+        self.assertEqual(self.client.post("/campaign-templates/nope/instantiate").status_code, 404)
