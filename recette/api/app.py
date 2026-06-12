@@ -7,12 +7,17 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from .config_store import ConfigStore
+from .routers import config as config_router
 
-def create_app() -> FastAPI:
+
+def create_app(*, config_store: ConfigStore | None = None) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0")
+    app.state.config_store = config_store or ConfigStore()
 
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.include_router(config_router.router)
     return app
