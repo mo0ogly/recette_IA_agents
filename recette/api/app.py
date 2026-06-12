@@ -8,6 +8,8 @@ Plane, Phase 1 SQLite), policy store, lab proxy and the Gateway (I2).
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,6 +34,7 @@ from .routers import config as config_router
 from .routers import policies as policies_router
 from .routers import runs as runs_router
 from .runs import RunManager
+from .server_manager import ServerManager
 
 DEFAULT_EVENT_STORE_PATH = "data/agentrail.events.db"
 BASELINE_POLICY_VERSION = "v1"
@@ -39,6 +42,13 @@ BASELINE_POLICY_VERSION = "v1"
 # requires CORS. Origins are configurable (R5); the default covers the local
 # console on both loopback spellings. Never wildcard with credentials.
 DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Stop every mock_local lab subprocess when the app shuts down."""
+    yield
+    app.state.server_manager.shutdown()
 
 
 class RestartSafeIdGenerator:
@@ -76,7 +86,7 @@ def create_app(
     campaign_store: CampaignStore | None = None,
     recording_store: RecordingStore | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="AgentRail Recette API", version="0.1.0")
+    app = FastAPI(title="AgentRail Recette API", version="0.1.0", lifespan=_lifespan)
 
     cors_origins = [
         origin.strip()
@@ -93,6 +103,7 @@ def create_app(
     cfg_store = config_store or ConfigStore()
     app.state.config_store = cfg_store
     app.state.run_manager = RunManager()
+    app.state.server_manager = ServerManager()
 
     if event_store is not None:
         events: EventStore = event_store

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import threading
 import unittest
 import urllib.error
@@ -18,6 +19,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from recette.api.server_manager import ServerManager
 from recette.lab.domains import HANDLER_MODULES
 from recette.lab.mock_server import _Handler
 
@@ -140,6 +142,76 @@ class LabServerLifecycleTest(unittest.TestCase):
             )
             self.assertEqual(status, 200)
             self.assertFalse(log_path.exists())
+
+
+def _free_port() -> int:
+    """Find an ephemeral free port by binding port 0 then closing."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+class ServerManagerTests(unittest.TestCase):
+    """Lifecycle of mock_local lab servers via recette.api.server_manager."""
+
+    def setUp(self) -> None:
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base_dir = Path(tmp.name) / "data" / "lab"
+        self.manager = ServerManager(base_dir=self.base_dir)
+        # Cleanup runs even when the test body fails: no leaked subprocess.
+        self.addCleanup(self._shutdown_and_assert_no_children)
+
+    def _shutdown_and_assert_no_children(self) -> None:
+        tracked = list(self.manager._procs.values())
+        self.manager.shutdown()
+        for proc in tracked:
+            self.assertIsNotNone(proc.poll(), "leftover child process after shutdown")
+        self.assertEqual(self.manager._procs, {})
+
+    def _health_status(self, port: int) -> int:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
+            return response.status
+
+    def test_start_creates_live_process_and_health_answers(self) -> None:
+        port = _free_port()
+        result = self.manager.start({"id": "s1", "mode": "mock_local", "port": port})
+        self.assertEqual(result, {"status": "up"})
+        self.assertEqual(self._health_status(port), 200)
+        self.assertEqual(self.manager.status("s1"), "up")
+
+    def test_start_on_busy_port_fails_explicitly(self) -> None:
+        blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.addCleanup(blocker.close)
+        blocker.bind(("127.0.0.1", 0))
+        port = blocker.getsockname()[1]
+        result = self.manager.start({"id": "s1", "mode": "mock_local", "port": port})
+        self.assertEqual(result["status"], "down")
+        self.assertIn(str(port), result["error"])
+        self.assertEqual(self.manager.status("s1"), "down")
+        self.assertEqual(self.manager._procs, {}, "no process may be spawned on a busy port")
+
+    def test_stop_terminates_process(self) -> None:
+        port = _free_port()
+        result = self.manager.start({"id": "s1", "mode": "mock_local", "port": port})
+        self.assertEqual(result, {"status": "up"})
+        self.assertEqual(self.manager.stop("s1"), {"status": "down"})
+        self.assertEqual(self.manager.status("s1"), "down")
+        with self.assertRaises(urllib.error.URLError):
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2)
+        # Stop is idempotent: stopping an already-stopped server stays "down".
+        self.assertEqual(self.manager.stop("s1"), {"status": "down"})
+
+    def test_status_down_for_never_started(self) -> None:
+        self.assertEqual(self.manager.status("nope"), "down")
+
+    def test_start_rejects_non_mock_local(self) -> None:
+        with self.assertRaises(ValueError):
+            self.manager.start({"id": "x", "mode": "declared_url", "base_url": "http://h"})
+
+    def test_access_log_path_under_data_lab(self) -> None:
+        path = self.manager.access_log_path("s1")
+        self.assertTrue(path.as_posix().endswith("data/lab/s1.access.jsonl"))
 
 
 if __name__ == "__main__":
