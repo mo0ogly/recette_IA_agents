@@ -158,13 +158,25 @@ def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
 
 
 def _cmd_agent_run(
-    manifest_path: str, provider: str, model: str, max_steps: int, real: bool, enable_writes: bool
+    manifest_path: str,
+    provider: str,
+    model: str,
+    max_steps: int,
+    real: bool,
+    enable_writes: bool,
+    base_url: str | None,
 ) -> int:
     from .lane_b import run_agent
     from .llm import build_llm
 
+    # Validate the provider/base_url combo before any file read or network call:
+    # build_llm raises ValueError when openai_compat is missing its base_url.
+    try:
+        llm = build_llm(provider, model, base_url=base_url)  # live; key from env (R8)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     spec = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
-    llm = build_llm(provider, model)  # live; key from env (R8)
     forge = None  # default = LabForge (no side effects)
     if real:
         from .realmode import build_real_forge
@@ -230,7 +242,19 @@ def _cmd_report(as_json: bool) -> int:
     return 0 if report.all_passed else 1
 
 
-def main(argv: list[str] | None = None) -> int:
+_LLM_PROVIDERS = (
+    "anthropic",
+    "openai",
+    "gemini",
+    "groq",
+    "mistral",
+    "deepseek",
+    "xai",
+    "openai_compat",
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="recette", description="AgentRail recette harness")
     parser.add_argument(
         "--corpus",
@@ -268,8 +292,13 @@ def main(argv: list[str] | None = None) -> int:
         "manifest",
         help="Lane B manifest JSON (agent_id, principal, target_system, goal, capability_scope)",
     )
-    a_run.add_argument("--provider", required=True, choices=["anthropic", "openai"])
+    a_run.add_argument("--provider", required=True, choices=list(_LLM_PROVIDERS))
     a_run.add_argument("--model", required=True)
+    a_run.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible base URL (required for --provider openai_compat)",
+    )
     a_run.add_argument("--max-steps", type=int, default=10)
     a_run.add_argument(
         "--real",
@@ -291,7 +320,11 @@ def main(argv: list[str] | None = None) -> int:
     pub.add_argument(
         "--apply", action="store_true", help="actually create + push (default: dry-run)"
     )
+    return parser
 
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "validate":
         return _cmd_validate(args.corpus)
@@ -312,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.max_steps,
                 args.real,
                 args.enable_writes,
+                args.base_url,
             )
         if args.agent_cmd == "replay":
             return _cmd_agent_replay(args.recording)
