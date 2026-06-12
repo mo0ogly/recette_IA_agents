@@ -81,7 +81,10 @@ def run_campaign(request: Request, campaign_id: str) -> dict:
         raise HTTPException(status_code=404, detail="no such campaign")
     mgr = request.app.state.run_manager
     runner = make_campaign_runner(
-        campaign, request.app.state.config_store, _recordings(request)
+        campaign,
+        request.app.state.config_store,
+        _recordings(request),
+        request.app.state.secret_store,
     )
     run = mgr.create("campaign", {"campaign_id": campaign_id})
     mgr.start(run, runner)

@@ -180,11 +180,15 @@ def _lane_b_step_emit(emit: Emit, agent_id: str) -> Callable[[int, object], None
 
 
 def make_campaign_runner(
-    campaign: dict, config_store: object, recording_store: object
+    campaign: dict,
+    config_store: object,
+    recording_store: object,
+    secret_store: object | None = None,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     """Run each campaign step as a Lane B agent, persisting one recording per
     step. A step with a stub_script runs as a mock; otherwise the agent's bound
-    ai_backend drives a live LLM (key from env, R8)."""
+    ai_backend drives a live LLM. Key resolution (R8): the per-backend secret
+    store first, then the provider's env fallback. The key is never logged."""
     from ..llm import build_llm
 
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
@@ -233,8 +237,16 @@ def make_campaign_runner(
                     continue
                 provider = backend["provider"]
                 model = backend["model"]
-                # Live; key from env (R8). base_url only matters for openai_compat.
-                llm = build_llm(provider, model, base_url=backend.get("base_url"))
+                # Per-backend secret first, then env fallback (R8). base_url
+                # only matters for openai_compat. The key is never logged.
+                api_key = (
+                    secret_store.get_secret(agent_cfg.get("ai_backend_id", ""))  # type: ignore[attr-defined]
+                    if secret_store is not None
+                    else None
+                )
+                llm = build_llm(
+                    provider, model, base_url=backend.get("base_url"), api_key=api_key
+                )
             try:
                 # Per-agent proxy routing (I5): a dangling server reference
                 # fails this step explicitly, never falls back to the default.

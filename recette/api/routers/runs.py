@@ -37,9 +37,14 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 raise HTTPException(status_code=400, detail="unknown ai_backend_id")
             from ...llm import build_llm
 
-            # Live; key from env (R8). base_url only matters for openai_compat.
+            # Per-backend secret first, then env fallback (R8). base_url only
+            # matters for openai_compat. The key is never logged.
+            api_key = request.app.state.secret_store.get_secret(agent_cfg["ai_backend_id"])
             llm = build_llm(
-                backend["provider"], backend["model"], base_url=backend.get("base_url")
+                backend["provider"],
+                backend["model"],
+                base_url=backend.get("base_url"),
+                api_key=api_key,
             )
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b", params)

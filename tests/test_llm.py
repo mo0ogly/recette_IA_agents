@@ -368,6 +368,20 @@ class TestFactory(unittest.TestCase):
             OpenAiCompatLlm,
         )
 
+    def test_api_key_is_threaded_to_provider(self):
+        # No client, no env: the key must reach the provider and become the
+        # Authorization bearer header on its constructed client (R8 resolution).
+        llm = build_llm("openai", "m", api_key="sk-threaded")
+        self.assertEqual(llm._client.headers["Authorization"], "Bearer sk-threaded")
+        vendor = build_llm("groq", "m", api_key="gk")
+        self.assertEqual(vendor._client.headers["Authorization"], "Bearer gk")
+        anthropic = build_llm("anthropic", "m", api_key="ak")
+        self.assertEqual(anthropic._client.headers["x-api-key"], "ak")
+        gemini = build_llm("gemini", "m", api_key="gemk")
+        self.assertEqual(gemini._client.headers["x-goog-api-key"], "gemk")
+        compat = build_llm("openai_compat", "m", base_url="http://h:1/v1", api_key="ck")
+        self.assertEqual(compat._client.headers["Authorization"], "Bearer ck")
+
     def test_unknown_provider_raises(self):
         with self.assertRaises(ValueError) as ctx:
             build_llm("bogus", "m")

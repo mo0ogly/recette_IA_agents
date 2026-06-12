@@ -16,6 +16,7 @@ try:
 
     from recette.api.app import create_app
     from recette.api.config_store import ConfigStore
+    from recette.api.secret_store import BackendSecretStore
     from recette.llm import LlmDecision, StubLlm
 
     _HAS_FASTAPI = True
@@ -162,7 +163,8 @@ class TestAiBackendConnectivityProbe(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         store = ConfigStore(Path(self.tmp.name) / "cfg.json")
-        self.app = create_app(config_store=store)
+        secrets = BackendSecretStore(Path(self.tmp.name) / "secrets.json")
+        self.app = create_app(config_store=store, secret_store=secrets)
         self.client = TestClient(self.app)
 
     def tearDown(self) -> None:
@@ -175,10 +177,17 @@ class TestAiBackendConnectivityProbe(unittest.TestCase):
     def test_ok_true_with_stub_factory(self) -> None:
         self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
 
-        def factory(provider: str, model: str, *, base_url: str | None = None) -> StubLlm:
+        def fake_factory(
+            provider: str,
+            model: str,
+            *,
+            client: object | None = None,
+            base_url: str | None = None,
+            api_key: str | None = None,
+        ) -> StubLlm:
             return StubLlm([LlmDecision(kind="final", text="pong")])
 
-        self.app.state.llm_factory = factory
+        self.app.state.llm_factory = fake_factory
         r = self.client.post("/config/ai-backends/b1/test")
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -186,6 +195,49 @@ class TestAiBackendConnectivityProbe(unittest.TestCase):
         self.assertIsInstance(body["latency_ms"], int)
         self.assertGreaterEqual(body["latency_ms"], 0)
         self.assertEqual(body["kind"], "final")
+
+    def test_factory_receives_stored_secret(self) -> None:
+        # A secret set in the store must be threaded into the factory call.
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+        self.app.state.secret_store.set_secret("b1", "sk-from-store")
+        captured: dict = {}
+
+        def fake_factory(
+            provider: str,
+            model: str,
+            *,
+            client: object | None = None,
+            base_url: str | None = None,
+            api_key: str | None = None,
+        ) -> StubLlm:
+            captured["api_key"] = api_key
+            return StubLlm([LlmDecision(kind="final", text="pong")])
+
+        self.app.state.llm_factory = fake_factory
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(captured["api_key"], "sk-from-store")
+
+    def test_factory_api_key_none_when_no_secret(self) -> None:
+        # No secret set: api_key is None so the provider env fallback applies.
+        self._add_backend({"id": "b1", "provider": "anthropic", "model": "claude"})
+        captured: dict = {}
+
+        def fake_factory(
+            provider: str,
+            model: str,
+            *,
+            client: object | None = None,
+            base_url: str | None = None,
+            api_key: str | None = None,
+        ) -> StubLlm:
+            captured["api_key"] = api_key
+            return StubLlm([LlmDecision(kind="final", text="pong")])
+
+        self.app.state.llm_factory = fake_factory
+        r = self.client.post("/config/ai-backends/b1/test")
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(captured["api_key"])
 
     def test_missing_key_is_ok_false_not_500(self) -> None:
         # Default factory (build_llm): constructing GeminiLlm without a key

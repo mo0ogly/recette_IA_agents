@@ -36,6 +36,7 @@ from .routers import policies as policies_router
 from .routers import runs as runs_router
 from .routers import verdicts as verdicts_router
 from .runs import RunManager
+from .secret_store import BackendSecretStore
 from .server_manager import ServerManager
 from .verdict_store import VerdictStore
 
@@ -89,6 +90,7 @@ def create_app(
     campaign_store: CampaignStore | None = None,
     recording_store: RecordingStore | None = None,
     verdict_store: VerdictStore | None = None,
+    secret_store: BackendSecretStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0", lifespan=_lifespan)
 
@@ -106,6 +108,9 @@ def create_app(
 
     cfg_store = config_store or ConfigStore()
     app.state.config_store = cfg_store
+    # Per-backend AI keys live in a gitignored secret store, never in the
+    # versioned config (R8). Resolved at LLM call time, never logged.
+    app.state.secret_store = secret_store if secret_store is not None else BackendSecretStore()
     app.state.run_manager = RunManager()
     app.state.server_manager = ServerManager()
     # Connectivity-probe factory; tests override it with a stub (no key/network).

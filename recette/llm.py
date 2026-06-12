@@ -431,27 +431,32 @@ def build_llm(
     *,
     client: _PostClient | None = None,
     base_url: str | None = None,
+    api_key: str | None = None,
 ) -> LlmBackend:
-    """Construct a live provider backend by name. Keys come from env (R8).
+    """Construct a live provider backend by name.
 
+    Key resolution (R8): an explicit api_key wins (per-backend secret store);
+    otherwise the provider reads its env var fallback. The key is never logged.
     base_url is required for (and only used by) the "openai_compat" provider.
     """
     if provider == "anthropic":
-        return AnthropicLlm(model=model, client=client)
+        return AnthropicLlm(model=model, client=client, api_key=api_key)
     if provider == "openai":
-        return OpenAiLlm(model=model, client=client)
+        return OpenAiLlm(model=model, client=client, api_key=api_key)
     if provider == "gemini":
-        return GeminiLlm(model=model, client=client)
+        return GeminiLlm(model=model, client=client, api_key=api_key)
     if provider == "groq":
-        return GroqLlm(model=model, client=client)
+        return GroqLlm(model=model, client=client, api_key=api_key)
     if provider == "mistral":
-        return MistralLlm(model=model, client=client)
+        return MistralLlm(model=model, client=client, api_key=api_key)
     if provider == "deepseek":
-        return DeepSeekLlm(model=model, client=client)
+        return DeepSeekLlm(model=model, client=client, api_key=api_key)
     if provider == "xai":
-        return XaiLlm(model=model, client=client)
+        return XaiLlm(model=model, client=client, api_key=api_key)
     if provider == "openai_compat":
         if not base_url and client is None:
             raise ValueError("openai_compat requires base_url")
-        return OpenAiCompatLlm(model=model, base_url=base_url or "", client=client)
+        return OpenAiCompatLlm(
+            model=model, base_url=base_url or "", client=client, api_key=api_key
+        )
     raise ValueError(f"unknown provider {provider!r}; known: {', '.join(_PROVIDERS)}")

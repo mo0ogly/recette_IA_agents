@@ -124,9 +124,17 @@ def test_ai_backend(request: Request, backend_id: str) -> dict:
     if backend is None:
         raise HTTPException(status_code=404, detail=f"no ai_backend {backend_id!r}")
     factory = getattr(request.app.state, "llm_factory", None) or build_llm
+    # Per-backend secret first, then the provider's env-var fallback (R8). The
+    # key is passed straight to the factory; it is never logged or returned.
+    api_key = request.app.state.secret_store.get_secret(backend_id)
     t0 = time.perf_counter()
     try:
-        llm = factory(backend["provider"], backend["model"], base_url=backend.get("base_url"))
+        llm = factory(
+            backend["provider"],
+            backend["model"],
+            base_url=backend.get("base_url"),
+            api_key=api_key,
+        )
         decision = llm.decide(
             system="You are a connectivity probe. Reply with one word.",
             history=[Message(role="user", content="ping")],
