@@ -324,6 +324,35 @@ class TestGemini(unittest.TestCase):
         self.assertEqual(out.text, "")
 
 
+class TestOpenAiWireVendors(unittest.TestCase):
+    """The 4 OpenAI-wire vendors share one base; each declares BASE_URL + ENV_KEY."""
+
+    _VENDORS = (
+        (GroqLlm, "https://api.groq.com/openai", "GROQ_API_KEY"),
+        (MistralLlm, "https://api.mistral.ai", "MISTRAL_API_KEY"),
+        (DeepSeekLlm, "https://api.deepseek.com", "DEEPSEEK_API_KEY"),
+        (XaiLlm, "https://api.x.ai", "XAI_API_KEY"),
+    )
+
+    def test_each_vendor_declares_base_url_and_env_key(self) -> None:
+        for cls, base_url, env_key in self._VENDORS:
+            with self.subTest(vendor=cls.__name__):
+                self.assertEqual(cls.BASE_URL, base_url)
+                self.assertEqual(cls.ENV_KEY, env_key)
+
+    def test_missing_key_raises_runtimeerror_naming_env_var(self) -> None:
+        for cls, _base_url, env_key in self._VENDORS:
+            with self.subTest(vendor=cls.__name__):
+                old = os.environ.pop(env_key, None)
+                try:
+                    with self.assertRaises(RuntimeError) as ctx:
+                        cls(model="m")
+                    self.assertIn(env_key, str(ctx.exception))
+                finally:
+                    if old is not None:
+                        os.environ[env_key] = old
+
+
 class TestFactory(unittest.TestCase):
     def test_build_known_providers(self):
         client = _StubClient({"content": []})

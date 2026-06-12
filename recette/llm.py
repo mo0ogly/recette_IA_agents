@@ -275,93 +275,66 @@ class OpenAiCompatLlm(OpenAiLlm):
         return base
 
 
-# --- Groq --------------------------------------------------------------------------------
+# --- OpenAI-wire cloud vendors -----------------------------------------------------------
 
 
-class GroqLlm(OpenAiLlm):
+class _OpenAiWireVendor(OpenAiLlm):
+    """Shared base for cloud vendors that speak the OpenAI wire format verbatim.
+
+    A concrete vendor only declares two class attributes:
+    - BASE_URL: the vendor host (request paths already start with /v1).
+    - ENV_KEY: the environment variable holding the bearer key (R8).
+
+    The shared __init__ reads the key from api_key or that env var (unless a client is
+    injected, e.g. in tests), builds an Authorization-Bearer client, and defers wire
+    handling to OpenAiLlm. Any other OpenAI-compatible vendor is covered by the
+    "openai_compat" provider + base_url instead.
+    """
+
+    BASE_URL: str
+    ENV_KEY: str
+
+    def __init__(
+        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+    ) -> None:
+        if client is None:
+            env_key = type(self).ENV_KEY
+            key = api_key or os.environ.get(env_key)
+            if not key:
+                raise RuntimeError(f"{env_key} not set (or pass client/api_key)")
+            client = StdlibHttpClient(
+                type(self).BASE_URL, headers={"Authorization": f"Bearer {key}"}
+            )
+        # Passing a non-None client makes the parent skip its env-key requirement.
+        super().__init__(model=model, client=client)
+
+
+class GroqLlm(_OpenAiWireVendor):
     """Groq cloud backend -- OpenAI wire format at api.groq.com. Key: GROQ_API_KEY."""
 
     BASE_URL = "https://api.groq.com/openai"
-
-    def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
-    ) -> None:
-        if client is None:
-            key = api_key or os.environ.get("GROQ_API_KEY")
-            if not key:
-                raise RuntimeError("GROQ_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
-        # Passing a non-None client makes the parent skip its env-key requirement.
-        super().__init__(model=model, client=client)
+    ENV_KEY = "GROQ_API_KEY"
 
 
-# --- Mistral -----------------------------------------------------------------------------
-
-
-class MistralLlm(OpenAiLlm):
-    """Mistral cloud backend -- OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY.
-
-    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
-    """
+class MistralLlm(_OpenAiWireVendor):
+    """Mistral cloud backend -- OpenAI wire format at api.mistral.ai. Key: MISTRAL_API_KEY."""
 
     BASE_URL = "https://api.mistral.ai"
-
-    def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
-    ) -> None:
-        if client is None:
-            key = api_key or os.environ.get("MISTRAL_API_KEY")
-            if not key:
-                raise RuntimeError("MISTRAL_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
-        # Passing a non-None client makes the parent skip its env-key requirement.
-        super().__init__(model=model, client=client)
+    ENV_KEY = "MISTRAL_API_KEY"
 
 
-# --- DeepSeek ----------------------------------------------------------------------------
-
-
-class DeepSeekLlm(OpenAiLlm):
-    """DeepSeek cloud backend -- OpenAI wire format at api.deepseek.com. Key: DEEPSEEK_API_KEY.
-
-    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
-    """
+class DeepSeekLlm(_OpenAiWireVendor):
+    """DeepSeek cloud backend -- OpenAI wire at api.deepseek.com. Key: DEEPSEEK_API_KEY."""
 
     BASE_URL = "https://api.deepseek.com"
-
-    def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
-    ) -> None:
-        if client is None:
-            key = api_key or os.environ.get("DEEPSEEK_API_KEY")
-            if not key:
-                raise RuntimeError("DEEPSEEK_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
-        # Passing a non-None client makes the parent skip its env-key requirement.
-        super().__init__(model=model, client=client)
+    ENV_KEY = "DEEPSEEK_API_KEY"
 
 
-# --- xAI ---------------------------------------------------------------------------------
-
-
-class XaiLlm(OpenAiLlm):
-    """xAI cloud backend -- OpenAI wire format at api.x.ai. Key: XAI_API_KEY.
-
-    Any other OpenAI-compatible vendor is covered by "openai_compat" + base_url.
-    """
+class XaiLlm(_OpenAiWireVendor):
+    """xAI cloud backend -- OpenAI wire format at api.x.ai. Key: XAI_API_KEY."""
 
     BASE_URL = "https://api.x.ai"
-
-    def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
-    ) -> None:
-        if client is None:
-            key = api_key or os.environ.get("XAI_API_KEY")
-            if not key:
-                raise RuntimeError("XAI_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
-        # Passing a non-None client makes the parent skip its env-key requirement.
-        super().__init__(model=model, client=client)
+    ENV_KEY = "XAI_API_KEY"
 
 
 # --- Gemini ------------------------------------------------------------------------------
