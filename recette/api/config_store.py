@@ -16,6 +16,12 @@ _FORBIDDEN_SECRET_FIELDS = {"api_key", "key", "token", "secret", "password", "pa
 _RUNTIMES = {"lab", "real"}
 _SERVER_MODES = {"mock_local", "declared_url", "real_saas"}
 _SERVER_MODE_REQUIRED = {"mock_local": "port", "declared_url": "base_url", "real_saas": "owner"}
+# Field names align with corpus/schemas/ground-truth.schema.json: "detectable"
+# (expected_discovery.detectable), "expected_verdict" (correct|incorrect) and the
+# 4 correctness dimensions of expected_identification.
+_GROUND_TRUTH_KEYS = {"detectable", "expected_identity", "dimensions", "expected_verdict"}
+_GROUND_TRUTH_DIMENSIONS = {"identity", "capabilities", "policy", "behavior"}
+_VERDICTS = {"correct", "incorrect"}
 
 
 class UnknownAgentError(LookupError):
@@ -29,6 +35,35 @@ class UnknownServerError(LookupError):
 def _check_runtime(runtime: object) -> None:
     if runtime not in _RUNTIMES:
         raise ValueError(f"runtime must be one of {_RUNTIMES}")
+
+
+def _check_ground_truth(ground_truth: object) -> None:
+    """Validate an optional agent ground_truth block (all fields optional).
+
+    Partial ground truth is allowed (the verdict judge only checks what is
+    declared); an empty dict is valid and yields a SKIP verdict downstream.
+    """
+    if not isinstance(ground_truth, dict):
+        raise ValueError("ground_truth must be a dict")
+    unknown = set(ground_truth) - _GROUND_TRUTH_KEYS
+    if unknown:
+        raise ValueError(f"ground_truth has unknown keys: {sorted(unknown)}")
+    if "detectable" in ground_truth and not isinstance(ground_truth["detectable"], bool):
+        raise ValueError("ground_truth 'detectable' must be a boolean")
+    if "expected_verdict" in ground_truth and ground_truth["expected_verdict"] not in _VERDICTS:
+        raise ValueError(f"ground_truth 'expected_verdict' must be one of {sorted(_VERDICTS)}")
+    if "dimensions" in ground_truth:
+        dimensions = ground_truth["dimensions"]
+        if not isinstance(dimensions, dict):
+            raise ValueError("ground_truth 'dimensions' must be a dict")
+        unknown_dims = set(dimensions) - _GROUND_TRUTH_DIMENSIONS
+        if unknown_dims:
+            raise ValueError(
+                f"ground_truth dimensions has unknown keys: {sorted(unknown_dims)}"
+            )
+        for dim, expected in dimensions.items():
+            if not isinstance(expected, bool):
+                raise ValueError(f"ground_truth dimension {dim!r} must be a boolean")
 
 
 def _check_server(server: dict) -> None:
@@ -88,6 +123,8 @@ class ConfigStore:
 
     def add_agent(self, agent: dict) -> dict:
         _check_runtime(agent.get("runtime"))
+        if "ground_truth" in agent:
+            _check_ground_truth(agent["ground_truth"])
         cfg = self.read()
         if any(a["id"] == agent["id"] for a in cfg["agents"]):
             raise ValueError(f"agent id {agent['id']!r} already exists")
@@ -98,6 +135,10 @@ class ConfigStore:
     def update_agent(self, agent_id: str, patch: dict) -> dict:
         if "runtime" in patch:
             _check_runtime(patch["runtime"])  # reject bad input before mutating/writing
+        if "ground_truth" in patch:
+            # update_agent validates patched fields only (it never re-validates
+            # the merged entry, unlike update_server); mirror that behavior.
+            _check_ground_truth(patch["ground_truth"])
         cfg = self.read()
         for a in cfg["agents"]:
             if a["id"] == agent_id:

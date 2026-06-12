@@ -99,6 +99,101 @@ class TestConfigStore(unittest.TestCase):
         self.assertEqual(self.store.get_agent("a1")["runtime"], "lab")
 
 
+class GroundTruthSectionTests(unittest.TestCase):
+    """Optional ground_truth block on agents (used by the verdict judge)."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "cfg.json"
+        self.store = ConfigStore(self.path)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _agent(self, **extra: object) -> dict:
+        return {
+            "id": "a1",
+            "principal": "bot@acme",
+            "target_system": "github",
+            "goal": "g",
+            "capability_scope": [],
+            "ai_backend_id": "b1",
+            "runtime": "lab",
+            **extra,
+        }
+
+    def test_full_ground_truth_block_accepted_and_roundtrips(self) -> None:
+        ground_truth = {
+            "detectable": True,
+            "expected_identity": "bot@acme",
+            "dimensions": {
+                "identity": True,
+                "capabilities": True,
+                "policy": True,
+                "behavior": True,
+            },
+            "expected_verdict": "correct",
+        }
+        self.store.add_agent(self._agent(ground_truth=ground_truth))
+        self.assertEqual(self.store.get_agent("a1")["ground_truth"], ground_truth)
+        # a fresh store over the same file sees the same block
+        self.assertEqual(ConfigStore(self.path).get_agent("a1")["ground_truth"], ground_truth)
+
+    def test_agent_without_ground_truth_still_fine(self) -> None:
+        self.store.add_agent(self._agent())
+        self.assertNotIn("ground_truth", self.store.get_agent("a1"))
+
+    def test_empty_ground_truth_dict_allowed(self) -> None:
+        self.store.add_agent(self._agent(ground_truth={}))
+        self.assertEqual(self.store.get_agent("a1")["ground_truth"], {})
+
+    def test_non_dict_ground_truth_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth=["detectable"]))
+
+    def test_bad_verdict_literal_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"expected_verdict": "maybe"}))
+
+    def test_non_bool_detectable_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"detectable": "yes"}))
+
+    def test_unknown_dimension_key_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"dimensions": {"latency": True}}))
+
+    def test_non_bool_dimension_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"dimensions": {"identity": "ok"}}))
+
+    def test_non_dict_dimensions_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"dimensions": ["identity"]}))
+
+    def test_unknown_top_level_key_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_agent(self._agent(ground_truth={"rationale": "because"}))
+
+    def test_partial_ground_truth_allowed(self) -> None:
+        self.store.add_agent(self._agent(ground_truth={"detectable": False}))
+        self.assertEqual(self.store.get_agent("a1")["ground_truth"], {"detectable": False})
+
+    def test_update_agent_validates_ground_truth_patch_without_writing(self) -> None:
+        self.store.add_agent(self._agent(ground_truth={"detectable": True}))
+        with self.assertRaises(ValueError):
+            self.store.update_agent("a1", {"ground_truth": {"expected_verdict": "bogus"}})
+        # the bad patch must not have been persisted
+        self.assertEqual(self.store.get_agent("a1")["ground_truth"], {"detectable": True})
+
+    def test_update_agent_accepts_valid_ground_truth_patch(self) -> None:
+        self.store.add_agent(self._agent())
+        self.store.update_agent("a1", {"ground_truth": {"expected_verdict": "incorrect"}})
+        self.assertEqual(
+            self.store.get_agent("a1")["ground_truth"], {"expected_verdict": "incorrect"}
+        )
+
+
 class ServerSectionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
