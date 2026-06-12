@@ -11,6 +11,9 @@ set -euo pipefail
 #   ./recette.sh logs [svc]|shell [svc]         # docker lab
 #   ./recette.sh status                         # full snapshot
 #   ./recette.sh api start|stop|restart|status|logs
+#   ./recette.sh platform up|down|restart|status     # lab mock + API gouvernee
+#   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
+#   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
 #   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
@@ -26,6 +29,7 @@ API_SH="${CICD_DIR}/api.sh"
 STATUS_SH="${CICD_DIR}/status.sh"
 CHECKS_SH="${CICD_DIR}/checks.sh"
 GIT_SH="${CICD_DIR}/git.sh"
+PLATFORM_SH="${CICD_DIR}/platform.sh"
 
 show_menu() {
     hdr "AgentRail recette - gestion"
@@ -50,6 +54,15 @@ show_menu() {
     echo -e "  ${GREEN}15)${NC} Git pull"
     echo -e "  ${GREEN}16)${NC} Git push"
     echo -e "  ${GREEN}17)${NC} Git sync (fetch + etat)"
+    echo -e "  ${BOLD}Plateforme gouvernee${NC}"
+    echo -e "  ${GREEN}18)${NC} Plateforme up (lab mock + API)"
+    echo -e "  ${GREEN}19)${NC} Plateforme down"
+    echo -e "  ${GREEN}20)${NC} Plateforme statut"
+    echo -e "  ${GREEN}21)${NC} Console UX start (http://localhost:${CONSOLE_PORT})"
+    echo -e "  ${GREEN}22)${NC} Console UX stop"
+    echo -e "  ${BOLD}Campagnes${NC}"
+    echo -e "  ${GREEN}23)${NC} Lister les campagnes"
+    echo -e "  ${GREEN}24)${NC} Lancer une campagne"
     echo
     echo -e "   ${GREEN}0)${NC} Quitter"
     echo
@@ -78,6 +91,13 @@ menu_loop() {
             15) "${GIT_SH}" pull ;;
             16) "${GIT_SH}" push ;;
             17) "${GIT_SH}" sync ;;
+            18) "${PLATFORM_SH}" up ;;
+            19) "${PLATFORM_SH}" down ;;
+            20) "${PLATFORM_SH}" status ;;
+            21) "${PLATFORM_SH}" console start ;;
+            22) "${PLATFORM_SH}" console stop ;;
+            23) "${PLATFORM_SH}" campaign list ;;
+            24) "${PLATFORM_SH}" campaign menu ;;
             0|q|Q) info "Bye"; exit 0 ;;
             *)  warn "choix invalide" ;;
         esac
@@ -92,11 +112,14 @@ case "${cmd}" in
                                        "${DOCKER_SH}" "${cmd}" "$@" ;;
     status)                            "${STATUS_SH}" ;;
     api)                               "${API_SH}" "$@" ;;
+    platform)                          "${PLATFORM_SH}" "$@" ;;
+    console)                           "${PLATFORM_SH}" console "$@" ;;
+    campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
     test|gates|report|validate|run|discovery)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
-        sed -n '4,16p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+        sed -n '4,19p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
     *)  err "commande inconnue: ${cmd}"; \
         echo "  voir: ./recette.sh --help"; exit 1 ;;
 esac

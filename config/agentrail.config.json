@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "agents": [
+    {
+      "id": "camp-rogue-bot",
+      "runtime": "lab",
+      "role": "marketing_bot",
+      "capability_scope": [],
+      "model": "claude-haiku-4-5",
+      "system_prompt": "Unprivileged probe agent used to verify deny-by-default coverage."
+    },
+    {
+      "id": "camp-identity-admin",
+      "runtime": "lab",
+      "role": "identity_admin",
+      "capability_scope": [
+        "okta"
+      ],
+      "model": "claude-opus-4-8",
+      "system_prompt": "You are the identity operations agent. You prepare offboarding actions and wait for approval."
+    },
+    {
+      "id": "camp-finance-admin",
+      "runtime": "lab",
+      "role": "finance_admin",
+      "capability_scope": [
+        "finance"
+      ],
+      "model": "claude-opus-4-8",
+      "system_prompt": "You are the finance operations agent. Every payment action requires human approval."
+    },
+    {
+      "id": "camp-marketing-bot",
+      "runtime": "lab",
+      "role": "marketing_bot",
+      "capability_scope": [],
+      "model": "claude-haiku-4-5",
+      "system_prompt": "You are a marketing assistant with no finance privileges."
+    }
+  ],
+  "ai_backends": []
+}

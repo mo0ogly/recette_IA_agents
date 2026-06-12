@@ -32,6 +32,24 @@ RUN_DIR="${REPO_ROOT}/.run"
 API_PID_FILE="${RUN_DIR}/api.pid"
 API_LOG_FILE="${RUN_DIR}/api.log"
 
+# -- governed platform defaults (lab mock + persistent stores, R5 via env) --
+LAB_PORT="${AGENTRAIL_LAB_PORT:-8082}"
+LAB_PID_FILE="${RUN_DIR}/lab.pid"
+LAB_LOG_FILE="${RUN_DIR}/lab.log"
+PLATFORM_DATA_DIR="${AGENTRAIL_PLATFORM_DATA:-${REPO_ROOT}/data}"
+EVENT_STORE_PATH="${AGENTRAIL_EVENT_STORE_PATH:-${PLATFORM_DATA_DIR}/agentrail.events.db}"
+POLICIES_DIR="${AGENTRAIL_POLICIES_DIR:-${REPO_ROOT}/config/policies}"
+
+# -- console (React dev server) ----------------------------------------------
+CONSOLE_DIR="${REPO_ROOT}/console"
+CONSOLE_PORT="${AGENTRAIL_CONSOLE_PORT:-5173}"
+CONSOLE_PID_FILE="${RUN_DIR}/console.pid"
+CONSOLE_LOG_FILE="${RUN_DIR}/console.log"
+
+# -- campaigns ---------------------------------------------------------------
+CAMPAIGNS_DIR="${REPO_ROOT}/campaigns"
+CAMPAIGN_REPORTS_DIR="${RUN_DIR}/campaigns"
+
 # -- python picker: prefer the project venv, else system python3 ------------
 py() {
     if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
