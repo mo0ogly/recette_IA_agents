@@ -233,7 +233,8 @@ def make_campaign_runner(
                     continue
                 provider = backend["provider"]
                 model = backend["model"]
-                llm = build_llm(provider, model)  # live; key from env (R8)
+                # Live; key from env (R8). base_url only matters for openai_compat.
+                llm = build_llm(provider, model, base_url=backend.get("base_url"))
             try:
                 # Per-agent proxy routing (I5): a dangling server reference
                 # fails this step explicitly, never falls back to the default.

@@ -266,10 +266,23 @@ class TestFactory(unittest.TestCase):
         client = _StubClient({"content": []})
         self.assertIsInstance(build_llm("anthropic", "m", client=client), AnthropicLlm)
         self.assertIsInstance(build_llm("openai", "m", client=client), OpenAiLlm)
+        self.assertIsInstance(build_llm("gemini", "m", client=client), GeminiLlm)
+        self.assertIsInstance(build_llm("groq", "m", client=client), GroqLlm)
+        self.assertIsInstance(
+            build_llm("openai_compat", "m", client=client, base_url="http://h:1/v1"),
+            OpenAiCompatLlm,
+        )
 
     def test_unknown_provider_raises(self):
-        with self.assertRaises(ValueError):
-            build_llm("ollama", "m")
+        with self.assertRaises(ValueError) as ctx:
+            build_llm("mistral", "m")
+        for known in ("anthropic", "openai", "gemini", "groq", "openai_compat"):
+            self.assertIn(known, str(ctx.exception))
+
+    def test_openai_compat_requires_base_url(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_llm("openai_compat", "m")
+        self.assertIn("openai_compat requires base_url", str(ctx.exception))
 
 
 if __name__ == "__main__":

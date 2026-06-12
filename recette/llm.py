@@ -368,13 +368,30 @@ class GeminiLlm:
 
 # --- provider factory --------------------------------------------------------------------
 
-_PROVIDERS = ("anthropic", "openai")
+_PROVIDERS = ("anthropic", "openai", "gemini", "groq", "openai_compat")
 
 
-def build_llm(provider: str, model: str, *, client: _PostClient | None = None) -> LlmBackend:
-    """Construct a live provider backend by name. Keys come from env (R8)."""
+def build_llm(
+    provider: str,
+    model: str,
+    *,
+    client: _PostClient | None = None,
+    base_url: str | None = None,
+) -> LlmBackend:
+    """Construct a live provider backend by name. Keys come from env (R8).
+
+    base_url is required for (and only used by) the "openai_compat" provider.
+    """
     if provider == "anthropic":
         return AnthropicLlm(model=model, client=client)
     if provider == "openai":
         return OpenAiLlm(model=model, client=client)
+    if provider == "gemini":
+        return GeminiLlm(model=model, client=client)
+    if provider == "groq":
+        return GroqLlm(model=model, client=client)
+    if provider == "openai_compat":
+        if not base_url and client is None:
+            raise ValueError("openai_compat requires base_url")
+        return OpenAiCompatLlm(model=model, base_url=base_url or "", client=client)
     raise ValueError(f"unknown provider {provider!r}; known: {', '.join(_PROVIDERS)}")
