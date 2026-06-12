@@ -69,6 +69,67 @@ class TestConfigRoutes(unittest.TestCase):
         )
         self.assertEqual(self.client.delete("/config/agents/a1").status_code, 204)
 
+    def test_servers_list_empty(self) -> None:
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_create_and_roundtrip(self) -> None:
+        server = {"id": "s1", "system": "github", "mode": "mock_local", "port": 8081}
+        r = self.client.post("/config/servers", json=server)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json(), server)
+        self.assertEqual(self.client.get("/config/servers").json(), [server])
+
+    def test_server_duplicate_id_is_400(self) -> None:
+        server = {"id": "s1", "system": "github", "mode": "mock_local", "port": 8081}
+        self.client.post("/config/servers", json=server)
+        r = self.client.post("/config/servers", json=server)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(len(self.client.get("/config/servers").json()), 1)
+
+    def test_server_invalid_mode_is_400(self) -> None:
+        r = self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "bogus"},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_update_persists(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        r = self.client.put("/config/servers/s1", json={"port": 9090})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["port"], 9090)
+        self.assertEqual(self.client.get("/config/servers").json()[0]["port"], 9090)
+
+    def test_server_update_unknown_is_404(self) -> None:
+        r = self.client.put("/config/servers/nope", json={"port": 1})
+        self.assertEqual(r.status_code, 404)
+
+    def test_server_update_bad_mode_is_400_not_404(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        r = self.client.put("/config/servers/s1", json={"mode": "bogus"})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            self.client.get("/config/servers").json()[0]["mode"], "mock_local"
+        )
+
+    def test_server_delete_then_gone(self) -> None:
+        self.client.post(
+            "/config/servers",
+            json={"id": "s1", "system": "github", "mode": "mock_local", "port": 8081},
+        )
+        self.assertEqual(self.client.delete("/config/servers/s1").status_code, 204)
+        self.assertEqual(self.client.get("/config/servers").json(), [])
+
+    def test_server_delete_unknown_is_404(self) -> None:
+        self.assertEqual(self.client.delete("/config/servers/nope").status_code, 404)
+
     def test_update_bad_runtime_is_400_not_404(self) -> None:
         self.client.post(
             "/config/agents",
