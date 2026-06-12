@@ -24,6 +24,7 @@ import {
   runCampaign,
 } from "../../api/client";
 import { useRunStream } from "../../hooks/useRunStream";
+import type { RunFrame } from "../../hooks/useRunStream";
 import type {
   AgentConfig,
   Campaign,
@@ -32,12 +33,14 @@ import type {
   RunSummary,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import { LogConsole } from "../../components/LogConsole";
+import type { LogLine } from "../../components/LogConsole";
 import "./campaigns.css";
 
 const POLL_MS = 2000;
 const ACTIVE = new Set(["pending", "running"]);
 
-function frameLine(f: { seq: number; type: string; data: Record<string, unknown> }): string {
+function frameLine(f: RunFrame): string {
   const d = f.data;
   const agent = d.agent_id ? ` ${String(d.agent_id)}` : "";
   switch (f.type) {
@@ -62,6 +65,17 @@ function frameLine(f: { seq: number; type: string; data: Record<string, unknown>
     default:
       return f.type;
   }
+}
+
+/** Map one streamed campaign frame to a displayable log line.
+ *  Step failures (step_error) and run failures (error) are error-level. */
+function frameToLogLine(f: RunFrame): LogLine {
+  return {
+    seq: f.seq,
+    level: f.type === "step_error" || f.type === "error" ? "error" : "info",
+    source: typeof f.data.agent_id === "string" ? f.data.agent_id : "run",
+    text: frameLine(f),
+  };
 }
 
 export default function CampaignsPage(): JSX.Element {
@@ -368,35 +382,26 @@ export default function CampaignsPage(): JSX.Element {
             Creer la campagne
           </button>
 
-          <h2 className="camp-h2-spaced">Console du run</h2>
-          {stream.runId !== null && (
-            <p className="camp-status">
-              run {stream.runId} -- {stream.status}
-            </p>
-          )}
-          {replayResult && (
-            <p className="camp-replay">
-              Replay determinisme :{" "}
-              <span
-                className={`pill ${replayResult.data.matches_original ? "pill-ok" : "pill-bad"}`}
-              >
-                {replayResult.data.matches_original ? "IDENTIQUE" : "DIVERGENT"}
-              </span>
-            </p>
-          )}
-          <div className="camp-console">
-            {stream.frames.length === 0 ? (
-              <span className="camp-console-empty">
-                Lance une campagne ou un replay pour voir le flux ici.
-              </span>
-            ) : (
-              stream.frames.map((f) => (
-                <div key={f.seq} className={`camp-cline camp-${f.type}`}>
-                  <span className="camp-cseq">{String(f.seq).padStart(2, "0")}</span>
-                  {frameLine(f)}
-                </div>
-              ))
+          <div className="camp-h2-spaced">
+            {stream.runId !== null && (
+              <p className="camp-status">
+                run {stream.runId} -- {stream.status}
+              </p>
             )}
+            {replayResult && (
+              <p className="camp-replay">
+                Replay determinisme :{" "}
+                <span
+                  className={`pill ${replayResult.data.matches_original ? "pill-ok" : "pill-bad"}`}
+                >
+                  {replayResult.data.matches_original ? "IDENTIQUE" : "DIVERGENT"}
+                </span>
+              </p>
+            )}
+            <LogConsole
+              title="Console du run"
+              lines={stream.frames.map(frameToLogLine)}
+            />
           </div>
         </section>
       </div>
