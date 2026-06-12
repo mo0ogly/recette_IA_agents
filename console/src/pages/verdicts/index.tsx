@@ -12,8 +12,8 @@
  *   the client maps that to null and this page renders the empty state.
  * - checks/expected/observed/evidence_event_ids are absent on SKIP and
  *   unknown-agent FAIL entries (only the error field is set on the latter).
- * - The audit page has no per-event filter, so evidence event ids link to
- *   /audit plainly (the operator filters by agent there).
+ * - Evidence event ids deep-link to /audit?event_id=<id>; the audit page
+ *   reads that param and shows an active-filter chip for the single event.
  */
 
 import { Fragment, useCallback, useEffect, useState } from "react";
@@ -202,8 +202,12 @@ function JudgedDetail({ entry, rowKey }: { entry: JudgedEntry; rowKey: string })
           <ul>
             {evidence.map((eventId) => (
               <li key={eventId}>
-                {/* The audit page has no event-id filter: plain /audit link. */}
-                <Link to="/audit" className="verdict-evidence-link mono">
+                {/* Deep-link to the audit page filtered on this event id; the
+                    audit page reads ?event_id= and shows an active-filter chip. */}
+                <Link
+                  to={`/audit?event_id=${encodeURIComponent(eventId)}`}
+                  className="verdict-evidence-link mono"
+                >
                   {eventId}
                 </Link>
               </li>

@@ -146,12 +146,15 @@ describe("VerdictsPage", () => {
     expect(within(detail).getByTestId("observed-json").textContent).toContain(
       '"detected": true',
     );
-    // Evidence event ids link to the audit page (no event filter exists there,
-    // so the link targets /audit plainly).
+    // Evidence event ids deep-link to the audit page filtered on that event
+    // (the audit page reads ?event_id= and shows an active-filter chip).
     const link = within(detail).getByRole("link", {
       name: "EV000000000000000001000001",
     });
-    expect(link).toHaveAttribute("href", "/audit");
+    expect(link).toHaveAttribute(
+      "href",
+      "/audit?event_id=EV000000000000000001000001",
+    );
   });
 
   it("shows the empty state with both submission paths when no verdicts exist", async () => {
