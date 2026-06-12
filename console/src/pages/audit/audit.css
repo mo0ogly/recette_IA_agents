@@ -1,0 +1,120 @@
+/* Audit Trail page styles (Audit Plane viewer). */
+
+.banner {
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.banner-ok {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  border-color: #b9d8c1;
+}
+
+.banner-broken {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-color: #e4b6ba;
+}
+
+.audit-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.audit-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.audit-filters select,
+.audit-filters input {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.audit-filters button {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.audit-filters button:hover {
+  opacity: 0.9;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.audit-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.audit-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.audit-row {
+  cursor: pointer;
+}
+
+.audit-row:hover {
+  background-color: var(--color-bg);
+}
+
+.mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.audit-subtle {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.audit-detail-row td {
+  background-color: var(--color-bg);
+}
+
+.audit-payload {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  background-color: #22272d;
+  color: #e6e9ec;
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+.audit-empty {
+  color: var(--color-text-muted);
+}
