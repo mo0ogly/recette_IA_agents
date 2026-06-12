@@ -34,8 +34,10 @@ from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
 from .routers import policies as policies_router
 from .routers import runs as runs_router
+from .routers import verdicts as verdicts_router
 from .runs import RunManager
 from .server_manager import ServerManager
+from .verdict_store import VerdictStore
 
 DEFAULT_EVENT_STORE_PATH = "data/agentrail.events.db"
 BASELINE_POLICY_VERSION = "v1"
@@ -86,6 +88,7 @@ def create_app(
     catalog: Catalog | None = None,
     campaign_store: CampaignStore | None = None,
     recording_store: RecordingStore | None = None,
+    verdict_store: VerdictStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0", lifespan=_lifespan)
 
@@ -135,6 +138,7 @@ def create_app(
     app.state.recording_store = (
         recording_store if recording_store is not None else RecordingStore()
     )
+    app.state.verdict_store = verdict_store if verdict_store is not None else VerdictStore()
     app.state.gateway = Gateway(
         catalog=action_catalog,
         policy_store=policies,
@@ -158,4 +162,5 @@ def create_app(
     app.include_router(catalog_actions_router.router)
     app.include_router(campaigns_router.router)
     app.include_router(agent_actions_router.router)
+    app.include_router(verdicts_router.router)
     return app
