@@ -1,7 +1,7 @@
 # Plan : APEX -- resorption dette technique plateforme recette
 Date : 2026-06-12
 Session : apex-20260612-dette-tech
-Status : EN_COURS
+Status : TERMINE
 Invariants concernes : I4 (determinisme domaines lab), I5 (routage proxy)
 
 ## Objectif
@@ -54,7 +54,21 @@ c'est multiple"). Baseline : main propre, 422 tests Python OK / 90 console OK / 
 - 127.0.0.1 retenu (pas localhost) : evite la resolution IPv6 ::1 divergente.
 
 ## Ecarts et replanification
-(a remplir)
+- S6 : aucun defaut de routage trouve -- le runner resout deja le backend par agent
+  dans la boucle per-step. Le test prouve le comportement existant (2 providers en
+  une campagne, 2 stubs distincts hits une fois chacun).
+- AJOUT mid-cycle (S8) : la validation live avec la vraie cle Groq a revele un defaut
+  reel hors des 7 items -- StdlibHttpClient n'envoyait pas de User-Agent, Cloudflare
+  (api.groq.com) bloquait avec HTTP 403 code 1010. curl passait, urllib non. Fix :
+  User-Agent par defaut "agentrail-recette/0.1" (override possible). Sans la cle reelle,
+  les stubs offline n'auraient jamais montre ce blocage (R14 valide : la verification
+  live attrape ce que les tests a stub ne voient pas).
 
 ## Resultat
-(a remplir)
+8 lots livres, 12 commits, 483 tests Python OK / 92 console OK / ruff / tsc clean.
+Tous les items verifies en live (curl sur API reelle) : i1 (purge champs + null-clear),
+i6 (404), i2 (read_repo/open_pr 200), i3 (filtre event_id 1 match / 0 unknown),
+i7 (run routed via 127.0.0.1, read_repo 200), i4 (CLI 8 providers + base-url).
+Validation provider reel : backend Groq test ok:true 198ms, agent reel pilote par
+Groq -> tool-calls routes via proxy vers mock github (200). Defaut Cloudflare/UA
+trouve et corrige pendant la RECETTE live.
