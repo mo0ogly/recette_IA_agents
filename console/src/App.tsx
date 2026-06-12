@@ -36,7 +36,7 @@ export default function App(): JSX.Element {
             Agents
           </NavLink>
           <NavLink to="/servers" className={navLinkClass}>
-            Servers
+            Serveurs
           </NavLink>
           <span className="nav-sep">Gouvernance (mock)</span>
           <NavLink to="/catalog" className={navLinkClass}>

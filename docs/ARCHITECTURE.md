@@ -77,6 +77,7 @@ flowchart TB
     RUNTAB["Recette<br/>runners discovery + identification"]
     CAMP["Campagnes<br/>templates, runs, replays"]
     AGENTS["Agents<br/>config, catalogue d'actions, ai-backends"]
+    SRVTAB["Serveurs<br/>registre, start/stop, access log"]
   end
 
   subgraph API["API FastAPI (recette/api/, extra [api])"]
@@ -111,7 +112,7 @@ flowchart TB
 Trois couches, trois responsabilites :
 
 1. **Console** (`console/`, React + Vite + TS) : le poste de pilotage de
-   l'equipe discovery. Six onglets recette ; les pages gouvernance (Catalog,
+   l'equipe discovery. Sept onglets recette (dont Serveurs, le registre des cibles) ; les pages gouvernance (Catalog,
    Approvals, Audit), separees dans la nav, exposent le chemin d'execution
    gouverne de la section 8 (catalogue policy, inbox d'approbations I6,
    piste d'audit I1).

@@ -26,6 +26,7 @@ import type {
   ServerMode,
   ServerStatus,
 } from "../../types/platform";
+import PageHelp from "../../components/help/PageHelp";
 import "./servers.css";
 
 /** Incremental poll period of an open log panel (swapped for LogConsole later). */
@@ -337,7 +338,8 @@ export default function ServersPage(): JSX.Element {
   return (
     <div>
       <div className="page-head">
-        <h1>Servers</h1>
+        <h1>Serveurs</h1>
+        <PageHelp topic="servers" />
       </div>
 
       {error !== null && (

@@ -14,10 +14,12 @@ It talks to the API directly (raw JSON, no envelope). Base URL from
 
 | Tab | Route | Purpose | API |
 |-----|-------|---------|-----|
+| **Tableau de bord** | `/dashboard` | control board: per-agent live status, the two mock/real axes (AI, target), launch/stop | `GET /runs` (poll), `POST /runs` |
 | **Cockpit** | `/cockpit` | pick an agent, choose mock (scripted stub) or real AI (bound ai_backend), launch, watch the live action stream, stop | `POST /runs` (kind=lane_b), `/runs/{id}/ws`, `/runs/{id}/stop` |
 | **Recette** | `/recette` | run the discovery and identification recettes over the corpus; per-surface / per-agent scorecard vs ground-truth | `POST /runs` (kind=discovery\|identification) |
 | **Campagnes** | `/campaigns` | persisted agent sets run on demand; live frames; list recordings; **replay** with an IDENTIQUE/DIVERGENT determinism verdict (I4) | `/campaigns*`, `/recordings*` |
 | **Agents** | `/agents` | define each agent (principal, target_system, goal, capability_scope as canonical actions, bound ai_backend) + **AI-backend CRUD** (provider+model, no secret, R8) | `/config/agents`, `/config/ai-backends` |
+| **Serveurs** | `/servers` | server registry (mock_local / declared_url / real_saas): CRUD, start/stop of managed lab servers, live status, JSONL access-log tail | `/config/servers*` |
 | Catalog | `/catalog` | governance mock: 118-action catalog + policy editor | `/catalog/actions`, `/policies` |
 | Approvals | `/approvals` | governance mock: approval inbox (I6) | `/approvals*` |
 | Audit | `/audit` | governance mock: immutable event log + hash chain | `/audit/*` |

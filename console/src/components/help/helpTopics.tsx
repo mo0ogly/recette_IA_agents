@@ -15,6 +15,7 @@ export type HelpTopicKey =
   | "recette"
   | "campaigns"
   | "agents"
+  | "servers"
   | "catalog"
   | "approvals"
   | "audit";
@@ -363,6 +364,65 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
         <p>
           Les projections (inbox, listes) sont reconstructibles a partir de ce
           journal : elles sont jetables, le journal ne l'est pas.
+        </p>
+      </>
+    ),
+  },
+  servers: {
+    title: "Aide — Serveurs",
+    summary:
+      "Registre des serveurs en face des agents : mock local pilotable, URL declaree, SaaS reel.",
+    body: (
+      <>
+        <p>
+          Cette page gere le <strong>registre des serveurs</strong> : ce qu'il y
+          a &laquo; en face &raquo; d'un agent quand il execute ses actions. Un
+          agent qui porte un champ <code>server</code> route ses appels vers
+          l'entree correspondante (vrai trafic HTTP) ; sans binding, il garde le
+          forge en memoire historique.
+        </p>
+        <h3>Les trois modes</h3>
+        <ul>
+          <li>
+            <strong>mock_local</strong> : un serveur lab simule, demarre et
+            arrete depuis cette page (port dedie). Deterministe, zero effet de
+            bord, mais le trafic est <strong>observable</strong> : chaque
+            requete ecrit une ligne dans le journal d'acces JSONL — la matiere
+            que l'outil discovery peut capter au runtime.
+          </li>
+          <li>
+            <strong>declared_url</strong> : un serveur externe qui parle le
+            contrat du lab (<code>POST /&#123;system&#125;/execute</code>). Le
+            statut est sonde par requete HTTP.
+          </li>
+          <li>
+            <strong>real_saas</strong> : reference declarative d'un SaaS reel.
+            Aucun proxy reel n'existe encore : un run route dessus echoue
+            (fail-safe I5), jamais de repli silencieux vers un autre serveur.
+          </li>
+        </ul>
+        <h3>Cycle de vie et journal</h3>
+        <ul>
+          <li>
+            <strong>Demarrer / Arreter</strong> (mock_local) : pilote un vrai
+            processus serveur. Un port occupe renvoie un statut
+            <code> down</code> avec l'erreur — ce n'est pas un bug, c'est un
+            diagnostic.
+          </li>
+          <li>
+            <strong>Statut</strong> : poll du processus (mock_local), sonde URL
+            (declared_url), <code>n/a</code> (real_saas).
+          </li>
+          <li>
+            <strong>Journal d'acces</strong> : tail incremental du JSONL
+            (event_id, systeme, action, ressource, statut HTTP). C'est la trace
+            cote serveur d'un agent en train d'agir.
+          </li>
+        </ul>
+        <p>
+          Regle fail-safe : un agent qui reference un serveur supprime ou un
+          mode non supporte voit son run <strong>echouer</strong>. Executer des
+          effets de bord contre le mauvais systeme violerait I5.
         </p>
       </>
     ),

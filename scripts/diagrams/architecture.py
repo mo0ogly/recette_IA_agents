@@ -49,6 +49,7 @@ flowchart TB
     RUNTAB["Recette<br/>runners discovery + identification"]
     CAMP["Campagnes<br/>templates, runs, replays"]
     AGENTS["Agents<br/>config, catalogue d'actions, ai-backends"]
+    SRVTAB["Serveurs<br/>registre, start/stop, access log"]
   end
 
   subgraph API["API FastAPI (recette/api/, extra [api])"]
