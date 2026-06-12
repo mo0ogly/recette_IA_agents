@@ -56,6 +56,10 @@ describe("AiBackendsPanel", () => {
     vi.mocked(testAiBackend).mockResolvedValue(testOk);
     renderPanel();
 
+    // The "Provider calls" LogConsole is mounted (empty) before any probe.
+    expect(screen.getByText("Provider calls")).toBeInTheDocument();
+    expect(screen.getByText("no log lines")).toBeInTheDocument();
+
     // Before any test the row dot is grey/untested.
     const row = screen.getByText("backend-1").closest("tr") as HTMLTableRowElement;
     expect(within(row).getByTestId("backend-test-status")).toHaveAttribute(
@@ -71,6 +75,12 @@ describe("AiBackendsPanel", () => {
       "ok",
     );
     expect(testAiBackend).toHaveBeenCalledWith("backend-1");
+
+    // The probe outcome is appended to the console as an info-level line.
+    const line = screen
+      .getByText("backend backend-1 ok in 17 ms")
+      .closest(".logc-line");
+    expect(line).toHaveAttribute("data-level", "info");
   });
 
   it("test button: error fixture renders a red dot and the error text", async () => {
@@ -87,6 +97,12 @@ describe("AiBackendsPanel", () => {
       "data-status",
       "error",
     );
+
+    // The failed probe is appended to the console as an error-level line.
+    const line = screen
+      .getByText(/^backend backend-1 failed in 0 ms: GEMINI_API_KEY not set/)
+      .closest(".logc-line");
+    expect(line).toHaveAttribute("data-level", "error");
   });
 
   it("provider select lists all 8 providers", () => {

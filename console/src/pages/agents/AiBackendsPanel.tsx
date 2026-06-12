@@ -4,12 +4,16 @@
  * Extracted from the Agents page to keep one responsibility per file. Provider
  * + model only -- the provider key is never stored here, it is resolved from
  * the environment at run time (R8). The "Test" button calls the server-side
- * connectivity probe; key material never reaches the console.
+ * connectivity probe; key material never reaches the console. Each probe
+ * outcome is also appended to the "Provider calls" LogConsole (the audit
+ * stream has no provider/LLM event kind, so the panel logs its own calls).
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { createAiBackend, deleteAiBackend, testAiBackend } from "../../api/client";
+import { LogConsole } from "../../components/LogConsole";
+import type { LogLine } from "../../components/LogConsole";
 import type { AiBackend, AiProvider } from "../../types/platform";
 
 export interface AiBackendsPanelProps {
@@ -54,6 +58,15 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
   const { backends, onChanged, onError } = props;
   const [form, setForm] = useState(EMPTY);
   const [tests, setTests] = useState<Record<string, TestState>>({});
+  // Accumulated probe outcomes shown in the "Provider calls" LogConsole.
+  const [calls, setCalls] = useState<LogLine[]>([]);
+  const callSeqRef = useRef(0);
+
+  function appendCall(level: LogLine["level"], id: string, text: string): void {
+    callSeqRef.current += 1;
+    const seq = callSeqRef.current;
+    setCalls((prev) => [...prev, { seq, level, source: id, text }]);
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -101,16 +114,23 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
           ? { phase: "ok", latencyMs: result.latency_ms }
           : { phase: "error", latencyMs: result.latency_ms, error: result.error },
       }));
+      if (result.ok) {
+        appendCall("info", id, `backend ${id} ok in ${result.latency_ms} ms`);
+      } else {
+        appendCall(
+          "error",
+          id,
+          `backend ${id} failed in ${result.latency_ms} ms: ${result.error}`,
+        );
+      }
     } catch (err) {
       // Transport / 404 failure: surface it in the row like a probe failure.
+      const message = err instanceof Error ? err.message : String(err);
       setTests((prev) => ({
         ...prev,
-        [id]: {
-          phase: "error",
-          latencyMs: 0,
-          error: err instanceof Error ? err.message : String(err),
-        },
+        [id]: { phase: "error", latencyMs: 0, error: message },
       }));
+      appendCall("error", id, `backend ${id} test failed: ${message}`);
     }
   }
 
@@ -189,6 +209,14 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
           )}
         </tbody>
       </table>
+
+      <div className="agents-run-log">
+        <LogConsole
+          title="Provider calls"
+          lines={calls}
+          onClear={() => setCalls([])}
+        />
+      </div>
 
       <form className="agents-form" onSubmit={(e) => void handleCreate(e)}>
         <h2>Create AI backend</h2>

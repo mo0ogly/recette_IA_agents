@@ -154,9 +154,10 @@ describe("AgentsPage", () => {
 
     render(<AgentsPage />);
 
-    // The LogConsole is mounted (empty state) before any run is launched.
+    // The run LogConsole is mounted (empty state) before any run is launched
+    // (the AI-backends panel mounts its own "Provider calls" console).
     expect(screen.getByText("Run log")).toBeInTheDocument();
-    expect(screen.getByText("no log lines")).toBeInTheDocument();
+    expect(screen.getAllByText("no log lines").length).toBeGreaterThanOrEqual(1);
 
     // Launch the fixture agent: it is bound to backend-1 (real AI), so the
     // launch body carries no stub_script.
