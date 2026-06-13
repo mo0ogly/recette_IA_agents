@@ -4,9 +4,9 @@ Deferred items from the reuse analysis (2026-06-13). The MCP discovery surface i
 being implemented now via APEX; everything below is queued.
 
 ## High value
-- [ ] **OpenTelemetry audit semantics** -- adopt OTel semantic conventions for the
-      action log / audit trace so AgentRail traces are interoperable with any OTel
-      backend. Audit Plane (I1). Effort: medium.
+- [x] **OpenTelemetry audit semantics** -- DONE (see the detailed "Full repo audit"
+      entry below): recette/otel.py maps both an orchestration run/recording AND the
+      git/MAF action log to canonical OTel GenAI spans. Audit Plane (I1/I4).
 - [x] **RedTeamAgent -> negative-corpus generator** -- DONE. recette/redteam.py:
       RedTeamSimulator (Crescendo 4-phase adversarial user, grounded on
       scenario/red_team_agent.py) + to_corpus_subject (deterministic single-axis

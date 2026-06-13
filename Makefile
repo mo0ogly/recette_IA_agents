@@ -2,7 +2,7 @@
 .PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
-        bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb \
+        bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb rag-e2e \
         system-recette system-recette-live recette
 
 help:
@@ -20,6 +20,8 @@ help:
 	@echo "  make coverage-guard    fail if ANY recette dimension has a gap (single gate)"
 	@echo "  make rag          run the RAG poisoning campaigns through the gateway"
 	@echo "  make rag-live     drive the poisoned knowledge base against a live Groq LLM"
+	@echo "  make rag-kb       list the operator knowledge base (CRUD off the agent path)"
+	@echo "  make rag-e2e      deterministic loop: reset -> apply scenario -> gateway blocks -> reset"
 	@echo "  make recette      full governed recette: guard + validate + run + discovery + bnp + role-matrix + rag"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
@@ -76,6 +78,9 @@ rag-live:
 
 rag-kb:
 	python3 -m recette rag-kb list
+
+rag-e2e:
+	python3 scripts/run_rag_poisoning_e2e.py
 
 system-recette:
 	python3 scripts/run_system_recette.py

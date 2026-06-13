@@ -1,7 +1,7 @@
 # TODO / Plan : RAG knowledge-base CRUD + poison scenarios + reset
 
 Date : 2026-06-13
-Status : TODO (planifie, NON implemente -- le repo est modifie en concurrence par le mainteneur)
+Status : TERMINE -- ce plan a ete entierement implemente (store rag_store.py, scenarios, API /rag/documents|reset|scenarios, CLI rag-kb, frontend KnowledgeBaseManager, tests). Suivi/polish: voir TODO_rag-kb-finition (T1-T5, tous faits). Plan conserve pour tracabilite.
 Invariants concernes : I2 (mediation), I4 (replay deterministe), I5 (proxy side-effects)
 Auteur du plan : session recette (apex, livrable = ce document)
 
@@ -40,19 +40,19 @@ documente comme tel, expose sur des routes operateur distinctes du `/actions/exe
 ## Etapes
 
 ### Backend (Python)
-- [ ] S1 `recette/rag_store.py` : `KnowledgeBaseStore` baseline-backed.
+- [x] S1 `recette/rag_store.py` : `KnowledgeBaseStore` baseline-backed.
       - `load_baseline()`, `list()`, `add(doc)`, `delete(doc_id)`, `reset()`.
       - `apply_scenario(name)` : charge `corpus/rag/scenarios/{name}.json` et injecte ses docs.
       - Validation : chaque doc {id, title, content, poisoned, tags} ; un doc poisonne porte
         `injected_action`/`injected_target_system`/`injected_expect`/`threat` (meme schema que
         knowledge_base.json). Refus d'un id duplique. Deterministe (pas d'horloge/random, I4).
-- [ ] S2 Schema `corpus/rag/scenarios/scenario.schema.json` + 2-3 scenarios nommes
+- [x] S2 Schema `corpus/rag/scenarios/scenario.schema.json` + 2-3 scenarios nommes
       (`exfil-finance.json`, `invalid-command-ops.json`, `mixed.json`) reutilisant les docs
       poisonnes existants + nouveaux. jsonschema-valides.
-- [ ] S3 Brancher le lab handler `recette/lab/domains/knowledge_base.py` sur le store
+- [x] S3 Brancher le lab handler `recette/lab/domains/knowledge_base.py` sur le store
       (au lieu de lire le fichier en dur) pour que `query_knowledge_base` reflete l'etat
       courant (baseline + scenario applique). Garder le fallback baseline si store non initialise.
-- [ ] S4 API `recette/api/routers/rag.py` (etend l'existant `GET /rag/scorecard`) :
+- [x] S4 API `recette/api/routers/rag.py` (etend l'existant `GET /rag/scorecard`) :
       - `GET /rag/documents` -> liste (id, title, poisoned, tags).
       - `POST /rag/documents` -> insere un doc (operateur).
       - `DELETE /rag/documents/{id}` -> retire.
@@ -61,7 +61,7 @@ documente comme tel, expose sur des routes operateur distinctes du `/actions/exe
       - `POST /rag/scenario/{name}/apply` -> applique un scenario.
       - Enveloppe reponse coherente avec le reste (`{success, data}` si c'est la convention
         backend en place -- a verifier sur les routers existants AVANT d'ecrire).
-- [ ] S5 CLI parite `python -m recette rag-kb {list|add|del|reset|apply <scenario>}`
+- [x] S5 CLI parite `python -m recette rag-kb {list|add|del|reset|apply <scenario>}`
       (sous-commande dans `recette/__main__.py`, meme style que `rag`).
 
 ### Frontend (React/TS -- COHERENT avec l'existant)
@@ -70,33 +70,33 @@ Pattern confirme : pages en `console/src/pages/<name>/{index.tsx,.css,index.test
 client via `request<T>(path, opts)` dans `console/src/api/client.ts` (PAS fetchWithConfig --
 c'est le helper `request<T>` qui est le standard ici), CRUD de reference = page `campaigns`
 (list/create/delete deja implementes : `listCampaigns`/`createCampaign`/`deleteCampaign`).
-- [ ] S6 Etendre `console/src/api/client.ts` : `listKbDocuments`, `addKbDocument`,
+- [x] S6 Etendre `console/src/api/client.ts` : `listKbDocuments`, `addKbDocument`,
       `deleteKbDocument`, `resetKb`, `listRagScenarios`, `applyRagScenario` -- mirror exact
       des signatures `listCampaigns`/`createCampaign`/`deleteCampaign` (memes types, meme
       unwrap d'enveloppe). Types dans `console/src/types/platform.ts`.
-- [ ] S7 Sous-onglet "Knowledge base" dans la page `rag` (ou nouvel onglet a cote du
+- [x] S7 Sous-onglet "Knowledge base" dans la page `rag` (ou nouvel onglet a cote du
       scorecard) : tableau des docs (colonnes id/title/tags + **badge poisoned** via Chip
       semantique `color="warning"`, borderRadius:1), bouton **Reset**, **selecteur de
       scenario** + bouton Apply, formulaire **Insert document** (modale, comme la creation de
       campagne). Style MUI identique aux pages `campaigns`/`flux`/`rag`. Loading =
       CircularProgress, erreur = `<Alert severity="error">`, vide = empty state -- memes
       composants que les autres pages (coherence transversale).
-- [ ] S8 R16 Contract Gate : fixture `__fixtures__/kb-documents.fixture.json` (payload reel
+- [x] S8 R16 Contract Gate : fixture `__fixtures__/kb-documents.fixture.json` (payload reel
       capture via curl sur `GET /rag/documents`), `index.test.tsx` render-and-assert (au moins
       le tableau + un badge poisoned), service unwrap `.data`. HelpButton + contenu d'aide
       (table ui_help_content si c'est le mecanisme retenu cote console).
 
 ### Tests + garde-fous
-- [ ] S9 `tests/test_rag_store.py` : CRUD + reset deterministe (apply scenario puis reset ->
+- [x] S9 `tests/test_rag_store.py` : CRUD + reset deterministe (apply scenario puis reset ->
       etat == baseline byte-identique), apply_scenario injecte bien les docs poisonnes,
       refus d'id duplique, validation schema.
-- [ ] S10 `tests/test_rag_scenarios.py` : chaque scenario `corpus/rag/scenarios/*.json` est
+- [x] S10 `tests/test_rag_scenarios.py` : chaque scenario `corpus/rag/scenarios/*.json` est
       schema-valide ET chaque doc poisonne d'un scenario a une campagne correspondante
       (extension de la KB-guard de `tests/test_rag_poisoning.py`).
-- [ ] S11 Garde-fou anti-backdoor : un test asserte qu'il n'existe AUCUNE route permettant a
+- [x] S11 Garde-fou anti-backdoor : un test asserte qu'il n'existe AUCUNE route permettant a
       un agent (chemin `/actions/execute`) de muter le KB sans verdict -- le CRUD est sur des
       routes operateur distinctes (I2). Le `test_coverage_guard` reste vert (12 domaines).
-- [ ] S12 Boucle e2e (script ou test) : reset -> apply exfil-finance -> run agent (ou
+- [x] S12 Boucle e2e (script ou test) : reset -> apply exfil-finance -> run agent (ou
       run_role_matrix --dir campaigns/rag) -> verifier gateway deny/escalate, executed=False
       -> reset -> KB == baseline.
 

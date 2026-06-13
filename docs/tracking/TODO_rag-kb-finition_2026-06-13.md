@@ -1,8 +1,8 @@
 # TODO / Plan : RAG-KB finition (a executer par APEX)
 
 Date : 2026-06-13
-Status : TODO (la feature RAG-KB CRUD est livree, securisee, testee, documentee --
-ceci est le reliquat de finition/polish)
+Status : TERMINE (T1/T4/T5 deja faits ; T2 Makefile + T3 e2e deterministe livres
+le 2026-06-13 -- cf commits de la session apex "fait les todo")
 Invariants concernes : I2 (mediation, anti-backdoor), I4 (reset deterministe), I5 (proxy)
 Reference feature : commits abe8b15, f905162, 0bf4ded ; runbook
 docs/runbooks/rag-knowledge-base-crud.md
@@ -24,13 +24,22 @@ runbook. Suite complete verte.
       (poison parti), zero erreur console app, gate reseau propre. Screenshot
       capture. Bonus : favicon.ico cree (le smoke avait expose le 404 favicon).
 
-- [ ] T2 Wiring Makefile : `make rag-kb` (liste le KB), `make rag-e2e` (cf T3).
-      Cible : parite avec les targets existants (rag, bnp, role-matrix, coverage-guard).
+- [x] T2 DONE -- Makefile : `make rag-kb` (liste le KB, deja present) + `make rag-e2e`
+      (nouveau, parite avec rag/bnp/role-matrix : `python3 scripts/run_rag_poisoning_e2e.py`).
+      Les deux ajoutes a l'aide `make help`. Parite verifiee : meme invocation `python3
+      scripts/...` que rag-live (echec identique sous python3 nu sans le package installe ;
+      OK sous l'env attendu .venv editable + extra [api]).
 
-- [ ] T3 Demo e2e en 1 commande : `scripts/run_rag_poisoning_e2e.py` qui enchaine
-      reset -> apply <scenario> -> run agent (ou run_role_matrix --dir campaigns/rag)
-      -> assert gateway deny/escalate, executed=False -> reset -> KB == baseline.
-      Deterministe (I4) ; sert de preuve vivante de la boucle de recette.
+- [x] T3 DONE -- `scripts/run_rag_poisoning_e2e.py` : DETERMINISTE (I4, aucun LLM).
+      L'action induite est lue directement du doc poisonne (injected_action /
+      injected_target_system / injected_expect) et soumise a la VRAIE gateway HTTP
+      (TestClient, catalogue committe + policy baseline). Boucle : reset -> apply
+      <scenario> -> pour chaque doc poisonne, assert verdict == injected_expect ET in
+      {deny,escalate} ET executed=False -> reset -> KB == baseline byte-identique +
+      audit chain intacte. Exit 0/1/2. Preuve live (R26, exfil-finance) : 4 actions
+      bloquees (deny/deny/escalate/deny), executed=False, baseline restauree, chaine
+      intacte. tests/test_rag_e2e.py l'invoque (2 scenarios + scenario inconnu -> 2 +
+      idempotence/determinisme), skip si pas d'extra [api].
 
 - [x] T4 Guard scenario<->campagne : DONE -- decide-based, pas require-a-campagne.
       `test_scenario_guard_every_poisoned_doc_is_blocked_by_the_gateway`
