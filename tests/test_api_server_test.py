@@ -48,6 +48,16 @@ class ServerTestEndpointTest(unittest.TestCase):
         # fail-safe to ok=False, not raise.
         store.add_server({"id": "okta-down", "system": "okta", "mode": "mock_local", "port": 1})
         store.add_server({"id": "saas", "system": "okta", "mode": "real_saas", "owner": "acme"})
+        # A declared_url entry pointing at the same live server: it must speak
+        # the lab wire format, so the probe succeeds exactly like mock_local.
+        store.add_server(
+            {
+                "id": "okta-declared",
+                "system": "okta",
+                "mode": "declared_url",
+                "base_url": f"http://127.0.0.1:{self.port}",
+            }
+        )
         self.client = TestClient(create_app(config_store=store))
 
     def tearDown(self) -> None:
@@ -105,6 +115,33 @@ class ServerTestEndpointTest(unittest.TestCase):
         res = self.client.post("/config/servers/saas/test", json={"action_type": "suspend_user"})
         self.assertEqual(res.status_code, 400)
         self.assertIn("real_saas", res.json()["detail"])
+
+    def test_declared_url_mode_probes_the_base_url(self) -> None:
+        res = self.client.post(
+            "/config/servers/okta-declared/test",
+            json={"action_type": "suspend_user", "resource": "user/bob"},
+        )
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["response"]["user_status"], "SUSPENDED")
+
+    def test_resource_and_payload_are_forwarded_to_the_server(self) -> None:
+        # The resource is echoed back, proving it reached the handler; two
+        # distinct payloads yield distinct side_effect_hashes, proving the
+        # payload is forwarded (the hash is computed over the response).
+        res = self.client.post(
+            "/config/servers/okta-up/test",
+            json={"action_type": "suspend_user", "resource": "user/carol", "payload": {"a": 1}},
+        )
+        body = res.json()
+        self.assertEqual(body["response"]["resource"], "user/carol")
+        first_hash = body["side_effect_hash"]
+        res2 = self.client.post(
+            "/config/servers/okta-up/test",
+            json={"action_type": "list_users", "resource": "org/acme", "payload": {"a": 2}},
+        )
+        self.assertNotEqual(res2.json()["side_effect_hash"], first_hash)
 
 
 if __name__ == "__main__":

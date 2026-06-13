@@ -80,6 +80,7 @@ Docker services (docker-compose.yml):
 | POST | `/config/servers/{id}/start`, `/stop` | lifecycle of a `mock_local` lab server (ServerManager); `{"status": "down", "error": ...}` is a domain result, not a transport error |
 | GET | `/config/servers/{id}/status` | live status: process poll (`mock_local`), URL probe (`declared_url`), `n/a` (`real_saas`) |
 | GET | `/config/servers/{id}/log?after=N` | incremental tail of the server's JSONL access log (cursor `next`) |
+| POST | `/config/servers/{id}/test` | fire one action (`{action_type, resource?, payload?}`) at the server through the run proxy (I5); returns `{ok, latency_ms, status_code, response, side_effect_hash, error?}` -- fail-safe (server down / bad action -> `ok:false`, never a 500); unknown id 404, `real_saas` 400 |
 | GET | `/catalog/actions` | high-risk action catalog (verdicts + risk levels) |
 | GET | `/agents`, POST `/agents/register` | Lane B agent catalog |
 | POST | `/runs` | launch a run; `kind` = `lane_b` \| `discovery` \| `identification` \| `campaign` \| `replay` |
@@ -283,6 +284,7 @@ fallback. Demo flow verified live:
 ```bash
 curl -X POST localhost:8090/config/servers -d '{"id":"okta-mock","system":"okta","mode":"mock_local","port":9122}' -H 'Content-Type: application/json'
 curl -X POST localhost:8090/config/servers/okta-mock/start
+curl -X POST localhost:8090/config/servers/okta-mock/test -H 'Content-Type: application/json' -d '{"action_type":"suspend_user","resource":"user:jdoe"}'
 curl -X POST localhost:8090/runs -H 'Content-Type: application/json' -d '{"kind":"lane_b","params":{"agent_id":"okta-rogue","stub_script":[{"kind":"tool_call","tool_name":"suspend_user","tool_args":{"resource":"user:jdoe"}},{"kind":"final","text":"done"}]}}'
 curl "localhost:8090/config/servers/okta-mock/log?after=0"
 ```
