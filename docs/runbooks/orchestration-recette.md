@@ -64,6 +64,19 @@ python3 -m recette orchestrate freeze /tmp/run.json --slug live-support-handoff 
 `sequential`/`concurrent` topologies are structural (no model needed to route);
 they live in the offline corpus and `tests/test_orchestrate.py`.
 
+### Visualize a team or a run
+
+```
+python3 -m recette orchestrate viz corpus/maf_orchestration/correct/support-handoff-correct/team.json
+python3 -m recette orchestrate viz /tmp/run.json --run
+```
+
+`viz` prints a Mermaid `flowchart TD`: the team's declared structure per style
+(handoff edges / sequential chain / concurrent fan-in / manager dotted edges for
+group_chat & magentic), or, with `--run`, the actual routed path (numbered hops
+or order, plus tool calls). Pure + deterministic (recette/viz.py), conventions
+from agent-framework `_viz.py`.
+
 ## How it integrates with the defined recette + campaigns
 
 - The orchestration corpus is part of the single release gate

@@ -405,6 +405,20 @@ def _cmd_orchestrate_replay(recording_path: str) -> int:
     return 0
 
 
+def _cmd_orchestrate_viz(target: str, from_run: bool) -> int:
+    from .manifest import load_validated
+    from .viz import run_mermaid, team_mermaid
+
+    if from_run:
+        from .orchestrate import OrchestrationRecording
+
+        rec = OrchestrationRecording.load(target)
+        print(run_mermaid(rec.team, rec.run))
+    else:
+        print(team_mermaid(load_validated("maf_orchestration", Path(target))))
+    return 0
+
+
 def _cmd_orchestrate_otel(recording_path: str, out: str | None) -> int:
     from .otel import recording_to_otlp
 
@@ -567,6 +581,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     o_otel.add_argument("recording", help="path to an orchestration recording JSON")
     o_otel.add_argument("--out", default=None, help="write the OTLP JSON here (default: stdout)")
+    o_viz = orch_sub.add_parser(
+        "viz", help="print a Mermaid diagram of a team (or a run with --run)"
+    )
+    o_viz.add_argument("target", help="path to a team.json, or a recording with --run")
+    o_viz.add_argument(
+        "--run", action="store_true", help="target is a recording; draw the actual routed path"
+    )
     o_frz = orch_sub.add_parser("freeze", help="freeze a recording into a corpus subject")
     o_frz.add_argument("recording", help="path to an orchestration recording JSON")
     o_frz.add_argument(
@@ -647,6 +668,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_orchestrate_replay(args.recording)
         if args.orch_cmd == "otel":
             return _cmd_orchestrate_otel(args.recording, args.out)
+        if args.orch_cmd == "viz":
+            return _cmd_orchestrate_viz(args.target, args.run)
         if args.orch_cmd == "freeze":
             return _cmd_orchestrate_freeze(
                 args.recording, args.out, args.slug, args.category, args.violation_type

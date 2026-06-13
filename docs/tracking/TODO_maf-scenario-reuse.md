@@ -95,9 +95,12 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       ALL runners (not just orchestration/campaign recordings). Source:
       `scenario/cache.py` (langwatch). Overlaps ReplayLlm; this is the call-level
       cache layer under build_llm. Effort: medium.
-- [ ] **Auto workflow viz** -- generate the mermaid we now hand-write from a team /
-      campaign definition. Source: `python/packages/core/agent_framework/_workflows/_viz.py`.
-      A `recette orchestrate viz <team>` that prints a mermaid graph. Effort: small.
+- [x] **Auto workflow viz** -- DONE. recette/viz.py: team_mermaid(team) (declared
+      structure per style: handoff edges / sequential chain / concurrent fan-in /
+      manager dotted edges for group_chat & magentic) + run_mermaid(team, run) (the
+      actual routed path, numbered hops/order + tool calls). Conventions mirror
+      _viz.py (flowchart TD, id["label"], a --> b, a -. label .-> b, ((fan-in)), id
+      sanitization). CLI `recette orchestrate viz <team> [--run]`; tests/test_viz.py.
 - [ ] **pytest plugin** -- expose the recette corpus as pytest test cases (parametrised
       per subject) alongside the unittest suite. Source: `scenario/pytest_plugin.py`.
       Effort: small. Optional (unittest already green).
