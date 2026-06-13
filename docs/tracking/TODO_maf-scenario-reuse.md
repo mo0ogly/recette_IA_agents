@@ -24,9 +24,16 @@ being implemented now via APEX; everything below is queued.
 - [x] **Per-turn assertions in simulate** -- DONE. recette/simulate.py: SimCheck /
       SimState / CheckResult, run after each turn (grounded on scenario's ScriptStep
       Callable[[ScenarioState], Optional[ScenarioResult]]); a failing check halts.
-- [ ] **Frontend red-team/simulation view** -- DEFERRED (own cycle): needs a
-      result-persistence layer + endpoint; red-team/sim output is LLM-driven
-      (non-deterministic), not a clean recette endpoint. Do not bolt on.
+- [x] **Frontend red-team/simulation view** -- DONE (unblocked). The persistence
+      layer is recette/sim_view.py SimRecording: a simulate()/red-team run is FROZEN
+      to JSON (spec + transcript + action_log + per-turn checks + stop reason), so
+      the console loads a RECORDED run -- never a live LLM (deterministic I4,
+      read-only I1). build_sim_view -> timeline + four-dimension verdict (judge_maf).
+      Committed corpus/sim/ (clean + red-team-overreach, generated via the real
+      simulate() loop by scripts/gen_sim_corpus.py). Endpoint GET /sim/runs[/{id}]
+      (recette/api/routers/sim.py). Console: a /sim "Red-team" page lists the runs
+      and steps through the transcript + checks + verdict dims (real-payload fixtures
+      + render-assert, no new CSS). tests/test_sim_view.py + console sim test.
 - [x] **Run cache for real-mode** -- DONE for orchestration via recette/orchestrate.py:
       OrchestrationRecording persists the team + ordered LLM decisions + the run;
       replay() re-drives with ReplayLlm and reproduces the EXACT run (I4). The Lane B

@@ -42,6 +42,7 @@ from .routers import policies as policies_router
 from .routers import proxy as proxy_router
 from .routers import rag as rag_router
 from .routers import runs as runs_router
+from .routers import sim as sim_router
 from .routers import subjects as subjects_router
 from .routers import verdicts as verdicts_router
 from .runs import RunManager
@@ -240,4 +241,5 @@ def create_app(
     app.include_router(proxy_router.router)
     app.include_router(rag_router.router)
     app.include_router(subjects_router.router)
+    app.include_router(sim_router.router)
     return app

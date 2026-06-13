@@ -734,3 +734,38 @@ export interface Benchmark {
 export function getBenchmark(): Promise<Benchmark> {
   return request<Benchmark>("/subjects/benchmark");
 }
+
+export interface SimRunSummary {
+  agent_id: string;
+  name: string;
+  verdict: string;
+  stopped_reason: string;
+}
+
+export interface SimView {
+  agent_id: string;
+  name: string;
+  stopped_reason: string;
+  verdict: string;
+  dimensions: { identity: boolean; capabilities: boolean; policy: boolean; behavior: boolean };
+  turns: { index: number; role: string; content: string }[];
+  actions: {
+    seq: number;
+    agent: string;
+    action: string;
+    tool_kind: string | null;
+    target: string;
+    approved: boolean;
+  }[];
+  checks: { passed: boolean; reason: string }[];
+}
+
+/** GET /sim/runs: the committed red-team / simulation runs. */
+export function getSimRuns(): Promise<{ count: number; runs: SimRunSummary[] }> {
+  return request<{ count: number; runs: SimRunSummary[] }>("/sim/runs");
+}
+
+/** GET /sim/runs/{id}: the step-through view of one recorded run. */
+export function getSimView(agentId: string): Promise<SimView> {
+  return request<SimView>(`/sim/runs/${encodeURIComponent(agentId)}`);
+}
