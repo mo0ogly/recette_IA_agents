@@ -33,6 +33,11 @@ api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
 ]
+# Phase 2 event store (event-store-decision.md). Optional: the SQLite Phase 1
+# path needs none of this; AGENTRAIL_EVENT_STORE=postgres requires it.
+postgres = [
+    "psycopg[binary]>=3.1",
+]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [
     "pytest>=8.0",
@@ -77,6 +82,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # cryptography is an optional [bundle] extra; not present in the audit venv where mypy runs.
 module = ["cryptography", "cryptography.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# psycopg is the optional [postgres] extra; not present in the audit venv where mypy runs.
+module = ["psycopg", "psycopg.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

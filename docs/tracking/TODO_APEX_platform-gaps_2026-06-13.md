@@ -44,14 +44,21 @@ Donc : reference/banc-de-test de qualite. Les gaps ci-dessous separent ca d'un
 - Done : kill du process pendant un `pending` -> l'approbation reprend ; test de timeout.
 - Pipeline : PYTHON (+ Temporal). Invariant : I6.
 
-### G3 -- Event store Phase 2 PostgreSQL -- HAUTE (des que distribue)
-- Constat verifie : aucune dep `psycopg/asyncpg/postgres`. Seul `SqliteEventStore`
-  (mono-hote). `event-store-decision.md` : bascule des hotes separes / multi-ecrivains.
-- Cible : `PostgresEventStore` derriere le meme trait `protocol.py` (append, read_from_seq,
-  replay), ordre total monotone, hash chain, bascule par config
-  `AGENTRAIL_EVENT_STORE=sqlite|postgres`. Reste du systeme inchange.
-- Done : meme suite de tests de store passe sur les deux backends ; test de replay
-  deterministe (I4) sur Postgres.
+### G3 -- Event store Phase 2 PostgreSQL -- [FAIT 2026-06-13, OPTION dormante, branch feat/g3-postgres-eventstore]
+- IMPORTANT : SQLite RESTE LE DEFAUT. Postgres est une option opt-in, code dormant tant
+  que `AGENTRAIL_EVENT_STORE=postgres` n'est pas mis. Aujourd'hui = 100% SQLite, inchange.
+- Livre : `PostgresEventStore` derriere le meme trait `EventStore` (parite append/read_from/
+  get_by_event_id/verify_chain), `seq BIGSERIAL` (ordre total I4), triggers anti UPDATE/DELETE
+  (I1), hash chain byte-identique (chain_hash canonicalise), `pg_advisory_xact_lock` sur
+  l'append -> chaine non-forkee sous ecrivains concurrents (la vraie valeur Phase 2).
+  Bascule `build_event_store_from_env()` via `AGENTRAIL_EVENT_STORE=sqlite|postgres`, DSN
+  `AGENTRAIL_DATABASE_URL` (R8). psycopg = extra optionnel `[postgres]`.
+- Verifie : `tests/test_eventstore_postgres.py` 9/9 contre un VRAI Postgres 16 (docker
+  ephemere) -- mirror suite SQLite + immutabilite + tamper + concurrence multi-writer.
+  Skip si pas de `AGENTRAIL_TEST_POSTGRES_DSN` (suite par defaut sans Postgres). Runbook
+  `docs/runbooks/event-store-postgres.md` + 2 mermaid.
+- RESIDUEL : la MIGRATION du flux SQLite existant vers Postgres (replay du log) est un acte
+  operateur, non automatise. A faire au cutover reel.
 - Pipeline : PYTHON. Invariants : I1, I4.
 
 ### G4 -- Transport temps reel NATS JetStream -- MOYENNE

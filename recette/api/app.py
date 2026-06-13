@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..llm import build_llm
 from ..platform.catalog import Catalog, load_catalog
-from ..platform.eventstore import EventStore, SqliteEventStore
+from ..platform.eventstore import EventStore, build_event_store_from_env
 from ..platform.gateway import AgentResolver, Gateway
 from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
@@ -45,7 +45,6 @@ from .secret_store import BackendSecretStore
 from .server_manager import ServerManager
 from .verdict_store import VerdictStore
 
-DEFAULT_EVENT_STORE_PATH = "data/agentrail.events.db"
 BASELINE_POLICY_VERSION = "v1"
 # Console (Vite) runs on a different origin than the API, so the browser
 # requires CORS. Origins are configurable (R5); the default covers the local
@@ -124,8 +123,8 @@ def create_app(
     if event_store is not None:
         events: EventStore = event_store
     else:
-        store_path = os.environ.get("AGENTRAIL_EVENT_STORE_PATH", DEFAULT_EVENT_STORE_PATH)
-        events = SqliteEventStore(store_path)
+        # Phase 1/2 switch via AGENTRAIL_EVENT_STORE (sqlite default, postgres opt-in).
+        events = build_event_store_from_env()
     policies = policy_store if policy_store is not None else PolicyStore()
     base_proxy: ExternalSystemProxy = proxy if proxy is not None else LabHttpProxy()
     # Debug tracing decorates the I5 path: every gateway side effect is recorded
