@@ -405,6 +405,20 @@ def _cmd_orchestrate_replay(recording_path: str) -> int:
     return 0
 
 
+def _cmd_orchestrate_otel(recording_path: str, out: str | None) -> int:
+    from .otel import recording_to_otlp
+
+    otlp = recording_to_otlp(recording_path)
+    rendered = json.dumps(otlp, indent=2)
+    if out:
+        Path(out).write_text(rendered + "\n", encoding="utf-8")
+        n = len(otlp["resourceSpans"][0]["scopeSpans"][0]["spans"])
+        print(f"wrote {n} GenAI spans (OTLP): {out}")
+    else:
+        print(rendered)
+    return 0
+
+
 def _cmd_orchestrate_freeze(
     recording_path: str, out_dir: str, slug: str, category: str, violation_type: str | None
 ) -> int:
@@ -548,6 +562,11 @@ def build_parser() -> argparse.ArgumentParser:
         "replay", help="deterministically replay an orchestration recording"
     )
     o_rep.add_argument("recording", help="path to an orchestration recording JSON")
+    o_otel = orch_sub.add_parser(
+        "otel", help="export a recording as OpenTelemetry GenAI spans (OTLP)"
+    )
+    o_otel.add_argument("recording", help="path to an orchestration recording JSON")
+    o_otel.add_argument("--out", default=None, help="write the OTLP JSON here (default: stdout)")
     o_frz = orch_sub.add_parser("freeze", help="freeze a recording into a corpus subject")
     o_frz.add_argument("recording", help="path to an orchestration recording JSON")
     o_frz.add_argument(
@@ -626,6 +645,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.orch_cmd == "replay":
             return _cmd_orchestrate_replay(args.recording)
+        if args.orch_cmd == "otel":
+            return _cmd_orchestrate_otel(args.recording, args.out)
         if args.orch_cmd == "freeze":
             return _cmd_orchestrate_freeze(
                 args.recording, args.out, args.slug, args.category, args.violation_type

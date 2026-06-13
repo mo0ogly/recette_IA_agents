@@ -175,3 +175,35 @@ flowchart LR
 
 See `.claude/rules/secrets-source-of-truth.md` (R18) and
 `docs/runbooks/orchestration-recette.md`.
+
+## OpenTelemetry GenAI export (audit interop, I1/I4)
+
+A recording exports to OpenTelemetry GenAI spans so an AgentRail audit trail
+interoperates with any OTel backend. The attribute/operation names are the
+canonical GenAI semantic conventions taken from the real
+`agent_framework/observability.py` (`invoke_agent` / `execute_tool`,
+`gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.agent.name`,
+`gen_ai.tool.name`). Dependency-free and deterministic (I4): span/trace ids are a
+stable digest of the run, timestamps are logical (no wall clock), so the same run
+exports byte-identical spans; the recording is read-only (I1).
+
+```mermaid
+flowchart TD
+  REC["OrchestrationRecording (team + run)"] --> RT["root span: invoke_agent {team}"]
+  RT --> A1["invoke_agent {participant}\ngen_ai.agent.name / .provider.name / .request.model"]
+  RT --> A2["invoke_agent {participant}"]
+  RT --> T1["execute_tool {tool}\ngen_ai.tool.name / .tool.call.id"]
+  RT --> OTLP["to_otlp() -> ResourceSpans (OTLP/JSON)"]
+  A1 --> OTLP
+  A2 --> OTLP
+  T1 --> OTLP
+  OTLP --> BE["any OTel backend / collector"]
+```
+
+```
+python3 -m recette orchestrate otel /tmp/run.json --out spans.json
+```
+
+`recette/otel.py`: `orchestration_spans(team, run)` -> `to_otlp(spans)`. A real
+OTel exporter (optional `[otel]` extra) re-stamps wall-clock times at emit; the
+recette only guarantees the structure is reproducible.

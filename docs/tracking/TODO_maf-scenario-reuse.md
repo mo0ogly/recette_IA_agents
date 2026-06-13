@@ -78,11 +78,16 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       the manager-routed loop (orchestrate.py); corpus magentic-research (1 correct +
       1 stall negative); tests + docs + Help. Five MAF styles complete (13 teams).
       Grounded on _magentic.py (StandardMagenticManager, progress ledger next_speaker).
-- [ ] **OpenTelemetry audit semantics** -- adopt OTel GenAI semantic conventions for
-      the action log / recording so AgentRail traces interoperate with any OTel
-      backend. Source: `python/packages/core/agent_framework/_telemetry.py`
-      (gen_ai.* spans). Audit Plane (I1). Map AgentActionEvent + the recordings to
-      gen_ai spans; emit an OTel-shaped export from a recording. Effort: medium.
+- [x] **OpenTelemetry audit semantics** -- DONE. recette/otel.py maps an
+      orchestration run/recording to canonical OTel GenAI spans (invoke_agent /
+      execute_tool, gen_ai.provider.name/.request.model/.agent.name/.tool.name),
+      grounded on the REAL agent_framework/observability.py (NOT _telemetry.py,
+      which is only user-agent). Dependency-free + deterministic (I4: digest ids,
+      logical times) + read-only (I1). to_otlp() -> OTLP/JSON ResourceSpans for any
+      OTel backend; CLI `recette orchestrate otel <recording>`; tests/test_otel.py;
+      mermaid in docs/runbooks/replay-model.md. A real OTel SDK export stays an
+      optional [otel] extra. (Mapping the git/MAF AgentActionEvent action log to
+      spans too remains a small follow-up.)
 
 ### Medium value
 - [ ] **Generic real-mode run cache** -- a content-addressed cache of LLM calls
