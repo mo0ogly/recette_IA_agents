@@ -1,0 +1,112 @@
+/* Page-scoped styles for the RAG retrieval recette. Reuses the global tokens. */
+
+.rag-page {
+  --rag-radius: 4px;
+}
+
+.rag-note {
+  color: var(--color-text-muted);
+  max-width: 70ch;
+  margin: 0.25rem 0 1rem;
+}
+
+.rag-loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.rag-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--rag-radius);
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.rag-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.rag-stat {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.rag-verdict {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--rag-radius);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.rag-verdict.ok {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.rag-verdict.fail {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+.rag-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--rag-radius);
+}
+
+.rag-table th,
+.rag-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.rag-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.rag-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rag-ids {
+  font-family: var(--font-mono, monospace);
+  color: var(--color-text-muted);
+}
+
+.rag-pill {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--rag-radius);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.rag-pill.ok {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.rag-pill.fail {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+.rag-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

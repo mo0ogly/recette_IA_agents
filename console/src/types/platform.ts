@@ -438,3 +438,23 @@ export interface ProxyDebugStatus {
   debug_enabled: boolean;
   trace_count: number;
 }
+
+/** One judged query in the RAG retrieval recette (GET /rag/scorecard). */
+export interface RagQueryResult {
+  query: string;
+  retrieved: string[];
+  precision: number;
+  recall: number;
+  top_ok: boolean;
+  passed: boolean;
+}
+
+/** RAG retrieval-quality scorecard (GET /rag/scorecard). Raw JSON, no envelope. */
+export interface RagScorecard {
+  total: number;
+  passed: number;
+  all_passed: boolean;
+  mean_precision: number;
+  mean_recall: number;
+  results: RagQueryResult[];
+}

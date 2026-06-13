@@ -33,6 +33,7 @@ import type {
   ServerStatus,
   ServerTestResult,
   VerdictJudgement,
+  RagScorecard,
   VerdictScorecard,
   VerdictSubmission,
   VerdictSubmissionRequest,
@@ -555,4 +556,47 @@ export function setActivePolicy(version: string): Promise<PolicyDocument> {
     method: "PUT",
     body: JSON.stringify({ version }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// RAG retrieval-quality recette (/rag/*)
+// ---------------------------------------------------------------------------
+
+/** GET /rag/scorecard: the deterministic retrieval recette result (raw JSON). */
+export function getRagScorecard(): Promise<RagScorecard> {
+  return request<RagScorecard>("/rag/scorecard");
+}
+
+// ---------------------------------------------------------------------------
+// Unified recette scorecard (/subjects/scorecard)
+// ---------------------------------------------------------------------------
+
+export interface DiscoverySurfaceScore {
+  repos: number;
+  passed: number;
+  false_positives: number;
+  false_negatives: number;
+  ordering_ok: boolean;
+  all_passed: boolean;
+}
+
+export interface IdentificationScore {
+  agents: number;
+  passed: number;
+  false_positives: number;
+  false_negatives: number;
+  all_passed: boolean;
+}
+
+export interface RecetteScorecard {
+  identification: IdentificationScore;
+  maf: IdentificationScore;
+  discovery: Record<string, DiscoverySurfaceScore>;
+  all_passed: boolean;
+}
+
+/** GET /subjects/scorecard: aggregate recette verdict over the unified corpus
+ *  (identification + MAF + every discovery surface, including mcp). Raw JSON. */
+export function getRecetteScorecard(): Promise<RecetteScorecard> {
+  return request<RecetteScorecard>("/subjects/scorecard");
 }

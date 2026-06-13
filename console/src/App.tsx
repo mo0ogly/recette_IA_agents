@@ -10,6 +10,7 @@ import DashboardPage from "./pages/dashboard";
 import FluxPage from "./pages/flux";
 import ProxyNavBadge from "./components/ProxyNavBadge";
 import ProxyPage from "./pages/proxy";
+import RagPage from "./pages/rag";
 import RecettePage from "./pages/recette";
 import ServersPage from "./pages/servers";
 import VerdictsPage from "./pages/verdicts";
@@ -42,6 +43,9 @@ export default function App(): JSX.Element {
           <NavLink to="/verdicts" className={navLinkClass}>
             Verdicts
           </NavLink>
+          <NavLink to="/rag" className={navLinkClass}>
+            RAG
+          </NavLink>
           <NavLink to="/agents" className={navLinkClass}>
             Agents
           </NavLink>
@@ -73,6 +77,7 @@ export default function App(): JSX.Element {
           <Route path="/recette" element={<RecettePage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/verdicts" element={<VerdictsPage />} />
+          <Route path="/rag" element={<RagPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
