@@ -38,6 +38,11 @@ api = [
 postgres = [
     "psycopg[binary]>=3.1",
 ]
+# Phase 2 realtime transport (G4). Optional: the in-process Phase 1 transport
+# needs none of this; AGENTRAIL_REALTIME=nats requires it.
+nats = [
+    "nats-py>=2.6",
+]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [
     "pytest>=8.0",
@@ -87,6 +92,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # psycopg is the optional [postgres] extra; not present in the audit venv where mypy runs.
 module = ["psycopg", "psycopg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# nats-py is the optional [nats] extra; not present in the audit venv where mypy runs.
+module = ["nats", "nats.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
