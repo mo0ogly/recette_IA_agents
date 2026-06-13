@@ -1,7 +1,7 @@
 # Plan : G4 -- Realtime transport (Data Plane) + console live feed
 
 Date : 2026-06-13
-Status : EN_COURS
+Status : TERMINE
 Invariants concernes : I1 (bus jamais source de verite), I5 (transport mediatise), failure-modes (buffer borne + retry, aucune execution externe entre-temps).
 
 ## Objectif
@@ -29,17 +29,17 @@ retry (`BoundedRetryBuffer`) couvre la degradation du downstream (failure-modes)
 dans la gateway ni bloquer l'append.
 
 ## Etapes
-- [ ] protocol.py : `RealtimeTransport` Protocol + `Subscription`
-- [ ] inproc.py : `InProcessTransport` (defaut Phase 1, fan-out borne par abonne)
-- [ ] buffer.py : `BoundedRetryBuffer` (degradation downstream, borne + retry, jamais raise gateway)
-- [ ] publishing_store.py : `PublishingEventStore` decorateur (store first, publish best-effort)
-- [ ] __init__.py : `build_realtime_transport_from_env()` (inproc defaut | nats opt-in)
-- [ ] tests unit : protocol/inproc/buffer/decorator + CHAOS (transport down -> buffer, store intact)
-- [ ] SSE router `GET /events/stream` + wiring app.py (decore le store, expose le transport)
-- [ ] console : page Live Events (EventSource) + api client + fixture + contract test (R16) + smoke live
-- [ ] NATS adapter + verif docker (ou residuel documente, seam pret)
-- [ ] runbook `docs/runbooks/realtime-transport.md` + mermaid
-- [ ] RETEX
+- [x] protocol.py : `RealtimeTransport` Protocol + `Subscription`
+- [x] inproc.py : `InProcessTransport` (defaut Phase 1, fan-out borne par abonne)
+- [x] buffer.py : `BoundedRetryBuffer` (degradation downstream, borne + retry, jamais raise gateway)
+- [x] publishing_store.py : `PublishingEventStore` decorateur (store first, publish best-effort)
+- [x] __init__.py : `build_realtime_transport_from_env()` (inproc defaut | nats opt-in)
+- [x] tests unit : protocol/inproc/buffer/decorator + CHAOS (transport down -> buffer, store intact)
+- [x] SSE router `GET /events/stream` + wiring app.py (decore le store, expose le transport)
+- [x] console : page Live Events (EventSource) + api client + fixture + contract test (R16) + smoke live
+- [x] NATS adapter + verif docker REELLE (3/3 contre nats:2.10 -js)
+- [x] runbook `docs/runbooks/realtime-transport.md` + 2 mermaid (mmdc valides)
+- [x] RETEX (RETEX_APEX_g4-realtime-transport_2026-06-13.md)
 
 ## Decisions prises
 - Decorateur store (pas hook gateway) -> impls store + gateway intactes, mirror TracingProxy.

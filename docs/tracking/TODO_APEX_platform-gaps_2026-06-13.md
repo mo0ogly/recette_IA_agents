@@ -75,7 +75,15 @@ Donc : reference/banc-de-test de qualite. Les gaps ci-dessous separent ca d'un
   operateur, non automatise. A faire au cutover reel.
 - Pipeline : PYTHON. Invariants : I1, I4.
 
-### G4 -- Transport temps reel NATS JetStream -- MOYENNE
+### G4 -- Transport temps reel NATS JetStream -- [FAIT 2026-06-13, branch feat/g4-realtime-transport]
+> Livre : `RealtimeTransport` protocol + `InProcessTransport` (Phase 1 reel,
+> defaut) + `BoundedRetryBuffer` (failure-mode bus degrade) + `PublishingEventStore`
+> decorateur (store first I1, publish best-effort, gateway intact) +
+> `NatsJetStreamTransport` (Phase 2 opt-in [nats], async->sync) verifie 3/3 contre
+> un VRAI NATS (docker nats:2.10 -js). SSE `GET /events/stream` + `GET /events/status`,
+> page console "Temps reel" (EventSource, R16 fixture reelle, smoke navigateur OK).
+> Bascule `AGENTRAIL_REALTIME=inproc|nats`. Runbook + 2 mermaid. RETEX livre.
+> Residuel : flush() pas branche a un scheduler ; SSE auth via token-in-query (tracke).
 - Constat verifie : NATS/JetStream seulement mentionnes (docs/enums), aucune dep ni client.
 - Cible : bus JetStream pour la diffusion des evenements (jamais source de verite, I1) ;
   degradation -> buffer local borne + retry, AUCUNE execution externe entre-temps
