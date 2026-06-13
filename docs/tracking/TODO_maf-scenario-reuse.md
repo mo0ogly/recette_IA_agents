@@ -113,8 +113,14 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       Effort: medium.
 
 ### Platform territory (heavier -- reference patterns, not recette-core)
-- [ ] **Middleware pipeline pattern** for the Gateway mediation (I2). Source:
-      `python/packages/core/agent_framework/_middleware.py`.
+- [x] **Middleware pipeline pattern** -- DONE. recette/platform/middleware.py:
+      Middleware protocol (before -> deny-reason|None, after -> observe) +
+      MiddlewarePipeline + RecordingMiddleware / DenyListMiddleware. Wired
+      additively into Gateway (optional middleware=; default unchanged): a
+      middleware may DENY (fail-safe; a raising before-hook denies) or OBSERVE, but
+      NEVER grant -- only the Policy Engine allows (I2 preserved). Deterministic (I4).
+      tests/test_middleware.py (observe, short-circuit deny, fail-safe on raise,
+      no-middleware unchanged); docs/runbooks/gateway-middleware.md. 779 tests green.
 - [x] **Checkpointing / time-travel** -- DONE. recette/checkpoint.py: a Checkpoint
       freezes a run's decision PREFIX (steps 0..k, serializable). checkpoint(recording,
       after=k) / resume(cp, tail) (replay the prefix then continue -- ReplayLlm of the

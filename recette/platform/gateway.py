@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .approvals.service import ApprovalService
 from .approvals.state_machine import ApprovalAction, InvalidTransition, transition
@@ -37,6 +38,9 @@ from .ids import EventIdGenerator
 from .policy.engine import decide
 from .policy.store import PolicyStore
 from .proxy.protocol import ExecutionResult, ExternalSystemProxy
+
+if TYPE_CHECKING:
+    from .middleware import MiddlewarePipeline
 
 
 class GatewayError(Exception):
@@ -104,6 +108,7 @@ class Gateway:
         proxy: ExternalSystemProxy,
         id_generator: EventIdGenerator,
         agent_resolver: AgentResolver,
+        middleware: MiddlewarePipeline | None = None,
     ) -> None:
         self._catalog = catalog
         self._policies = policy_store
@@ -112,6 +117,13 @@ class Gateway:
         self._ids = id_generator
         self._agents = agent_resolver
         self._approvals = ApprovalService(event_store)
+        self._middleware = middleware
+
+    def _after(self, request: ActionRequest, outcome: ActionOutcome) -> ActionOutcome:
+        """Run the middleware after-hooks (observe-only) and return the outcome."""
+        if self._middleware is not None:
+            self._middleware.run_after(request, outcome)
+        return outcome
 
     # --- submission path ---
 
@@ -121,11 +133,17 @@ class Gateway:
         if agent is None:
             # Unknown identity: deny, audited (I3 fail-closed).
             event = self._normalize(request, event_id, role="", scope=())
-            return self._record_denied(event, reason="unknown agent identity")
+            return self._after(request, self._record_denied(event, reason="unknown agent identity"))
 
         role = str(agent.get("role", ""))
         scope = tuple(agent.get("capability_scope", ()))
         event = self._normalize(request, event_id, role=role, scope=scope)
+
+        # Middleware before-hook: may DENY (fail-safe), never ALLOW (I2 preserved).
+        if self._middleware is not None:
+            veto = self._middleware.run_before(request)
+            if veto is not None:
+                return self._after(request, self._record_denied(event, reason=veto))
 
         try:
             policy = self._policies.active()
@@ -137,7 +155,9 @@ class Gateway:
                 {**event.to_dict(), "error": f"policy evaluation failed: {exc}"},
                 event_id=f"{event_id}E",
             )
-            return self._record_denied(event, reason="policy evaluation failed -> deny")
+            return self._after(
+                request, self._record_denied(event, reason="policy evaluation failed -> deny")
+            )
 
         recorded = PolicyDecision(
             verdict=decision.verdict,
@@ -147,23 +167,28 @@ class Gateway:
         event = self._with_decision(event, recorded, decision.risk_level)
 
         if decision.verdict is PolicyVerdict.DENY:
-            return self._record_denied(event, reason=None)
+            return self._after(request, self._record_denied(event, reason=None))
         if decision.verdict is PolicyVerdict.ESCALATE:
             pending = self._with_approval(event, ApprovalState.PENDING)
             self._append(EventKind.ACTION_REQUESTED, pending.to_dict(), event_id=event_id)
-            return ActionOutcome(
-                event_id=event_id,
-                verdict=PolicyVerdict.ESCALATE,
-                approval_state=ApprovalState.PENDING,
-                risk_level=event.risk_level,
-                policy_version=recorded.policy_version,
-                rule_id=recorded.rule_id,
-                executed=False,
-                result=None,
-                side_effect_hash=None,
+            return self._after(
+                request,
+                ActionOutcome(
+                    event_id=event_id,
+                    verdict=PolicyVerdict.ESCALATE,
+                    approval_state=ApprovalState.PENDING,
+                    risk_level=event.risk_level,
+                    policy_version=recorded.policy_version,
+                    rule_id=recorded.rule_id,
+                    executed=False,
+                    result=None,
+                    side_effect_hash=None,
+                ),
             )
         # allow
-        return self._execute_and_record(event, approval_state=ApprovalState.NONE)
+        return self._after(
+            request, self._execute_and_record(event, approval_state=ApprovalState.NONE)
+        )
 
     # --- approval resolution path ---
 
