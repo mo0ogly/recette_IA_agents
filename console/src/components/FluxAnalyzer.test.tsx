@@ -13,10 +13,25 @@ import { describe, expect, it, vi } from "vitest";
 import auditFixture from "../hooks/__fixtures__/auditEvents.fixture.json";
 import type { AuditEvent } from "../types/platform";
 import { FluxAnalyzer, fluxAnalyzerContent } from "./FluxAnalyzer";
+import type { FluxDecoration } from "./fluxModel";
 
 vi.mock("./MonacoJsonViewer", () => ({
-  default: ({ value }: { value: string }) => (
-    <textarea readOnly data-testid="monaco-stub" value={value} />
+  // Stub exposes both the value and the decoration count (data-attr) so the
+  // decorated-stream path is assertable without the Monaco runtime.
+  default: ({ value, decorations = [] }: { value: string; decorations?: FluxDecoration[] }) => (
+    <textarea
+      readOnly
+      data-testid="monaco-stub"
+      data-deco-count={decorations.length}
+      data-deco-classes={decorations.map((d) => d.className ?? "").join(",")}
+      value={value}
+    />
+  ),
+}));
+
+vi.mock("./MonacoDiffViewer", () => ({
+  default: ({ original, modified }: { original: string; modified: string }) => (
+    <div data-testid="diff-stub" data-original={original} data-modified={modified} />
   ),
 }));
 
@@ -43,10 +58,11 @@ describe("fluxAnalyzerContent", () => {
     // Canonical top-level key order (nested objects like payload preserved):
     // reorder top-level keys only, not via an array replacer (which filters
     // keys at every depth and would strip payload's inner fields).
+    const first = events[0] as unknown as Record<string, unknown>;
     const ordered = Object.fromEntries(
-      Object.keys(events[0])
+      Object.keys(first)
         .sort()
-        .map((k) => [k, (events[0] as Record<string, unknown>)[k]]),
+        .map((k) => [k, first[k]]),
     );
     expect(lines[0]).toBe(JSON.stringify(ordered));
   });
@@ -69,5 +85,52 @@ describe("FluxAnalyzer", () => {
 
     const stub = await screen.findByTestId("monaco-stub");
     expect((stub as HTMLTextAreaElement).value.split("\n")).toHaveLength(events.length);
+  });
+
+  it("passes governance decorations to the viewer in stream mode", async () => {
+    render(<FluxAnalyzer events={events} selectedSeq={null} mode="stream" />);
+
+    const stub = await screen.findByTestId("monaco-stub");
+    // All three fixture events carry a verdict or approval signal -> decorated.
+    expect(stub).toHaveAttribute("data-deco-count", String(events.length));
+    expect(stub.getAttribute("data-deco-classes")).toContain("flux-verdict-deny");
+  });
+
+  it("applies the stream filter before serializing", async () => {
+    render(
+      <FluxAnalyzer
+        events={events}
+        selectedSeq={null}
+        mode="stream"
+        filter={{ minRisk: 3 }}
+      />,
+    );
+
+    const stub = await screen.findByTestId("monaco-stub");
+    // minRisk=3 drops seq 3 (no risk_score): 2 lines, 2 decorations.
+    expect((stub as HTMLTextAreaElement).value.split("\n")).toHaveLength(2);
+    expect(stub).toHaveAttribute("data-deco-count", "2");
+  });
+
+  it("renders a side-by-side diff of the two chosen events", async () => {
+    render(
+      <FluxAnalyzer
+        events={events}
+        selectedSeq={null}
+        mode="diff"
+        diffSeqs={[events[0].seq, events[1].seq]}
+      />,
+    );
+
+    const diff = await screen.findByTestId("diff-stub");
+    expect(diff).toHaveAttribute("data-original", JSON.stringify(events[0], null, 2));
+    expect(diff).toHaveAttribute("data-modified", JSON.stringify(events[1], null, 2));
+  });
+
+  it("shows a hint on the diff side that is not chosen yet", async () => {
+    render(<FluxAnalyzer events={events} selectedSeq={null} mode="diff" diffSeqs={[null, null]} />);
+
+    const diff = await screen.findByTestId("diff-stub");
+    expect(JSON.parse(diff.getAttribute("data-original") ?? "{}")).toHaveProperty("hint");
   });
 });

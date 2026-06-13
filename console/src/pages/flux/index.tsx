@@ -17,7 +17,7 @@
  * download link does not belong in a live viewer.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { listAgents } from "../../api/client";
@@ -26,6 +26,7 @@ import {
   fluxAnalyzerContent,
   type FluxAnalyzerMode,
 } from "../../components/FluxAnalyzer";
+import { distinctPayloadValues, type FluxFilter } from "../../components/fluxModel";
 import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
 import { useAuditTail } from "../../hooks/useAuditTail";
 import type { AgentConfig } from "../../types/platform";
@@ -42,7 +43,40 @@ export default function FluxPage(): JSX.Element {
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [mode, setMode] = useState<FluxAnalyzerMode>("event");
 
+  // Stream-mode governance filter (ephemeral UI state, not reflected in the URL).
+  const [actionType, setActionType] = useState("");
+  const [targetSystem, setTargetSystem] = useState("");
+  const [minRisk, setMinRisk] = useState("");
+  // Diff-mode comparands (left A / right B), chosen from the visible window.
+  const [diffA, setDiffA] = useState<number | null>(null);
+  const [diffB, setDiffB] = useState<number | null>(null);
+
   const audit = useAuditTail({ agentId: agentFilter === "" ? undefined : agentFilter });
+
+  const filter: FluxFilter = useMemo(() => {
+    const f: FluxFilter = {};
+    if (actionType !== "") {
+      f.actionType = actionType;
+    }
+    if (targetSystem !== "") {
+      f.targetSystem = targetSystem;
+    }
+    const parsed = Number(minRisk);
+    if (minRisk !== "" && Number.isFinite(parsed)) {
+      f.minRisk = parsed;
+    }
+    return f;
+  }, [actionType, targetSystem, minRisk]);
+
+  const actionTypes = useMemo(
+    () => distinctPayloadValues(audit.events, "action_type"),
+    [audit.events],
+  );
+  const targetSystems = useMemo(
+    () => distinctPayloadValues(audit.events, "target_system"),
+    [audit.events],
+  );
+  const seqs = useMemo(() => audit.events.map((e) => e.seq), [audit.events]);
 
   useEffect(() => {
     listAgents()
@@ -136,11 +170,98 @@ export default function FluxPage(): JSX.Element {
           >
             stream
           </button>
+          <button
+            type="button"
+            className="flux-mode-btn"
+            data-active={mode === "diff"}
+            onClick={() => setMode("diff")}
+          >
+            diff
+          </button>
         </span>
         <button type="button" className="flux-export" onClick={exportWindow}>
           Export window (JSONL)
         </button>
       </header>
+      {mode === "stream" && (
+        <div className="flux-filter" role="group" aria-label="stream filter">
+          <label className="flux-filter-label">
+            action_type
+            <select
+              className="flux-filter-input"
+              value={actionType}
+              onChange={(e) => setActionType(e.target.value)}
+            >
+              <option value="">any</option>
+              {actionTypes.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flux-filter-label">
+            target_system
+            <select
+              className="flux-filter-input"
+              value={targetSystem}
+              onChange={(e) => setTargetSystem(e.target.value)}
+            >
+              <option value="">any</option>
+              {targetSystems.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flux-filter-label">
+            min risk
+            <input
+              className="flux-filter-input"
+              type="number"
+              min={0}
+              value={minRisk}
+              onChange={(e) => setMinRisk(e.target.value)}
+              placeholder="0"
+            />
+          </label>
+        </div>
+      )}
+      {mode === "diff" && (
+        <div className="flux-filter" role="group" aria-label="diff selection">
+          <label className="flux-filter-label">
+            A (original)
+            <select
+              className="flux-filter-input"
+              value={diffA ?? ""}
+              onChange={(e) => setDiffA(e.target.value === "" ? null : Number(e.target.value))}
+            >
+              <option value="">pick</option>
+              {seqs.map((s) => (
+                <option key={s} value={s}>
+                  seq {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flux-filter-label">
+            B (modified)
+            <select
+              className="flux-filter-input"
+              value={diffB ?? ""}
+              onChange={(e) => setDiffB(e.target.value === "" ? null : Number(e.target.value))}
+            >
+              <option value="">pick</option>
+              {seqs.map((s) => (
+                <option key={s} value={s}>
+                  seq {s}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {agentsError !== null && <p className="flux-error">{agentsError}</p>}
       <div className="flux-grid">
         <LogConsole
@@ -152,7 +273,13 @@ export default function FluxPage(): JSX.Element {
           onLineClick={onLineClick}
           selectedSeq={selectedSeq}
         />
-        <FluxAnalyzer events={audit.events} selectedSeq={selectedSeq} mode={mode} />
+        <FluxAnalyzer
+          events={audit.events}
+          selectedSeq={selectedSeq}
+          mode={mode}
+          filter={filter}
+          diffSeqs={[diffA, diffB]}
+        />
       </div>
     </section>
   );

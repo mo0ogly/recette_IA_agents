@@ -17,3 +17,44 @@
   font-size: 0.8rem;
   min-height: 420px;
 }
+
+/*
+ * Governance decorations (stream mode). Whole-line tints keyed on the policy
+ * verdict; gutter glyphs keyed on the approval state. Colours are low-alpha so
+ * the JSON stays readable on the vs-dark background. Display layer only (I1).
+ */
+.flux-verdict-allow {
+  background-color: rgba(61, 143, 91, 0.16);
+}
+.flux-verdict-deny {
+  background-color: rgba(214, 69, 69, 0.18);
+}
+.flux-verdict-escalate {
+  background-color: rgba(214, 161, 61, 0.18);
+}
+
+/* Approval-state gutter glyphs (Monaco renders the glyphMargin cell). */
+.flux-appr-pending::before,
+.flux-appr-approved::before,
+.flux-appr-denied::before,
+.flux-appr-timeout::before {
+  display: block;
+  text-align: center;
+  font-weight: 700;
+}
+.flux-appr-pending::before {
+  content: "?";
+  color: #d6a13d;
+}
+.flux-appr-approved::before {
+  content: "+";
+  color: #3d8f5b;
+}
+.flux-appr-denied::before {
+  content: "x";
+  color: #d64545;
+}
+.flux-appr-timeout::before {
+  content: "!";
+  color: #c46b3d;
+}
