@@ -25,6 +25,20 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
         agent_cfg = store.get_agent(params.get("agent_id", ""))
         if agent_cfg is None:
             raise HTTPException(status_code=400, detail="unknown lane_b agent_id")
+        # Fail fast on an incomplete agent: the lane_b runner reads these as
+        # required fields, so a missing one must surface as an explicit 400
+        # here, never as a cryptic KeyError 500 inside the run thread.
+        # principal/target_system/goal must be non-empty; capability_scope may
+        # legitimately be an empty list (an unprivileged agent), so it only has
+        # to be present, not truthy.
+        missing = [f for f in ("principal", "target_system", "goal") if not agent_cfg.get(f)]
+        if agent_cfg.get("capability_scope") is None:
+            missing.append("capability_scope")
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"agent {agent_cfg['id']!r} missing required field(s): {missing}",
+            )
         from ...llm import LlmBackend
         from ..runners import build_stub_llm, make_lane_b_runner
 
@@ -32,14 +46,20 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
         if "stub_script" in params:
             llm = build_stub_llm(params["stub_script"])
         else:
-            backend = store.get_ai_backend(agent_cfg["ai_backend_id"])
+            backend_id = agent_cfg.get("ai_backend_id")
+            if not backend_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"agent {agent_cfg['id']!r} has no ai_backend_id (required without stub_script)",
+                )
+            backend = store.get_ai_backend(backend_id)
             if backend is None:
                 raise HTTPException(status_code=400, detail="unknown ai_backend_id")
             from ...llm import build_llm
 
             # Per-backend secret first, then env fallback (R8). base_url only
             # matters for openai_compat. The key is never logged.
-            api_key = request.app.state.secret_store.get_secret(agent_cfg["ai_backend_id"])
+            api_key = request.app.state.secret_store.get_secret(backend_id)
             llm = build_llm(
                 backend["provider"],
                 backend["model"],
