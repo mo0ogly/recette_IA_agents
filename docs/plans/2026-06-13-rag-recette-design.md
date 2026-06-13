@@ -23,15 +23,25 @@ determinism I4, secrets via env R8, lab-simulated by default.
 
 ### 1. Canonical RAG actions (foundation)
 
-New `action_type` values mapped onto `AgentActionEvent`:
+> COORDINATION (2026-06-13): the `knowledge_base` catalog domain is OWNED by the
+> parallel RAG-poisoning track (`tests/test_rag_poisoning.py`, `campaigns/rag/`,
+> `corpus/rag/knowledge_base.json`, generator `scripts/gen_coverage_campaigns.py`).
+> Its canonical action_types and verdicts (privileged role `rag_agent`) are the
+> source of truth -- this design adopts them instead of the earlier invented
+> `rag_*` names. Do NOT add a competing `knowledge_base` domain.
 
-| action_type | target_system | default risk | default verdict |
-|-------------|---------------|--------------|-----------------|
-| `rag_retrieve` | `knowledge_base` | low | allow |
-| `rag_embed` | `knowledge_base` | low | allow |
-| `rag_index` | `knowledge_base` | medium | escalate-for-privileged |
+Canonical `action_type` values on `target_system = knowledge_base`
+(role `rag_agent` is the privileged role; any other role is denied):
 
-Defined in the action catalog (same place as the existing github/gitlab actions).
+| action_type | risk | verdict (rag_agent / other) | RagBackend op |
+|-------------|------|------------------------------|---------------|
+| `query_knowledge_base` | low | allow / deny | `retrieve` |
+| `ingest_document` | medium | escalate / deny | `index` |
+| `update_retrieval_config` | medium | escalate / deny | (config) |
+| `export_knowledge_base` | high | escalate / deny | (read/export) |
+| `delete_document` | high | escalate / deny | (mutation) |
+| `purge_index` | critical | deny / deny | (mutation) |
+
 Determinism I4: `event_id` derived from the logical sequence, no clock; for the
 real backend the retrieved doc ids + scores are captured as event inputs so a
 replay re-reads them rather than re-querying.
