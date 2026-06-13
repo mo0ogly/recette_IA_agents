@@ -110,3 +110,34 @@
   color: var(--color-text-muted);
   font-style: italic;
 }
+
+.kb-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.kb-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 32rem;
+  margin-top: 1rem;
+}
+
+.kb-form input,
+.kb-form textarea,
+.kb-toolbar select {
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--rag-radius);
+  border: 1px solid var(--color-border, #ccc);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.kb-form textarea {
+  min-height: 4rem;
+  resize: vertical;
+}

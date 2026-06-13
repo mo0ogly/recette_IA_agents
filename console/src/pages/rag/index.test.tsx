@@ -7,6 +7,14 @@ import type { RagScorecard } from "../../types/platform";
 
 vi.mock("../../api/client", () => ({
   getRagScorecard: vi.fn(),
+  // RagPage now embeds the KnowledgeBaseManager; stub its calls so these
+  // scorecard tests stay focused (the manager has its own test file).
+  listKbDocuments: vi.fn(() => Promise.resolve([])),
+  listRagScenarios: vi.fn(() => Promise.resolve([])),
+  resetKb: vi.fn(),
+  applyRagScenario: vi.fn(),
+  addKbDocument: vi.fn(),
+  deleteKbDocument: vi.fn(),
 }));
 
 afterEach(() => {

@@ -567,6 +567,60 @@ export function getRagScorecard(): Promise<RagScorecard> {
   return request<RagScorecard>("/rag/scorecard");
 }
 
+/** One knowledge-base document as listed by the operator CRUD. */
+export interface KbDocument {
+  id: string;
+  title: string;
+  tags: string[];
+  poisoned: boolean;
+  threat: string | null;
+}
+
+/** A document insertion payload (operator path, off the agent path). */
+export interface KbDocumentInput {
+  id: string;
+  title: string;
+  content: string;
+  poisoned: boolean;
+  tags: string[];
+}
+
+/** GET /rag/documents: the current knowledge base (baseline + applied scenario). */
+export function listKbDocuments(): Promise<KbDocument[]> {
+  return request<{ documents: KbDocument[] }>("/rag/documents").then((r) => r.documents);
+}
+
+/** POST /rag/documents: insert a document (operator, off the agent path). */
+export function addKbDocument(doc: KbDocumentInput): Promise<KbDocument> {
+  return request<KbDocument>("/rag/documents", {
+    method: "POST",
+    body: JSON.stringify(doc),
+  });
+}
+
+/** DELETE /rag/documents/{id}. */
+export function deleteKbDocument(id: string): Promise<void> {
+  return request<void>(`/rag/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/** POST /rag/reset: restore the clean baseline (un-poison). */
+export function resetKb(): Promise<{ reset: boolean; documents: number }> {
+  return request<{ reset: boolean; documents: number }>("/rag/reset", { method: "POST" });
+}
+
+/** GET /rag/scenarios: the named poison scenarios. */
+export function listRagScenarios(): Promise<string[]> {
+  return request<{ scenarios: string[] }>("/rag/scenarios").then((r) => r.scenarios);
+}
+
+/** POST /rag/scenario/{name}/apply: inject a named scenario's documents. */
+export function applyRagScenario(name: string): Promise<{ applied: string; injected: string[] }> {
+  return request<{ applied: string; injected: string[] }>(
+    `/rag/scenario/${encodeURIComponent(name)}/apply`,
+    { method: "POST" },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Unified recette scorecard (/subjects/scorecard)
 // ---------------------------------------------------------------------------
@@ -588,9 +642,18 @@ export interface IdentificationScore {
   all_passed: boolean;
 }
 
+export interface OrchestrationScore {
+  teams: number;
+  passed: number;
+  false_positives: number;
+  false_negatives: number;
+  all_passed: boolean;
+}
+
 export interface RecetteScorecard {
   identification: IdentificationScore;
   maf: IdentificationScore;
+  orchestration: OrchestrationScore;
   discovery: Record<string, DiscoverySurfaceScore>;
   all_passed: boolean;
 }

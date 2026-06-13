@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { getRagScorecard } from "../../api/client";
 import type { RagScorecard } from "../../types/platform";
+import KnowledgeBaseManager from "./KnowledgeBaseManager";
 import "./rag.css";
 
 export default function RagPage(): JSX.Element {
@@ -37,6 +38,7 @@ export default function RagPage(): JSX.Element {
   }, []);
 
   return (
+    <>
     <section className="rag-page">
       <h1>RAG retrieval recette</h1>
       <p className="rag-note">
@@ -104,5 +106,7 @@ export default function RagPage(): JSX.Element {
         </>
       )}
     </section>
+    <KnowledgeBaseManager />
+    </>
   );
 }
