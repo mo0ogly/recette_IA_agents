@@ -2,7 +2,7 @@
 .PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
-        bnp role-matrix role-matrix-live coverage-guard recette
+        bnp role-matrix role-matrix-live coverage-guard rag rag-live recette
 
 help:
 	@echo "Setup:"
@@ -17,7 +17,9 @@ help:
 	@echo "  make role-matrix  run the role x action matrix harness (every role x every action)"
 	@echo "  make role-matrix-live  drive each role over its domain via a live Groq LLM"
 	@echo "  make coverage-guard    fail if ANY recette dimension has a gap (single gate)"
-	@echo "  make recette      full governed recette: guard + validate + run + discovery + bnp + role-matrix"
+	@echo "  make rag          run the RAG poisoning campaigns through the gateway"
+	@echo "  make rag-live     drive the poisoned knowledge base against a live Groq LLM"
+	@echo "  make recette      full governed recette: guard + validate + run + discovery + bnp + role-matrix + rag"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
 	@echo "  make api          run the Track U API (uvicorn, needs the [api] extra)"
@@ -65,7 +67,13 @@ role-matrix-live:
 coverage-guard:
 	python3 -m unittest tests.test_coverage_guard
 
-recette: coverage-guard validate run discovery bnp role-matrix
+rag:
+	python3 scripts/run_role_matrix.py --dir campaigns/rag
+
+rag-live:
+	python3 scripts/run_rag_poisoning_live_groq.py
+
+recette: coverage-guard validate run discovery bnp role-matrix rag
 	@echo "recette: ALL PASS"
 
 test:
