@@ -132,6 +132,27 @@ def _cmd_run(corpus_root: Path) -> int:
     return 0 if scorecard.all_passed else 1
 
 
+def _cmd_rag(eval_path: str, k: int) -> int:
+    """RAG retrieval-quality recette: judge a retrieval tool against ground truth."""
+    from .rag import DeterministicRagBackend, Document
+    from .rag_eval import RagQueryTruth, ReferenceRagAdapter, judge_rag
+
+    spec = json.loads(Path(eval_path).read_text(encoding="utf-8"))
+    corpus = [Document(doc_id=d["doc_id"], text=d["text"]) for d in spec["corpus"]]
+    truths = [
+        RagQueryTruth(
+            query=q["query"],
+            relevant_ids=tuple(q["relevant_ids"]),
+            top_id=q.get("top_id"),
+        )
+        for q in spec["queries"]
+    ]
+    adapter = ReferenceRagAdapter(DeterministicRagBackend(corpus))
+    scorecard = judge_rag(adapter, truths, k=k)
+    print(scorecard.render())
+    return 0 if scorecard.all_passed else 1
+
+
 def _cmd_publish(slug: str, owner: str, visibility: str, apply: bool) -> int:
     from .publish import publish_repo
 
@@ -391,6 +412,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     imp.add_argument("spec", help="path to a MAF spec (.yaml/.yml needs [maf], or .json)")
     imp.add_argument("--out", default=None, help="write the draft here (default: stdout)")
+    rag = sub.add_parser("rag", help="run the RAG retrieval-quality recette (scorecard)")
+    rag.add_argument(
+        "--eval",
+        default="corpus/rag/retrieval-eval.json",
+        help="ground-truth eval file (corpus + queries)",
+    )
+    rag.add_argument("--k", type=int, default=5, help="number of docs to retrieve per query")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -408,6 +436,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_validate(args.corpus)
     if args.command == "run":
         return _cmd_run(args.corpus)
+    if args.command == "rag":
+        return _cmd_rag(args.eval, args.k)
     if args.command == "discovery":
         return _cmd_discovery(args.adapter, args.surface)
     if args.command == "report":

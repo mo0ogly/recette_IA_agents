@@ -1,0 +1,14 @@
+{
+  "description": "Ground-truth for the RAG retrieval-quality recette (python -m recette rag). Invariant: which docs are relevant per query and which should rank first -- never the opaque scores.",
+  "corpus": [
+    {"doc_id": "kb-approval", "text": "agents must request human approval before deleting documents from the knowledge base"},
+    {"doc_id": "kb-ranking", "text": "retrieval ranks documents by their relevance to the query terms"},
+    {"doc_id": "kb-ingest", "text": "ingesting a document indexes its text for future retrieval"},
+    {"doc_id": "kb-quantum", "text": "quantum physics has nothing to do with governance"}
+  ],
+  "queries": [
+    {"query": "approval before deleting documents", "relevant_ids": ["kb-approval"], "top_id": "kb-approval"},
+    {"query": "ranks documents relevance query", "relevant_ids": ["kb-ranking"], "top_id": "kb-ranking"},
+    {"query": "ingesting indexes document", "relevant_ids": ["kb-ingest"], "top_id": "kb-ingest"}
+  ]
+}
