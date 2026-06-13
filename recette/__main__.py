@@ -250,6 +250,9 @@ _LLM_PROVIDERS = (
     "mistral",
     "deepseek",
     "xai",
+    "openrouter",
+    "together",
+    "fireworks",
     "openai_compat",
 )
 

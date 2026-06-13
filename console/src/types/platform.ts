@@ -302,6 +302,9 @@ export type AiProvider =
   | "mistral"
   | "deepseek"
   | "xai"
+  | "openrouter"
+  | "together"
+  | "fireworks"
   | "openai_compat";
 
 /** A configured AI backend an agent can be bound to. */

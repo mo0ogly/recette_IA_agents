@@ -22,12 +22,15 @@ _PROVIDERS = (
     "mistral",
     "deepseek",
     "xai",
+    "openrouter",
+    "together",
+    "fireworks",
     "openai_compat",
 )
 
 
 class TestAgentRunParser(unittest.TestCase):
-    def test_all_eight_providers_accepted(self) -> None:
+    def test_all_providers_accepted(self) -> None:
         parser = build_parser()
         for provider in _PROVIDERS:
             with self.subTest(provider=provider):

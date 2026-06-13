@@ -337,6 +337,34 @@ class XaiLlm(_OpenAiWireVendor):
     ENV_KEY = "XAI_API_KEY"
 
 
+class OpenRouterLlm(_OpenAiWireVendor):
+    """OpenRouter aggregator -- OpenAI wire at openrouter.ai/api. Key: OPENROUTER_API_KEY.
+
+    BASE_URL has no trailing /v1: request paths already start with /v1, so the
+    effective endpoint is /api/v1/chat/completions.
+    """
+
+    BASE_URL = "https://openrouter.ai/api"
+    ENV_KEY = "OPENROUTER_API_KEY"
+
+
+class TogetherLlm(_OpenAiWireVendor):
+    """Together AI -- OpenAI wire at api.together.xyz. Key: TOGETHER_API_KEY."""
+
+    BASE_URL = "https://api.together.xyz"
+    ENV_KEY = "TOGETHER_API_KEY"
+
+
+class FireworksLlm(_OpenAiWireVendor):
+    """Fireworks AI -- OpenAI wire at api.fireworks.ai/inference. Key: FIREWORKS_API_KEY.
+
+    The /v1 in request paths yields the effective /inference/v1/chat/completions.
+    """
+
+    BASE_URL = "https://api.fireworks.ai/inference"
+    ENV_KEY = "FIREWORKS_API_KEY"
+
+
 # --- Gemini ------------------------------------------------------------------------------
 
 
@@ -421,6 +449,9 @@ _PROVIDERS = (
     "mistral",
     "deepseek",
     "xai",
+    "openrouter",
+    "together",
+    "fireworks",
     "openai_compat",
 )
 
@@ -453,6 +484,12 @@ def build_llm(
         return DeepSeekLlm(model=model, client=client, api_key=api_key)
     if provider == "xai":
         return XaiLlm(model=model, client=client, api_key=api_key)
+    if provider == "openrouter":
+        return OpenRouterLlm(model=model, client=client, api_key=api_key)
+    if provider == "together":
+        return TogetherLlm(model=model, client=client, api_key=api_key)
+    if provider == "fireworks":
+        return FireworksLlm(model=model, client=client, api_key=api_key)
     if provider == "openai_compat":
         if not base_url and client is None:
             raise ValueError("openai_compat requires base_url")

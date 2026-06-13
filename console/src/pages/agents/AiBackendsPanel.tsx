@@ -39,6 +39,9 @@ const PROVIDERS: Array<{ id: AiProvider; keyHint: string }> = [
   { id: "mistral", keyHint: "MISTRAL_API_KEY" },
   { id: "deepseek", keyHint: "DEEPSEEK_API_KEY" },
   { id: "xai", keyHint: "XAI_API_KEY" },
+  { id: "openrouter", keyHint: "OPENROUTER_API_KEY" },
+  { id: "together", keyHint: "TOGETHER_API_KEY" },
+  { id: "fireworks", keyHint: "FIREWORKS_API_KEY" },
   { id: "openai_compat", keyHint: "no key (or set on server)" },
 ];
 

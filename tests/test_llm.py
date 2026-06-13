@@ -9,6 +9,7 @@ from typing import Any
 from recette.llm import (
     AnthropicLlm,
     DeepSeekLlm,
+    FireworksLlm,
     GeminiLlm,
     GroqLlm,
     LlmDecision,
@@ -16,7 +17,9 @@ from recette.llm import (
     MistralLlm,
     OpenAiCompatLlm,
     OpenAiLlm,
+    OpenRouterLlm,
     StubLlm,
+    TogetherLlm,
     ToolSpec,
     XaiLlm,
     build_llm,
@@ -332,6 +335,9 @@ class TestOpenAiWireVendors(unittest.TestCase):
         (MistralLlm, "https://api.mistral.ai", "MISTRAL_API_KEY"),
         (DeepSeekLlm, "https://api.deepseek.com", "DEEPSEEK_API_KEY"),
         (XaiLlm, "https://api.x.ai", "XAI_API_KEY"),
+        (OpenRouterLlm, "https://openrouter.ai/api", "OPENROUTER_API_KEY"),
+        (TogetherLlm, "https://api.together.xyz", "TOGETHER_API_KEY"),
+        (FireworksLlm, "https://api.fireworks.ai/inference", "FIREWORKS_API_KEY"),
     )
 
     def test_each_vendor_declares_base_url_and_env_key(self) -> None:
@@ -363,6 +369,9 @@ class TestFactory(unittest.TestCase):
         self.assertIsInstance(build_llm("mistral", "m", client=client), MistralLlm)
         self.assertIsInstance(build_llm("deepseek", "m", client=client), DeepSeekLlm)
         self.assertIsInstance(build_llm("xai", "m", client=client), XaiLlm)
+        self.assertIsInstance(build_llm("openrouter", "m", client=client), OpenRouterLlm)
+        self.assertIsInstance(build_llm("together", "m", client=client), TogetherLlm)
+        self.assertIsInstance(build_llm("fireworks", "m", client=client), FireworksLlm)
         self.assertIsInstance(
             build_llm("openai_compat", "m", client=client, base_url="http://h:1/v1"),
             OpenAiCompatLlm,
@@ -393,6 +402,9 @@ class TestFactory(unittest.TestCase):
             "mistral",
             "deepseek",
             "xai",
+            "openrouter",
+            "together",
+            "fireworks",
             "openai_compat",
         ):
             self.assertIn(known, str(ctx.exception))

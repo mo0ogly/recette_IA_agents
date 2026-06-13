@@ -44,6 +44,9 @@ _PROVIDER_ENV_KEY = {
     "mistral": "MISTRAL_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "xai": "XAI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "together": "TOGETHER_API_KEY",
+    "fireworks": "FIREWORKS_API_KEY",
 }
 
 
