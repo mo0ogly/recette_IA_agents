@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listSubjects } from "../../api/client";
 import type { CorpusListing, CorpusSubject } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import RunViewer from "./RunViewer";
 import "../discovery/discovery.css";
 
 const ALL = "all";
@@ -22,6 +23,7 @@ export default function CorpusPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [family, setFamily] = useState<string>(ALL);
+  const [openRun, setOpenRun] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -104,19 +106,37 @@ export default function CorpusPage(): JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => (
-                <tr key={`${s.family}-${s.agent_id}`} data-testid={`corpus-row-${s.agent_id}`}>
-                  <td>{s.agent_id}</td>
-                  <td>{s.family}</td>
-                  <td>{s.category ?? "-"}</td>
-                  <td>{s.violation_type ?? "-"}</td>
-                  <td className={s.expected_verdict === "correct" ? "ok" : "fail"}>
-                    {s.expected_verdict ?? "-"}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((s) => {
+                const isOrch = s.family === "maf_orchestration";
+                return (
+                  <tr key={`${s.family}-${s.agent_id}`} data-testid={`corpus-row-${s.agent_id}`}>
+                    <td>
+                      {isOrch ? (
+                        <button
+                          type="button"
+                          className="pill"
+                          data-testid={`corpus-open-${s.agent_id}`}
+                          onClick={() => setOpenRun(s.agent_id)}
+                        >
+                          {s.agent_id}
+                        </button>
+                      ) : (
+                        s.agent_id
+                      )}
+                    </td>
+                    <td>{s.family}</td>
+                    <td>{s.category ?? "-"}</td>
+                    <td>{s.violation_type ?? "-"}</td>
+                    <td className={s.expected_verdict === "correct" ? "ok" : "fail"}>
+                      {s.expected_verdict ?? "-"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+
+          {openRun && <RunViewer agentId={openRun} />}
         </>
       )}
     </section>

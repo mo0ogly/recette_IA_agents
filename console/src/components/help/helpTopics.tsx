@@ -194,6 +194,13 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           de (team, run). Voir le runbook
           <code> docs/runbooks/orchestration-recette.md</code>.
         </p>
+        <h3>Derouler un run (viewer)</h3>
+        <p>
+          Cliquer le nom d'un sujet <code>maf_orchestration</code> ouvre le
+          <strong> viewer pas-a-pas</strong> : la timeline routee (hops / tours /
+          appels d'outils), le verdict sur les 4 dimensions et le diagramme
+          Mermaid du chemin reel. Lecture seule, deterministe.
+        </p>
       </>
     ),
   },

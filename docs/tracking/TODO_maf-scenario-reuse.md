@@ -117,9 +117,13 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       `python/packages/core/agent_framework/_middleware.py`.
 - [ ] **Checkpointing / time-travel** (resume a run mid-flight), aligned with replay (I4).
       Source: `python/packages/core/agent_framework/_workflows/_checkpoint.py` + `_state.py`.
-- [ ] **DevUI-style interactive trace/replay viewer** in the console. Source:
-      `python/packages/devui/agent_framework_devui/` -- our analog: a console page that
-      loads an OrchestrationRecording/CampaignRecording and steps through it.
+- [x] **DevUI-style interactive trace/replay viewer** -- DONE. recette/run_view.py
+      build_run_view(team, run) -> ordered step timeline (handoff/turn/tool) + the
+      four-dimension verdict + violations + run_mermaid diagram (pure, I4). Endpoint
+      GET /subjects/orchestration/{agent_id}. Console RunViewer.tsx opens from a
+      maf_orchestration row on the Corpus page, steps through with prev/next, shows
+      verdict dims + Mermaid (real-payload fixture + render-assert, no new CSS).
+      tests/test_run_view.py + RunViewer.test.tsx.
 - [ ] **AF Labs benchmark/eval harness** as a scorecard benchmark reference. Source:
       `python/packages/core/agent_framework/lab/` + core `_evaluation.py`.
 

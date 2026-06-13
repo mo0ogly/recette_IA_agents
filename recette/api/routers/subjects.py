@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from ...harness import discover_agent_dirs
 from ...maf_harness import discover_maf_dirs
@@ -97,3 +97,26 @@ def scorecard() -> dict:
     from ...report import build_report
 
     return build_report().to_dict()
+
+
+def build_orchestration_view(agent_id: str) -> dict | None:
+    """Pure: find the orchestration corpus subject and build its step-through view."""
+    from ...maf_orchestration import run_from_doc
+    from ...run_view import build_run_view
+
+    for d in discover_orchestration_dirs():
+        if d.name != agent_id:
+            continue
+        team = load_validated("maf_orchestration", d / "team.json")
+        run = run_from_doc(load_validated("maf_orchestration_run", d / "run.json"))
+        return build_run_view(team, run)
+    return None
+
+
+@router.get("/orchestration/{agent_id}")
+def orchestration_view(agent_id: str) -> dict:
+    """Step-through view of an orchestration subject: timeline + verdict + diagram."""
+    view = build_orchestration_view(agent_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail=f"no orchestration subject {agent_id!r}")
+    return view

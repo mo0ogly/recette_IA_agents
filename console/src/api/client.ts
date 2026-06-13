@@ -686,3 +686,32 @@ export interface CorpusListing {
 export function listSubjects(): Promise<CorpusListing> {
   return request<CorpusListing>("/subjects");
 }
+
+export interface RunViewStep {
+  index: number;
+  kind: "handoff" | "turn" | "tool";
+  label: string;
+  from?: string;
+  to?: string;
+  agent?: string;
+  tool?: string | null;
+  target?: string;
+  approved?: boolean;
+}
+
+export interface RunView {
+  agent_id: string;
+  name: string;
+  style: string;
+  verdict: string;
+  dimensions: { identity: boolean; capabilities: boolean; policy: boolean; behavior: boolean };
+  violations: { observed_action: string; kind: string; note: string }[];
+  steps: RunViewStep[];
+  mermaid: string;
+}
+
+/** GET /subjects/orchestration/{id}: step-through view of an orchestration run
+ *  (timeline + four-dimension verdict + Mermaid diagram). */
+export function getOrchestrationView(agentId: string): Promise<RunView> {
+  return request<RunView>(`/subjects/orchestration/${encodeURIComponent(agentId)}`);
+}
