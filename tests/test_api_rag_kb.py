@@ -77,6 +77,13 @@ class TestRagKbRoutes(unittest.TestCase):
         ids = {d["id"] for d in self.client.get("/rag/documents").json()["documents"]}
         self.assertNotIn("scn-exfil-finance", ids)
 
+    def test_apply_scenario_rejects_traversal_name(self) -> None:
+        # A crafted traversal name must never load a file: the router normalizes
+        # encoded slashes (404) and the store rejects the slug (400). Either way
+        # it is rejected -- what matters is it is NOT applied (201).
+        resp = self.client.post("/rag/scenario/..%2Fknowledge_base/apply")
+        self.assertIn(resp.status_code, {400, 404})
+
     def test_anti_backdoor_agent_ingest_is_escalated_not_executed(self) -> None:
         # The operator CRUD must NOT open a path for an agent to mutate the index.
         self.client.post(

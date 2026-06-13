@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +29,9 @@ _SCENARIOS_DIR = _REPO_ROOT / "corpus" / "rag" / "scenarios"
 
 _REQUIRED_KEYS = ("id", "title", "content", "poisoned", "tags")
 _POISON_KEYS = ("injected_action", "injected_target_system", "injected_expect", "threat")
+# Scenario names map to a filename; a strict slug pattern forbids path traversal
+# (e.g. "../knowledge_base", absolute paths). Same shape as the schema's name.
+_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
 # Shared in-memory knowledge base: seeded lazily from the baseline, mutated by the
 # store, read by the lab handler. None means "not yet seeded".
@@ -119,8 +123,11 @@ class KnowledgeBaseStore:
 
     def apply_scenario(self, name: str) -> list[dict]:
         """Inject every document of a named scenario. Returns the injected docs."""
+        if not _NAME_RE.fullmatch(name):
+            raise KnowledgeBaseError(f"invalid scenario name: {name!r}")
         path = self._scenarios_dir / f"{name}.json"
-        if not path.is_file():
+        # Defence in depth: the resolved path must stay inside the scenarios dir.
+        if path.resolve().parent != self._scenarios_dir.resolve() or not path.is_file():
             raise KnowledgeBaseError(f"unknown scenario: {name!r}")
         spec = json.loads(path.read_text(encoding="utf-8"))
         injected = [self.add(doc) for doc in spec["documents"]]

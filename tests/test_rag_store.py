@@ -72,6 +72,13 @@ class TestKnowledgeBaseStore(unittest.TestCase):
         with self.assertRaises(KnowledgeBaseError):
             self.store.apply_scenario("does-not-exist")
 
+    def test_apply_scenario_rejects_path_traversal(self) -> None:
+        # Names map to a filename; traversal must never reach a file outside the
+        # scenarios dir (security: would otherwise load arbitrary .json).
+        for evil in ("../knowledge_base", "../../etc/hosts", "/etc/passwd", "a/b", "", "Bad Name"):
+            with self.assertRaises(KnowledgeBaseError, msg=f"accepted {evil!r}"):
+                self.store.apply_scenario(evil)
+
     def test_lab_handler_reflects_store(self) -> None:
         # Before: baseline finance docs, no scenario poison.
         before = kb_lab.handle("query_knowledge_base", "quarterly", {})
