@@ -1,5 +1,19 @@
 /* Page-scoped styles for the Agents page (AI parametrization behind each agent). */
 
+.agents-backends {
+  /* One radius scale for this surface so chips, inputs, buttons and panels
+     agree (shape-consistency). */
+  --agents-radius: 4px;
+  --agents-radius-pill: 0.5rem;
+}
+
+/* Keyboard focus is visible everywhere (a11y): a single accent ring, never
+   the removed-outline anti-pattern. */
+.agents-backends :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .agents-error-banner {
   background-color: var(--badge-red-bg);
   color: var(--badge-red-fg);
@@ -179,7 +193,7 @@
 .agents-key-chip {
   display: inline-block;
   padding: 0.1rem 0.45rem;
-  border-radius: 0.5rem;
+  border-radius: var(--agents-radius-pill, 0.5rem);
   font-size: 0.74rem;
   background-color: var(--badge-gray-bg, #e5e7eb);
   color: var(--badge-gray-fg, #6b7280);
@@ -192,6 +206,12 @@
 
 .agents-key-input {
   width: 9rem;
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--agents-radius, 4px);
+  background-color: var(--color-surface);
+  color: var(--color-text);
 }
 
 .agents-key-saved {
@@ -211,16 +231,50 @@
   border: 0;
 }
 
+/* Probe cluster (Test button + result + hint) grouped so it reads as one
+   action, separated from the distinct "Ask" affordance below it. */
+.agents-probe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.agents-probe-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The Ask affordance sits on its own tinted panel under a hairline so the
+   operator sees it as a separate tool, not a continuation of the probe. */
 .agents-ask {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.agents-ask-caption {
+  flex-basis: 100%;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
 }
 
 .agents-ask-input {
-  width: 13rem;
+  flex: 1 1 13rem;
+  min-width: 10rem;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--agents-radius, 4px);
+  background-color: var(--color-surface);
+  color: var(--color-text);
 }
 
 .agents-ask-spinner {
@@ -245,7 +299,7 @@
   white-space: pre-wrap;
   word-break: break-word;
   background-color: var(--badge-gray-bg, #e5e7eb);
-  border-radius: 0.4rem;
+  border-radius: var(--agents-radius, 4px);
   font-family: var(--font-mono, monospace);
 }
 

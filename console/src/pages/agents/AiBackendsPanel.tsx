@@ -300,6 +300,9 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     const inputId = `backend-ask-${id}`;
     return (
       <div className="agents-ask" data-testid="backend-ask">
+        <span className="agents-ask-caption" aria-hidden="true">
+          Ask the model
+        </span>
         <label className="agents-visually-hidden" htmlFor={inputId}>
           {`Ask the model behind ${id}`}
         </label>
@@ -370,8 +373,9 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     <section className="agents-backends">
       <h2>AI backends (the AI behind agents)</h2>
       <p className="agents-backends-note">
-        Provider + model only. The provider key is never stored here; it is
-        resolved from the environment at run time (R8).
+        Each backend pins a provider and model. Set an API key per backend
+        below (write-only: the console sends it but never reads it back) or
+        leave it unset to fall back to the provider env var at run time (R8).
       </p>
       <table className="agents-table">
         <thead>
@@ -399,18 +403,22 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
                 <td>{backend.model}</td>
                 <td className="agents-key-cell">{renderKeyCell(backend)}</td>
                 <td>
-                  <button
-                    type="button"
-                    className="agents-btn"
-                    disabled={tests[backend.id]?.phase === "testing"}
-                    onClick={() => void handleTest(backend.id)}
-                  >
-                    Test
-                  </button>{" "}
-                  {renderTestCell(backend.id)}
-                  <span className="agents-key-hint">
-                    Test uses the stored key (or the provider env var).
-                  </span>
+                  <div className="agents-probe">
+                    <div className="agents-probe-row">
+                      <button
+                        type="button"
+                        className="agents-btn"
+                        disabled={tests[backend.id]?.phase === "testing"}
+                        onClick={() => void handleTest(backend.id)}
+                      >
+                        Test
+                      </button>
+                      {renderTestCell(backend.id)}
+                    </div>
+                    <span className="agents-key-hint">
+                      Uses the stored key, or the provider env var.
+                    </span>
+                  </div>
                   {renderAskCell(backend.id)}
                 </td>
                 <td>
