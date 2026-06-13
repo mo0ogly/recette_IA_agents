@@ -142,7 +142,7 @@ describe("AiBackendsPanel", () => {
     expect(line).toHaveAttribute("data-level", "error");
   });
 
-  it("provider select lists all 8 providers", () => {
+  it("provider select lists every provider", () => {
     renderPanel();
 
     const select = screen.getByLabelText("Provider");
@@ -150,6 +150,25 @@ describe("AiBackendsPanel", () => {
       .getAllByRole("option")
       .map((o) => (o as HTMLOptionElement).value);
     expect(values).toEqual(ALL_PROVIDERS);
+  });
+
+  it("note copy is truthful: per-backend keys are stored write-only", () => {
+    renderPanel();
+
+    // Regression lock: the old note claimed the key is "never stored here",
+    // which contradicts the per-backend write-only secret store. Assert the
+    // false claim is gone and the truthful wording is present.
+    expect(screen.queryByText(/never stored here/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/write-only: the console sends it but never reads it back/),
+    ).toBeInTheDocument();
+  });
+
+  it("each row shows a visible 'Ask the model' caption for the ask affordance", () => {
+    renderPanel();
+
+    const row = screen.getByText("backend-1").closest("tr") as HTMLTableRowElement;
+    expect(within(row).getByText("Ask the model")).toBeInTheDocument();
   });
 
   it("base_url input appears only for openai_compat", () => {
