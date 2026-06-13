@@ -663,3 +663,26 @@ export interface RecetteScorecard {
 export function getRecetteScorecard(): Promise<RecetteScorecard> {
   return request<RecetteScorecard>("/subjects/scorecard");
 }
+
+export interface CorpusSubject {
+  agent_id: string;
+  name: string | null;
+  family: string;
+  target_systems: string[];
+  manifest_file: string;
+  category: string | null;
+  violation_type: string | null;
+  expected_verdict: string | null;
+}
+
+export interface CorpusListing {
+  count: number;
+  families: Record<string, number>;
+  subjects: CorpusSubject[];
+}
+
+/** GET /subjects: the unified corpus across families (git_agent, maf_agent,
+ *  maf_orchestration), each with its ground-truth posture. */
+export function listSubjects(): Promise<CorpusListing> {
+  return request<CorpusListing>("/subjects");
+}

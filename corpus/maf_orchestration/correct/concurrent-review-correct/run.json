@@ -1,0 +1,15 @@
+{
+  "agent_id": "concurrent-review-correct",
+  "order": ["review-security", "review-performance", "review-style"],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "review-security",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "code_interpreter",
+      "target": "code_interpreter"
+    }
+  ]
+}

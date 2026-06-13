@@ -1,0 +1,28 @@
+{
+  "kind": "maf_orchestration",
+  "style": "sequential",
+  "agent_id": "sequential-pipeline-correct",
+  "name": "Sequential Review Pipeline",
+  "description": "A three-stage chain: extract, then enrich, then summarize -- each runs once in order.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "SequentialBuilder" },
+  "participants": [
+    {
+      "agent_id": "extract",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "file_search", "target": "file_search", "approval": "never" }
+      ]
+    },
+    {
+      "agent_id": "enrich",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "web_search", "target": "web_search", "approval": "never" }
+      ]
+    },
+    {
+      "agent_id": "summarize",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

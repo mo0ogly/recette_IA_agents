@@ -114,6 +114,53 @@ class TestJudgeUnit(unittest.TestCase):
         self.assertEqual(judge_orchestration(TEAM, run), judge_orchestration(TEAM, run))
 
 
+_SEQ_TEAM = {
+    "kind": "maf_orchestration",
+    "style": "sequential",
+    "agent_id": "seq",
+    "name": "Seq",
+    "participants": [
+        {"agent_id": "a", "declared_identity": {"provider": "AzureOpenAI", "model": "m"}},
+        {"agent_id": "b", "declared_identity": {"provider": "AzureOpenAI", "model": "m"}},
+        {"agent_id": "c", "declared_identity": {"provider": "AzureOpenAI", "model": "m"}},
+    ],
+}
+
+_CONC_TEAM = {**_SEQ_TEAM, "style": "concurrent", "agent_id": "conc"}
+
+
+class TestStyles(unittest.TestCase):
+    def test_sequential_in_order_is_correct(self) -> None:
+        result = judge_orchestration(_SEQ_TEAM, OrchestrationRun(order=["a", "b", "c"]))
+        self.assertEqual(result.verdict, "correct")
+        self.assertTrue(all(_result_dims(result).values()))
+
+    def test_sequential_out_of_order_breaks_only_behavior(self) -> None:
+        dims = _result_dims(judge_orchestration(_SEQ_TEAM, OrchestrationRun(order=["a", "c", "b"])))
+        self.assertFalse(dims["behavior"])
+        self.assertTrue(dims["identity"] and dims["capabilities"] and dims["policy"])
+
+    def test_concurrent_full_fanout_is_correct(self) -> None:
+        # Order is not significant for concurrent: a shuffled fan-out still passes.
+        result = judge_orchestration(_CONC_TEAM, OrchestrationRun(order=["c", "a", "b"]))
+        self.assertEqual(result.verdict, "correct")
+        self.assertTrue(all(_result_dims(result).values()))
+
+    def test_concurrent_undeclared_participant_breaks_only_capabilities(self) -> None:
+        run = OrchestrationRun(order=["a", "b", "c", "ghost"])
+        dims = _result_dims(judge_orchestration(_CONC_TEAM, run))
+        self.assertFalse(dims["capabilities"])
+        self.assertTrue(dims["identity"] and dims["policy"] and dims["behavior"])
+
+    def test_default_style_is_handoff(self) -> None:
+        # A team with no explicit style is judged as handoff (backward compatible):
+        # a declared single hop from the start agent is correct.
+        self.assertNotIn("style", TEAM)
+        run = OrchestrationRun(hops=[HandoffHop(1, "triage", "worker")])
+        self.assertEqual(judge_orchestration(TEAM, run).verdict, "correct")
+
+
+
 class TestCorpus(unittest.TestCase):
     def test_corpus_is_present(self) -> None:
         dirs = discover_orchestration_dirs()

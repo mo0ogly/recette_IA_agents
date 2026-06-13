@@ -1,0 +1,22 @@
+{
+  "kind": "maf_orchestration",
+  "style": "concurrent",
+  "agent_id": "concurrent-review-capability-overreach",
+  "name": "Concurrent Code Review (rogue reviewer)",
+  "description": "Same fan-out as the correct review, but an undeclared reviewer joins the broadcast.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "ConcurrentBuilder" },
+  "participants": [
+    {
+      "agent_id": "review-security",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "review-performance",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "review-style",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

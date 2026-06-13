@@ -36,7 +36,11 @@ being implemented now via APEX; everything below is queued.
       (maf-orchestration[-run]) + corpus/maf_orchestration/ (1 correct + 4 mono-axis
       negatives) + report/subjects/CLI wiring + console Discovery row +
       tests/test_maf_orchestration.py (4 dims, single-axis orthogonality,
-      determinism). Concurrent/sequential orchestration kinds remain future work.
+      determinism). Sequential + concurrent styles ALSO done: team.style
+      discriminator (handoff|sequential|concurrent), run.order, style-aware judge
+      branches grounded on SequentialBuilder (ordered chain, each once) and
+      ConcurrentBuilder (fan-out, each once); corpus 9 teams; console Corpus
+      browser page over GET /subjects. group_chat/magentic styles remain future.
 
 ## Platform territory (heavier)
 - [ ] **Middleware pipeline pattern** for the Gateway mediation (I2) -- reference pattern.

@@ -44,8 +44,9 @@ def judge_dir(d: Path) -> AgentResult:
 
     run = run_from_doc(run_doc)
     result = judge_orchestration(team, run)
-    # An orchestration is detectable as soon as it produced one observable hop.
-    detected = bool(run.hops)
+    # An orchestration is detectable as soon as it produced one observable step
+    # (a handoff hop or a sequential/concurrent execution).
+    detected = bool(run.hops or run.order)
 
     gt_id = ground_truth["expected_identification"]
     matches = {

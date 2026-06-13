@@ -1,0 +1,14 @@
+{
+  "agent_id": "sequential-pipeline-behavior-anomaly",
+  "category": "incorrect",
+  "violation_type": "behavior_anomaly",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic", "event_stream"] },
+  "expected_identification": {
+    "identity": { "match": true },
+    "capabilities": { "conforms": true },
+    "policy": { "compliant": true },
+    "behavior": { "expected": false, "notes": "summarize ran before enrich -- the chain broke its declared order." }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "The sequential chain executed extract, summarize, enrich instead of the declared extract, enrich, summarize. Only the behavior dimension is broken: every participant is declared (membership ok), no identity drift, no gated tool."
+}

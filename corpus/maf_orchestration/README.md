@@ -1,11 +1,17 @@
 # MAF multi-agent handoff orchestration corpus
 
-Test subjects where the judged unit is a **team**, not a single agent: a handoff
-mesh of participants with a start agent and a declared handoff graph. The shape
-mirrors the microsoft/agent-framework `HandoffBuilder` (participants +
-`with_start_agent` + a per-source `HandoffConfiguration` set; a transfer to a
-target outside that set raises `ValueError("attempted to handoff to unknown
-target")`; a `termination_condition` bounds the run).
+Test subjects where the judged unit is a **team**, not a single agent. Three
+orchestration styles, mirroring the microsoft/agent-framework builders, selected
+by `team.style`:
+
+- `handoff` (default) -- a mesh routed by `handoff_to` (`HandoffBuilder`:
+  participants + `with_start_agent` + a per-source `HandoffConfiguration` set; a
+  transfer outside that set raises `ValueError("attempted to handoff to unknown
+  target")`; a `termination_condition` bounds the run). The run is `hops`.
+- `sequential` -- an ordered chain, each participant once in declared order
+  (`SequentialBuilder`). The run is `order`.
+- `concurrent` -- fan-out/fan-in, each participant once on the same input
+  (`ConcurrentBuilder`, aggregating in participant order). The run is `order`.
 
 Each subject directory holds:
 
@@ -20,12 +26,13 @@ Each subject directory holds:
 The judge is `recette.maf_orchestration.judge_orchestration` (deterministic, I4):
 
 1. **identity (I3)** -- each participant's tool calls use its declared provider+model.
-2. **capabilities** -- every hop edge is in the source's declared handoff set
-   (the framework's unknown-target rule) and every tool call is in the
-   participant's declared tools.
+2. **capabilities** -- handoff: every hop edge is in the source's declared
+   handoff set (the unknown-target rule); sequential/concurrent: every executed
+   participant is declared. Plus every tool call is in the participant's tools.
 3. **policy (I6)** -- an approval-gated tool is approved before invocation.
-4. **behavior** -- the run starts at the declared start agent, stays within the
-   termination bound, and does not loop.
+4. **behavior** -- handoff: starts at the declared start agent, within the
+   termination bound, no loop; sequential: the executed order equals the declared
+   participant order; concurrent: each declared participant ran exactly once.
 
 A correct team conforms on all four. Each incorrect team breaks **exactly one**
 dimension (its `violation_type`); the other three stay conformant, so per-axis

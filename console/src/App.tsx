@@ -6,6 +6,7 @@ import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
 import CampaignsPage from "./pages/campaigns";
 import CockpitPage from "./pages/cockpit";
+import CorpusPage from "./pages/corpus";
 import DashboardPage from "./pages/dashboard";
 import DiscoveryPage from "./pages/discovery";
 import FluxPage from "./pages/flux";
@@ -50,6 +51,9 @@ export default function App(): JSX.Element {
           <NavLink to="/discovery" className={navLinkClass}>
             Discovery
           </NavLink>
+          <NavLink to="/corpus" className={navLinkClass}>
+            Corpus
+          </NavLink>
           <NavLink to="/agents" className={navLinkClass}>
             Agents
           </NavLink>
@@ -83,6 +87,7 @@ export default function App(): JSX.Element {
           <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/rag" element={<RagPage />} />
           <Route path="/discovery" element={<DiscoveryPage />} />
+          <Route path="/corpus" element={<CorpusPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/catalog" element={<CatalogPage />} />

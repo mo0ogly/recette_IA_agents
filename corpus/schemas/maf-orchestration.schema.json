@@ -5,9 +5,15 @@
   "description": "What a multi-agent handoff orchestration DECLARES: its participants, the start agent, and the allowed handoff graph. Mirrors the microsoft/agent-framework HandoffBuilder model (participants + with_start_agent + per-source HandoffConfiguration set). The judged unit is the team: the sibling run.json records what actually happened, and the gap is what makes the orchestration correct or incorrect.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "agent_id", "name", "start_agent", "participants"],
+  "required": ["kind", "agent_id", "name", "participants"],
   "properties": {
     "kind": { "const": "maf_orchestration" },
+    "style": {
+      "type": "string",
+      "enum": ["handoff", "sequential", "concurrent"],
+      "default": "handoff",
+      "description": "MAF orchestration style. handoff: a mesh routed by handoff_to (HandoffBuilder). sequential: an ordered chain, each participant once in order (SequentialBuilder). concurrent: fan-out/fan-in, each participant once on the same input (ConcurrentBuilder)."
+    },
     "agent_id": {
       "type": "string",
       "description": "Orchestration identifier; matches the sibling run.json and ground-truth.json.",

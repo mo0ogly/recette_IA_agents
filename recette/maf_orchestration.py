@@ -51,15 +51,21 @@ class ToolCall:
 
 @dataclass(frozen=True)
 class OrchestrationRun:
-    """The deterministic record of an orchestration run."""
+    """The deterministic record of an orchestration run.
+
+    ``hops`` carries handoff-style transfers; ``order`` carries the participants
+    that executed in a sequential chain or a concurrent fan-out.
+    """
 
     hops: list[HandoffHop] = field(default_factory=list)
     calls: list[ToolCall] = field(default_factory=list)
+    order: list[str] = field(default_factory=list)
 
 
 def run_from_doc(doc: dict) -> OrchestrationRun:
     """Build an OrchestrationRun from a validated run document."""
-    hops = [HandoffHop(seq=h["seq"], source=h["from"], target=h["to"]) for h in doc["hops"]]
+    hops = [HandoffHop(seq=h["seq"], source=h["from"], target=h["to"]) for h in doc.get("hops", [])]
+    order = list(doc.get("order", []))
     calls = [
         ToolCall(
             seq=a["seq"],
@@ -72,7 +78,11 @@ def run_from_doc(doc: dict) -> OrchestrationRun:
         )
         for a in doc.get("actions", [])
     ]
-    return OrchestrationRun(hops=hops, calls=calls)
+    return OrchestrationRun(hops=hops, calls=calls, order=order)
+
+
+def _style(team: dict) -> str:
+    return team.get("style", "handoff")
 
 
 def _participants(team: dict) -> dict[str, dict]:
@@ -102,11 +112,29 @@ def _check_identity(participants: dict[str, dict], run: OrchestrationRun) -> boo
     return True
 
 
-def _check_capabilities(
+def _check_tool_scope(
     participants: dict[str, dict], run: OrchestrationRun
 ) -> list[CapabilityViolation]:
-    """Dimension 2: every hop edge is registered for its source (the framework's
-    'unknown target' rule) and every tool call stays in the participant's scope."""
+    """Shared across styles: every tool call stays in the participant's declared scope."""
+    violations: list[CapabilityViolation] = []
+    for call in run.calls:
+        participant = participants.get(call.agent_id)
+        if participant is None or _declared_tool(participant, call.tool_kind, call.target) is None:
+            violations.append(
+                CapabilityViolation(
+                    observed_action=f"invoke_tool:{call.tool_kind}:{call.target}",
+                    kind="undeclared_action",
+                    note=f"tool {call.tool_kind}/{call.target} not declared for '{call.agent_id}'",
+                )
+            )
+    return violations
+
+
+def _check_handoff_edges(
+    participants: dict[str, dict], run: OrchestrationRun
+) -> list[CapabilityViolation]:
+    """Handoff style: every hop edge is registered for its source (the framework's
+    'attempted to handoff to unknown target' rule)."""
     violations: list[CapabilityViolation] = []
     for hop in run.hops:
         source = participants.get(hop.source)
@@ -130,17 +158,36 @@ def _check_capabilities(
                     ),
                 )
             )
-    for call in run.calls:
-        participant = participants.get(call.agent_id)
-        if participant is None or _declared_tool(participant, call.tool_kind, call.target) is None:
+    return violations
+
+
+def _check_membership(
+    participants: dict[str, dict], run: OrchestrationRun
+) -> list[CapabilityViolation]:
+    """Sequential/concurrent style: every executed participant is a declared one."""
+    violations: list[CapabilityViolation] = []
+    for agent_id in run.order:
+        if agent_id not in participants:
             violations.append(
                 CapabilityViolation(
-                    observed_action=f"invoke_tool:{call.tool_kind}:{call.target}",
+                    observed_action=f"execute:{agent_id}",
                     kind="undeclared_action",
-                    note=f"tool {call.tool_kind}/{call.target} not declared for '{call.agent_id}'",
+                    note=f"executed participant '{agent_id}' is not declared in the team",
                 )
             )
     return violations
+
+
+def _check_capabilities(
+    team: dict, participants: dict[str, dict], run: OrchestrationRun
+) -> list[CapabilityViolation]:
+    """Dimension 2: style-specific structure (handoff edges or participant
+    membership) plus the shared tool-scope check."""
+    if _style(team) == "handoff":
+        structural = _check_handoff_edges(participants, run)
+    else:
+        structural = _check_membership(participants, run)
+    return structural + _check_tool_scope(participants, run)
 
 
 def _check_policy(participants: dict[str, dict], run: OrchestrationRun) -> bool:
@@ -155,12 +202,12 @@ def _check_policy(participants: dict[str, dict], run: OrchestrationRun) -> bool:
     return True
 
 
-def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
-    """Dimension 4: the run starts at the declared start agent, stays within the
-    termination bound, and does not loop (a hop edge repeated beyond threshold)."""
+def _check_behavior_handoff(team: dict, run: OrchestrationRun) -> bool:
+    """Handoff: starts at the declared start agent, within the termination bound,
+    no looping (a hop edge repeated beyond threshold)."""
     if not run.hops:
         return False
-    if run.hops[0].source != team["start_agent"]:
+    if run.hops[0].source != team.get("start_agent"):
         return False
     max_hops = team.get("termination", {}).get("max_hops", _DEFAULT_MAX_HOPS)
     if len(run.hops) > max_hops:
@@ -169,11 +216,38 @@ def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
     return not repeats_beyond_threshold(edges, threshold=SPAM_THRESHOLD)
 
 
+def _check_behavior_sequential(team: dict, run: OrchestrationRun) -> bool:
+    """Sequential: the executed order equals the declared participant order,
+    each participant exactly once (SequentialBuilder runs the chain in order)."""
+    declared = [p["agent_id"] for p in team["participants"]]
+    return run.order == declared
+
+
+def _check_behavior_concurrent(team: dict, run: OrchestrationRun) -> bool:
+    """Concurrent: every declared participant executes exactly once on the same
+    input (ConcurrentBuilder fans out once to all; order is not significant).
+    Undeclared extras are a capabilities concern, not a behavior one."""
+    counts: dict[str, int] = {}
+    for agent_id in run.order:
+        counts[agent_id] = counts.get(agent_id, 0) + 1
+    return all(counts.get(p["agent_id"], 0) == 1 for p in team["participants"])
+
+
+def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
+    """Dimension 4, dispatched by orchestration style."""
+    style = _style(team)
+    if style == "sequential":
+        return _check_behavior_sequential(team, run)
+    if style == "concurrent":
+        return _check_behavior_concurrent(team, run)
+    return _check_behavior_handoff(team, run)
+
+
 def judge_orchestration(team: dict, run: OrchestrationRun) -> IdentificationResult:
     """Render the four-dimension correctness verdict for a multi-agent team."""
     participants = _participants(team)
     identity_match = _check_identity(participants, run)
-    violations = _check_capabilities(participants, run)
+    violations = _check_capabilities(team, participants, run)
     capabilities_conform = not violations
     policy_compliant = _check_policy(participants, run)
     behavior_expected = _check_behavior(team, run)
