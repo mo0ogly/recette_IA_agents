@@ -11,10 +11,11 @@ the ExternalSystemProxy a run must execute through:
 - ``declared_url`` -> LabHttpProxy(base_url). The lab wire format
   (``POST /{target_system}/execute`` returning the ``{"success", "data"}``
   envelope) is the contract: a declared server MUST speak it;
-- ``real_saas``    -> ValueError. recette/realmode.py only exposes
-  forge-level wrappers (AllowlistForge over GitForge), not an
-  ExternalSystemProxy implementation, so there is no real-SaaS proxy to
-  route to yet. Fail-safe: never fall back to the default.
+- ``real_saas``    -> the injected ``real_proxy_factory(server)`` when one is
+  provided (the call-site -- runners/api -- builds a RealForgeProxy over an
+  allowlisted real forge, holding the env token). When NO factory is injected,
+  ValueError: this module is pure and holds no credentials, so it cannot build a
+  real proxy itself. Fail-safe either way: never fall back to the default.
 
 Failure modes (fail-safe, this module never falls back silently):
 - the agent references a server id absent from the registry -> ValueError.
@@ -25,19 +26,34 @@ Failure modes (fail-safe, this module never falls back silently):
   (non-integer ``port``, empty ``base_url``) -> ValueError.
 
 Purity: this function does no I/O and reads no environment. Constructing a
-LabHttpProxy is allowed because it performs no I/O at construction time.
+LabHttpProxy is allowed because it performs no I/O at construction time. The
+``real_proxy_factory`` is the single seam through which a real-mode proxy (which
+DOES touch env/credentials) is injected from an impure call-site, keeping this
+router pure and deterministic.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .lab_proxy import LabHttpProxy
 from .protocol import ExternalSystemProxy
 
+RealProxyFactory = Callable[[dict], ExternalSystemProxy]
+
 
 def resolve_proxy(
-    agent: dict, servers: list[dict], default: ExternalSystemProxy
+    agent: dict,
+    servers: list[dict],
+    default: ExternalSystemProxy,
+    *,
+    real_proxy_factory: RealProxyFactory | None = None,
 ) -> ExternalSystemProxy:
     """Resolve the proxy for one agent run from the server registry.
+
+    ``real_proxy_factory`` (optional) builds the ExternalSystemProxy for a
+    ``real_saas`` server entry; it is invoked with that server dict. When omitted,
+    a ``real_saas`` entry raises ValueError (this module holds no credentials).
 
     Raises ValueError on a dangling server reference, an unsupported mode,
     or a malformed server entry (fail-safe: the run must fail, never
@@ -62,5 +78,7 @@ def resolve_proxy(
         # The declared server must implement the lab wire format (module docstring).
         return LabHttpProxy(base_url)
     if mode == "real_saas":
-        raise ValueError("real_saas execution requires realmode wiring")
+        if real_proxy_factory is None:
+            raise ValueError("real_saas execution requires realmode wiring")
+        return real_proxy_factory(server)
     raise ValueError(f"server {server_id!r} has unsupported mode {mode!r}")

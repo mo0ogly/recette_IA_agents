@@ -406,3 +406,35 @@ export interface PolicyDocument {
   approval_timeout_seconds: number;
   rules: PolicyRule[];
 }
+
+/**
+ * One recorded side-effect proxy execution (I5 debug trace). Mirrors the
+ * backend ProxyTrace: the request intent (event fields) plus the outcome. A
+ * trace is a read-only view over execution (I1); the console never mutates it.
+ */
+export interface ProxyTrace {
+  seq: number;
+  event_id: string;
+  timestamp: string;
+  agent_id: string;
+  target_system: string;
+  action_type: string;
+  resource: string;
+  request_payload: Record<string, unknown>;
+  ok: boolean;
+  status_code: number;
+  side_effect_hash: string | null;
+  error: string | null;
+}
+
+/** Response of GET /proxy/traces: the recorded traces plus the debug toggle. */
+export interface ProxyTraceResponse {
+  debug_enabled: boolean;
+  traces: ProxyTrace[];
+}
+
+/** Response of GET /proxy/debug: the toggle state and the buffered trace count. */
+export interface ProxyDebugStatus {
+  debug_enabled: boolean;
+  trace_count: number;
+}

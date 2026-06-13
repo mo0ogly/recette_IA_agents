@@ -92,6 +92,26 @@ h1 {
   color: #ffffff;
 }
 
+.proxy-nav-badge {
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.proxy-nav-badge[data-enabled="true"] {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.proxy-nav-badge[data-enabled="false"] {
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
 .app-main {
   flex: 1;
   padding: 1.5rem;

@@ -19,7 +19,8 @@ export type HelpTopicKey =
   | "servers"
   | "catalog"
   | "approvals"
-  | "audit";
+  | "audit"
+  | "proxy";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -429,6 +430,51 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
       </>
     ),
   },
+  proxy: {
+    title: "Aide — Proxy (debug side-effect)",
+    summary:
+      "Tracer chaque effet de bord passe par le proxy I5 : requete, resultat, side_effect_hash.",
+    body: (
+      <>
+        <p>
+          Cette page est la <strong>console de debug du proxy</strong>. Tout effet
+          de bord externe passe par un proxy mediatise (invariant I5) ; en mode
+          debug, chaque <code>execute()</code> est enregistre comme une{" "}
+          <strong>trace</strong> : l'intention (event_id, agent, action, systeme,
+          ressource, payload) et le resultat (ok, code, <code>side_effect_hash</code>,
+          erreur).
+        </p>
+        <h3>Activer le mode debug</h3>
+        <p>
+          Le tracage est <strong>parametrable</strong> (R5) via la variable
+          d'environnement <code>AGENTRAIL_PROXY_DEBUG</code> (
+          <code>1/true/on</code>). Desactive, le proxy s'execute sans surcout et
+          aucune trace n'est enregistree — le bandeau l'indique alors clairement.
+        </p>
+        <h3>Lire les traces</h3>
+        <ul>
+          <li>
+            <strong>Liste</strong> : une ligne par effet de bord, dans l'ordre{" "}
+            <code>seq</code> (monotone, deterministe I4). La pastille{" "}
+            <code>ok</code> / <code>fail</code> resume l'issue.
+          </li>
+          <li>
+            <strong>Inspecteur</strong> : selectionner une trace l'affiche en JSON
+            (Monaco, lecture seule). Le mode <code>stream</code> serialise tout le
+            tampon en JSONL.
+          </li>
+          <li>
+            <strong>Vider</strong> : le tampon est borne et jetable ; le vider ne
+            touche jamais le journal d'audit immuable (I1), qui reste la verite.
+          </li>
+        </ul>
+        <p>
+          Lab et reel passent par le meme decorateur de tracage : la console
+          montre aussi bien un effet simule qu'un appel SaaS reel allowliste.
+        </p>
+      </>
+    ),
+  },
   servers: {
     title: "Aide — Serveurs",
     summary:
@@ -458,7 +504,9 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           </li>
           <li>
             <strong>real_saas</strong> : reference declarative d'un SaaS reel.
-            Aucun proxy reel n'existe encore : un run route dessus echoue
+            Le run route dessus via un proxy reel allowliste (token en env R8,
+            ecritures desactivees par defaut), branche par une factory injectee
+            au call-site ; sans cette factory ou hors allowlist, le run echoue
             (fail-safe I5), jamais de repli silencieux vers un autre serveur.
           </li>
         </ul>

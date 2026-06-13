@@ -22,6 +22,7 @@ from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
+from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
 from .campaign_store import CampaignStore, RecordingStore
 from .config_store import ConfigStore
 from .routers import actions as actions_router
@@ -33,6 +34,7 @@ from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
 from .routers import policies as policies_router
+from .routers import proxy as proxy_router
 from .routers import runs as runs_router
 from .routers import verdicts as verdicts_router
 from .runs import RunManager
@@ -122,7 +124,18 @@ def create_app(
         store_path = os.environ.get("AGENTRAIL_EVENT_STORE_PATH", DEFAULT_EVENT_STORE_PATH)
         events = SqliteEventStore(store_path)
     policies = policy_store if policy_store is not None else PolicyStore()
-    side_effect_proxy: ExternalSystemProxy = proxy if proxy is not None else LabHttpProxy()
+    base_proxy: ExternalSystemProxy = proxy if proxy is not None else LabHttpProxy()
+    # Debug tracing decorates the I5 path: every gateway side effect is recorded
+    # in a bounded in-memory ring (jettable, I1) read back by GET /proxy/traces.
+    # Parametrable via AGENTRAIL_PROXY_DEBUG (R5); off => the wrapped proxy is
+    # called directly with zero recording overhead.
+    trace_recorder = RingTraceRecorder()
+    app.state.proxy_trace_recorder = trace_recorder
+    proxy_debug_enabled = debug_enabled_from_env()
+    app.state.proxy_debug_enabled = proxy_debug_enabled
+    side_effect_proxy: ExternalSystemProxy = TracingProxy(
+        base_proxy, trace_recorder, enabled=proxy_debug_enabled
+    )
     action_catalog = catalog if catalog is not None else load_catalog()
 
     # Policy bootstrap: ensure an active version exists so the gateway never
@@ -168,4 +181,5 @@ def create_app(
     app.include_router(campaigns_router.router)
     app.include_router(agent_actions_router.router)
     app.include_router(verdicts_router.router)
+    app.include_router(proxy_router.router)
     return app

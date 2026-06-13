@@ -8,6 +8,8 @@ import CampaignsPage from "./pages/campaigns";
 import CockpitPage from "./pages/cockpit";
 import DashboardPage from "./pages/dashboard";
 import FluxPage from "./pages/flux";
+import ProxyNavBadge from "./components/ProxyNavBadge";
+import ProxyPage from "./pages/proxy";
 import RecettePage from "./pages/recette";
 import ServersPage from "./pages/servers";
 import VerdictsPage from "./pages/verdicts";
@@ -56,6 +58,10 @@ export default function App(): JSX.Element {
           <NavLink to="/audit" className={navLinkClass}>
             Audit
           </NavLink>
+          <NavLink to="/proxy" className={navLinkClass}>
+            Proxy
+            <ProxyNavBadge />
+          </NavLink>
         </nav>
       </header>
       <main className="app-main">
@@ -72,6 +78,7 @@ export default function App(): JSX.Element {
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/proxy" element={<ProxyPage />} />
         </Routes>
       </main>
     </div>

@@ -27,6 +27,7 @@ from ..platform.events import PlatformActionEvent
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
+from ..platform.proxy.tracing import TraceRecorder, TracingProxy
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
 
@@ -110,11 +111,21 @@ class ProxyForge:
 
 
 def forge_for_agent(
-    agent_cfg: dict, servers: list[dict], default_proxy: ExternalSystemProxy | None = None
+    agent_cfg: dict,
+    servers: list[dict],
+    default_proxy: ExternalSystemProxy | None = None,
+    *,
+    recorder: TraceRecorder | None = None,
+    debug_enabled: bool = False,
 ) -> GitForge:
     """Forge for one run. An agent without a ``server`` binding keeps the
     historical in-memory LabForge; an agent bound to a server executes
     through the proxy resolved from the server registry (I5).
+
+    When ``recorder`` is provided, the proxy-bound path is wrapped in a
+    ``TracingProxy`` so each side effect a real agent produces is recorded for
+    the debug console (parametrable via ``debug_enabled``). The in-memory
+    LabForge path produces no external side effect, so it is not traced.
 
     Raises ValueError on a dangling or unsupported server reference
     (fail-safe: the run must fail, never execute against the wrong target).
@@ -124,6 +135,8 @@ def forge_for_agent(
     # The default is never returned here (the agent has a server), but
     # resolve_proxy's contract requires the actual default proxy.
     proxy = resolve_proxy(agent_cfg, servers, default_proxy or LabHttpProxy())
+    if recorder is not None:
+        proxy = TracingProxy(proxy, recorder, enabled=debug_enabled)
     return ProxyForge(proxy)
 
 
@@ -140,7 +153,12 @@ def _scope_from_recording(recording: Recording) -> list[str]:
 
 
 def make_lane_b_runner(
-    agent_cfg: dict, llm: LlmBackend, *, config_store: object | None = None
+    agent_cfg: dict,
+    llm: LlmBackend,
+    *,
+    config_store: object | None = None,
+    recorder: TraceRecorder | None = None,
+    debug_enabled: bool = False,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
         # Proxy resolution happens inside the runner so a dangling server
@@ -148,7 +166,9 @@ def make_lane_b_runner(
         # error frame via RunManager), never as an API crash and never as
         # a silent fallback to the wrong execution target (I5 fail-safe).
         servers = config_store.list_servers() if config_store is not None else []  # type: ignore[attr-defined]
-        forge = forge_for_agent(agent_cfg, servers)
+        forge = forge_for_agent(
+            agent_cfg, servers, recorder=recorder, debug_enabled=debug_enabled
+        )
         result = run_lane_b_agent(
             agent_id=agent_cfg["id"],
             principal=agent_cfg["principal"],
@@ -184,6 +204,9 @@ def make_campaign_runner(
     config_store: object,
     recording_store: object,
     secret_store: object | None = None,
+    *,
+    recorder: TraceRecorder | None = None,
+    debug_enabled: bool = False,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     """Run each campaign step as a Lane B agent, persisting one recording per
     step. A step with a stub_script runs as a mock; otherwise the agent's bound
@@ -253,6 +276,8 @@ def make_campaign_runner(
                 forge = forge_for_agent(
                     agent_cfg,
                     config_store.list_servers(),  # type: ignore[attr-defined]
+                    recorder=recorder,
+                    debug_enabled=debug_enabled,
                 )
             except ValueError as exc:
                 emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})

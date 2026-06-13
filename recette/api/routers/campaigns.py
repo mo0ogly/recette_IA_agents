@@ -85,6 +85,8 @@ def run_campaign(request: Request, campaign_id: str) -> dict:
         request.app.state.config_store,
         _recordings(request),
         request.app.state.secret_store,
+        recorder=request.app.state.proxy_trace_recorder,
+        debug_enabled=request.app.state.proxy_debug_enabled,
     )
     run = mgr.create("campaign", {"campaign_id": campaign_id})
     mgr.start(run, runner)

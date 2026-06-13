@@ -20,6 +20,8 @@ import type {
   ChainReport,
   PendingApproval,
   PolicyDocument,
+  ProxyDebugStatus,
+  ProxyTraceResponse,
   RecordingMeta,
   RunEvent,
   RunHandle,
@@ -466,6 +468,28 @@ export function listAuditEvents(params: AuditEventsParams = {}): Promise<AuditEv
 
 export function verifyChain(): Promise<ChainReport> {
   return request<ChainReport>("/audit/verify", { method: "GET" });
+}
+
+// ---------------------------------------------------------------------------
+// Side-effect proxy debug traces (I5 observability, read-only)
+// ---------------------------------------------------------------------------
+
+/** Recorded side-effect traces (oldest first). tail keeps only the last N. */
+export function getProxyTraces(tail?: number): Promise<ProxyTraceResponse> {
+  return request<ProxyTraceResponse>(
+    withQuery("/proxy/traces", { tail }),
+    { method: "GET" },
+  );
+}
+
+/** Debug toggle state plus the buffered trace count. */
+export function getProxyDebugStatus(): Promise<ProxyDebugStatus> {
+  return request<ProxyDebugStatus>("/proxy/debug", { method: "GET" });
+}
+
+/** Discard the debug trace buffer (the append-only audit log is untouched, I1). */
+export function clearProxyTraces(): Promise<{ cleared: boolean }> {
+  return request<{ cleared: boolean }>("/proxy/traces", { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------

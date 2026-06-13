@@ -68,13 +68,37 @@ class ProxyRouterTests(unittest.TestCase):
             resolve_proxy(agent, SERVERS, self.default)
         self.assertIn("gh-missing", str(ctx.exception))
 
-    def test_real_saas_requires_realmode_wiring(self) -> None:
-        # recette/realmode.py exposes forge-level wrappers (AllowlistForge),
-        # not an ExternalSystemProxy implementation -> fail-safe error.
+    def test_real_saas_without_factory_is_an_error(self) -> None:
+        # No real_proxy_factory injected -> the pure router cannot build a real
+        # proxy (holds no credentials) -> fail-safe error, never the default.
         agent = {"id": "a3", "target_system": "okta", "server": "okta-prod"}
         with self.assertRaises(ValueError) as ctx:
             resolve_proxy(agent, SERVERS, self.default)
         self.assertIn("real_saas execution requires realmode wiring", str(ctx.exception))
+
+    def test_real_saas_uses_injected_factory(self) -> None:
+        # With a factory injected, real_saas routes to the factory-built proxy,
+        # which receives the resolved server entry.
+        sentinel = object()
+        seen: list[dict] = []
+
+        def factory(server: dict) -> object:
+            seen.append(server)
+            return sentinel
+
+        agent = {"id": "a3", "target_system": "okta", "server": "okta-prod"}
+        resolved = resolve_proxy(agent, SERVERS, self.default, real_proxy_factory=factory)
+        self.assertIs(resolved, sentinel)
+        self.assertEqual(seen[0]["id"], "okta-prod")
+
+    def test_factory_is_not_called_for_lab_modes(self) -> None:
+        # A lab-mode agent never triggers the real factory (no env/credential reach).
+        called = []
+        agent = {"id": "a1", "target_system": "github", "server": "gh-mock"}
+        resolve_proxy(
+            agent, SERVERS, self.default, real_proxy_factory=lambda s: called.append(s)
+        )
+        self.assertEqual(called, [])
 
     def test_unsupported_mode_is_an_error(self) -> None:
         servers = [{"id": "weird", "system": "github", "mode": "carrier_pigeon"}]

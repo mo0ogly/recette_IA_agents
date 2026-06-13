@@ -49,7 +49,18 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b", params)
         # config_store carries the server registry for per-agent proxy routing (I5).
-        mgr.start(run, make_lane_b_runner(agent_cfg, llm, config_store=store))
+        # The shared trace recorder makes a real agent's side effects show up in
+        # the proxy debug console (parametrable via AGENTRAIL_PROXY_DEBUG, R5).
+        mgr.start(
+            run,
+            make_lane_b_runner(
+                agent_cfg,
+                llm,
+                config_store=store,
+                recorder=request.app.state.proxy_trace_recorder,
+                debug_enabled=request.app.state.proxy_debug_enabled,
+            ),
+        )
         return {"run_id": run.id, "status": run.status}
     runner = _RUNNERS.get(kind) if isinstance(kind, str) else None
     if runner is None:
