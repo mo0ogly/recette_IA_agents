@@ -22,6 +22,8 @@ import {
 } from "../../api/client";
 import { LogConsole } from "../../components/LogConsole";
 import type { LogLine } from "../../components/LogConsole";
+import { AskCell, KeyCell, TestCell } from "./AiBackendRowCells";
+import type { AskState, TestState } from "./AiBackendRowCells";
 import type { AiBackend, AiProvider } from "../../types/platform";
 
 export interface AiBackendsPanelProps {
@@ -51,25 +53,6 @@ const EMPTY: { id: string; provider: AiProvider; model: string; base_url: string
   model: "",
   base_url: "",
 };
-
-/** Per-backend probe outcome kept in component state, keyed by backend id. */
-type TestState =
-  | { phase: "testing" }
-  | { phase: "ok"; latencyMs: number }
-  | { phase: "error"; latencyMs: number; error: string };
-
-/** Per-backend free-text prompt outcome (the "Ask the AI" affordance). */
-type AskState =
-  | { phase: "asking" }
-  | { phase: "ok"; latencyMs: number; text: string }
-  | { phase: "error"; latencyMs: number; error: string };
-
-function statusOf(state: TestState | undefined): "untested" | "ok" | "error" {
-  if (state === undefined || state.phase === "testing") {
-    return "untested";
-  }
-  return state.phase;
-}
 
 export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Element {
   const { backends, onChanged, onError } = props;
@@ -239,136 +222,6 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     }
   }
 
-  function renderKeyCell(backend: AiBackend): JSX.Element {
-    const id = backend.id;
-    const configured = backend.key_configured === true;
-    const draft = keyDrafts[id] ?? "";
-    const inputId = `backend-key-${id}`;
-    return (
-      <div className="agents-key-manage">
-        <span
-          className="agents-key-chip"
-          data-testid="backend-key-status"
-          data-key-configured={configured ? "true" : "false"}
-        >
-          {configured ? "key set" : "no key"}
-        </span>
-        <label className="agents-visually-hidden" htmlFor={inputId}>
-          {`API key for ${id}`}
-        </label>
-        <input
-          id={inputId}
-          type="password"
-          autoComplete="off"
-          className="agents-key-input"
-          placeholder="paste API key"
-          value={draft}
-          onChange={(e) =>
-            setKeyDrafts((prev) => ({ ...prev, [id]: e.target.value }))
-          }
-        />
-        <button
-          type="button"
-          className="agents-btn"
-          disabled={draft.length === 0}
-          onClick={() => void handleSaveKey(id)}
-        >
-          Save key
-        </button>
-        {configured && (
-          <button
-            type="button"
-            className="agents-btn agents-btn-danger"
-            onClick={() => void handleRemoveKey(id)}
-          >
-            Remove key
-          </button>
-        )}
-        {savedHints[id] && (
-          <span className="agents-key-saved" data-testid="backend-key-saved">
-            saved
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  function renderAskCell(id: string): JSX.Element {
-    const state = asks[id];
-    const draft = askDrafts[id] ?? "";
-    const asking = state?.phase === "asking";
-    const inputId = `backend-ask-${id}`;
-    return (
-      <div className="agents-ask" data-testid="backend-ask">
-        <span className="agents-ask-caption" aria-hidden="true">
-          Ask the model
-        </span>
-        <label className="agents-visually-hidden" htmlFor={inputId}>
-          {`Ask the model behind ${id}`}
-        </label>
-        <input
-          id={inputId}
-          type="text"
-          className="agents-ask-input"
-          placeholder="Ask the model something..."
-          value={draft}
-          onChange={(e) =>
-            setAskDrafts((prev) => ({ ...prev, [id]: e.target.value }))
-          }
-        />
-        <button
-          type="button"
-          className="agents-btn"
-          disabled={draft.trim().length === 0 || asking}
-          onClick={() => void handleAsk(id)}
-        >
-          Ask
-        </button>
-        {asking && <span className="agents-ask-spinner">asking...</span>}
-        {state?.phase === "ok" && (
-          <div
-            className="agents-ask-answer"
-            data-testid="backend-ask-answer"
-            data-status="ok"
-          >
-            <pre className="agents-ask-text">{state.text}</pre>
-            <span className="agents-ask-latency">{state.latencyMs} ms</span>
-          </div>
-        )}
-        {state?.phase === "error" && (
-          <div
-            className="agents-ask-answer agents-ask-error"
-            data-testid="backend-ask-answer"
-            data-status="error"
-          >
-            <span>{state.error}</span>
-            <span className="agents-ask-latency">{state.latencyMs} ms</span>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderTestCell(id: string): JSX.Element {
-    const state = tests[id];
-    return (
-      <span className="agents-test-result">
-        <span
-          className="agents-status-dot"
-          data-testid="backend-test-status"
-          data-status={statusOf(state)}
-        />
-        {state?.phase === "testing" && <span>testing...</span>}
-        {state?.phase === "ok" && <span>{state.latencyMs} ms</span>}
-        {state?.phase === "error" && (
-          <span className="agents-test-error" title={state.error}>
-            {state.error}
-          </span>
-        )}
-      </span>
-    );
-  }
-
   return (
     <section className="agents-backends">
       <h2>AI backends (the AI behind agents)</h2>
@@ -401,7 +254,18 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
                 <td>{backend.id}</td>
                 <td>{backend.provider}</td>
                 <td>{backend.model}</td>
-                <td className="agents-key-cell">{renderKeyCell(backend)}</td>
+                <td className="agents-key-cell">
+                  <KeyCell
+                    backend={backend}
+                    draft={keyDrafts[backend.id] ?? ""}
+                    onDraftChange={(value) =>
+                      setKeyDrafts((prev) => ({ ...prev, [backend.id]: value }))
+                    }
+                    onSave={() => void handleSaveKey(backend.id)}
+                    onRemove={() => void handleRemoveKey(backend.id)}
+                    saved={savedHints[backend.id] === true}
+                  />
+                </td>
                 <td>
                   <div className="agents-probe">
                     <div className="agents-probe-row">
@@ -413,13 +277,21 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
                       >
                         Test
                       </button>
-                      {renderTestCell(backend.id)}
+                      <TestCell state={tests[backend.id]} />
                     </div>
                     <span className="agents-key-hint">
                       Uses the stored key, or the provider env var.
                     </span>
                   </div>
-                  {renderAskCell(backend.id)}
+                  <AskCell
+                    id={backend.id}
+                    state={asks[backend.id]}
+                    draft={askDrafts[backend.id] ?? ""}
+                    onDraftChange={(value) =>
+                      setAskDrafts((prev) => ({ ...prev, [backend.id]: value }))
+                    }
+                    onAsk={() => void handleAsk(backend.id)}
+                  />
                 </td>
                 <td>
                   <button

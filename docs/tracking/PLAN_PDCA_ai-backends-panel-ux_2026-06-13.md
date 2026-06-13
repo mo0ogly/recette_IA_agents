@@ -61,3 +61,39 @@ pas landing) ; seules ses regles universelles s'appliquent.
 Panneau plus lisible (probe vs ask separes), copie veridique, focus a11y,
 formes coherentes, et regressions de copie/caption desormais bloquees par test.
 Reste hors-scope de cette session : smoke navigateur visuel (a verifier par l'utilisateur).
+
+---
+
+## Cycle 2 -- audit-pdca (structural)
+
+Status : TERMINE
+Declencheur : skill audit-pdca sur le panneau.
+
+### CHECK (audit)
+Sante du scope : R25 (couleurs hex) clean, zero console.log (R6), zero `any`/
+`@ts-ignore`, zero XSS, fixtures presentes (R17 satisfait), tsc scope clean,
+16 tests verts. UNE dette structurelle : `AiBackendsPanel.tsx` = 509 LOC,
+au-dessus du plafond .tsx de 400 (R29).
+
+### ACT (remediation)
+Extraction des 3 renderers de cellule (`KeyCell`, `AskCell`, `TestCell`) +
+types `TestState`/`AskState` + `statusOf` vers un module presentationnel
+`AiBackendRowCells.tsx` (179 LOC, sous plafond, R29 No-Birth OK). Composants
+purs : tout l'etat reste dans le parent, passe en props ; DOM identique
+(classes, data-testid, roles, copie inchanges).
+
+Resultat : `AiBackendsPanel.tsx` 509 -> 381 LOC (sous plafond). tsc scope
+clean, 16 tests panel verts (contrats DOM preserves), suite console 175 verte.
+
+### Scorecard (evidence-based, recette PASS 0 critical)
+| Domaine | Score | Preuve |
+|---------|-------|--------|
+| security | 20/20 | pas de XSS/secret/URL en dur (placeholder seul), cle write-only R8 |
+| testing | 15/15 | 16 tests panel, fixtures R17, locks copie+caption |
+| architecture | 15/15 | extraction SRP, sous plafond LOC |
+| code_hygiene | 15/15 | dette LOC resorbee (509->381) |
+| completeness | 15/15 | 11 providers, key/test/ask/console complets |
+| documentation | 10/10 | doc-comments module + PDCA trace |
+
+Verdict : COMPLETE. Residuel hors-scope (A2) : smoke navigateur visuel
+(pas de Playwright MCP) -> a verifier par l'utilisateur.
