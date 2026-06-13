@@ -115,8 +115,12 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
 ### Platform territory (heavier -- reference patterns, not recette-core)
 - [ ] **Middleware pipeline pattern** for the Gateway mediation (I2). Source:
       `python/packages/core/agent_framework/_middleware.py`.
-- [ ] **Checkpointing / time-travel** (resume a run mid-flight), aligned with replay (I4).
-      Source: `python/packages/core/agent_framework/_workflows/_checkpoint.py` + `_state.py`.
+- [x] **Checkpointing / time-travel** -- DONE. recette/checkpoint.py: a Checkpoint
+      freezes a run's decision PREFIX (steps 0..k, serializable). checkpoint(recording,
+      after=k) / resume(cp, tail) (replay the prefix then continue -- ReplayLlm of the
+      tail reproduces, a live/other backend branches) / partial_run(cp) (prefix only).
+      Pure + deterministic (I4), grounded on _workflows/_checkpoint.py. tests/test_checkpoint.py
+      (reproduce, branch, truncate, disk round-trip); mermaid in replay-model.md.
 - [x] **DevUI-style interactive trace/replay viewer** -- DONE. recette/run_view.py
       build_run_view(team, run) -> ordered step timeline (handoff/turn/tool) + the
       four-dimension verdict + violations + run_mermaid diagram (pure, I4). Endpoint

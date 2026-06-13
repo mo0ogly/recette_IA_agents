@@ -176,6 +176,25 @@ flowchart LR
 See `.claude/rules/secrets-source-of-truth.md` (R18) and
 `docs/runbooks/orchestration-recette.md`.
 
+## Checkpoint / time-travel (I4)
+
+Because `drive` is a pure function of the decision stream, a run can be frozen at
+any step and resumed -- to reproduce the original path or to branch a different
+one. `recette/checkpoint.py`: `checkpoint(recording, after=k)` freezes the first
+k decisions; `resume(cp, tail)` replays the prefix then continues with `tail`
+(a `ReplayLlm` of the original tail reproduces the run; a live or different
+backend branches); `partial_run(cp)` is the run truncated at the checkpoint.
+Mirrors the agent-framework `_workflows/_checkpoint.py` concept, kept
+dependency-free and deterministic.
+
+```mermaid
+flowchart LR
+  REC["recording (decisions 0..N)"] --> CP["checkpoint(after=k)\nprefix 0..k"]
+  CP --> R1["resume(cp, ReplayLlm(tail)) -> original path"]
+  CP --> R2["resume(cp, live/other) -> branched path"]
+  CP --> PR["partial_run(cp) -> prefix only"]
+```
+
 ## OpenTelemetry GenAI export (audit interop, I1/I4)
 
 A recording exports to OpenTelemetry GenAI spans so an AgentRail audit trail
