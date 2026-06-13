@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from recette.api._dotenv import load_dotenv  # noqa: E402
 from recette.llm import build_llm  # noqa: E402
 from recette.maf_orchestration_harness import discover_orchestration_dirs  # noqa: E402
 from recette.manifest import load_validated  # noqa: E402
@@ -47,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    load_dotenv()  # R18: resolve GROQ_API_KEY from the gitignored .env if not already set
     try:
         llm = build_llm("groq", args.model)  # key from env (R8)
     except ValueError as exc:

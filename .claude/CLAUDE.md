@@ -243,6 +243,11 @@ reelle + render-and-assert + unwrap de l'enveloppe de reponse. Detail :
 **R17 Vuln Fix Latest Version:** Sur un report de vuln, recuperer la DERNIERE version stable
 (crates.io / `cargo update`), jamais iterer a l'aveugle. Detail : `.claude/rules/vuln-fix-latest-version.md`.
 
+**R18 Secrets Source of Truth:** Les cles API vivent dans `.env` (env providers) et
+`data/backend_secrets.json` (par ai_backend), tous deux gitignores. JAMAIS redemander une cle
+qui s'y resout, JAMAIS accepter une cle collee dans le chat comme stockage (l'ecrire dans `.env`
++ avertir rotation). Detail : `.claude/rules/secrets-source-of-truth.md`.
+
 ---
 
 ## REFERENCES RULES
@@ -261,6 +266,7 @@ reelle + render-and-assert + unwrap de l'enveloppe de reponse. Detail :
 | `.claude/rules/no-deduction-verify-facts.md` | R13 |
 | `.claude/rules/no-fix-without-live-verification.md` | R14 |
 | `.claude/rules/no-hardcoded-secrets.md` | R8/R15 |
+| `.claude/rules/secrets-source-of-truth.md` | R18 -- ou vivent les cles (.env + data/backend_secrets.json), ne pas redemander |
 | `.claude/rules/frontend-contract-gate.md` | R16 |
 | `.claude/rules/vuln-fix-latest-version.md` | R17 |
 | `.claude/rules/no-backslash-line-continuation-copypaste.md` | Commandes copy-paste sures |
