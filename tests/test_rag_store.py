@@ -47,6 +47,14 @@ class TestKnowledgeBaseStore(unittest.TestCase):
         with self.assertRaises(KnowledgeBaseError):
             self.store.add(dict(_DOC))
 
+    def test_add_rejects_invalid_id_slug(self) -> None:
+        # T5: an inserted id must match the corpus slug shape (defence in depth,
+        # coherence with the schema). A legit slug is accepted; stray ids are not.
+        self.store.add({**_DOC, "id": "good-id-1"})
+        for bad in ("Bad ID", "../escape", "a/b", "UPPER", "x" * 100, "-leadhyphen", "x"):
+            with self.assertRaises(KnowledgeBaseError, msg=f"accepted {bad!r}"):
+                self.store.add({**_DOC, "id": bad})
+
     def test_add_validates_poison_fields(self) -> None:
         bad = {"id": "p1", "title": "t", "content": "c", "poisoned": True, "tags": []}
         with self.assertRaises(KnowledgeBaseError):

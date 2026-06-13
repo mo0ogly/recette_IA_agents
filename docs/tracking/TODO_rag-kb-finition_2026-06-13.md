@@ -30,15 +30,16 @@ runbook. Suite complete verte.
       -> assert gateway deny/escalate, executed=False -> reset -> KB == baseline.
       Deterministe (I4) ; sert de preuve vivante de la boucle de recette.
 
-- [ ] T4 Guard scenario<->campagne : etendre la KB-guard pour que chaque doc
-      poisonne d'un `corpus/rag/scenarios/*.json` ait soit une campagne, soit un
-      assert explicite que son `injected_action`/`injected_expect` est bloque par la
-      gateway (decide-based, comme test_rag_poisoning). Empeche un scenario poisonne
-      sans preuve de blocage.
+- [x] T4 Guard scenario<->campagne : DONE -- decide-based, pas require-a-campagne.
+      `test_scenario_guard_every_poisoned_doc_is_blocked_by_the_gateway`
+      (tests/test_rag_poisoning.py) decide chaque doc poisonne de
+      `corpus/rag/scenarios/*.json` pour rag_agent et assert verdict ==
+      injected_expect ET in {deny,escalate}. Negative-prouve rouge sur un scenario
+      menteur (claim deny / engine allow). I4 deterministe.
 
-- [ ] T5 Durcissement store.add : valider l'id d'un document insere contre le meme
-      slug `^[a-z0-9][a-z0-9-]{1,63}$` que le nom de scenario (defense en profondeur,
-      coherence avec le schema). Mineur : l'id ne touche aucun chemin fichier.
+- [x] T5 Durcissement store.add : DONE -- `_validate` rejette un id ne matchant pas
+      `^[a-z0-9][a-z0-9-]{1,63}$` (`test_add_rejects_invalid_id_slug`). Ids legitimes
+      (kb-*, scn-*) inchanges ; baseline charge hors `add` donc non impacte.
 
 ## Criteres de "done"
 

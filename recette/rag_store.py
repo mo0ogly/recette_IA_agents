@@ -29,8 +29,11 @@ _SCENARIOS_DIR = _REPO_ROOT / "corpus" / "rag" / "scenarios"
 
 _REQUIRED_KEYS = ("id", "title", "content", "poisoned", "tags")
 _POISON_KEYS = ("injected_action", "injected_target_system", "injected_expect", "threat")
-# Scenario names map to a filename; a strict slug pattern forbids path traversal
-# (e.g. "../knowledge_base", absolute paths). Same shape as the schema's name.
+# Scenario names AND document ids map to a slug shape (same as the schema's
+# `name`/`id` pattern). For names it forbids path traversal ("../knowledge_base",
+# absolute paths); for ids it is defence in depth -- an id touches no file path,
+# but enforcing the schema shape at the store keeps inserts coherent with the
+# committed corpus and rejects stray identifiers early.
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
 # Shared in-memory knowledge base: seeded lazily from the baseline, mutated by the
@@ -61,6 +64,8 @@ def _validate(doc: dict) -> dict:
         raise KnowledgeBaseError(f"document missing keys: {missing}")
     if not isinstance(doc["id"], str) or not doc["id"]:
         raise KnowledgeBaseError("document id must be a non-empty string")
+    if not _NAME_RE.fullmatch(doc["id"]):
+        raise KnowledgeBaseError(f"document id must match {_NAME_RE.pattern}: {doc['id']!r}")
     if not isinstance(doc["poisoned"], bool):
         raise KnowledgeBaseError("'poisoned' must be a boolean")
     if not isinstance(doc["tags"], list):

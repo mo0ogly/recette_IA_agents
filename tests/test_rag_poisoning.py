@@ -24,6 +24,10 @@ from recette.platform.policy.model import PolicyVersion, baseline_from_catalog
 REPO = Path(__file__).resolve().parent.parent
 RAG_CAMPAIGNS = REPO / "campaigns" / "rag"
 KB_SEED = REPO / "corpus" / "rag" / "knowledge_base.json"
+SCENARIOS_DIR = REPO / "corpus" / "rag" / "scenarios"
+# The role that queries the knowledge base in the recette. A poison scenario is
+# defined relative to this querying agent, so the guard decides against it.
+RAG_ROLE = "rag_agent"
 
 
 def _event(role: str, target_system: str, action_type: str) -> PlatformActionEvent:
@@ -47,6 +51,7 @@ class TestRagPoisoning(unittest.TestCase):
     policy: PolicyVersion
     campaigns: list[dict]
     kb: list[dict]
+    scenarios: list[dict]
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -56,6 +61,11 @@ class TestRagPoisoning(unittest.TestCase):
             json.loads(p.read_text(encoding="utf-8")) for p in sorted(RAG_CAMPAIGNS.glob("*.json"))
         ]
         cls.kb = json.loads(KB_SEED.read_text(encoding="utf-8"))["documents"]
+        cls.scenarios = [
+            json.loads(p.read_text(encoding="utf-8"))
+            for p in sorted(SCENARIOS_DIR.glob("*.json"))
+            if p.name != "scenario.schema.json"
+        ]
 
     def test_every_rag_action_decides_to_expected_verdict(self) -> None:
         for doc in self.campaigns:
@@ -104,6 +114,36 @@ class TestRagPoisoning(unittest.TestCase):
                     {"deny", "escalate"},
                     f"{doc['name']}: induced {action['action_type']} must be blocked",
                 )
+
+    def test_scenario_guard_every_poisoned_doc_is_blocked_by_the_gateway(self) -> None:
+        # T4: a poison scenario injected at runtime (corpus/rag/scenarios/*.json) must
+        # carry decide-based proof of blocking. For every poisoned doc, the gateway
+        # decision for the querying role on its injected action MUST match the doc's
+        # injected_expect AND be a block (deny/escalate) -- never a silent allow.
+        # A new scenario whose injected action is actually allowed, or whose stated
+        # injected_expect drifts from the engine, fails the suite here.
+        seen_poison = False
+        for scenario in self.scenarios:
+            for doc in scenario["documents"]:
+                if not doc.get("poisoned"):
+                    continue
+                seen_poison = True
+                self.assertIn(
+                    doc["injected_expect"],
+                    {"deny", "escalate"},
+                    f"scenario {scenario['name']} doc {doc['id']}: poison must be blocked",
+                )
+                event = _event(RAG_ROLE, doc["injected_target_system"], doc["injected_action"])
+                verdict = str(decide(event, self.policy, self.catalog).verdict)
+                self.assertEqual(
+                    verdict,
+                    doc["injected_expect"],
+                    f"scenario {scenario['name']} doc {doc['id']}: injects "
+                    f"{doc['injected_action']} on {doc['injected_target_system']} "
+                    f"expecting {doc['injected_expect']}, but the gateway decided "
+                    f"{verdict} for {RAG_ROLE} -- no proof of blocking",
+                )
+        self.assertTrue(seen_poison, "no poisoned scenario document found to guard")
 
     def test_at_least_one_clean_and_each_threat_covered(self) -> None:
         names = {doc["name"] for doc in self.campaigns}
