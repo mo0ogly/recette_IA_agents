@@ -11,33 +11,6 @@
 
 ---
 
-## PERIMETRE COURANT -- tu travailles sur la RECETTE (pas la plateforme)
-
-Ce repo `recette_railgun` est la partie **RECETTE** de Railgun/AgentRail, PAS la plateforme
-de gouvernance complete. Mon role concret :
-
-**Creer des agents de test (sujets ground-truth)** qui servent a valider deux outils :
-1. l'outil de **DISCOVERY** -> doit REPERER/detecter ces agents.
-2. l'outil d'**IDENTIFICATION / EVALUATION** -> doit juger si ces agents sont CORRECTS.
-
-Boucle de recette :
-```
-author agent (proprietes connues, verdict attendu)
-  -> discovery doit le trouver           (recette: detecte = oui/non)
-  -> identification rend un verdict        (recette: verdict == ground-truth ?)
-  -> comparer au ground-truth, tracer la preuve
-```
-
-Regles de cadrage :
-- Je produis le **corpus de test + le harnais de validation**, pas la Gateway/Policy/Risk/Approval.
-- L'architecture multi-plan et les invariants I1-I6 ci-dessous sont du **CONTEXTE DE REFERENCE**
-  (les agents de test et les criteres d'evaluation s'y conforment), pas un backlog a construire ici.
-- Ne PAS deriver vers l'implementation de Temporal/NATS/Axum/Policy Engine sauf demande explicite.
-- Chaque agent de test doit porter son ground-truth (detectable oui/non, identite attendue,
-  verdict correct/incorrect attendu) pour rendre la recette mesurable et tracable.
-
----
-
 ## RAISON D'ETRE
 
 AgentRail est une couche de gouvernance runtime qui impose un controle deterministe,
