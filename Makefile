@@ -1,7 +1,8 @@
 # AgentRail recette -- local + Docker lab targets.
 .PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
-        platform-lab platform-e2e platform-down console
+        platform-lab platform-e2e platform-down console \
+        bnp role-matrix recette
 
 help:
 	@echo "Setup:"
@@ -12,6 +13,9 @@ help:
 	@echo "  make run          identification recette scorecard"
 	@echo "  make discovery    discovery recette (offline reference oracle, all surfaces)"
 	@echo "  make report       aggregate report (identification + all discovery surfaces)"
+	@echo "  make bnp          run the BNP governed-campaign harness (verdict check)"
+	@echo "  make role-matrix  run the role x action matrix harness (every role x every action)"
+	@echo "  make recette      full governed recette: validate + run + discovery + bnp + role-matrix"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
 	@echo "  make api          run the Track U API (uvicorn, needs the [api] extra)"
@@ -46,6 +50,15 @@ discovery:
 
 report:
 	python3 -m recette report
+
+bnp:
+	python3 scripts/run_bnp_scenarios.py
+
+role-matrix:
+	python3 scripts/run_role_matrix.py
+
+recette: validate run discovery bnp role-matrix
+	@echo "recette: ALL PASS"
 
 test:
 	python3 -m unittest discover -s tests
