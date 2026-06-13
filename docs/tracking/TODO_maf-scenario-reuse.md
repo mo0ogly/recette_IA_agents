@@ -11,9 +11,14 @@ being implemented now via APEX; everything below is queued.
       RedTeamSimulator (Crescendo 4-phase adversarial user, grounded on
       scenario/red_team_agent.py) + to_corpus_subject (deterministic single-axis
       negative freeze, ground-truth derived from judge_subject). tests/test_redteam.py.
-- [ ] **require_approval -> real approval workflow** -- a MAF approval=always action
-      triggers an actual approval workflow (not just a judged flag). Closes I6 loop.
-      Effort: medium.
+- [x] **require_approval -> real approval workflow** -- DONE. A MAF gated tool
+      (mcp invoke_tool / handoff) is wired onto the EXISTING I6 pipeline via a new
+      catalog domain recette/platform/catalog/domains/mcp.py (escalate-class,
+      deny-by-default): gateway escalate -> pending -> ApprovalService -> console
+      Approvals page (surfaces automatically). Cascade: lab domain + coverage +
+      role-matrix (tool_operator) regenerated. tests/test_maf_approval_workflow.py
+      (real gateway: escalate/pending/approve/deny/timeout, no auto-approve) +
+      console R16 contract test on the existing Approvals page.
 
 ## Medium value
 - [x] **Per-turn assertions in simulate** -- DONE. recette/simulate.py: SimCheck /

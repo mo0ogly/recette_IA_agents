@@ -20,4 +20,5 @@ DOMAIN_MODULES: tuple[str, ...] = (
     "legal_dms",
     "product_cms",
     "knowledge_base",
+    "mcp",
 )

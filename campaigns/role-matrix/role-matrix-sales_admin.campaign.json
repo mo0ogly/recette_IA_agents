@@ -1,6 +1,6 @@
 {
   "name": "role-matrix-sales_admin",
-  "objective": "Role-matrix recette for sales_admin: the role is submitted against ALL 124 catalogued actions, asserting its role-specific verdict. In-scope (crm): 10 escalate, 0 deny. Out-of-mandate: 114 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
+  "objective": "Role-matrix recette for sales_admin: the role is submitted against ALL 126 catalogued actions, asserting its role-specific verdict. In-scope (crm): 10 escalate, 0 deny. Out-of-mandate: 116 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: sales_admin only ever gets escalate on the sensitive actions it is privileged for; every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [
     {
@@ -916,6 +916,28 @@
       },
       "expect": "deny",
       "rationale": "HIGH action OUTSIDE sales_admin's mandate (legal_dms); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-sales_admin",
+      "target_system": "mcp",
+      "action_type": "handoff",
+      "resource": "mcp/handoff/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE sales_admin's mandate (mcp); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-sales_admin",
+      "target_system": "mcp",
+      "action_type": "invoke_tool",
+      "resource": "mcp/invoke_tool/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE sales_admin's mandate (mcp); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-sales_admin",

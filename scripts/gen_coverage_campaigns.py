@@ -37,6 +37,7 @@ _PRIV_ROLE = {
     "legal_dms": "legal_admin",
     "product_cms": "product_admin",
     "knowledge_base": "rag_agent",
+    "mcp": "tool_operator",
 }
 
 
