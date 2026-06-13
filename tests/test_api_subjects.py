@@ -25,8 +25,9 @@ class TestSubjectsApi(unittest.TestCase):
         self.assertGreater(body["count"], 0)
         self.assertIn("git_agent", body["families"])
         self.assertIn("maf_agent", body["families"])
+        self.assertIn("maf_orchestration", body["families"])
         families = {s["family"] for s in body["subjects"]}
-        self.assertEqual(families, {"git_agent", "maf_agent"})
+        self.assertEqual(families, {"git_agent", "maf_agent", "maf_orchestration"})
 
     def test_maf_subject_carries_target_and_ground_truth(self) -> None:
         body = self.client.get("/subjects").json()
