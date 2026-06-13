@@ -450,11 +450,6 @@ export function verifyChain(): Promise<ChainReport> {
   return request<ChainReport>("/audit/verify", { method: "GET" });
 }
 
-/** Absolute URL of the NDJSON audit export (download link, no fetch here). */
-export function auditExportUrl(): string {
-  return `${API_BASE_URL}/audit/export.jsonl`;
-}
-
 // ---------------------------------------------------------------------------
 // Verdicts: external tool results judged against stored ground truth
 // ---------------------------------------------------------------------------
