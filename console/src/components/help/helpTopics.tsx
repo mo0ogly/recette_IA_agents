@@ -21,6 +21,7 @@ export type HelpTopicKey =
   | "catalog"
   | "approvals"
   | "audit"
+  | "live"
   | "proxy";
 
 export interface HelpTopic {
@@ -33,6 +34,48 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
+  live: {
+    title: "Aide — Flux temps reel",
+    summary:
+      "Diffusion en direct des evenements gouvernes (SSE). Vue derivee, jamais la source de verite (I1).",
+    body: (
+      <>
+        <p>
+          Cette page ouvre un flux <strong>Server-Sent Events</strong> vers{" "}
+          <code>/events/stream</code> et affiche chaque evenement gouverne des
+          qu'il est ajoute au journal : <code>action_executed</code>,{" "}
+          <code>action_denied</code>, <code>action_requested</code>,{" "}
+          <code>approval_resolved</code>, <code>platform_error</code>.
+        </p>
+        <h3>Vue derivee, pas la verite (I1)</h3>
+        <p>
+          Le transport temps reel ne remplace pas l'event store : il en diffuse
+          une <strong>copie</strong>. Un evenement perdu cote temps reel reste
+          dans le journal append-only et se retrouve via l'onglet{" "}
+          <strong>Audit</strong> (rejouable). Une reconnexion ne rejoue pas
+          l'historique ; elle reprend le tail courant.
+        </p>
+        <h3>Etat du transport</h3>
+        <ul>
+          <li>
+            <strong>Connecte / Deconnecte</strong> : etat du flux SSE du
+            navigateur.
+          </li>
+          <li>
+            <strong>Degrade</strong> : le bus aval (NATS) est injoignable ; les
+            evenements sont mis en tampon borne et retentes (jamais d'execution
+            externe entre-temps, failure-modes). En Phase 1 (transport in-process)
+            ce drapeau reste toujours faux.
+          </li>
+          <li>
+            <strong>En attente / Abandonnes</strong> : taille du backlog de
+            retry et nombre de copies evincees d'un backlog plein (toujours
+            recuperables depuis le journal).
+          </li>
+        </ul>
+      </>
+    ),
+  },
   dashboard: {
     title: "Aide — Tableau de bord",
     summary:

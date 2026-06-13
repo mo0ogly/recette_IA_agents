@@ -112,6 +112,18 @@ export interface AuditEvent {
   hash: string;
 }
 
+/**
+ * Realtime transport health (GET /events/status). The in-process Phase 1
+ * transport is never degraded; a NATS transport may buffer when the bus is
+ * unreachable (failure-modes.md). `dropped` counts events evicted from a full
+ * backlog -- still recoverable from the durable audit log (I1).
+ */
+export interface RealtimeStatus {
+  degraded: boolean;
+  pending: number;
+  dropped: number;
+}
+
 /** Result of verifying the event store hash chain. */
 export interface ChainReport {
   ok: boolean;

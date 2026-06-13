@@ -22,6 +22,7 @@ import type {
   PolicyDocument,
   ProxyDebugStatus,
   ProxyTraceResponse,
+  RealtimeStatus,
   RecordingMeta,
   RunEvent,
   RunHandle,
@@ -491,6 +492,20 @@ export function getProxyDebugStatus(): Promise<ProxyDebugStatus> {
 /** Discard the debug trace buffer (the append-only audit log is untouched, I1). */
 export function clearProxyTraces(): Promise<{ cleared: boolean }> {
   return request<{ cleared: boolean }>("/proxy/traces", { method: "DELETE" });
+}
+
+/**
+ * Absolute URL of the realtime SSE stream (G4). The console opens this with an
+ * EventSource; it carries a derived live tail of governed events, never the
+ * source of truth (I1) -- history is backfilled from the audit endpoints.
+ */
+export function realtimeStreamUrl(): string {
+  return `${API_BASE_URL}/events/stream`;
+}
+
+/** Realtime transport health for the live-feed badge. */
+export function getRealtimeStatus(): Promise<RealtimeStatus> {
+  return request<RealtimeStatus>("/events/status", { method: "GET" });
 }
 
 // ---------------------------------------------------------------------------

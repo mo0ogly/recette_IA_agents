@@ -26,6 +26,11 @@ from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
+from ..platform.realtime import (
+    PublishingEventStore,
+    RealtimeTransport,
+    build_realtime_transport_from_env,
+)
 from ..rag_store import KnowledgeBaseStore
 from .auth import AuthError, decode_token, principal_from_claims
 from .campaign_store import CampaignStore, RecordingStore
@@ -38,6 +43,7 @@ from .routers import campaigns as campaigns_router
 from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
+from .routers import events as events_router
 from .routers import policies as policies_router
 from .routers import proxy as proxy_router
 from .routers import rag as rag_router
@@ -53,7 +59,12 @@ from .verdict_store import VerdictStore
 BASELINE_POLICY_VERSION = "v1"
 # Routes reachable without a token: liveness + the OpenAPI surface. Everything
 # else requires a verified identity once a signing key is configured (I3).
-AUTH_ALLOWLIST = frozenset({"/health", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"})
+# /events/stream is allowlisted because EventSource (browser SSE) cannot set an
+# Authorization header; in a keyed deployment it must be fronted by a token-in-
+# query or cookie gate (tracked residual). It only exposes a derived event tail.
+AUTH_ALLOWLIST = frozenset(
+    {"/health", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/events/stream"}
+)
 _auth_logger = logging.getLogger("agentrail.api.auth")
 
 
@@ -100,6 +111,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Stop every mock_local lab subprocess when the app shuts down."""
     yield
     app.state.server_manager.shutdown()
+    app.state.realtime_transport.close()
 
 
 class RestartSafeIdGenerator:
@@ -138,6 +150,7 @@ def create_app(
     recording_store: RecordingStore | None = None,
     verdict_store: VerdictStore | None = None,
     secret_store: BackendSecretStore | None = None,
+    realtime_transport: RealtimeTransport | None = None,
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0", lifespan=_lifespan)
 
@@ -181,6 +194,16 @@ def create_app(
     else:
         # Phase 1/2 switch via AGENTRAIL_EVENT_STORE (sqlite default, postgres opt-in).
         events = build_event_store_from_env()
+    # Realtime fan-out (G4): decorate the store so every append is diffused to the
+    # live console stream. The store stays the source of truth (I1); the transport
+    # is derived. Default in-process (mono-host); AGENTRAIL_REALTIME=nats opt-in.
+    transport = (
+        realtime_transport
+        if realtime_transport is not None
+        else build_realtime_transport_from_env()
+    )
+    app.state.realtime_transport = transport
+    events = PublishingEventStore(events, transport)
     policies = policy_store if policy_store is not None else PolicyStore()
     base_proxy: ExternalSystemProxy = proxy if proxy is not None else LabHttpProxy()
     # Debug tracing decorates the I5 path: every gateway side effect is recorded
@@ -242,4 +265,5 @@ def create_app(
     app.include_router(rag_router.router)
     app.include_router(subjects_router.router)
     app.include_router(sim_router.router)
+    app.include_router(events_router.router)
     return app
