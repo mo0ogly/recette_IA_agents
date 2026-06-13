@@ -1,5 +1,8 @@
 # Runbook -- multi-agent orchestration recette (end-to-end, replayable)
 
+> Diagrams (mermaid) of the record / replay / freeze model across agents, teams
+> and campaigns: see [`replay-model.md`](replay-model.md).
+
 The judged unit is a **team**: a set of participants with a declared structure.
 Four orchestration styles, each grounded on a real microsoft/agent-framework
 builder:

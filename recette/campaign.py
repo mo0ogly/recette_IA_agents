@@ -10,9 +10,15 @@ Optional per-action "expect" assertions turn a campaign into a checkable
 scenario: the runner exits non-zero on any verdict mismatch, making campaigns
 usable both as demo seeders for the console and as black-box recette runs.
 
+Like the orchestration teams and Lane B agents, a campaign run is replayable: a
+CampaignRecording captures the verdict sequence, and replaying re-submits the
+same document and asserts the verdicts reproduce (I4 at the campaign level).
+
 CLI:
   python -m recette.campaign list [--dir campaigns]
   python -m recette.campaign run <file> [--api URL] [--json out.json]
+  python -m recette.campaign record <file> --out rec.json [--api URL]
+  python -m recette.campaign replay <recording> [--api URL]
 """
 
 from __future__ import annotations
@@ -207,6 +213,76 @@ class CampaignRunner:
         return report
 
 
+@dataclass
+class CampaignRecording:
+    """A persistent, replayable record of one campaign run (mirrors the
+    orchestration/Lane B recordings). It stores the campaign document and the
+    verdict sequence the gateway produced. Replaying re-submits the same document
+    and asserts the verdicts reproduce -- the campaign-level I4 check ("rejouer
+    pour voir si ca fait la meme chose")."""
+
+    name: str
+    doc: dict
+    verdicts: list[dict] = field(default_factory=list)
+    schema_version: str = "1.0"
+
+    @staticmethod
+    def _verdict_rows(report: CampaignReport) -> list[dict]:
+        return [
+            {
+                "index": r.index,
+                "verdict": r.verdict,
+                "approval_state": r.approval_state,
+                "executed": r.executed,
+            }
+            for r in report.results
+        ]
+
+    def to_dict(self) -> dict:
+        return {
+            "schema_version": self.schema_version,
+            "name": self.name,
+            "doc": self.doc,
+            "verdicts": self.verdicts,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> CampaignRecording:
+        return CampaignRecording(
+            name=d["name"],
+            doc=d["doc"],
+            verdicts=d.get("verdicts", []),
+            schema_version=d.get("schema_version", "1.0"),
+        )
+
+    def save(self, path: str | Path) -> None:
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2) + "\n", encoding="utf-8")
+
+    @staticmethod
+    def load(path: str | Path) -> CampaignRecording:
+        return CampaignRecording.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def record_campaign(runner: CampaignRunner, doc: dict) -> CampaignRecording:
+    """Run the campaign through the gateway and capture its verdict sequence."""
+    report = runner.run(doc)
+    return CampaignRecording(
+        name=doc["name"], doc=doc, verdicts=CampaignRecording._verdict_rows(report)
+    )
+
+
+def replay_campaign(
+    runner: CampaignRunner, recording: CampaignRecording
+) -> tuple[CampaignReport, bool]:
+    """Re-submit the recorded campaign and report whether the verdicts reproduce.
+
+    Returns (fresh report, deterministic). A True flag means the gateway produced
+    the exact same verdict sequence as the recording (I4 at the campaign level)."""
+    report = runner.run(recording.doc)
+    deterministic = CampaignRecording._verdict_rows(report) == recording.verdicts
+    return report, deterministic
+
+
 def _render_report(report: CampaignReport) -> str:
     lines = [f"campaign: {report.name}"]
     if report.objective:
@@ -267,6 +343,28 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _cmd_record(args: argparse.Namespace) -> int:
+    from ._http_client import StdlibHttpClient
+
+    doc = load_campaign(args.file)
+    recording = record_campaign(CampaignRunner(StdlibHttpClient(args.api)), doc)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    recording.save(out)
+    print(f"recorded {len(recording.verdicts)} verdicts; recording written: {out}")
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    from ._http_client import StdlibHttpClient
+
+    recording = CampaignRecording.load(args.recording)
+    report, deterministic = replay_campaign(CampaignRunner(StdlibHttpClient(args.api)), recording)
+    print(_render_report(report))
+    print(f"replay deterministic: {deterministic}")
+    return 0 if (deterministic and report.ok) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="recette.campaign")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -280,6 +378,17 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--api", default=os.environ.get("AGENTRAIL_API_URL", DEFAULT_API_URL))
     p_run.add_argument("--json", default=None, help="write the full report to this path")
     p_run.set_defaults(func=_cmd_run)
+
+    p_rec = sub.add_parser("record", help="run a campaign and save a replayable recording")
+    p_rec.add_argument("file")
+    p_rec.add_argument("--api", default=os.environ.get("AGENTRAIL_API_URL", DEFAULT_API_URL))
+    p_rec.add_argument("--out", required=True, help="recording output path")
+    p_rec.set_defaults(func=_cmd_record)
+
+    p_rep = sub.add_parser("replay", help="replay a recording and check verdicts reproduce (I4)")
+    p_rep.add_argument("recording")
+    p_rep.add_argument("--api", default=os.environ.get("AGENTRAIL_API_URL", DEFAULT_API_URL))
+    p_rep.set_defaults(func=_cmd_replay)
 
     args = parser.parse_args(argv)
     try:
