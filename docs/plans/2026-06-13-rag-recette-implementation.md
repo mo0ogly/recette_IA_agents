@@ -12,7 +12,19 @@
 
 ## Phase 1 -- Foundation (canonical actions + RagBackend)
 
-### Task 1: knowledge_base catalog domain
+> COORDINATION (2026-06-13): Task 1 below is SUPERSEDED. The `knowledge_base`
+> catalog domain is already built and actively owned by the parallel
+> RAG-poisoning track (canonical actions `query_knowledge_base`,
+> `ingest_document`, `update_retrieval_config`, `export_knowledge_base`,
+> `delete_document`, `purge_index`; privileged role `rag_agent`; regenerated
+> role-matrix campaigns + a `rag_agent` campaign). Do NOT build a competing
+> domain (R28 flag-not-sweep). The committed `recette/rag.py` (Task 2-6, on
+> main at 3c24bb6) is the execution engine behind that domain:
+> `query_knowledge_base -> RagBackend.retrieve`, `ingest_document ->
+> RagBackend.index`. Wiring the engine to the domain happens once their domain
+> lands on main (Phase 3).
+
+### Task 1: knowledge_base catalog domain (DONE by parallel track -- do not duplicate)
 
 **Files:**
 - Create: `recette/platform/catalog/domains/knowledge_base.py`
