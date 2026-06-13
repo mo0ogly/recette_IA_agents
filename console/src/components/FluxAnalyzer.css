@@ -15,4 +15,5 @@
   padding: 0.6rem 0.85rem;
   font-family: "Cascadia Code", "Consolas", monospace;
   font-size: 0.8rem;
+  min-height: 420px;
 }

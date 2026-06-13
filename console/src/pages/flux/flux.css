@@ -58,11 +58,24 @@
 
 .flux-export {
   margin-left: auto;
-  font-size: 0.85rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.flux-export:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .flux-error {
-  color: #c0392b;
+  color: var(--badge-red-fg);
   margin: 0;
 }
 

@@ -7,16 +7,25 @@
  * JSONL ("stream" mode). Read-only end to end: the audit log is immutable
  * (I1) and this page never writes.
  *
- * Deep links (mirrors the audit page ?event_id= pattern):
- * - ?agent_id=X pre-applies the per-agent filter;
- * - ?seq=N pre-selects an event once it is present in the tail buffer.
+ * Deep links: ?agent_id=X pre-applies the per-agent filter; ?seq=N selects an
+ * event. The URL is the single source of truth for both (selection survives
+ * back/forward navigation). The analyzer mode is deliberately ephemeral UI
+ * state and is NOT reflected in the URL.
+ *
+ * Export: client-side JSONL of the VISIBLE window only (bounded by the tail
+ * buffer). The full-log server export exists for SIEM tooling; an unbounded
+ * download link does not belong in a live viewer.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { auditExportUrl, listAgents } from "../../api/client";
-import { FluxAnalyzer, type FluxAnalyzerMode } from "../../components/FluxAnalyzer";
+import { listAgents } from "../../api/client";
+import {
+  FluxAnalyzer,
+  fluxAnalyzerContent,
+  type FluxAnalyzerMode,
+} from "../../components/FluxAnalyzer";
 import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
 import { useAuditTail } from "../../hooks/useAuditTail";
 import type { AgentConfig } from "../../types/platform";
@@ -26,12 +35,11 @@ export default function FluxPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const agentFilter = searchParams.get("agent_id") ?? "";
   const seqParam = searchParams.get("seq");
+  // Derived, not duplicated into state: back/forward keeps URL and view in sync.
+  const selectedSeq = seqParam !== null && /^\d+$/.test(seqParam) ? Number(seqParam) : null;
 
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [agentsError, setAgentsError] = useState<string | null>(null);
-  const [selectedSeq, setSelectedSeq] = useState<number | null>(
-    seqParam !== null && /^\d+$/.test(seqParam) ? Number(seqParam) : null,
-  );
   const [mode, setMode] = useState<FluxAnalyzerMode>("event");
 
   const audit = useAuditTail({ agentId: agentFilter === "" ? undefined : agentFilter });
@@ -47,7 +55,6 @@ export default function FluxPage(): JSX.Element {
   const onAgentChange = useCallback(
     (value: string) => {
       // Filter change resets the tail (hook semantics); drop the selection too.
-      setSelectedSeq(null);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         if (value === "") {
@@ -64,7 +71,6 @@ export default function FluxPage(): JSX.Element {
 
   const onLineClick = useCallback(
     (seq: number) => {
-      setSelectedSeq(seq);
       setMode("event");
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
@@ -74,6 +80,22 @@ export default function FluxPage(): JSX.Element {
     },
     [setSearchParams],
   );
+
+  const exportWindow = useCallback(() => {
+    // Bounded by construction: only the visible tail buffer is serialized.
+    const jsonl = fluxAnalyzerContent(audit.events, null, "stream");
+    const blob = new Blob([`${jsonl}\n`], { type: "application/x-ndjson" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "flux-window.jsonl";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [audit.events]);
+
+  // Keep the controlled select coherent while agents are still loading: a
+  // value without a matching option would silently snap to the first option.
+  const agentKnown = agents.some((a) => a.id === agentFilter);
 
   return (
     <section className="flux-page">
@@ -87,6 +109,9 @@ export default function FluxPage(): JSX.Element {
             onChange={(e) => onAgentChange(e.target.value)}
           >
             <option value="">all agents</option>
+            {agentFilter !== "" && !agentKnown && (
+              <option value={agentFilter}>{agentFilter}</option>
+            )}
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.id}
@@ -112,9 +137,9 @@ export default function FluxPage(): JSX.Element {
             stream
           </button>
         </span>
-        <a className="flux-export" href={auditExportUrl()} download>
-          Export JSONL
-        </a>
+        <button type="button" className="flux-export" onClick={exportWindow}>
+          Export window (JSONL)
+        </button>
       </header>
       {agentsError !== null && <p className="flux-error">{agentsError}</p>}
       <div className="flux-grid">

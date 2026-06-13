@@ -141,7 +141,9 @@ export function LogConsole({
     if (el !== null && stickToBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [visible.length]);
+    // Depend on the array identity, not its length: a full bounded buffer
+    // evicts one line per append, leaving the length unchanged.
+  }, [visible]);
 
   const handleScroll = (): void => {
     const el = bodyRef.current;
@@ -222,7 +224,19 @@ export function LogConsole({
               data-selected={selectedSeq === line.seq || undefined}
               data-clickable={onLineClick !== undefined || undefined}
               key={line.seq}
+              role={onLineClick === undefined ? undefined : "button"}
+              tabIndex={onLineClick === undefined ? undefined : 0}
               onClick={onLineClick === undefined ? undefined : () => onLineClick(line.seq)}
+              onKeyDown={
+                onLineClick === undefined
+                  ? undefined
+                  : (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onLineClick(line.seq);
+                      }
+                    }
+              }
             >
               <span className="logc-seq">{line.seq}</span>
               <span className="logc-source">{line.source}</span>

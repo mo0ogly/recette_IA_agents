@@ -2,9 +2,9 @@
  * FluxAnalyzer tests (R16 contract gate).
  *
  * Fixture: the real captured audit events (auditEvents.fixture.json). Monaco
- * cannot run under jsdom, so @monaco-editor/react is mocked with a textarea
- * stub exposing the value prop; the real rendering is checked at the live
- * smoke stage. fluxAnalyzerContent (pure) is tested directly as well.
+ * cannot run under jsdom, so the lazy MonacoJsonViewer module is mocked with
+ * a textarea stub exposing the value prop; the real rendering is checked at
+ * the live smoke stage. fluxAnalyzerContent (pure) is tested directly too.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -14,7 +14,7 @@ import auditFixture from "../hooks/__fixtures__/auditEvents.fixture.json";
 import type { AuditEvent } from "../types/platform";
 import { FluxAnalyzer, fluxAnalyzerContent } from "./FluxAnalyzer";
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("./MonacoJsonViewer", () => ({
   default: ({ value }: { value: string }) => (
     <textarea readOnly data-testid="monaco-stub" value={value} />
   ),
@@ -26,9 +26,8 @@ describe("fluxAnalyzerContent", () => {
   it("serializes the selected event as pretty JSON in event mode", () => {
     const target = events[0];
     const content = fluxAnalyzerContent(events, target.seq, "event");
-    expect(JSON.parse(content)).toEqual(target);
-    // Pretty-printed: multi-line output.
-    expect(content).toContain("\n");
+    // Exact serialization, not just a parse round-trip (catches key drops).
+    expect(content).toBe(JSON.stringify(target, null, 2));
   });
 
   it("falls back to a hint when nothing is selected", () => {
@@ -36,11 +35,24 @@ describe("fluxAnalyzerContent", () => {
     expect(JSON.parse(content)).toHaveProperty("hint");
   });
 
-  it("serializes the whole window as JSONL in stream mode", () => {
+  it("serializes the whole window as JSONL in stream mode, canonical key order", () => {
     const content = fluxAnalyzerContent(events, null, "stream");
     const lines = content.split("\n");
     expect(lines).toHaveLength(events.length);
     expect(JSON.parse(lines[0])).toEqual(events[0]);
+    // Canonical top-level key order (nested objects like payload preserved):
+    // reorder top-level keys only, not via an array replacer (which filters
+    // keys at every depth and would strip payload's inner fields).
+    const ordered = Object.fromEntries(
+      Object.keys(events[0])
+        .sort()
+        .map((k) => [k, (events[0] as Record<string, unknown>)[k]]),
+    );
+    expect(lines[0]).toBe(JSON.stringify(ordered));
+  });
+
+  it("shows a hint for an empty stream window", () => {
+    expect(JSON.parse(fluxAnalyzerContent([], null, "stream"))).toHaveProperty("hint");
   });
 });
 

@@ -75,10 +75,32 @@ Code = sequential (git index races between writer agents already observed on
 this repo). Swarm reserved for read-only phases: parallel review agents
 (frontend lens, contract lens, perf lens) after S2, merged before S5.
 
+## Swarm review (3 lenses, 2026-06-13) -- integrated
+
+- BLOCKER fixed: @monaco-editor/react default loader pulls Monaco from a CDN
+  -> new lazy module MonacoJsonViewer.tsx with loader.config({monaco}) +
+  bundled editor/json workers (?worker imports). Offline lab safe.
+- BLOCKER fixed: unbounded /audit/export.jsonl download link -> client-side
+  Blob export of the visible window only; auditExportUrl removed.
+- BLOCKER fixed: page tests ran the 1.5 s poll on real timers -> fake timers
+  + flush() helper across the suite.
+- MAJOR fixed: selection state duplicated URL -> selectedSeq now DERIVED from
+  ?seq= (back/forward coherent). Stream value throttled (2 s) against editor
+  model resets. Clickable lines: role=button + tabIndex + keyboard handler.
+  listAgents mock now uses the real captured agents fixture (R16).
+- MINOR fixed: canonical key order in JSONL, empty-stream hint, ErrorBoundary
+  around the lazy editor, fallback min-height, controlled select placeholder
+  while agents load, --badge-red-fg var, autoscroll on same-length eviction.
+- Rejected findings (verified false): approval_state guard already correct;
+  Resume label exact-match concern; monaco mock default-export shape.
+- DEFERRED to PDCA: jsdom/vite CVE upgrades (R17, needs npm exec);
+  payload display documented as intentional (audit audience).
+
 ## Decisions prises
 
 - Monaco lazy-loaded, read-only (I1: nobody edits audit events).
-- jsdom tests mock the editor module; real rendering checked at smoke stage.
+- jsdom tests mock the lazy viewer module; real rendering checked at smoke stage.
+- Mode (event/stream) is ephemeral UI state, NOT in the URL (documented).
 
 ## Ecarts et replanification
 
