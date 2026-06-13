@@ -9,13 +9,19 @@ from __future__ import annotations
 
 import unittest
 
+from recette.events import AgentAction
 from recette.maf_orchestration import HandoffHop, OrchestrationRun, ToolCall
 from recette.otel import (
+    AGENT_ID,
     AGENT_NAME,
+    APPROVED,
     OP,
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
+    RESOURCE,
+    TARGET_SYSTEM,
     TOOL_NAME,
+    action_log_spans,
     orchestration_spans,
     to_otlp,
 )
@@ -106,6 +112,61 @@ class TestOrchestrationSpans(unittest.TestCase):
         spans = orchestration_spans(team, OrchestrationRun(order=["a", "b"]))
         names = [s.attributes.get(AGENT_NAME) for s in spans]
         self.assertEqual(names, ["seq-otel", "a", "b"])  # root + 2 routed
+
+
+def _action(seq: int, action_type: str, mode: str, resource: str, approved: bool) -> AgentAction:
+    return AgentAction(
+        event_id=f"ev-{seq}",
+        seq=seq,
+        timestamp="1970-01-01T00:00:00Z",
+        agent_id="git-bot",
+        principal="ci-bot",
+        target_system="github",
+        action_type=action_type,
+        mode=mode,
+        resource=resource,
+        approved=approved,
+    )
+
+
+ACTION_LOG = [
+    _action(1, "read_repo", "read", "acme/widgets", False),
+    _action(2, "merge_pr", "write", "acme/widgets#42", True),
+]
+
+
+class TestActionLogSpans(unittest.TestCase):
+    def test_root_invoke_agent_then_execute_tool_per_action(self) -> None:
+        spans = action_log_spans(ACTION_LOG)
+        # root invoke_agent + one execute_tool per action.
+        self.assertEqual(len(spans), 3)
+        root = spans[0]
+        self.assertEqual(root.parent_span_id, "")
+        self.assertEqual(root.attributes[OP], OP_INVOKE_AGENT)
+        self.assertEqual(root.attributes[AGENT_NAME], "git-bot")
+
+        read, merge = spans[1], spans[2]
+        self.assertEqual(read.attributes[OP], OP_EXECUTE_TOOL)
+        self.assertEqual(read.attributes[TOOL_NAME], "read_repo")
+        self.assertEqual(read.name, "execute_tool read_repo")
+        self.assertEqual(read.parent_span_id, root.span_id)
+        # AgentRail-only AgentActionEvent fields ride along as agentrail.* attrs.
+        self.assertEqual(merge.attributes[TARGET_SYSTEM], "github")
+        self.assertEqual(merge.attributes[RESOURCE], "acme/widgets#42")
+        self.assertEqual(merge.attributes[APPROVED], 1)
+        self.assertEqual(read.attributes[APPROVED], 0)
+        self.assertEqual(merge.attributes[AGENT_ID], "git-bot")
+
+    def test_empty_log_yields_no_spans(self) -> None:
+        self.assertEqual(action_log_spans([]), [])
+
+    def test_export_is_deterministic_and_read_only(self) -> None:
+        self.assertEqual(
+            to_otlp(action_log_spans(ACTION_LOG)),
+            to_otlp(action_log_spans(ACTION_LOG)),
+        )
+        # I1: the source rows are untouched.
+        self.assertEqual([a.seq for a in ACTION_LOG], [1, 2])
 
 
 if __name__ == "__main__":

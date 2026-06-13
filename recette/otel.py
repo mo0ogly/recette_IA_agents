@@ -21,8 +21,12 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .maf_orchestration import OrchestrationRun
+
+if TYPE_CHECKING:
+    from .events import AgentAction
 
 # Canonical GenAI semantic-convention names (agent-framework observability.py).
 OP = "gen_ai.operation.name"
@@ -35,6 +39,13 @@ AGENT_NAME = "gen_ai.agent.name"
 AGENT_ID = "gen_ai.agent.id"
 TOOL_NAME = "gen_ai.tool.name"
 TOOL_CALL_ID = "gen_ai.tool.call.id"
+# AgentRail-specific attributes for the canonical AgentActionEvent fields that
+# have no GenAI equivalent (target system, identity-in-use, side-effect class).
+TARGET_SYSTEM = "agentrail.target_system"
+PRINCIPAL = "agentrail.principal"
+ACTION_MODE = "agentrail.mode"
+RESOURCE = "agentrail.resource"
+APPROVED = "agentrail.approved"
 
 _SYSTEM = "agentrail"
 _STEP_NANO = 1_000_000  # logical 1ms per span; deterministic, not wall clock
@@ -122,6 +133,62 @@ def orchestration_spans(team: dict, run: OrchestrationRun) -> list[GenAiSpan]:
         }
         _emit(f"{OP_EXECUTE_TOOL} {call.tool_kind or call.target}", parent=root, attrs=attrs)
 
+    return spans
+
+
+def action_log_spans(action_log: list[AgentAction]) -> list[GenAiSpan]:
+    """Map a git/MAF agent action log (canonical AgentActionEvent rows) to GenAI
+    spans: a root invoke_agent span for the agent, then one execute_tool span per
+    recorded action. action_type -> gen_ai.tool.name, the action seq -> the tool
+    call id, and the AgentRail-only fields (target_system, principal, mode,
+    resource, approved) ride along as agentrail.* attributes. Deterministic (I4):
+    ids derive from the agent id + seq, times are logical; read-only (I1)."""
+    if not action_log:
+        return []
+    seed = action_log[0].agent_id
+    trace = _trace_id(seed)
+    spans: list[GenAiSpan] = []
+    idx = 0
+
+    def _emit(name: str, parent: str, attrs: dict[str, str | int]) -> str:
+        nonlocal idx
+        sid = _span_id(seed, idx)
+        start = idx * _STEP_NANO
+        spans.append(
+            GenAiSpan(
+                name=name,
+                span_id=sid,
+                parent_span_id=parent,
+                trace_id=trace,
+                start_nano=start,
+                end_nano=start + _STEP_NANO,
+                attributes={SYSTEM: _SYSTEM, **attrs},
+            )
+        )
+        idx += 1
+        return sid
+
+    root = _emit(
+        f"{OP_INVOKE_AGENT} {seed}",
+        parent="",
+        attrs={OP: OP_INVOKE_AGENT, AGENT_NAME: seed, AGENT_ID: seed},
+    )
+    for action in action_log:
+        _emit(
+            f"{OP_EXECUTE_TOOL} {action.action_type}",
+            parent=root,
+            attrs={
+                OP: OP_EXECUTE_TOOL,
+                TOOL_NAME: action.action_type,
+                TOOL_CALL_ID: str(action.seq),
+                AGENT_ID: action.agent_id,
+                TARGET_SYSTEM: action.target_system,
+                PRINCIPAL: action.principal,
+                ACTION_MODE: action.mode,
+                RESOURCE: action.resource,
+                APPROVED: int(action.approved),
+            },
+        )
     return spans
 
 

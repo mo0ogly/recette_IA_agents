@@ -70,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--backend-id", default="groq-llama-3.3-70b")
     parser.add_argument("--role", default=None, help="run a single role (default: all)")
     parser.add_argument("--max-steps", type=int, default=4)
+    parser.add_argument(
+        "--cache",
+        default=None,
+        help="path to a content-addressed LLM call cache (reuses prior live decisions)",
+    )
     args = parser.parse_args(argv)
 
     from fastapi.testclient import TestClient
@@ -86,6 +91,12 @@ def main(argv: list[str] | None = None) -> int:
     domain_tools, role_domain = _domain_and_roles()
     roles = [args.role] if args.role else sorted(role_domain)
     llm = build_llm("groq", args.model, api_key=api_key)
+    cache = None
+    if args.cache:
+        from recette.llm_cache import CachingLlm, LlmCache
+
+        cache = CachingLlm(llm, cache=LlmCache(args.cache), namespace=f"groq:{args.model}")
+        llm = cache
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -167,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         verify = client.get("/audit/verify").json()
         chain = "intact" if verify.get("ok") else "BROKEN"
         print(f"\nroles run: {ran}/{len(roles)} -- audit chain: {chain}")
+        if cache is not None:
+            print(f"llm cache: {cache.hits} hits / {cache.misses} misses -> {args.cache}")
         print(
             "RESULT: "
             + (

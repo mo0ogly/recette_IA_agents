@@ -70,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="llama-3.3-70b-versatile")
     parser.add_argument("--backend-id", default="groq-llama-3.3-70b")
     parser.add_argument("--max-steps", type=int, default=4)
+    parser.add_argument(
+        "--cache",
+        default=None,
+        help="path to a content-addressed LLM call cache (reuses prior live decisions)",
+    )
     args = parser.parse_args(argv)
 
     from fastapi.testclient import TestClient
@@ -85,6 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     catalog = load_catalog()
     target_of = _target_index()
     llm = build_llm("groq", args.model, api_key=api_key)
+    cache = None
+    if args.cache:
+        from recette.llm_cache import CachingLlm, LlmCache
+
+        cache = CachingLlm(llm, cache=LlmCache(args.cache), namespace=f"groq:{args.model}")
+        llm = cache
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -161,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
 
         verify = client.get("/audit/verify").json()
         print(f"\naudit chain: {'intact' if verify.get('ok') else 'BROKEN'}")
+        if cache is not None:
+            print(f"llm cache: {cache.hits} hits / {cache.misses} misses -> {args.cache}")
         print(
             "RESULT: "
             + (

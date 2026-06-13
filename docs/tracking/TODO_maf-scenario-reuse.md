@@ -94,8 +94,12 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       logical times) + read-only (I1). to_otlp() -> OTLP/JSON ResourceSpans for any
       OTel backend; CLI `recette orchestrate otel <recording>`; tests/test_otel.py;
       mermaid in docs/runbooks/replay-model.md. A real OTel SDK export stays an
-      optional [otel] extra. (Mapping the git/MAF AgentActionEvent action log to
-      spans too remains a small follow-up.)
+      optional [otel] extra. The git/MAF AgentActionEvent action log maps too:
+      action_log_spans(action_log) -> a root invoke_agent span + one execute_tool
+      span per AgentAction (action_type -> gen_ai.tool.name, seq -> tool.call.id;
+      the AgentRail-only fields target_system/principal/mode/resource/approved ride
+      as agentrail.* attrs). Composes with the Lane B output directly
+      (to_otlp(action_log_spans(result.actions))). tests/test_otel.py TestActionLogSpans.
 
 ### Medium value
 - [x] **Generic real-mode run cache** -- DONE. recette/llm_cache.py: CachingLlm
@@ -116,11 +120,12 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       case per corpus subject (id = slug) over the orchestration + MAF corpora, so
       `pytest -k <slug>` runs a single subject; bare functions, so unittest discovery
       ignores them (no double-run). Grounded on scenario/pytest_plugin.py. 18 params green.
-- [~] **Record the live runners** -- PARTIAL. The orchestration live runner already
-      records (recette/orchestrate.py) and now takes `--cache` (run_orchestration_live_groq.py)
-      so a live run is cheap + reproducible. The role-matrix/bnp/rag live_groq runners
-      drive Lane B agents (which already return a Recording) but still discard it --
-      wiring `--cache`/save there is the remaining slice.
+- [x] **Record the live runners** -- DONE. The orchestration live runner records
+      (recette/orchestrate.py) + takes `--cache`. The role-matrix/bnp/rag live_groq
+      runners now ALSO take `--cache <file>`: the live Groq LlmBackend is wrapped in
+      CachingLlm (namespace `groq:{model}`, content-addressed), so a live run is paid
+      for once and then reproduces for free across every role/scenario; the runner
+      prints `llm cache: H hits / M misses` at the end. --help verified on all three.
 
 ### Platform territory (heavier -- reference patterns, not recette-core)
 - [x] **Middleware pipeline pattern** -- DONE. recette/platform/middleware.py:
