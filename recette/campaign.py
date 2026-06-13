@@ -213,6 +213,19 @@ class CampaignRunner:
         return report
 
 
+def _verdict_rows(report: CampaignReport) -> list[dict]:
+    """The verdict sequence of a run -- the comparable core of a recording."""
+    return [
+        {
+            "index": r.index,
+            "verdict": r.verdict,
+            "approval_state": r.approval_state,
+            "executed": r.executed,
+        }
+        for r in report.results
+    ]
+
+
 @dataclass
 class CampaignRecording:
     """A persistent, replayable record of one campaign run (mirrors the
@@ -225,18 +238,6 @@ class CampaignRecording:
     doc: dict
     verdicts: list[dict] = field(default_factory=list)
     schema_version: str = "1.0"
-
-    @staticmethod
-    def _verdict_rows(report: CampaignReport) -> list[dict]:
-        return [
-            {
-                "index": r.index,
-                "verdict": r.verdict,
-                "approval_state": r.approval_state,
-                "executed": r.executed,
-            }
-            for r in report.results
-        ]
 
     def to_dict(self) -> dict:
         return {
@@ -266,9 +267,7 @@ class CampaignRecording:
 def record_campaign(runner: CampaignRunner, doc: dict) -> CampaignRecording:
     """Run the campaign through the gateway and capture its verdict sequence."""
     report = runner.run(doc)
-    return CampaignRecording(
-        name=doc["name"], doc=doc, verdicts=CampaignRecording._verdict_rows(report)
-    )
+    return CampaignRecording(name=doc["name"], doc=doc, verdicts=_verdict_rows(report))
 
 
 def replay_campaign(
@@ -279,7 +278,7 @@ def replay_campaign(
     Returns (fresh report, deterministic). A True flag means the gateway produced
     the exact same verdict sequence as the recording (I4 at the campaign level)."""
     report = runner.run(recording.doc)
-    deterministic = CampaignRecording._verdict_rows(report) == recording.verdicts
+    deterministic = _verdict_rows(report) == recording.verdicts
     return report, deterministic
 
 

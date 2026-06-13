@@ -31,6 +31,7 @@ from .maf_orchestration import (
     OrchestrationRun,
     ToolCall,
     judge_orchestration,
+    run_from_doc,
 )
 
 SCHEMA_VERSION = "1.0"
@@ -280,8 +281,6 @@ class OrchestrationRecording:
 
     @staticmethod
     def from_dict(d: dict) -> OrchestrationRecording:
-        from .maf_orchestration import run_from_doc
-
         decisions = [
             LlmDecision(
                 kind=x["kind"],

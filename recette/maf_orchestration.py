@@ -165,17 +165,15 @@ def _check_membership(
     participants: dict[str, dict], run: OrchestrationRun
 ) -> list[CapabilityViolation]:
     """Sequential/concurrent style: every executed participant is a declared one."""
-    violations: list[CapabilityViolation] = []
-    for agent_id in run.order:
-        if agent_id not in participants:
-            violations.append(
-                CapabilityViolation(
-                    observed_action=f"execute:{agent_id}",
-                    kind="undeclared_action",
-                    note=f"executed participant '{agent_id}' is not declared in the team",
-                )
-            )
-    return violations
+    return [
+        CapabilityViolation(
+            observed_action=f"execute:{agent_id}",
+            kind="undeclared_action",
+            note=f"executed participant '{agent_id}' is not declared in the team",
+        )
+        for agent_id in run.order
+        if agent_id not in participants
+    ]
 
 
 def _check_capabilities(

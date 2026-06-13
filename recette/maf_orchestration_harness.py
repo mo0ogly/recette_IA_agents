@@ -26,9 +26,7 @@ def discover_orchestration_dirs(root: Path = DEFAULT_ORCHESTRATION_CORPUS) -> li
         base = root / category
         if not base.is_dir():
             continue
-        for d in sorted(base.iterdir()):
-            if (d / "team.json").is_file():
-                dirs.append(d)
+        dirs.extend(d for d in sorted(base.iterdir()) if (d / "team.json").is_file())
     return dirs
 
 

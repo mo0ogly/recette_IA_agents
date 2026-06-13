@@ -12,9 +12,13 @@ dimensions are computed differently, but the verdict contract is identical.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .adapters import IdentificationResult, ReferenceIdentificationAdapter
-from .events import AgentAction
 from .maf_judge import MafAction, judge_maf
+
+if TYPE_CHECKING:
+    from .events import AgentAction
 
 
 def subject_family(manifest: dict) -> str:
