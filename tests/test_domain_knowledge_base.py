@@ -1,0 +1,68 @@
+"""knowledge_base domain tests: catalog specs + lab handler determinism + RAG seed."""
+
+from __future__ import annotations
+
+import unittest
+
+from recette.lab.domains import knowledge_base as kb_lab
+from recette.platform.catalog import load_catalog
+from recette.platform.catalog.domains.knowledge_base import ACTIONS, TARGET_SYSTEM
+from recette.platform.events import PolicyVerdict
+
+# (action_type, expected privileged verdict)
+EXPECTED: tuple[tuple[str, PolicyVerdict], ...] = (
+    ("query_knowledge_base", PolicyVerdict.ALLOW),
+    ("ingest_document", PolicyVerdict.ESCALATE),
+    ("update_retrieval_config", PolicyVerdict.ESCALATE),
+    ("export_knowledge_base", PolicyVerdict.ESCALATE),
+    ("delete_document", PolicyVerdict.ESCALATE),
+    ("purge_index", PolicyVerdict.DENY),
+)
+
+
+class TestKnowledgeBaseCatalog(unittest.TestCase):
+    def test_target_system(self) -> None:
+        self.assertEqual(TARGET_SYSTEM, "knowledge_base")
+
+    def test_actions_and_verdicts(self) -> None:
+        self.assertEqual(
+            tuple((s.action_type, s.verdict_privileged) for s in ACTIONS),
+            EXPECTED,
+        )
+
+    def test_query_is_the_only_allow_in_the_whole_catalog(self) -> None:
+        allows = [s for s in load_catalog().all() if s.verdict_privileged == PolicyVerdict.ALLOW]
+        self.assertEqual([s.action_type for s in allows], ["query_knowledge_base"])
+
+    def test_rag_agent_is_the_sole_privileged_role(self) -> None:
+        for spec in ACTIONS:
+            if spec.privileged_roles:
+                self.assertEqual(spec.privileged_roles, ("rag_agent",))
+
+
+class TestKnowledgeBaseLab(unittest.TestCase):
+    def test_handler_covers_every_catalogued_action(self) -> None:
+        for spec in ACTIONS:
+            self.assertIsNotNone(
+                kb_lab.handle(spec.action_type, "onboarding", {}),
+                f"lab handler returns None for {spec.action_type}",
+            )
+
+    def test_query_returns_documents_including_poison(self) -> None:
+        resp = kb_lab.handle("query_knowledge_base", "finance", {})
+        assert resp is not None
+        docs = resp["documents"]
+        self.assertTrue(docs, "query returned no documents")
+        self.assertTrue(any(d["poisoned"] for d in docs), "finance query surfaces a poisoned doc")
+
+    def test_handler_is_deterministic(self) -> None:
+        a = kb_lab.handle("query_knowledge_base", "runbook", {"q": 1})
+        b = kb_lab.handle("query_knowledge_base", "runbook", {"q": 1})
+        self.assertEqual(a, b)
+
+    def test_unknown_action_returns_none(self) -> None:
+        self.assertIsNone(kb_lab.handle("execute_shell_command", "x", {}))
+
+
+if __name__ == "__main__":
+    unittest.main()

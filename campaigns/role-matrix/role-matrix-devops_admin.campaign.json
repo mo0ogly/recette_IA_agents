@@ -1,6 +1,6 @@
 {
   "name": "role-matrix-devops_admin",
-  "objective": "Role-matrix recette for devops_admin: the role is submitted against ALL 118 catalogued actions, asserting its role-specific verdict. In-scope (github): 13 escalate, 0 deny. Out-of-mandate: 105 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
+  "objective": "Role-matrix recette for devops_admin: the role is submitted against ALL 124 catalogued actions, asserting its role-specific verdict. In-scope (github): 13 escalate, 0 deny. Out-of-mandate: 111 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: devops_admin only ever gets escalate on the sensitive actions it is privileged for; every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [
     {
@@ -751,6 +751,72 @@
       },
       "expect": "deny",
       "rationale": "HIGH action OUTSIDE devops_admin's mandate (hris); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "delete_document",
+      "resource": "knowledge_base/delete_document/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "export_knowledge_base",
+      "resource": "knowledge_base/export_knowledge_base/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "ingest_document",
+      "resource": "knowledge_base/ingest_document/sample",
+      "payload": {
+        "criticality": "medium"
+      },
+      "expect": "deny",
+      "rationale": "MEDIUM action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "purge_index",
+      "resource": "knowledge_base/purge_index/sample",
+      "payload": {
+        "criticality": "critical"
+      },
+      "expect": "deny",
+      "rationale": "CRITICAL action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "query_knowledge_base",
+      "resource": "knowledge_base/query_knowledge_base/sample",
+      "payload": {
+        "criticality": "low"
+      },
+      "expect": "deny",
+      "rationale": "LOW action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "knowledge_base",
+      "action_type": "update_retrieval_config",
+      "resource": "knowledge_base/update_retrieval_config/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE devops_admin's mandate (knowledge_base); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-devops_admin",

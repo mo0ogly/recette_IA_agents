@@ -18,4 +18,5 @@ HANDLER_MODULES: dict[str, str] = {
     "hris": "hris",
     "legal_dms": "legal_dms",
     "product_cms": "product_cms",
+    "knowledge_base": "knowledge_base",
 }

@@ -36,6 +36,7 @@ _PRIV_ROLE = {
     "hris": "hr_admin",
     "legal_dms": "legal_admin",
     "product_cms": "product_admin",
+    "knowledge_base": "rag_agent",
 }
 
 
