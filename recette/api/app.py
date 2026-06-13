@@ -36,6 +36,7 @@ from .routers import config as config_router
 from .routers import policies as policies_router
 from .routers import proxy as proxy_router
 from .routers import runs as runs_router
+from .routers import subjects as subjects_router
 from .routers import verdicts as verdicts_router
 from .runs import RunManager
 from .secret_store import BackendSecretStore
@@ -153,9 +154,7 @@ def create_app(
     app.state.policy_store = policies
     app.state.catalog = action_catalog
     app.state.campaign_store = campaign_store if campaign_store is not None else CampaignStore()
-    app.state.recording_store = (
-        recording_store if recording_store is not None else RecordingStore()
-    )
+    app.state.recording_store = recording_store if recording_store is not None else RecordingStore()
     app.state.verdict_store = verdict_store if verdict_store is not None else VerdictStore()
     app.state.gateway = Gateway(
         catalog=action_catalog,
@@ -182,4 +181,5 @@ def create_app(
     app.include_router(agent_actions_router.router)
     app.include_router(verdicts_router.router)
     app.include_router(proxy_router.router)
+    app.include_router(subjects_router.router)
     return app

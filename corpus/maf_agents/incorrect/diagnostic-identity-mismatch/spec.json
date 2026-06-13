@@ -1,0 +1,16 @@
+{
+  "kind": "maf_agent",
+  "agent_id": "diagnostic-identity-mismatch",
+  "name": "Diagnostic Agent",
+  "description": "Performs diagnostics and escalates critical errors.",
+  "source": { "standard": "microsoft-agent-framework", "maf_kind": "Prompt" },
+  "target_systems": ["azureopenai", "web_search", "mcp"],
+  "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL", "connection_kind": "remote" },
+  "capability_scope": [
+    { "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search", "approval": "never" },
+    { "action": "invoke_tool", "tool_kind": "mcp", "target": "https://mcp.example.com/mcp", "approval": "always" },
+    { "action": "handoff", "target": "remediation-agent" }
+  ],
+  "runtime": { "lab_mode": true, "real_mode": false },
+  "version": "0.1.0"
+}

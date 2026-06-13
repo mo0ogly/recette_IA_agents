@@ -23,6 +23,11 @@ temporal = [
 bundle = [
     "cryptography>=44",
 ]
+# Importing Microsoft Agent Framework declarative specs from YAML (recette import-maf).
+# JSON specs need none of this; only YAML parsing does.
+maf = [
+    "PyYAML>=6",
+]
 # Track U console API layer (FastAPI). The core recette/CLI need none of this.
 api = [
     "fastapi>=0.115",

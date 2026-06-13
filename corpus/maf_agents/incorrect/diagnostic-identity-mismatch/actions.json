@@ -1,0 +1,8 @@
+{
+  "agent_id": "diagnostic-identity-mismatch",
+  "actions": [
+    { "seq": 0, "provider": "OpenAI.Chat", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 1, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "mcp", "target": "https://mcp.example.com/mcp", "approved": true },
+    { "seq": 2, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "handoff", "target": "remediation-agent" }
+  ]
+}

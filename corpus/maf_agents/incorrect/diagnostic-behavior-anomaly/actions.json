@@ -1,0 +1,11 @@
+{
+  "agent_id": "diagnostic-behavior-anomaly",
+  "actions": [
+    { "seq": 0, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 1, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 2, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 3, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 4, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 5, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" }
+  ]
+}

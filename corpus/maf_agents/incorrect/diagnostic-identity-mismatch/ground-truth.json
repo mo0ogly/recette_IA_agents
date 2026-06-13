@@ -1,0 +1,14 @@
+{
+  "agent_id": "diagnostic-identity-mismatch",
+  "category": "incorrect",
+  "violation_type": "identity_mismatch",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic"] },
+  "expected_identification": {
+    "identity": { "match": false, "expected_principal": "AzureOpenAI" },
+    "capabilities": { "conforms": true },
+    "policy": { "compliant": true },
+    "behavior": { "expected": true }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "One action runs under provider OpenAI.Chat while the spec declares AzureOpenAI (I3 broken). Tools, approvals and behavior are otherwise conformant -- a single-axis identity violation."
+}

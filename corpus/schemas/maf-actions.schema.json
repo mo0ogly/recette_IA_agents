@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrail.local/schemas/maf-actions.schema.json",
+  "title": "AgentRail recette -- MAF subject action log",
+  "description": "What a standard-aligned (MAF) test subject ACTUALLY did: an ordered, deterministic log of tool invocations and handoffs. The gap between this and the sibling agent-spec (what it DECLARES) is what makes the subject correct or incorrect. Judged by recette.maf_judge on the four dimensions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "actions"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Must match the agent_id in the sibling spec.json.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "provider", "model", "action", "target"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 0 },
+          "provider": { "type": "string", "description": "Identity actually used (may differ from declared, I3)." },
+          "model": { "type": "string" },
+          "action": { "type": "string", "enum": ["invoke_tool", "handoff"] },
+          "target": { "type": "string", "minLength": 1 },
+          "tool_kind": {
+            "type": "string",
+            "enum": ["mcp", "function", "web_search", "file_search", "code_interpreter"],
+            "description": "Set when action=invoke_tool; absent/unknown models a hallucinated tool."
+          },
+          "approved": { "type": "boolean", "description": "Whether approval was obtained before invocation (I6)." }
+        }
+      }
+    }
+  }
+}

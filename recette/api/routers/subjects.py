@@ -1,0 +1,78 @@
+"""Unified subject catalog: the merged git + MAF corpus exposed to the console.
+
+After the fusion a subject is one manifest with a ``kind`` discriminator
+(git_agent | maf_agent). GET /subjects lists both families from the on-disk
+corpus; GET /subjects/scorecard returns the aggregate recette verdict
+(identification + MAF + discovery) the console renders as one dashboard.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi import APIRouter
+
+from ...harness import discover_agent_dirs
+from ...maf_harness import discover_maf_dirs
+from ...manifest import load_manifest
+
+router = APIRouter(prefix="/subjects", tags=["subjects"])
+
+
+def _read_ground_truth(d: Path) -> dict:
+    path = d / "ground-truth.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return {}
+
+
+def _summarize(manifest: dict, ground_truth: dict, manifest_file: str) -> dict:
+    return {
+        "agent_id": manifest.get("agent_id"),
+        "name": manifest.get("name"),
+        "family": manifest.get("kind", "git_agent"),
+        "target_systems": manifest.get("target_systems", []),
+        "manifest_file": manifest_file,
+        "category": ground_truth.get("category"),
+        "violation_type": ground_truth.get("violation_type"),
+        "expected_verdict": ground_truth.get("expected_verdict"),
+    }
+
+
+def _collect() -> list[dict]:
+    subjects: list[dict] = []
+    for d in discover_agent_dirs():
+        try:
+            manifest = load_manifest(d / "manifest.json")
+        except (ValueError, FileNotFoundError):
+            continue
+        subjects.append(_summarize(manifest, _read_ground_truth(d), "manifest.json"))
+    for d in discover_maf_dirs():
+        try:
+            manifest = load_manifest(d / "spec.json")
+        except (ValueError, FileNotFoundError):
+            continue
+        subjects.append(_summarize(manifest, _read_ground_truth(d), "spec.json"))
+    return subjects
+
+
+@router.get("")
+def list_subjects() -> dict:
+    """List every corpus subject across both families, with its ground-truth posture."""
+    subjects = _collect()
+    families: dict[str, int] = {}
+    for s in subjects:
+        families[s["family"]] = families.get(s["family"], 0) + 1
+    return {"count": len(subjects), "families": families, "subjects": subjects}
+
+
+@router.get("/scorecard")
+def scorecard() -> dict:
+    """Aggregate recette verdict over the unified corpus (identification + MAF + discovery)."""
+    from ...report import build_report
+
+    return build_report().to_dict()

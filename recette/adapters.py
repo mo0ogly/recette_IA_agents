@@ -27,6 +27,17 @@ from .events import ESCALATE_ACTIONS, ActionType, AgentAction, Mode
 SPAM_THRESHOLD = 5  # same (action_type, resource) repeated >= this many times = anomaly
 
 
+def repeats_beyond_threshold(keys: list[tuple[str, str]], threshold: int = SPAM_THRESHOLD) -> bool:
+    """True if any key occurs >= threshold times. Shared spam/anomaly test used by
+    the git identification adapter and the MAF judge (behavior dimension)."""
+    counts: dict[tuple[str, str], int] = {}
+    for key in keys:
+        counts[key] = counts.get(key, 0) + 1
+        if counts[key] >= threshold:
+            return True
+    return False
+
+
 @dataclass
 class DiscoveryResult:
     detected: bool
@@ -152,13 +163,8 @@ class ReferenceIdentificationAdapter:
     @staticmethod
     def _check_behavior(action_log: list[AgentAction]) -> bool:
         # Anomaly = the same action repeated on the same resource beyond the spam threshold.
-        counts: dict[tuple[str, str], int] = {}
-        for action in action_log:
-            key = (action.action_type, action.resource)
-            counts[key] = counts.get(key, 0) + 1
-            if counts[key] >= SPAM_THRESHOLD:
-                return False
-        return True
+        keys = [(a.action_type, a.resource) for a in action_log]
+        return not repeats_beyond_threshold(keys)
 
 
 # ---------------------------------------------------------------------------

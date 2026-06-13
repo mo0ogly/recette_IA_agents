@@ -16,6 +16,7 @@ _SCHEMAS = {
     "manifest": _SCHEMA_DIR / "agent-manifest.schema.json",
     "ground_truth": _SCHEMA_DIR / "ground-truth.schema.json",
     "scenario": _SCHEMA_DIR / "scenario.schema.json",
+    "maf_actions": _SCHEMA_DIR / "maf-actions.schema.json",
 }
 
 

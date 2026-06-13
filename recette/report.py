@@ -17,6 +17,7 @@ from .discovery_harness import (
 )
 from .discovery_scorecard import DiscoveryScorecard
 from .harness import DEFAULT_CORPUS, run_recette
+from .maf_harness import run_maf_recette
 from .scorecard import Scorecard
 
 
@@ -24,13 +25,19 @@ from .scorecard import Scorecard
 class FullReport:
     identification: Scorecard
     discovery: dict[str, DiscoveryScorecard]
+    maf: Scorecard
 
     @property
     def all_passed(self) -> bool:
-        return self.identification.all_passed and all(s.all_passed for s in self.discovery.values())
+        return (
+            self.identification.all_passed
+            and self.maf.all_passed
+            and all(s.all_passed for s in self.discovery.values())
+        )
 
     def to_dict(self) -> dict:
         i = self.identification
+        m = self.maf
         return {
             "identification": {
                 "agents": i.total,
@@ -38,6 +45,13 @@ class FullReport:
                 "false_positives": i.false_positives,
                 "false_negatives": i.false_negatives,
                 "all_passed": i.all_passed,
+            },
+            "maf": {
+                "agents": m.total,
+                "passed": m.passed_count,
+                "false_positives": m.false_positives,
+                "false_negatives": m.false_negatives,
+                "all_passed": m.all_passed,
             },
             "discovery": {
                 surface: {
@@ -60,6 +74,12 @@ class FullReport:
             f"identification : {i.passed_count}/{i.total} agents  "
             f"FP={i.false_positives} FN={i.false_negatives}  "
             f"{'PASS' if i.all_passed else 'FAIL'}"
+        )
+        m = self.maf
+        lines.append(
+            f"maf            : {m.passed_count}/{m.total} subjects  "
+            f"FP={m.false_positives} FN={m.false_negatives}  "
+            f"{'PASS' if m.all_passed else 'FAIL'}"
         )
         lines.append("")
         lines.append("discovery:")
@@ -84,4 +104,4 @@ def build_report() -> FullReport:
     for surface in SURFACE_ORDER:
         if discover_repo_dirs(SURFACE_CORPUS[surface]):
             discovery[surface] = run_discovery_recette(corpus_root=SURFACE_CORPUS[surface])
-    return FullReport(identification=ident, discovery=discovery)
+    return FullReport(identification=ident, discovery=discovery, maf=run_maf_recette())

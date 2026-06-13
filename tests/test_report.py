@@ -24,10 +24,17 @@ class TestAggregateReport(unittest.TestCase):
     def test_identification_present(self):
         self.assertGreater(self.report.identification.total, 0)
 
+    def test_maf_subjects_present_and_pass(self):
+        # The unified report aggregates the standard-aligned (MAF) corpus too.
+        self.assertGreater(self.report.maf.total, 0)
+        self.assertTrue(self.report.maf.all_passed, "\n" + self.report.render())
+
     def test_to_dict_shape(self):
         d = self.report.to_dict()
         self.assertIn("identification", d)
         self.assertIn("discovery", d)
+        self.assertIn("maf", d)
+        self.assertGreater(d["maf"]["agents"], 0)
         self.assertTrue(d["all_passed"])
         for surface in self.report.discovery:
             self.assertIn(surface, SURFACE_ORDER)

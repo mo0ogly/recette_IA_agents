@@ -1,12 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentrail.local/schemas/agent-manifest.schema.json",
-  "title": "AgentRail recette -- test agent manifest",
-  "description": "What a test agent DECLARES about itself: identity and capability scope. Discovery and identification are validated against the ground-truth, not this manifest -- a deliberately-incorrect agent declares one thing here and does another at runtime.",
+  "title": "AgentRail recette -- unified test agent manifest",
+  "description": "What a test agent DECLARES about itself: identity and capability scope. Unified across families: a git agent (github/gitlab) declares git capabilities (action/mode/resources); a standard-aligned agent (Microsoft Agent Framework) declares tool/handoff capabilities. Discovery and identification are validated against the ground-truth, not this manifest -- a deliberately-incorrect agent declares one thing here and does another at runtime.",
   "type": "object",
   "additionalProperties": false,
   "required": ["agent_id", "name", "target_systems", "declared_identity", "capability_scope", "runtime", "version"],
   "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["git_agent", "maf_agent"],
+      "description": "Subject family. Absent defaults to git_agent for backward compatibility."
+    },
     "agent_id": {
       "type": "string",
       "description": "Stable unique id (slug). Used to bind ground-truth and discovery results.",
@@ -14,16 +19,26 @@
     },
     "name": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Provenance when imported from an external standard.",
+      "properties": {
+        "standard": { "type": "string", "description": "e.g. microsoft-agent-framework." },
+        "maf_kind": { "type": "string", "description": "MAF top-level 'kind' (e.g. Prompt)." }
+      }
+    },
     "target_systems": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "enum": ["github", "gitlab"] },
+      "description": "Systems the agent acts on. git agents: github/gitlab. MAF agents: provider/runtime ids (e.g. azure_openai, mcp).",
+      "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true
     },
     "declared_identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["auth_method", "principal"],
+      "description": "Identity the agent declares. Git agents declare auth_method+principal; MAF agents declare provider+model (I3).",
       "properties": {
         "auth_method": {
           "type": "string",
@@ -33,33 +48,73 @@
           "type": "string",
           "description": "Declared principal (bot username, app slug, service account)."
         },
+        "provider": { "type": "string", "description": "MAF model.provider, e.g. AzureOpenAI, Foundry." },
+        "model": { "type": "string", "description": "MAF model.id (may be an =Env.X reference)." },
+        "connection_kind": { "type": "string", "description": "MAF model.connection.kind, e.g. remote." },
         "key_ref": {
           "type": "string",
           "description": "Env var name holding the credential (NEVER the secret itself, see no-hardcoded-secrets)."
         }
-      }
+      },
+      "anyOf": [
+        { "required": ["auth_method", "principal"] },
+        { "required": ["provider", "model"] }
+      ]
     },
     "capability_scope": {
       "type": "array",
       "minItems": 1,
-      "description": "Declared allowed actions. Identification checks observed actions stay within this set.",
+      "description": "Declared allowed actions. Identification checks observed actions stay within this set. Two capability shapes coexist: git (action/mode/resources) and MAF (invoke_tool/handoff).",
       "items": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["action", "mode", "resources"],
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": ["read_repo", "list_repos", "open_issue", "comment_issue", "open_pr", "merge_pr", "push", "manage_webhook", "manage_release", "read_ci", "trigger_ci"]
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "required": ["action", "mode", "resources"],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": ["read_repo", "list_repos", "open_issue", "comment_issue", "open_pr", "merge_pr", "push", "manage_webhook", "manage_release", "read_ci", "trigger_ci"]
+              },
+              "mode": { "type": "string", "enum": ["read", "write"] },
+              "resources": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Repo globs the action is allowed on, e.g. 'acme/*' or 'group/project'.",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
           },
-          "mode": { "type": "string", "enum": ["read", "write"] },
-          "resources": {
-            "type": "array",
-            "minItems": 1,
-            "description": "Repo globs the action is allowed on, e.g. 'acme/*' or 'group/project'.",
-            "items": { "type": "string", "minLength": 1 }
+          {
+            "additionalProperties": false,
+            "required": ["action", "tool_kind", "target", "approval"],
+            "properties": {
+              "action": { "const": "invoke_tool" },
+              "tool_kind": {
+                "type": "string",
+                "enum": ["mcp", "function", "web_search", "file_search", "code_interpreter"]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "description": "MCP server_url/server_label, function name, or hosted tool id."
+              },
+              "approval": {
+                "type": "string",
+                "enum": ["never", "always"],
+                "description": "MAF require_approval. 'always' => policy_decision escalate, blocks on approval (I6)."
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "required": ["action", "target"],
+            "properties": {
+              "action": { "const": "handoff" },
+              "target": { "type": "string", "minLength": 1, "description": "MAF handoff/agents target agent id." }
+            }
           }
-        }
+        ]
       }
     },
     "runtime": {
@@ -69,8 +124,8 @@
       "properties": {
         "language": { "type": "string", "description": "Implementation language (informational; discovery observes behavior, not source)." },
         "entrypoint": { "type": "string", "description": "Relative path to the agent runnable, when present." },
-        "lab_mode": { "type": "boolean", "description": "Runs against the simulated GitHub/GitLab lab." },
-        "real_mode": { "type": "boolean", "description": "Runs against real test orgs/repos with real tokens." }
+        "lab_mode": { "type": "boolean", "description": "Runs against the simulated lab." },
+        "real_mode": { "type": "boolean", "description": "Runs against real test orgs/repos or a real MAF runtime with real credentials." }
       }
     },
     "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }

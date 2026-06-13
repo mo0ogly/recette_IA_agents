@@ -56,12 +56,52 @@ def _cmd_validate(corpus_root: Path) -> int:
     # Validate the discovery repo corpus too.
     repo_errors, repo_count = _validate_repo_corpus()
     errors += repo_errors
+    # Validate the standard-aligned (MAF) subject corpus.
+    maf_errors, maf_count = _validate_maf_corpus()
+    errors += maf_errors
 
     if errors:
         print(f"\n{errors} validation error(s)", file=sys.stderr)
         return 1
-    print(f"OK: {len(agent_dirs)} agents valid, {repo_count} discovery repos valid")
+    print(
+        f"OK: {len(agent_dirs)} agents valid, {repo_count} discovery repos valid, "
+        f"{maf_count} MAF subjects valid"
+    )
     return 0
+
+
+def _validate_maf_corpus() -> tuple[int, int]:
+    """Schema-validate every MAF subject (spec/actions/ground-truth). Returns (errors, count)."""
+    from .maf_harness import discover_maf_dirs
+    from .manifest import load_validated
+
+    errors = 0
+    count = 0
+    for d in discover_maf_dirs():
+        count += 1
+        for kind, fname in (
+            ("manifest", "spec.json"),
+            ("maf_actions", "actions.json"),
+            ("ground_truth", "ground-truth.json"),
+        ):
+            try:
+                doc = load_validated(kind, d / fname)
+            except (ValueError, FileNotFoundError) as exc:
+                errors += 1
+                print(f"INVALID maf/{d.name}/{fname}: {exc}", file=sys.stderr)
+                continue
+            if doc.get("agent_id") != d.name:
+                errors += 1
+                print(f"INVALID maf/{d.name}/{fname}: agent_id != dir name", file=sys.stderr)
+    return errors, count
+
+
+def _cmd_maf() -> int:
+    from .maf_harness import run_maf_recette
+
+    scorecard = run_maf_recette()
+    print(scorecard.render())
+    return 0 if scorecard.all_passed else 1
 
 
 def _validate_repo_corpus() -> tuple[int, int]:
@@ -242,6 +282,32 @@ def _cmd_report(as_json: bool) -> int:
     return 0 if report.all_passed else 1
 
 
+def _cmd_import_maf(spec_path: str, out: str | None) -> int:
+    from .import_maf import load_maf, maf_to_manifest
+    from .manifest import validate
+
+    try:
+        maf = load_maf(Path(spec_path))
+        spec, gaps = maf_to_manifest(maf)
+    except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"import-maf failed: {exc}", file=sys.stderr)
+        return 2
+    for gap in gaps:
+        print(f"WARN unmapped MAF tool (no fabrication): {gap}", file=sys.stderr)
+    errors = validate("manifest", spec)
+    if errors:
+        for err in errors:
+            print(f"INVALID manifest: {err}", file=sys.stderr)
+        return 2
+    rendered = json.dumps(spec, indent=2)
+    if out:
+        Path(out).write_text(rendered + "\n", encoding="utf-8")
+        print(f"wrote agent-spec draft: {out} ({len(spec['capability_scope'])} capabilities)")
+    else:
+        print(rendered)
+    return 0
+
+
 _LLM_PROVIDERS = (
     "anthropic",
     "openai",
@@ -316,6 +382,15 @@ def build_parser() -> argparse.ArgumentParser:
     a_frz = agent_sub.add_parser("freeze", help="promote a recording into a Lane A golden")
     a_frz.add_argument("recording", help="path to a recording JSON")
     a_frz.add_argument("--out", default="corpus/agents/correct", help="output corpus dir")
+    sub.add_parser(
+        "maf", help="run the standard-aligned (MAF) identification recette and print the scorecard"
+    )
+    imp = sub.add_parser(
+        "import-maf",
+        help="import a Microsoft Agent Framework declarative spec into a unified manifest draft",
+    )
+    imp.add_argument("spec", help="path to a MAF spec (.yaml/.yml needs [maf], or .json)")
+    imp.add_argument("--out", default=None, help="write the draft here (default: stdout)")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -354,6 +429,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_agent_replay(args.recording)
         if args.agent_cmd == "freeze":
             return _cmd_agent_freeze(args.recording, args.out)
+    if args.command == "maf":
+        return _cmd_maf()
+    if args.command == "import-maf":
+        return _cmd_import_maf(args.spec, args.out)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")
