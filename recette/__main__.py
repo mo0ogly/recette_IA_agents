@@ -153,6 +153,52 @@ def _cmd_rag(eval_path: str, k: int) -> int:
     return 0 if scorecard.all_passed else 1
 
 
+def _cmd_rag_kb(action: str, doc_path: str | None, doc_id: str | None, scenario: str | None) -> int:
+    """Operator knowledge-base CRUD: list/add/del/reset/apply/scenarios."""
+    from .rag_store import KnowledgeBaseError, KnowledgeBaseStore
+
+    store = KnowledgeBaseStore()
+    try:
+        if action == "list":
+            for d in store.documents():
+                flag = f"  [poison:{d.get('threat')}]" if d["poisoned"] else ""
+                print(f"  {d['id']:28} {d['title']}{flag}")
+            return 0
+        if action == "scenarios":
+            for name in store.list_scenarios():
+                print(f"  {name}")
+            return 0
+        if action == "reset":
+            print(f"reset -> baseline ({store.reset()} documents)")
+            return 0
+        if action == "apply":
+            if not scenario:
+                print("apply requires --scenario", file=sys.stderr)
+                return 2
+            injected = store.apply_scenario(scenario)
+            print(f"applied {scenario}: injected {[d['id'] for d in injected]}")
+            return 0
+        if action == "add":
+            if not doc_path:
+                print("add requires --doc <file.json>", file=sys.stderr)
+                return 2
+            doc = json.loads(Path(doc_path).read_text(encoding="utf-8"))
+            print(f"added {store.add(doc)['id']}")
+            return 0
+        if action == "del":
+            if not doc_id:
+                print("del requires --id", file=sys.stderr)
+                return 2
+            store.delete(doc_id)
+            print(f"deleted {doc_id}")
+            return 0
+    except KnowledgeBaseError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"unknown rag-kb action: {action}", file=sys.stderr)
+    return 2
+
+
 def _cmd_publish(slug: str, owner: str, visibility: str, apply: bool) -> int:
     from .publish import publish_repo
 
@@ -419,6 +465,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="ground-truth eval file (corpus + queries)",
     )
     rag.add_argument("--k", type=int, default=5, help="number of docs to retrieve per query")
+    ragkb = sub.add_parser("rag-kb", help="operator knowledge-base CRUD (list/add/del/reset/apply)")
+    ragkb.add_argument(
+        "action", choices=["list", "add", "del", "reset", "apply", "scenarios"]
+    )
+    ragkb.add_argument("--doc", default=None, help="document JSON file (for add)")
+    ragkb.add_argument("--id", default=None, dest="doc_id", help="document id (for del)")
+    ragkb.add_argument("--scenario", default=None, help="scenario name (for apply)")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -438,6 +491,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_run(args.corpus)
     if args.command == "rag":
         return _cmd_rag(args.eval, args.k)
+    if args.command == "rag-kb":
+        return _cmd_rag_kb(args.action, args.doc, args.doc_id, args.scenario)
     if args.command == "discovery":
         return _cmd_discovery(args.adapter, args.surface)
     if args.command == "report":

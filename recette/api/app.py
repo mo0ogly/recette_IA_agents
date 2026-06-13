@@ -23,6 +23,7 @@ from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
+from ..rag_store import KnowledgeBaseStore
 from .campaign_store import CampaignStore, RecordingStore
 from .config_store import ConfigStore
 from .routers import actions as actions_router
@@ -157,6 +158,7 @@ def create_app(
     app.state.campaign_store = campaign_store if campaign_store is not None else CampaignStore()
     app.state.recording_store = recording_store if recording_store is not None else RecordingStore()
     app.state.verdict_store = verdict_store if verdict_store is not None else VerdictStore()
+    app.state.kb_store = KnowledgeBaseStore()
     app.state.gateway = Gateway(
         catalog=action_catalog,
         policy_store=policies,

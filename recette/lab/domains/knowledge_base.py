@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from functools import lru_cache
-from pathlib import Path
 
-_KB_PATH = Path(__file__).resolve().parents[3] / "corpus" / "rag" / "knowledge_base.json"
+from ...rag_store import live_documents
 
 _ACTION_FIELDS: dict[str, dict[str, str]] = {
     "ingest_document": {"index_state": "document_ingested"},
@@ -25,10 +23,9 @@ _ACTION_FIELDS: dict[str, dict[str, str]] = {
 }
 
 
-@lru_cache(maxsize=1)
 def _documents() -> tuple[dict, ...]:
-    data = json.loads(_KB_PATH.read_text(encoding="utf-8"))
-    return tuple(data["documents"])
+    """Current shared knowledge base (baseline + any applied scenario)."""
+    return tuple(live_documents())
 
 
 def _retrieve(query: str) -> list[dict]:

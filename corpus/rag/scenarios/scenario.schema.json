@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrail.local/schemas/rag-scenario.schema.json",
+  "title": "RAG poison scenario -- documents injected into the knowledge base for a recette",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description", "documents"],
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+    "description": {"type": "string"},
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "content", "poisoned", "tags"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+          "title": {"type": "string"},
+          "content": {"type": "string"},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "poisoned": {"type": "boolean"},
+          "injected_action": {"type": "string"},
+          "injected_target_system": {"type": "string"},
+          "injected_expect": {"type": "string", "enum": ["allow", "deny", "escalate"]},
+          "threat": {"type": "string"}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"poisoned": {"const": true}}},
+            "then": {
+              "required": [
+                "injected_action",
+                "injected_target_system",
+                "injected_expect",
+                "threat"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
