@@ -23,7 +23,13 @@ Donc : reference/banc-de-test de qualite. Les gaps ci-dessous separent ca d'un
 
 ## Gaps priorises
 
-### G1 -- AuthN/AuthZ sur l'API (I3) -- CRITIQUE
+### G1 -- AuthN/AuthZ sur l'API (I3) -- CRITIQUE -- [FAIT 2026-06-13, branch feat/g1-api-auth]
+> Livre : JWT HS256 stdlib (`recette/api/auth.py`), `JWTAuthMiddleware` deny-by-default
+> gate par `AGENTRAIL_JWT_SIGNING_KEY`, liaison identite sur `/actions/execute` (agent ne
+> peut agir que comme lui-meme, 403 sinon), echec d'auth log structure (R6). 17 tests
+> (`tests/test_api_auth.py` : alg-confusion/none/tamper/exp/nbf/401/403/200), runbook
+> `docs/runbooks/api-auth.md` + 2 mermaid. Suite 749 verte, gates clean. Reste possible :
+> auth des autres routes sensibles via roles (operator vs agent) plus fin, rotation de cle.
 - Constat verifie : `grep Depends|Security recette/api/routers/` = **0 hit**. Toutes les
   routes (`/actions/execute`, `/config/*`, `/policies`, `/rag/*`, `/approvals`...) sont
   **non authentifiees**. I3 (liaison crypto a une identite) n'est pas applique sur la

@@ -8,6 +8,7 @@ the decision path downstream never reads the host clock.
 from __future__ import annotations
 
 import datetime as _dt
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -19,6 +20,24 @@ from ...platform.gateway import ActionRequest
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 _REQUIRED_FIELDS = ("agent_id", "action_type", "target_system", "resource")
+_log = logging.getLogger("agentrail.api.actions")
+
+
+def _bind_identity(request: Request, agent_id: str) -> None:
+    """I3: an authenticated agent may only act as itself. A token whose bound
+    agent_id differs from the requested one is refused (403, audited). When auth
+    is disabled (no principal) there is no identity to bind against -- unchanged."""
+    principal = getattr(request.state, "principal", None)
+    if principal is not None and principal.kind == "agent" and agent_id != principal.agent_id:
+        _log.warning(
+            "identity mismatch path=/actions/execute sub=%s bound_agent=%s requested_agent=%s",
+            principal.sub,
+            principal.agent_id,
+            agent_id,
+        )
+        raise HTTPException(
+            status_code=403, detail="agent_id does not match the authenticated identity"
+        )
 
 
 def _capture_timestamp() -> str:
@@ -34,6 +53,7 @@ def execute_action(request: Request, body: dict[str, Any], response: Response) -
     payload = body.get("payload", {})
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="'payload' must be an object when present")
+    _bind_identity(request, str(body["agent_id"]))
     action = ActionRequest(
         agent_id=str(body["agent_id"]),
         action_type=str(body["action_type"]),
