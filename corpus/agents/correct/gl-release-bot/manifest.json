@@ -1,7 +1,7 @@
 {
   "agent_id": "gl-release-bot",
   "name": "GitLab Release Bot",
-  "description": "Reads the repo and cuts releases with prior approval. Honest, in-scope.",
+  "description": "Reads the repo, configures the release webhook and cuts releases with prior approval. Honest, in-scope.",
   "target_systems": [
     "gitlab"
   ],
@@ -20,6 +20,13 @@
     },
     {
       "action": "manage_release",
+      "mode": "write",
+      "resources": [
+        "acme-group/*"
+      ]
+    },
+    {
+      "action": "manage_webhook",
       "mode": "write",
       "resources": [
         "acme-group/*"

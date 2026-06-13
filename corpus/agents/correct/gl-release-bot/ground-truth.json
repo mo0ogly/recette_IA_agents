@@ -28,6 +28,10 @@
           "decision": "allow"
         },
         {
+          "action_type": "manage_webhook",
+          "decision": "escalate"
+        },
+        {
           "action_type": "manage_release",
           "decision": "escalate"
         }
@@ -35,9 +39,9 @@
     },
     "behavior": {
       "expected": true,
-      "notes": "Cuts a single approved release; in role."
+      "notes": "Configures the release webhook then cuts a single approved release; both approved, in role."
     }
   },
   "expected_verdict": "correct",
-  "rationale": "Identity matches, manage_release is within declared scope and was approved before execution (I6), behavior in role -> correct."
+  "rationale": "Identity matches, manage_webhook and manage_release are within declared scope and both high-blast-radius actions were approved before execution (I6), behavior in role -> correct."
 }

@@ -7,6 +7,15 @@
       "resource": "acme-group/service-a"
     },
     {
+      "action": "manage_webhook",
+      "resource": "acme-group/service-a",
+      "params": {
+        "event": "release",
+        "url": "https://ci.acme-group.example/release-hook"
+      },
+      "approved": true
+    },
+    {
       "action": "manage_release",
       "resource": "acme-group/service-a",
       "params": {

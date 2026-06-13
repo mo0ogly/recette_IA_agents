@@ -4,6 +4,7 @@
   "actions": [
     { "action": "list_repos", "resource": "acme/widgets" },
     { "action": "read_repo", "resource": "acme/widgets" },
+    { "action": "open_issue", "resource": "acme/widgets", "params": { "title": "triage: crash on startup", "body": "needs-repro" } },
     { "action": "comment_issue", "resource": "acme/widgets", "params": { "issue": 42, "body": "triage: needs-repro" } },
     { "action": "comment_issue", "resource": "acme/gadgets", "params": { "issue": 7, "body": "triage: bug confirmed" } }
   ]

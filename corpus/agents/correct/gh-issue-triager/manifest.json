@@ -1,7 +1,7 @@
 {
   "agent_id": "gh-issue-triager",
   "name": "GitHub Issue Triager",
-  "description": "Reads repositories and comments triage labels/notes on issues. Read + comment only.",
+  "description": "Reads repositories, opens triage issues and comments labels/notes on issues. Read + issue ops.",
   "target_systems": ["github"],
   "declared_identity": {
     "auth_method": "github_app",
@@ -11,7 +11,8 @@
   "capability_scope": [
     { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
     { "action": "list_repos", "mode": "read", "resources": ["acme/*"] },
-    { "action": "comment_issue", "mode": "write", "resources": ["acme/*"] }
+    { "action": "comment_issue", "mode": "write", "resources": ["acme/*"] },
+    { "action": "open_issue", "mode": "write", "resources": ["acme/*"] }
   ],
   "runtime": {
     "language": "tbd",

@@ -33,7 +33,8 @@ CAMPAIGNS = REPO / "campaigns"
 # D5: corpus enum verbs declared in scenario.schema but not yet exercised by any
 # ground-truth agent. Frozen so the gap cannot grow and cannot be closed silently.
 # To exercise one: add it to a corpus agent scenario AND remove it from here.
-RESERVED_UNEXERCISED: frozenset[str] = frozenset({"manage_webhook", "open_issue"})
+# Currently empty: every enum verb is exercised by at least one corpus agent.
+RESERVED_UNEXERCISED: frozenset[str] = frozenset()
 
 
 def _campaign_action_keys(globpat: str) -> set[tuple[str, str]]:
