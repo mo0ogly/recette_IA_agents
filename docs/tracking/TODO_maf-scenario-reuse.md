@@ -50,10 +50,11 @@ being implemented now via APEX; everything below is queued.
       magentic (manager/ledger) style remains future.
 
 ## Platform territory (heavier)
-- [ ] **Middleware pipeline pattern** for the Gateway mediation (I2) -- reference pattern.
-- [ ] **Checkpointing / time-travel** semantics aligned with replay (I4).
-- [ ] **DevUI**-style interactive trace viewer in the console -- reference UX.
-- [ ] **AF Labs benchmark/RL eval** harness as a scorecard benchmark reference.
+All four DONE -- see the detailed entries in the "Full repo audit" section below.
+- [x] **Middleware pipeline pattern** for the Gateway mediation (I2).
+- [x] **Checkpointing / time-travel** semantics aligned with replay (I4).
+- [x] **DevUI**-style interactive trace viewer in the console.
+- [x] **AF Labs benchmark/RL eval** harness as a scorecard benchmark reference.
 
 ## Done
 - [x] MAF declarative spec -> unified manifest (import-maf)
