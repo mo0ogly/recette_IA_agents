@@ -89,15 +89,19 @@ class KnowledgeBaseStore:
         live_documents()
 
     def documents(self) -> list[dict]:
+        """Return a deep copy of the current knowledge base (callers cannot mutate it)."""
         return [copy.deepcopy(d) for d in live_documents()]
 
     def get(self, doc_id: str) -> dict | None:
+        """Return a copy of the document with this id, or None if absent."""
         for doc in live_documents():
             if doc["id"] == doc_id:
                 return copy.deepcopy(doc)
         return None
 
     def add(self, doc: dict) -> dict:
+        """Insert a validated document. Raises KnowledgeBaseError on invalid shape,
+        bad id slug, missing poison fields, or a duplicate id."""
         _validate(doc)
         docs = live_documents()
         if any(d["id"] == doc["id"] for d in docs):
@@ -106,6 +110,7 @@ class KnowledgeBaseStore:
         return copy.deepcopy(doc)
 
     def delete(self, doc_id: str) -> None:
+        """Remove the document with this id. Raises KnowledgeBaseError if unknown."""
         docs = live_documents()
         for i, doc in enumerate(docs):
             if doc["id"] == doc_id:
@@ -120,6 +125,7 @@ class KnowledgeBaseStore:
         return len(_LIVE)
 
     def list_scenarios(self) -> list[str]:
+        """Return the names of the available poison scenarios (the schema excluded)."""
         if not self._scenarios_dir.is_dir():
             return []
         return sorted(
