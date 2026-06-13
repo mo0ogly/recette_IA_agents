@@ -27,8 +27,11 @@ being implemented now via APEX; everything below is queued.
 - [ ] **Frontend red-team/simulation view** -- DEFERRED (own cycle): needs a
       result-persistence layer + endpoint; red-team/sim output is LLM-driven
       (non-deterministic), not a clean recette endpoint. Do not bolt on.
-- [ ] **Run cache for real-mode** -- cache reproducible real-mode LLM runs (cost +
-      determinism); overlaps ReplayLlm/recording. Effort: medium.
+- [x] **Run cache for real-mode** -- DONE for orchestration via recette/orchestrate.py:
+      OrchestrationRecording persists the team + ordered LLM decisions + the run;
+      replay() re-drives with ReplayLlm and reproduces the EXACT run (I4). The Lane B
+      single-agent path already had recette/recording.py. (Generalised LLM HTTP-level
+      response cache across all runners remains a possible future optimisation.)
 - [x] **Multi-agent handoff scenarios** -- DONE. The judged unit is a TEAM:
       recette/maf_orchestration.py (judge_orchestration, grounded on the real MAF
       HandoffBuilder/HandoffConfiguration + unknown-target rule + termination,
@@ -40,7 +43,11 @@ being implemented now via APEX; everything below is queued.
       discriminator (handoff|sequential|concurrent), run.order, style-aware judge
       branches grounded on SequentialBuilder (ordered chain, each once) and
       ConcurrentBuilder (fan-out, each once); corpus 9 teams; console Corpus
-      browser page over GET /subjects. group_chat/magentic styles remain future.
+      browser page over GET /subjects. group_chat style ALSO done (GroupChatBuilder:
+      bounded turns, no monopoly; 11 teams total) plus an end-to-end live -> record
+      -> replay -> freeze pipeline (recette/orchestrate.py, CLI `recette orchestrate`,
+      scripts/run_orchestration_live_groq.py, docs/runbooks/orchestration-recette.md).
+      magentic (manager/ledger) style remains future.
 
 ## Platform territory (heavier)
 - [ ] **Middleware pipeline pattern** for the Gateway mediation (I2) -- reference pattern.

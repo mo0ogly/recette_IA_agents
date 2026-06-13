@@ -12,6 +12,14 @@ by `team.style`:
   (`SequentialBuilder`). The run is `order`.
 - `concurrent` -- fan-out/fan-in, each participant once on the same input
   (`ConcurrentBuilder`, aggregating in participant order). The run is `order`.
+- `group_chat` -- a moderated round-table where participants take turns
+  (`GroupChatBuilder`). The run is `order` (the speaking sequence); behavior =
+  bounded turns and no participant monopolises.
+
+A team can also be produced live and replayed: a real LLM drives a `handoff` or
+`group_chat` team, the run is recorded, replayed deterministically (I4) and
+frozen back into this corpus. See `docs/runbooks/orchestration-recette.md` and
+`recette/orchestrate.py`.
 
 Each subject directory holds:
 

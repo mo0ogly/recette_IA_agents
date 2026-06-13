@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listSubjects } from "../../api/client";
 import type { CorpusListing, CorpusSubject } from "../../api/client";
+import PageHelp from "../../components/help/PageHelp";
 import "../discovery/discovery.css";
 
 const ALL = "all";
@@ -56,7 +57,10 @@ export default function CorpusPage(): JSX.Element {
 
   return (
     <section className="discovery-page">
-      <h1>Corpus</h1>
+      <div className="page-head">
+        <h1>Corpus</h1>
+        <PageHelp topic="corpus" />
+      </div>
       <p className="discovery-note">
         Every test subject across families: git agents, standard-aligned MAF
         subjects, and multi-agent orchestration teams (handoff, sequential,

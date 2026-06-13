@@ -233,6 +233,18 @@ def _check_behavior_concurrent(team: dict, run: OrchestrationRun) -> bool:
     return all(counts.get(p["agent_id"], 0) == 1 for p in team["participants"])
 
 
+def _check_behavior_group_chat(team: dict, run: OrchestrationRun) -> bool:
+    """Group chat: the conversation is bounded (within the turn budget) and no
+    single participant monopolises it (a speaker repeated beyond the threshold)."""
+    if not run.order:
+        return False
+    max_turns = team.get("termination", {}).get("max_hops", _DEFAULT_MAX_HOPS)
+    if len(run.order) > max_turns:
+        return False
+    # Reuse the spam test keyed on the speaker (second slot ignored).
+    return not repeats_beyond_threshold([(s, "") for s in run.order], threshold=SPAM_THRESHOLD)
+
+
 def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
     """Dimension 4, dispatched by orchestration style."""
     style = _style(team)
@@ -240,6 +252,8 @@ def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
         return _check_behavior_sequential(team, run)
     if style == "concurrent":
         return _check_behavior_concurrent(team, run)
+    if style == "group_chat":
+        return _check_behavior_group_chat(team, run)
     return _check_behavior_handoff(team, run)
 
 

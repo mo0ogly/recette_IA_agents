@@ -370,6 +370,58 @@ def _cmd_agent_freeze(recording_path: str, out_dir: str) -> int:
     return 0
 
 
+def _cmd_orchestrate_run(
+    team_path: str, provider: str, model: str, base_url: str | None, max_steps: int, out: str | None
+) -> int:
+    from .llm import build_llm
+    from .maf_orchestration import judge_orchestration
+    from .manifest import load_validated
+    from .orchestrate import record
+
+    try:
+        llm = build_llm(provider, model, base_url=base_url)  # live; key from env (R8)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    team = load_validated("maf_orchestration", Path(team_path))
+    rec = record(team, llm, provider=provider, model=model, max_steps=max_steps)
+    out_path = Path(out or f"{team['agent_id']}.orchestration.json")
+    rec.save(out_path)
+    verdict = judge_orchestration(team, rec.run).verdict
+    print(f"recorded {len(rec.decisions)} decisions; verdict={verdict}; saved {out_path}")
+    return 0
+
+
+def _cmd_orchestrate_replay(recording_path: str) -> int:
+    from .orchestrate import OrchestrationRecording, replay
+
+    rec = OrchestrationRecording.load(recording_path)
+    try:
+        _, result = replay(rec)
+    except ValueError as exc:
+        print(f"replay diverged: {exc}", file=sys.stderr)
+        return 1
+    print(f"replay deterministic: True; verdict={result.verdict}")
+    return 0
+
+
+def _cmd_orchestrate_freeze(
+    recording_path: str, out_dir: str, slug: str, category: str, violation_type: str | None
+) -> int:
+    from .orchestrate import OrchestrationRecording, freeze_to_corpus
+
+    rec = OrchestrationRecording.load(recording_path)
+    try:
+        out = freeze_to_corpus(
+            rec, out_dir, slug=slug, category=category, violation_type=violation_type
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"frozen corpus subject: {out}")
+    return 0
+
+
 def _cmd_report(as_json: bool) -> int:
     from .report import build_report
 
@@ -481,6 +533,29 @@ def build_parser() -> argparse.ArgumentParser:
     a_frz = agent_sub.add_parser("freeze", help="promote a recording into a Lane A golden")
     a_frz.add_argument("recording", help="path to a recording JSON")
     a_frz.add_argument("--out", default="corpus/agents/correct", help="output corpus dir")
+    orch = sub.add_parser(
+        "orchestrate", help="end-to-end multi-agent orchestration (run / replay / freeze)"
+    )
+    orch_sub = orch.add_subparsers(dest="orch_cmd", required=True)
+    o_run = orch_sub.add_parser("run", help="drive a team with a live LLM and record the run")
+    o_run.add_argument("team", help="path to a team.json (maf_orchestration)")
+    o_run.add_argument("--provider", default="groq", choices=list(_LLM_PROVIDERS))
+    o_run.add_argument("--model", required=True)
+    o_run.add_argument("--base-url", default=None, help="base URL for openai_compat")
+    o_run.add_argument("--max-steps", type=int, default=32)
+    o_run.add_argument("--out", default=None, help="recording output path")
+    o_rep = orch_sub.add_parser(
+        "replay", help="deterministically replay an orchestration recording"
+    )
+    o_rep.add_argument("recording", help="path to an orchestration recording JSON")
+    o_frz = orch_sub.add_parser("freeze", help="freeze a recording into a corpus subject")
+    o_frz.add_argument("recording", help="path to an orchestration recording JSON")
+    o_frz.add_argument(
+        "--out", default="corpus/maf_orchestration/correct", help="output corpus dir"
+    )
+    o_frz.add_argument("--slug", required=True, help="subject slug (dir + agent_id)")
+    o_frz.add_argument("--category", choices=["correct", "incorrect"], default="correct")
+    o_frz.add_argument("--violation-type", default=None, help="required when category=incorrect")
     sub.add_parser(
         "maf", help="run the standard-aligned (MAF) identification recette and print the scorecard"
     )
@@ -498,9 +573,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rag.add_argument("--k", type=int, default=5, help="number of docs to retrieve per query")
     ragkb = sub.add_parser("rag-kb", help="operator knowledge-base CRUD (list/add/del/reset/apply)")
-    ragkb.add_argument(
-        "action", choices=["list", "add", "del", "reset", "apply", "scenarios"]
-    )
+    ragkb.add_argument("action", choices=["list", "add", "del", "reset", "apply", "scenarios"])
     ragkb.add_argument("--doc", default=None, help="document JSON file (for add)")
     ragkb.add_argument("--id", default=None, dest="doc_id", help="document id (for del)")
     ragkb.add_argument("--scenario", default=None, help="scenario name (for apply)")
@@ -546,6 +619,17 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_agent_replay(args.recording)
         if args.agent_cmd == "freeze":
             return _cmd_agent_freeze(args.recording, args.out)
+    if args.command == "orchestrate":
+        if args.orch_cmd == "run":
+            return _cmd_orchestrate_run(
+                args.team, args.provider, args.model, args.base_url, args.max_steps, args.out
+            )
+        if args.orch_cmd == "replay":
+            return _cmd_orchestrate_replay(args.recording)
+        if args.orch_cmd == "freeze":
+            return _cmd_orchestrate_freeze(
+                args.recording, args.out, args.slug, args.category, args.violation_type
+            )
     if args.command == "maf":
         return _cmd_maf()
     if args.command == "import-maf":

@@ -13,6 +13,7 @@ export type HelpTopicKey =
   | "dashboard"
   | "cockpit"
   | "recette"
+  | "corpus"
   | "campaigns"
   | "verdicts"
   | "agents"
@@ -147,6 +148,51 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Les <code>ReferenceAdapter</code> fournis sont l'oracle de reference
           (offline). Un vrai outil se branche en implementant le meme protocole
           d'adaptateur.
+        </p>
+      </>
+    ),
+  },
+  corpus: {
+    title: "Aide — Corpus",
+    summary:
+      "Tous les sujets de recette, toutes familles : git, MAF, et equipes multi-agents.",
+    body: (
+      <>
+        <p>
+          Le corpus liste chaque <strong>sujet de test</strong> apres la fusion
+          git / MAF. Filtrer par <strong>famille</strong> :
+        </p>
+        <ul>
+          <li>
+            <code>git_agent</code> : action-logs GitHub / GitLab (identite +
+            capability_scope), juges sur 4 dimensions.
+          </li>
+          <li>
+            <code>maf_agent</code> : sujets alignes sur le standard Microsoft
+            Agent Framework (un seul agent declaratif).
+          </li>
+          <li>
+            <code>maf_orchestration</code> : equipes multi-agents. Quatre styles
+            calques sur les builders MAF reels : <code>handoff</code>,{" "}
+            <code>sequential</code>, <code>concurrent</code>,{" "}
+            <code>group_chat</code>.
+          </li>
+        </ul>
+        <h3>Les colonnes</h3>
+        <p>
+          <strong>Category</strong> (correct / incorrect),{" "}
+          <strong>Broken axis</strong> (l'unique dimension cassee d'un negatif :
+          identity, capabilities, policy ou behavior) et{" "}
+          <strong>Expected</strong> (le verdict attendu du ground-truth). Chaque
+          negatif casse <strong>exactement une</strong> dimension, ce qui rend la
+          precision par axe mesurable.
+        </p>
+        <h3>Bout en bout et rejouable (I4)</h3>
+        <p>
+          Une equipe peut etre jouee par un vrai LLM (Groq), enregistree, puis
+          <strong> rejouee a l'identique</strong> : le juge est une fonction pure
+          de (team, run). Voir le runbook
+          <code> docs/runbooks/orchestration-recette.md</code>.
         </p>
       </>
     ),

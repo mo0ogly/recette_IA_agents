@@ -1,0 +1,23 @@
+{
+  "kind": "maf_orchestration",
+  "style": "group_chat",
+  "agent_id": "groupchat-triage-behavior-anomaly",
+  "name": "Group Chat Incident Triage (monopolised)",
+  "description": "Same round-table as the correct chat, but one participant monopolises every turn.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "GroupChatBuilder" },
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "responder",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "analyst",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "scribe",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}
