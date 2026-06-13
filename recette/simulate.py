@@ -18,7 +18,7 @@ in real_mode, where the run is recorded, not replayed.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .llm import LlmBackend, Message, ToolSpec
 from .maf_judge import MafAction
@@ -60,10 +60,38 @@ class LlmUserSimulator:
 
 
 @dataclass(frozen=True)
+class SimState:
+    """Conversation state passed to a per-turn check.
+
+    Mirrors langwatch/scenario's ScenarioState handed to a ScriptStep: the check
+    sees the running transcript and the action log so far and decides whether to
+    continue or halt.
+    """
+
+    turn_index: int
+    transcript: list[Message]
+    action_log: list[MafAction]
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    passed: bool
+    reason: str = ""
+
+
+# A per-turn check inspects the SimState and returns None to continue, or a
+# CheckResult to record an assertion outcome. A CheckResult with passed=False
+# halts the run. Mirrors scenario's ScriptStep:
+# Callable[[ScenarioState], Optional[ScenarioResult]].
+SimCheck = Callable[["SimState"], "CheckResult | None"]
+
+
+@dataclass(frozen=True)
 class SimResult:
     action_log: list[MafAction]
     transcript: list[Message]
-    stopped_reason: str  # "completed" | "max_turns"
+    stopped_reason: str  # "completed" | "max_turns" | "check_failed"
+    check_results: list[CheckResult] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -151,6 +179,7 @@ def simulate(
     max_tool_steps: int = 6,
     max_user_turns: int = 8,
     approver: Approver = _deny_all,
+    checks: Sequence[SimCheck] = (),
 ) -> SimResult:
     """Drive ``subject`` through ``user_turns`` and return its action log.
 
@@ -159,6 +188,11 @@ def simulate(
     For each user message the subject may emit a chain of tool calls before a
     final answer (bounded by ``max_tool_steps``). Approval-gated tool calls are
     submitted to ``approver``; a denial records the call as unapproved (I6).
+
+    ``checks`` run after every user turn (mirroring scenario's per-step
+    ScriptStep): each returns None to continue or a CheckResult to record an
+    assertion; the first failing CheckResult halts the run (stopped_reason
+    "check_failed").
     """
     identity = spec["declared_identity"]
     provider, model = identity["provider"], identity["model"]
@@ -168,6 +202,7 @@ def simulate(
 
     history: list[Message] = []
     log: list[MafAction] = []
+    check_results: list[CheckResult] = []
     seq = 0
     stopped_reason = "completed"
 
@@ -207,4 +242,22 @@ def simulate(
             history.append(Message(role="assistant", content="", tool_name=name))
             history.append(Message(role="tool", content=f"ok:{name}", tool_name=name))
 
-    return SimResult(action_log=log, transcript=history, stopped_reason=stopped_reason)
+        state = SimState(turn_index=turn_index, transcript=list(history), action_log=list(log))
+        halted = False
+        for check in checks:
+            outcome = check(state)
+            if outcome is not None:
+                check_results.append(outcome)
+                if not outcome.passed:
+                    stopped_reason = "check_failed"
+                    halted = True
+                    break
+        if halted:
+            break
+
+    return SimResult(
+        action_log=log,
+        transcript=history,
+        stopped_reason=stopped_reason,
+        check_results=check_results,
+    )

@@ -10,7 +10,7 @@ import unittest
 from recette.import_maf import maf_to_manifest
 from recette.llm import LlmDecision, StubLlm
 from recette.maf_judge import judge_maf
-from recette.simulate import LlmUserSimulator, simulate
+from recette.simulate import CheckResult, LlmUserSimulator, SimState, simulate
 
 MAF_SPEC = {
     "kind": "Prompt",
@@ -78,6 +78,42 @@ class TestSimulate(unittest.TestCase):
         self.assertEqual(len(res.action_log), 1)
         self.assertEqual(res.action_log[0].target, "web_search")
         self.assertEqual(res.stopped_reason, "completed")
+
+    def test_per_turn_check_halts_on_failure(self) -> None:
+        # A per-turn check that fails as soon as an undeclared tool is invoked
+        # (mirrors scenario's ScriptStep returning a result to halt).
+        def no_undeclared(state: SimState) -> CheckResult | None:
+            for a in state.action_log:
+                if a.tool_kind is None:
+                    return CheckResult(passed=False, reason=f"undeclared {a.target}")
+            return None
+
+        subject = StubLlm([_tc("delete_everything"), _final("oops")])
+        res = simulate(
+            spec=SPEC,
+            subject=subject,
+            user_turns=["a", "b"],
+            approver=lambda _a: True,
+            checks=[no_undeclared],
+        )
+        self.assertEqual(res.stopped_reason, "check_failed")
+        self.assertFalse(res.check_results[0].passed)
+        self.assertIn("undeclared", res.check_results[0].reason)
+
+    def test_passing_check_does_not_halt(self) -> None:
+        calls: list[int] = []
+
+        def always_ok(state: SimState) -> CheckResult | None:
+            calls.append(state.turn_index)
+            return CheckResult(passed=True, reason="ok")
+
+        subject = StubLlm([_tc("web_search"), _final("done")])
+        res = simulate(
+            spec=SPEC, subject=subject, user_turns=["only-turn"], checks=[always_ok]
+        )
+        self.assertEqual(res.stopped_reason, "completed")
+        self.assertEqual(calls, [1])  # check ran once, after the single user turn
+        self.assertTrue(res.check_results[0].passed)
 
     def test_simulation_is_deterministic(self) -> None:
         run = lambda: simulate(  # noqa: E731

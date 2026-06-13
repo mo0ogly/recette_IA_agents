@@ -7,16 +7,21 @@ being implemented now via APEX; everything below is queued.
 - [ ] **OpenTelemetry audit semantics** -- adopt OTel semantic conventions for the
       action log / audit trace so AgentRail traces are interoperable with any OTel
       backend. Audit Plane (I1). Effort: medium.
-- [ ] **RedTeamAgent -> negative-corpus generator** -- transpose scenario's RedTeamAgent
-      to auto-generate adversarial subjects (rag-poisoning, capability_overreach).
-      Effort: medium.
+- [x] **RedTeamAgent -> negative-corpus generator** -- DONE. recette/redteam.py:
+      RedTeamSimulator (Crescendo 4-phase adversarial user, grounded on
+      scenario/red_team_agent.py) + to_corpus_subject (deterministic single-axis
+      negative freeze, ground-truth derived from judge_subject). tests/test_redteam.py.
 - [ ] **require_approval -> real approval workflow** -- a MAF approval=always action
       triggers an actual approval workflow (not just a judged flag). Closes I6 loop.
       Effort: medium.
 
 ## Medium value
-- [ ] **Per-turn assertions in simulate** -- extend recette/simulate.py to assert at any
-      conversation point, not only the final verdict (scenario feature). Effort: quick win.
+- [x] **Per-turn assertions in simulate** -- DONE. recette/simulate.py: SimCheck /
+      SimState / CheckResult, run after each turn (grounded on scenario's ScriptStep
+      Callable[[ScenarioState], Optional[ScenarioResult]]); a failing check halts.
+- [ ] **Frontend red-team/simulation view** -- DEFERRED (own cycle): needs a
+      result-persistence layer + endpoint; red-team/sim output is LLM-driven
+      (non-deterministic), not a clean recette endpoint. Do not bolt on.
 - [ ] **Run cache for real-mode** -- cache reproducible real-mode LLM runs (cost +
       determinism); overlaps ReplayLlm/recording. Effort: medium.
 - [ ] **Multi-agent handoff scenarios** -- subjects where agent A delegates to B
