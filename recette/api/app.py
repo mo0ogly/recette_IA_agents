@@ -7,12 +7,15 @@ Plane, Phase 1 SQLite), policy store, lab proxy and the Gateway (I2).
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from ..llm import build_llm
 from ..platform.catalog import Catalog, load_catalog
@@ -24,6 +27,7 @@ from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
 from ..rag_store import KnowledgeBaseStore
+from .auth import AuthError, decode_token, principal_from_claims
 from .campaign_store import CampaignStore, RecordingStore
 from .config_store import ConfigStore
 from .routers import actions as actions_router
@@ -47,6 +51,44 @@ from .verdict_store import VerdictStore
 
 DEFAULT_EVENT_STORE_PATH = "data/agentrail.events.db"
 BASELINE_POLICY_VERSION = "v1"
+# Routes reachable without a token: liveness + the OpenAPI surface. Everything
+# else requires a verified identity once a signing key is configured (I3).
+AUTH_ALLOWLIST = frozenset({"/health", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"})
+_auth_logger = logging.getLogger("agentrail.api.auth")
+
+
+class JWTAuthMiddleware(BaseHTTPMiddleware):
+    """Resolve a Principal from a Bearer JWT before any handler runs (I3).
+
+    Enforcement is gated on configuration: when ``app.state.auth_key`` is None
+    (no ``AGENTRAIL_JWT_SIGNING_KEY``) the API runs in open dev/test mode and a
+    loud warning is logged once at startup. When a key IS set, every non-allowlisted
+    route is deny-by-default: no valid token -> 401, and the failure is logged
+    structured (R6) with the path and reason (never the token contents).
+    """
+
+    async def dispatch(self, request, call_next):  # type: ignore[no-untyped-def]
+        key = getattr(request.app.state, "auth_key", None)
+        if key is None:
+            request.state.principal = None
+            return await call_next(request)
+        if request.method == "OPTIONS" or request.url.path in AUTH_ALLOWLIST:
+            return await call_next(request)
+        header = request.headers.get("authorization", "")
+        token = header[7:].strip() if header[:7].lower() == "bearer " else ""
+        try:
+            request.state.principal = principal_from_claims(decode_token(token, key))
+        except AuthError as exc:
+            _auth_logger.warning(
+                "auth rejected path=%s method=%s reason=%s",
+                request.url.path,
+                request.method,
+                exc,
+            )
+            return JSONResponse(status_code=401, content={"detail": "authentication required"})
+        return await call_next(request)
+
+
 # Console (Vite) runs on a different origin than the API, so the browser
 # requires CORS. Origins are configurable (R5); the default covers the local
 # console on both loopback spellings. Never wildcard with credentials.
@@ -99,6 +141,19 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="AgentRail Recette API", version="0.1.0", lifespan=_lifespan)
 
+    # Identity binding (I3). The key is the only thing that turns enforcement on:
+    # set in production, unset in dev/test. Resolved from env (R8), never hardcoded.
+    auth_key = os.environ.get("AGENTRAIL_JWT_SIGNING_KEY") or None
+    app.state.auth_key = auth_key
+    if auth_key is None:
+        _auth_logger.warning(
+            "AUTH DISABLED: AGENTRAIL_JWT_SIGNING_KEY is unset -- the API accepts "
+            "unauthenticated requests (dev/test mode). Production MUST set this key."
+        )
+
+    # Middleware added FIRST is innermost; CORS is added LAST so it wraps auth and
+    # still stamps CORS headers on a 401. Auth runs after CORS resolves the request.
+    app.add_middleware(JWTAuthMiddleware)
     cors_origins = [
         origin.strip()
         for origin in os.environ.get("AGENTRAIL_CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
