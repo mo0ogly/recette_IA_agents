@@ -16,11 +16,13 @@ runbook. Suite complete verte.
 
 ## Reste a faire
 
-- [ ] T1 (BLOQUANT) Verif visuelle frontend -- jamais smoke-teste en navigateur
-      (R26 : livre, non verifie). Avec Playwright MCP : naviguer localhost:5173 ->
-      onglet RAG -> section "Knowledge base", verifier zero Component Error, table
-      des docs visible, badge poison, boutons Reset / Apply scenario / Insert.
-      Capture ARIA snapshot. Si pas de Playwright : laisser a l'utilisateur.
+- [x] T1 DONE -- smoke navigateur reel (headless puppeteer, pas de Playwright MCP).
+      Stack monte (API :8080 + vite :5174), navigation /rag -> section "Knowledge
+      base" : table 8 docs, badges poison (kb-poison-exfil/invalid-command),
+      boutons Reset/Apply/scenario-select, form Insert. FLUX live verifie (R26) :
+      load 8 -> apply exfil-finance -> 9 (scn-exfil-finance present) -> reset -> 8
+      (poison parti), zero erreur console app, gate reseau propre. Screenshot
+      capture. Bonus : favicon.ico cree (le smoke avait expose le 404 favicon).
 
 - [ ] T2 Wiring Makefile : `make rag-kb` (liste le KB), `make rag-e2e` (cf T3).
       Cible : parite avec les targets existants (rag, bnp, role-matrix, coverage-guard).
