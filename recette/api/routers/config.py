@@ -17,6 +17,9 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Request, Response
 
 from ...llm import Message, build_llm
+from ...platform.events import PlatformActionEvent
+from ...platform.proxy.lab_proxy import LabHttpProxy
+from ...platform.proxy.router import resolve_proxy
 from ..config_store import UnknownAgentError, UnknownServerError
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -344,3 +347,73 @@ def server_log(request: Request, server_id: str, after: int = 0) -> dict:
             except json.JSONDecodeError:
                 break
     return {"lines": entries[after:], "next": len(entries)}
+
+
+@router.post("/servers/{server_id}/test")
+def test_server(request: Request, server_id: str, body: dict | None = _OPTIONAL_JSON_BODY) -> dict:
+    """Diagnostic probe: fire one action at a configured server and return its
+    raw response, exactly as a run's proxy would (I5 path).
+
+    Body: ``{"action_type": str, "resource": str, "payload": dict}``.
+    ``action_type`` is required; ``resource`` defaults to "" and ``payload``
+    to ``{}``. The action is sent through the SAME ExternalSystemProxy a real
+    run uses (``resolve_proxy``), so a "test OK" here means the server answers
+    the lab wire contract (``POST /{system}/execute`` -> ``{success, data}``).
+
+    Diagnostic path, NOT a decision/audit path: no event is appended (I1 N/A)
+    and the synthetic ``event_id``/``timestamp`` are fixed inputs, never
+    generated inside a decision (I4 N/A). Fail-safe: every execution error
+    (server down, transport failure, non-2xx) maps to ``{"ok": false, ...}``;
+    only an unknown server id is a 404, and a non-probeable mode
+    (real_saas / malformed entry) is a 400.
+    """
+    server = _get_server_or_404(request, server_id)
+    action_type = ""
+    resource = ""
+    payload: dict = {}
+    if isinstance(body, dict):
+        raw_action = body.get("action_type")
+        if isinstance(raw_action, str):
+            action_type = raw_action.strip()
+        raw_resource = body.get("resource")
+        if isinstance(raw_resource, str):
+            resource = raw_resource
+        raw_payload = body.get("payload")
+        if isinstance(raw_payload, dict):
+            payload = raw_payload
+    if not action_type:
+        raise HTTPException(status_code=400, detail="action_type is required")
+    try:
+        # A single-entry registry: resolve_proxy validates mode/port and refuses
+        # real_saas or a malformed entry (fail-safe, never the wrong target).
+        proxy = resolve_proxy({"server": server_id}, [server], LabHttpProxy())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    event = PlatformActionEvent(
+        event_id=f"console-test-{server_id}-{action_type}",
+        timestamp="1970-01-01T00:00:00Z",
+        agent_id="console-test",
+        capability_scope=(),
+        role="diagnostic",
+        action_type=action_type,
+        target_system=str(server["system"]),
+        resource=resource,
+        payload=payload,
+        risk_score=0,
+        risk_level="low",
+    )
+    t0 = time.perf_counter()
+    try:
+        result = proxy.execute(event)
+    except Exception as exc:  # noqa: BLE001 -- fail-safe diagnostic boundary
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+        return {"ok": False, "latency_ms": latency_ms, "error": str(exc)}
+    latency_ms = int((time.perf_counter() - t0) * 1000)
+    return {
+        "ok": result.ok,
+        "latency_ms": latency_ms,
+        "status_code": result.status_code,
+        "response": result.response,
+        "side_effect_hash": result.side_effect_hash,
+        "error": result.error,
+    }

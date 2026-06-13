@@ -27,6 +27,7 @@ import type {
   ServerStatus,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import ServerTestPanel from "../../components/ServerTestPanel";
 import { LogConsole } from "../../components/LogConsole";
 import type { LogLine } from "../../components/LogConsole";
 import "./servers.css";
@@ -228,6 +229,7 @@ export default function ServersPage(): JSX.Element {
   const [statuses, setStatuses] = useState<Record<string, ServerStatus>>({});
   const [lifecycleErrors, setLifecycleErrors] = useState<Record<string, string>>({});
   const [openLogs, setOpenLogs] = useState<Record<string, boolean>>({});
+  const [openTests, setOpenTests] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // null means the form is in create mode; otherwise the id being edited.
@@ -351,6 +353,10 @@ export default function ServersPage(): JSX.Element {
     setOpenLogs((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  function toggleTest(id: string): void {
+    setOpenTests((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -429,6 +435,15 @@ export default function ServersPage(): JSX.Element {
                           </button>
                         </>
                       )}
+                      {server.mode !== "real_saas" && (
+                        <button
+                          type="button"
+                          className="servers-btn"
+                          onClick={() => toggleTest(server.id)}
+                        >
+                          {openTests[server.id] ? "Hide test" : "Test"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="servers-btn"
@@ -454,6 +469,15 @@ export default function ServersPage(): JSX.Element {
                   </td>
                 </tr>,
               ];
+              if (openTests[server.id]) {
+                rows.push(
+                  <tr key={`${server.id}-test`}>
+                    <td colSpan={6}>
+                      <ServerTestPanel server={server} />
+                    </td>
+                  </tr>,
+                );
+              }
               if (openLogs[server.id]) {
                 rows.push(
                   <tr key={`${server.id}-log`}>

@@ -169,3 +169,82 @@
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+/* Test panel: fire one action at a server and show its raw response. */
+.servers-test-panel {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-surface);
+}
+
+.servers-test-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 640px;
+}
+
+.servers-test-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 0.4rem;
+}
+
+.servers-test-form input,
+.servers-test-form select,
+.servers-test-form textarea {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.servers-test-form button {
+  margin-top: 0.6rem;
+  align-self: flex-start;
+}
+
+.servers-test-error {
+  margin-top: 0.6rem;
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.servers-test-result {
+  margin-top: 0.75rem;
+}
+
+.servers-test-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.servers-test-hash {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.servers-test-json {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  white-space: pre;
+}

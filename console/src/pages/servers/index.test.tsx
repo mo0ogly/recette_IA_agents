@@ -32,6 +32,8 @@ vi.mock("../../api/client", async (importOriginal) => {
     stopServer: vi.fn(),
     getServerStatus: vi.fn(),
     getServerLog: vi.fn(),
+    getCatalog: vi.fn(),
+    testServer: vi.fn(),
   };
 });
 
@@ -39,6 +41,7 @@ import {
   ApiError,
   createServer,
   deleteServer,
+  getCatalog,
   getServerLog,
   getServerStatus,
   listServers,
@@ -214,6 +217,30 @@ describe("ServersPage", () => {
     const panel = await screen.findByTestId("server-log-gh-mock");
     const line = await within(panel).findByText(/e2 delete_repository acme\/x 403/);
     expect(line.closest(".logc-line")).toHaveAttribute("data-level", "error");
+  });
+
+  it("toggles the Test panel on probeable servers but hides it for real_saas", async () => {
+    mockHappyList();
+    vi.mocked(getCatalog).mockResolvedValue([]);
+
+    render(<ServersPage />);
+
+    // real_saas cannot be probed: no Test button.
+    expect(
+      within(await rowOf("gh-saas")).queryByRole("button", { name: "Test" }),
+    ).not.toBeInTheDocument();
+
+    // mock_local exposes Test; clicking opens the panel for that server.
+    const row = await rowOf("gh-mock");
+    await within(row).findByText("up");
+    fireEvent.click(within(row).getByRole("button", { name: "Test" }));
+
+    expect(await screen.findByTestId("server-test-gh-mock")).toBeInTheDocument();
+    expect(getCatalog).toHaveBeenCalledWith("github");
+
+    // Toggle off removes the panel.
+    fireEvent.click(within(await rowOf("gh-mock")).getByRole("button", { name: "Hide test" }));
+    expect(screen.queryByTestId("server-test-gh-mock")).not.toBeInTheDocument();
   });
 
   it("shows mode-dependent form fields (port vs base_url vs owner)", async () => {

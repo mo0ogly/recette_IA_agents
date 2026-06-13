@@ -355,6 +355,22 @@ export interface ServerLifecycleResult {
   error?: string;
 }
 
+/** Result of POST /config/servers/{id}/test: one diagnostic action fired at
+ *  the server through the I5 proxy path. Fail-safe: ok=false carries error and
+ *  no response (server down, bad action, transport failure). */
+export interface ServerTestResult {
+  ok: boolean;
+  latency_ms: number;
+  /** Upstream HTTP status (0 when the call never reached the server). */
+  status_code?: number;
+  /** Raw server response body when ok=true. */
+  response?: Record<string, unknown>;
+  /** Audit hash of the produced side effect (I1/I5) when ok=true. */
+  side_effect_hash?: string | null;
+  /** Explanation when ok=false. */
+  error?: string | null;
+}
+
 /** One entry of a server's JSONL access log. */
 export interface ServerLogLine {
   event_id: string;

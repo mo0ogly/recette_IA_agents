@@ -141,6 +141,26 @@ def _stop_server(page: Page, console: str) -> None:
     print("[4/5] /servers: Stop -> status down")
 
 
+def _drive_test(page: Page) -> None:
+    # The "Test" verb: fire one action at the running server from the UI and
+    # assert it answers like a real server (ok + HTTP 200 in the result panel).
+    _server_row(page).get_by_role("button", name="Test", exact=True).click()
+    panel = page.get_by_test_id(f"server-test-{SERVER_ID}")
+    panel.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    # The dropdown is fed by the live catalog for the system; run the default
+    # (first) catalogued action -- the lab handler answers it deterministically.
+    combo = panel.get_by_role("combobox")
+    combo.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    chosen = combo.input_value()
+    _expect(chosen != "", "test panel action dropdown stayed empty (catalog not loaded)")
+    panel.get_by_role("button", name="Run test", exact=True).click()
+    result = page.get_by_test_id(f"server-test-result-{SERVER_ID}")
+    result.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    result.get_by_text("HTTP 200", exact=False).wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect("ok" in (result.inner_text() or ""), "test result panel did not report ok")
+    print(f"[2b] /servers: Test {chosen} -> ok HTTP 200 (server answers live)")
+
+
 def _drive_campaign(page: Page, console: str) -> None:
     page.goto(f"{console}/campaigns", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
     row = page.locator("tr", has=page.get_by_text(CAMPAIGN_ID, exact=True)).first
@@ -182,6 +202,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # Order matters: the agent is bound to the server, so the server
             # must be UP for the campaign's proxied actions to succeed (I5).
             _start_server(page, console)
+            _drive_test(page)
             _drive_campaign(page, console)
             _stop_server(page, console)
             _verify_recording_and_replay(page, console)

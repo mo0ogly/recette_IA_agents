@@ -29,6 +29,7 @@ import type {
   ServerLifecycleResult,
   ServerLogTail,
   ServerStatus,
+  ServerTestResult,
   VerdictJudgement,
   VerdictScorecard,
   VerdictSubmission,
@@ -246,6 +247,23 @@ export function getServerLog(id: string, after = 0): Promise<ServerLogTail> {
   return request<ServerLogTail>(
     withQuery(`/config/servers/${encodeURIComponent(id)}/log`, { after }),
     { method: "GET" },
+  );
+}
+
+/** Request body for POST /config/servers/{id}/test. */
+export interface ServerTestRequest {
+  action_type: string;
+  resource?: string;
+  payload?: Record<string, unknown>;
+}
+
+export function testServer(
+  id: string,
+  body: ServerTestRequest,
+): Promise<ServerTestResult> {
+  return request<ServerTestResult>(
+    `/config/servers/${encodeURIComponent(id)}/test`,
+    { method: "POST", body: JSON.stringify(body) },
   );
 }
 
