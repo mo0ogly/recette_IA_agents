@@ -70,6 +70,16 @@ const EMPTY_STREAM_HINT = JSON.stringify({ hint: "no events in the buffer yet" }
 /** Hint shown in "diff" mode when a side is not chosen yet. */
 const DIFF_HINT = JSON.stringify({ hint: "pick two events (A and B) to compare" }, null, 2);
 
+/** Serialized stream text plus the decorations that must stay line-aligned. */
+interface StreamModel {
+  text: string;
+  decorations: FluxDecoration[];
+}
+
+/** Stable empty references so non-stream renders don't churn the viewer. */
+const EMPTY_DECORATIONS: FluxDecoration[] = [];
+const EMPTY_MODEL: StreamModel = { text: EMPTY_STREAM_HINT, decorations: EMPTY_DECORATIONS };
+
 /** Serialize the analyzer content for event/stream mode (pure, testable). */
 export function fluxAnalyzerContent(
   events: AuditEvent[],
@@ -157,14 +167,17 @@ export function FluxAnalyzer({
   filter = {},
   diffSeqs,
 }: FluxAnalyzerProps): JSX.Element {
-  // Stream mode is the only decorated/filtered surface. Build the model once.
-  const stream = useMemo(() => {
+  // Stream mode is the only decorated/filtered surface. Text and decorations
+  // are built together so they stay line-consistent: throttling them as one
+  // value prevents a stale (throttled) buffer from being lit by newer
+  // decorations whose line numbers exceed the displayed text.
+  const stream = useMemo<StreamModel>(() => {
     if (mode !== "stream") {
-      return null;
+      return EMPTY_MODEL;
     }
     const visible = filterEvents(events, filter);
     if (visible.length === 0) {
-      return { text: EMPTY_STREAM_HINT, decorations: [] as FluxDecoration[] };
+      return { text: EMPTY_STREAM_HINT, decorations: EMPTY_DECORATIONS };
     }
     const model = buildStreamModel(visible);
     return { text: model.text, decorations: streamDecorations(model.lines) };
@@ -177,17 +190,18 @@ export function FluxAnalyzer({
     return fluxAnalyzerContent(events, selectedSeq, "event");
   }, [events, selectedSeq, mode]);
 
-  // Throttle only the stream text (tail churn); event/diff are user-driven.
-  const streamText = useThrottledValue(stream?.text ?? "", STREAM_THROTTLE_MS, mode !== "stream");
+  // Throttle the whole model (text churn from the tail); event/diff are
+  // user-driven and bypass the throttle.
+  const shownStream = useThrottledValue(stream, STREAM_THROTTLE_MS, mode !== "stream");
 
   let body: ReactNode;
   if (mode === "diff") {
     const [a, b] = diffSeqs ?? [null, null];
     body = <MonacoDiffViewer original={eventJson(events, a)} modified={eventJson(events, b)} />;
   } else if (mode === "stream") {
-    body = <MonacoJsonViewer value={streamText} decorations={stream?.decorations ?? []} />;
+    body = <MonacoJsonViewer value={shownStream.text} decorations={shownStream.decorations} />;
   } else {
-    body = <MonacoJsonViewer value={eventValue} />;
+    body = <MonacoJsonViewer value={eventValue} decorations={EMPTY_DECORATIONS} />;
   }
 
   return (

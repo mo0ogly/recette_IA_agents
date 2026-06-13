@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import auditFixture from "../hooks/__fixtures__/auditEvents.fixture.json";
 import type { AuditEvent } from "../types/platform";
-import { FluxAnalyzer, fluxAnalyzerContent } from "./FluxAnalyzer";
+import { FluxAnalyzer, fluxAnalyzerContent, STREAM_THROTTLE_MS } from "./FluxAnalyzer";
 import type { FluxDecoration } from "./fluxModel";
 
 vi.mock("./MonacoJsonViewer", () => ({
@@ -132,5 +132,30 @@ describe("FluxAnalyzer", () => {
 
     const diff = await screen.findByTestId("diff-stub");
     expect(JSON.parse(diff.getAttribute("data-original") ?? "{}")).toHaveProperty("hint");
+  });
+
+  it("keeps decorations line-aligned with the throttled stream text", async () => {
+    // Regression: the stream text is throttled (2 s) but decorations used to be
+    // passed un-throttled, so a tail append could light lines the displayed
+    // (older) buffer did not yet contain. Text + decorations are now throttled
+    // as one model. A rerender that grows the tail happens within the throttle
+    // window (the test runs in well under STREAM_THROTTLE_MS), so the displayed
+    // value stays the OLD one -- and both fields move together: the decoration
+    // count tracks the displayed line count instead of jumping ahead.
+    expect(STREAM_THROTTLE_MS).toBeGreaterThan(100);
+    const { rerender } = render(
+      <FluxAnalyzer events={events.slice(0, 1)} selectedSeq={null} mode="stream" />,
+    );
+    const initial = (await screen.findByTestId("monaco-stub")) as HTMLTextAreaElement;
+    expect(initial.value.split("\n")).toHaveLength(1);
+    expect(initial.getAttribute("data-deco-count")).toBe("1");
+
+    // Tail grows to the full window; still inside the throttle interval.
+    rerender(<FluxAnalyzer events={events} selectedSeq={null} mode="stream" />);
+    const mid = screen.getByTestId("monaco-stub") as HTMLTextAreaElement;
+    const midLines = mid.value.split("\n").length;
+    const midDecos = Number(mid.getAttribute("data-deco-count"));
+    // Lockstep: decorations never reference more lines than are displayed.
+    expect(midDecos).toBe(midLines);
   });
 });
