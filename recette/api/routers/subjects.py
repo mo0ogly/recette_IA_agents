@@ -120,3 +120,11 @@ def orchestration_view(agent_id: str) -> dict:
     if view is None:
         raise HTTPException(status_code=404, detail=f"no orchestration subject {agent_id!r}")
     return view
+
+
+@router.get("/benchmark")
+def benchmark() -> dict:
+    """Judge-accuracy benchmark per dimension / style / area over the corpus."""
+    from ...benchmark import full_benchmark
+
+    return full_benchmark()

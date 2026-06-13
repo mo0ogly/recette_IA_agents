@@ -104,13 +104,15 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       actual routed path, numbered hops/order + tool calls). Conventions mirror
       _viz.py (flowchart TD, id["label"], a --> b, a -. label .-> b, ((fan-in)), id
       sanitization). CLI `recette orchestrate viz <team> [--run]`; tests/test_viz.py.
-- [ ] **pytest plugin** -- expose the recette corpus as pytest test cases (parametrised
-      per subject) alongside the unittest suite. Source: `scenario/pytest_plugin.py`.
-      Effort: small. Optional (unittest already green).
-- [ ] **Record the live campaign/role-matrix/rag runners** -- the scripts/run_*_live_groq.py
-      family still throws the live LLM run away ("NOT a replayable recette"). Capture
-      their decisions exactly like recette/orchestrate.py so each becomes replayable.
-      Effort: medium.
+- [x] **pytest plugin** -- DONE. tests/test_corpus_pytest.py: one parametrized pytest
+      case per corpus subject (id = slug) over the orchestration + MAF corpora, so
+      `pytest -k <slug>` runs a single subject; bare functions, so unittest discovery
+      ignores them (no double-run). Grounded on scenario/pytest_plugin.py. 18 params green.
+- [~] **Record the live runners** -- PARTIAL. The orchestration live runner already
+      records (recette/orchestrate.py) and now takes `--cache` (run_orchestration_live_groq.py)
+      so a live run is cheap + reproducible. The role-matrix/bnp/rag live_groq runners
+      drive Lane B agents (which already return a Recording) but still discard it --
+      wiring `--cache`/save there is the remaining slice.
 
 ### Platform territory (heavier -- reference patterns, not recette-core)
 - [x] **Middleware pipeline pattern** -- DONE. recette/platform/middleware.py:

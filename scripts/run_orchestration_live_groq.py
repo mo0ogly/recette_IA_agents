@@ -46,6 +46,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="if set, freeze each recording as a corpus subject under this dir",
     )
+    parser.add_argument(
+        "--cache",
+        default=None,
+        help="content-addressed LLM cache file (cheap, reproducible across runs)",
+    )
     args = parser.parse_args(argv)
 
     load_dotenv()  # R18: resolve GROQ_API_KEY from the gitignored .env if not already set
@@ -54,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    if args.cache is not None:
+        from recette.llm_cache import CachingLlm, LlmCache
+
+        llm = CachingLlm(llm, cache=LlmCache(args.cache), namespace=f"groq:{args.model}")
 
     teams = []
     for d in discover_orchestration_dirs():

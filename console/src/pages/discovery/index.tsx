@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { getRecetteScorecard } from "../../api/client";
 import type { RecetteScorecard } from "../../api/client";
+import BenchmarkPanel from "./BenchmarkPanel";
 import "./discovery.css";
 
 const SURFACE_ORDER = ["github", "gitlab", "temporal", "openapi", "mcp"] as const;
@@ -108,6 +109,8 @@ export default function DiscoveryPage(): JSX.Element {
               })}
             </tbody>
           </table>
+
+          <BenchmarkPanel />
         </>
       )}
     </section>

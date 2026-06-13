@@ -1,13 +1,19 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DiscoveryPage from "./index";
-import { getRecetteScorecard } from "../../api/client";
-import type { RecetteScorecard } from "../../api/client";
+import { getBenchmark, getRecetteScorecard } from "../../api/client";
+import type { Benchmark, RecetteScorecard } from "../../api/client";
 import fixture from "./__fixtures__/scorecard.fixture.json";
+import benchmarkFixture from "./__fixtures__/benchmark.fixture.json";
 
 vi.mock("../../api/client", () => ({
   getRecetteScorecard: vi.fn(),
+  getBenchmark: vi.fn(),
 }));
+
+beforeEach(() => {
+  vi.mocked(getBenchmark).mockResolvedValue(benchmarkFixture as Benchmark);
+});
 
 afterEach(() => {
   vi.clearAllMocks();

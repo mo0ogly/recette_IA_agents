@@ -715,3 +715,22 @@ export interface RunView {
 export function getOrchestrationView(agentId: string): Promise<RunView> {
   return request<RunView>(`/subjects/orchestration/${encodeURIComponent(agentId)}`);
 }
+
+export interface BenchmarkArea {
+  total: number;
+  passed: number;
+  false_positives: number;
+  false_negatives: number;
+  dimension_accuracy: { identity: number; capabilities: number; policy: number; behavior: number };
+}
+
+export interface Benchmark {
+  identification: BenchmarkArea;
+  maf: BenchmarkArea;
+  orchestration: BenchmarkArea & { by_style: Record<string, BenchmarkArea> };
+}
+
+/** GET /subjects/benchmark: judge-accuracy benchmark per dimension / style / area. */
+export function getBenchmark(): Promise<Benchmark> {
+  return request<Benchmark>("/subjects/benchmark");
+}
