@@ -71,13 +71,13 @@ REAL source file to ground a future cycle on (rule: reprends le code des repos).
 Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
 
 ### High value
-- [ ] **magentic orchestration style** -- a manager plans + delegates to workers
-      against a ledger until done. Source:
-      `python/packages/orchestrations/agent_framework_orchestrations/_magentic.py`
-      (MagenticBuilder). Finishes the 5 MAF styles. Recette: team.style "magentic";
-      judged unit = team; behavior = bounded manager turns + every dispatched worker
-      declared; capabilities = membership; corpus 1 correct + 1 mono-axis negative;
-      extend recette/maf_orchestration.py judge branch + drive() in orchestrate.py.
+- [x] **magentic orchestration style** -- DONE. team.style "magentic"; judged unit =
+      team; behavior = bounded rounds + no stall (same speaker selected >= 3 in a
+      row = MAF max_stall_count); capabilities = membership (invalid next_speaker).
+      _check_behavior_magentic in recette/maf_orchestration.py; drive() routes it to
+      the manager-routed loop (orchestrate.py); corpus magentic-research (1 correct +
+      1 stall negative); tests + docs + Help. Five MAF styles complete (13 teams).
+      Grounded on _magentic.py (StandardMagenticManager, progress ledger next_speaker).
 - [ ] **OpenTelemetry audit semantics** -- adopt OTel GenAI semantic conventions for
       the action log / recording so AgentRail traces interoperate with any OTel
       backend. Source: `python/packages/core/agent_framework/_telemetry.py`

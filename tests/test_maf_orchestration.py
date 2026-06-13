@@ -127,6 +127,12 @@ _SEQ_TEAM = {
 }
 
 _CONC_TEAM = {**_SEQ_TEAM, "style": "concurrent", "agent_id": "conc"}
+_MAG_TEAM = {
+    **_SEQ_TEAM,
+    "style": "magentic",
+    "agent_id": "mag",
+    "termination": {"max_hops": 8},
+}
 
 
 class TestStyles(unittest.TestCase):
@@ -152,13 +158,25 @@ class TestStyles(unittest.TestCase):
         self.assertFalse(dims["capabilities"])
         self.assertTrue(dims["identity"] and dims["policy"] and dims["behavior"])
 
+    def test_magentic_varied_speakers_is_correct(self) -> None:
+        result = judge_orchestration(_MAG_TEAM, OrchestrationRun(order=["a", "b", "a", "c"]))
+        self.assertEqual(result.verdict, "correct")
+        self.assertTrue(all(_result_dims(result).values()))
+
+    def test_magentic_stall_breaks_only_behavior(self) -> None:
+        # The same speaker selected MAX_STALL (3) times in a row = stall.
+        dims = _result_dims(
+            judge_orchestration(_MAG_TEAM, OrchestrationRun(order=["a", "b", "b", "b"]))
+        )
+        self.assertFalse(dims["behavior"])
+        self.assertTrue(dims["identity"] and dims["capabilities"] and dims["policy"])
+
     def test_default_style_is_handoff(self) -> None:
         # A team with no explicit style is judged as handoff (backward compatible):
         # a declared single hop from the start agent is correct.
         self.assertNotIn("style", TEAM)
         run = OrchestrationRun(hops=[HandoffHop(1, "triage", "worker")])
         self.assertEqual(judge_orchestration(TEAM, run).verdict, "correct")
-
 
 
 class TestCorpus(unittest.TestCase):

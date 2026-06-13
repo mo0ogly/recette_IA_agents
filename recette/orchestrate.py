@@ -223,7 +223,8 @@ def drive(
     style = team.get("style", "handoff")
     if style in ("sequential", "concurrent"):
         return _drive_linear(team, backend)
-    if style == "group_chat":
+    if style in ("group_chat", "magentic"):
+        # Both are manager-routed: the manager selects the next speaker each round.
         return _drive_group_chat(team, backend, max_steps)
     return _drive_handoff(team, backend, max_steps)
 

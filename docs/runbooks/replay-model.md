@@ -106,12 +106,18 @@ flowchart TB
     M -- "speak_Y" --> T2["turn: analyst"]
     M -- "speak_X" --> T3["turn: responder"]
   end
+  subgraph magentic["magentic -- MagenticBuilder"]
+    MM["manager + progress ledger"] -- "next_speaker" --> R1["round: planner"]
+    MM -- "next_speaker" --> R2["round: researcher"]
+    MM -- "next_speaker" --> R3["round: writer"]
+  end
 ```
 
 Behavior axis per style: handoff = start at start_agent, within the termination
 bound, no loop; sequential = executed order == declared order, each once;
 concurrent = each declared participant once; group_chat = bounded turns, no
-participant monopolises.
+participant monopolises; magentic = bounded rounds, no stall (same speaker
+selected three rounds in a row).
 
 ## Campaign record -> replay (I4 at the campaign level)
 

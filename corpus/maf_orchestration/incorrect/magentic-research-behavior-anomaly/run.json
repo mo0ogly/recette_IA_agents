@@ -1,0 +1,4 @@
+{
+  "agent_id": "magentic-research-behavior-anomaly",
+  "order": ["planner", "researcher", "researcher", "researcher"]
+}

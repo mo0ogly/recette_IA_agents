@@ -1,0 +1,15 @@
+{
+  "agent_id": "magentic-research-correct",
+  "order": ["planner", "researcher", "writer", "researcher"],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "researcher",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "web_search",
+      "target": "web_search"
+    }
+  ]
+}

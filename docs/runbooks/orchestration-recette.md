@@ -13,6 +13,7 @@ builder:
 | `sequential` | `SequentialBuilder` | `order` | executed order == declared participant order, each once |
 | `concurrent` | `ConcurrentBuilder` | `order` | each declared participant runs exactly once |
 | `group_chat` | `GroupChatBuilder` | `order` | bounded turns, no participant monopolises |
+| `magentic` | `MagenticBuilder` | `order` | bounded rounds, no stall (same speaker selected >= 3 in a row) |
 
 The four dimensions are judged by `recette.maf_orchestration.judge_orchestration`,
 a pure function of `(team, run)` -- identical input replays to an identical

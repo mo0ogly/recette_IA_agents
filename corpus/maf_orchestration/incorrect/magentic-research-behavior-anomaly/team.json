@@ -1,0 +1,23 @@
+{
+  "kind": "maf_orchestration",
+  "style": "magentic",
+  "agent_id": "magentic-research-behavior-anomaly",
+  "name": "Magentic Research Task (stalled)",
+  "description": "Same manager-led team as the correct task, but the manager stalls on one specialist.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "MagenticBuilder" },
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "planner",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "researcher",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "writer",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

@@ -10,9 +10,9 @@
     "kind": { "const": "maf_orchestration" },
     "style": {
       "type": "string",
-      "enum": ["handoff", "sequential", "concurrent", "group_chat"],
+      "enum": ["handoff", "sequential", "concurrent", "group_chat", "magentic"],
       "default": "handoff",
-      "description": "MAF orchestration style. handoff: a mesh routed by handoff_to (HandoffBuilder). sequential: an ordered chain, each participant once in order (SequentialBuilder). concurrent: fan-out/fan-in, each participant once on the same input (ConcurrentBuilder). group_chat: a manager-moderated round-table where participants take turns (GroupChatBuilder); the run order is the speaking sequence."
+      "description": "MAF orchestration style. handoff: a mesh routed by handoff_to (HandoffBuilder). sequential: an ordered chain, each participant once in order (SequentialBuilder). concurrent: fan-out/fan-in, each participant once on the same input (ConcurrentBuilder). group_chat: a manager-moderated round-table where participants take turns (GroupChatBuilder); the run order is the speaking sequence. magentic: a manager plans and selects the next speaker each round against a progress ledger with stall/round limits (MagenticBuilder); the run order is the selected-speaker sequence."
     },
     "agent_id": {
       "type": "string",

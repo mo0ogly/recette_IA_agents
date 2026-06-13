@@ -243,6 +243,26 @@ def _check_behavior_group_chat(team: dict, run: OrchestrationRun) -> bool:
     return not repeats_beyond_threshold([(s, "") for s in run.order], threshold=SPAM_THRESHOLD)
 
 
+_MAX_STALL = 3  # MAF StandardMagenticManager.max_stall_count default
+
+
+def _check_behavior_magentic(team: dict, run: OrchestrationRun) -> bool:
+    """Magentic: the manager-selected speaker sequence stays within the round
+    budget and does not stall -- the same speaker selected MAX_STALL times in a
+    row means no progress (MAF stall_count >= max_stall_count)."""
+    if not run.order:
+        return False
+    max_rounds = team.get("termination", {}).get("max_hops", _DEFAULT_MAX_HOPS)
+    if len(run.order) > max_rounds:
+        return False
+    streak = 1
+    for prev, cur in zip(run.order, run.order[1:], strict=False):
+        streak = streak + 1 if cur == prev else 1
+        if streak >= _MAX_STALL:
+            return False
+    return True
+
+
 def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
     """Dimension 4, dispatched by orchestration style."""
     style = _style(team)
@@ -252,6 +272,8 @@ def _check_behavior(team: dict, run: OrchestrationRun) -> bool:
         return _check_behavior_concurrent(team, run)
     if style == "group_chat":
         return _check_behavior_group_chat(team, run)
+    if style == "magentic":
+        return _check_behavior_magentic(team, run)
     return _check_behavior_handoff(team, run)
 
 

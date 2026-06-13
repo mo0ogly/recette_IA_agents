@@ -172,10 +172,10 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             Agent Framework (un seul agent declaratif).
           </li>
           <li>
-            <code>maf_orchestration</code> : equipes multi-agents. Quatre styles
+            <code>maf_orchestration</code> : equipes multi-agents. Cinq styles
             calques sur les builders MAF reels : <code>handoff</code>,{" "}
             <code>sequential</code>, <code>concurrent</code>,{" "}
-            <code>group_chat</code>.
+            <code>group_chat</code>, <code>magentic</code>.
           </li>
         </ul>
         <h3>Les colonnes</h3>

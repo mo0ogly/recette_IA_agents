@@ -15,6 +15,10 @@ by `team.style`:
 - `group_chat` -- a moderated round-table where participants take turns
   (`GroupChatBuilder`). The run is `order` (the speaking sequence); behavior =
   bounded turns and no participant monopolises.
+- `magentic` -- a manager plans and selects the next speaker each round against a
+  progress ledger with stall/round limits (`MagenticBuilder`). The run is `order`
+  (the selected-speaker sequence); behavior = bounded rounds and no stall (the
+  same speaker selected three rounds in a row, MAF `max_stall_count`).
 
 A team can also be produced live and replayed: a real LLM drives a `handoff` or
 `group_chat` team, the run is recorded, replayed deterministically (I4) and
