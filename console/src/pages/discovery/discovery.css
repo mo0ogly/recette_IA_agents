@@ -1,0 +1,78 @@
+/* Page-scoped styles for the Discovery recette. Reuses the global tokens. */
+
+.discovery-page {
+  --discovery-radius: 4px;
+}
+
+.discovery-note {
+  color: var(--color-text-muted);
+  max-width: 70ch;
+  margin: 0.25rem 0 1rem;
+}
+
+.discovery-loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.discovery-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--discovery-radius);
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.discovery-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.discovery-stat {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.discovery-verdict {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--discovery-radius);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.discovery-verdict.ok {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.discovery-verdict.fail {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+.discovery-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.discovery-table th,
+.discovery-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.discovery-table td.ok {
+  color: var(--badge-green-fg);
+  font-weight: 600;
+}
+
+.discovery-table td.fail {
+  color: var(--badge-red-fg);
+  font-weight: 600;
+}
