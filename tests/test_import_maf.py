@@ -64,6 +64,47 @@ class TestImportMaf(unittest.TestCase):
         ws = next(c for c in scope if c.get("tool_kind") == "web_search")
         self.assertEqual(ws["approval"], "never")
 
+    def test_real_maf_declarative_schema(self) -> None:
+        # The real MAF declarative Tool model (agent_framework_declarative._models):
+        # discriminator `kind`, McpTool with `url`/`serverName` and an `approvalMode`
+        # object whose kind is always|never|specify.
+        spec = {
+            "kind": "Prompt",
+            "name": "Diagnostic Agent",
+            "model": {"id": "=Env.MODEL", "provider": "AzureOpenAI"},
+            "tools": [
+                {"kind": "web_search", "name": "search"},
+                {
+                    "kind": "mcp",
+                    "name": "diag",
+                    "serverName": "diagnostic-mcp",
+                    "url": "https://mcp.example.com/mcp",
+                    "approvalMode": {"kind": "always"},
+                },
+                {"kind": "function", "name": "restart_service"},
+            ],
+        }
+        manifest, gaps = maf_to_manifest(spec)
+        self.assertEqual(validate("manifest", manifest), [])
+        self.assertEqual(gaps, [])
+        scope = manifest["capability_scope"]
+        mcp = next(c for c in scope if c.get("tool_kind") == "mcp")
+        self.assertEqual(mcp["target"], "https://mcp.example.com/mcp")  # McpTool.url
+        self.assertEqual(mcp["approval"], "always")  # approvalMode.kind == always (I6)
+        fn = next(c for c in scope if c.get("tool_kind") == "function")
+        self.assertEqual(fn["target"], "restart_service")
+
+    def test_specify_approval_mode_is_gated(self) -> None:
+        # approvalMode.kind == "specify" requires approval for some tools -> gated.
+        spec = {
+            "kind": "Prompt",
+            "name": "Agent",
+            "model": {"id": "m", "provider": "p"},
+            "tools": [{"kind": "mcp", "url": "https://s/mcp", "approvalMode": {"kind": "specify"}}],
+        }
+        scope, _ = capabilities_from_maf(spec)
+        self.assertEqual(scope[0]["approval"], "always")
+
     def test_handoff_maps_to_capability(self) -> None:
         scope, _ = capabilities_from_maf(MAF_SPEC)
         handoffs = [c for c in scope if c["action"] == "handoff"]

@@ -50,16 +50,24 @@ def slugify(name: str) -> str:
 
 
 def _tool_kind(tool: dict) -> str | None:
-    """Read a MAF tool's kind from its 'type' or 'kind' field, if recognized."""
-    raw = tool.get("type") or tool.get("kind")
+    """Read a MAF tool's kind, if recognized.
+
+    The MAF declarative Tool model (agent_framework_declarative._models) keys the
+    discriminator on `kind`; older/sample specs used `type`. Both are accepted.
+    """
+    raw = tool.get("kind") or tool.get("type")
     if isinstance(raw, str) and raw in MAF_TOOL_KINDS:
         return raw
     return None
 
 
 def _tool_target(tool: dict) -> str:
-    """Pick a stable target identifier for a MAF tool, preferring the MCP server."""
-    for key in ("server_url", "server_label", "name", "toolName", "id"):
+    """Pick a stable target identifier for a MAF tool, preferring the MCP server.
+
+    Mirrors the real McpTool model fields (`url`, `serverName`) plus the
+    sample-spec spellings (`server_url`, `server_label`).
+    """
+    for key in ("url", "serverName", "server_url", "server_label", "name", "toolName", "id"):
         value = tool.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
@@ -67,13 +75,20 @@ def _tool_target(tool: dict) -> str:
 
 
 def _approval(tool: dict) -> str:
-    """Map MAF require_approval to the recette approval expectation.
+    """Map a MAF tool's approval requirement to the recette approval expectation.
 
-    MAF's hosted tools default to no approval; absence is mapped to 'never'
-    rather than invented as 'always' (that would fabricate a policy gate).
+    The real McpTool carries `approvalMode` as an object whose `kind` is
+    `always | never | specify` (McpServerApprovalMode). `specify` requires
+    approval for at least some tools, so it is treated as gated (always). Older
+    sample specs used a flat `require_approval` string/bool. Absence => never
+    (no fabricated policy gate, R13).
     """
+    mode = tool.get("approvalMode")
+    if isinstance(mode, dict):
+        kind = mode.get("kind")
+        return "always" if kind in ("always", "specify") else "never"
     raw = tool.get("require_approval")
-    return "always" if raw == "always" else "never"
+    return "always" if raw == "always" or raw is True else "never"
 
 
 def capabilities_from_maf(maf: dict) -> tuple[list[dict], list[str]]:
