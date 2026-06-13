@@ -2,7 +2,8 @@
 .PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
-        bnp role-matrix role-matrix-live coverage-guard rag rag-live recette
+        bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb \
+        system-recette system-recette-live recette
 
 help:
 	@echo "Setup:"
@@ -73,7 +74,16 @@ rag:
 rag-live:
 	python3 scripts/run_rag_poisoning_live_groq.py
 
-recette: coverage-guard validate run discovery bnp role-matrix rag
+rag-kb:
+	python3 -m recette rag-kb list
+
+system-recette:
+	python3 scripts/run_system_recette.py
+
+system-recette-live:
+	python3 scripts/run_system_recette.py --live
+
+recette: coverage-guard validate run discovery bnp role-matrix rag system-recette
 	@echo "recette: ALL PASS"
 
 test:
