@@ -136,6 +136,14 @@ def _cmd_maf() -> int:
     return 0 if scorecard.all_passed else 1
 
 
+def _cmd_benchmark(as_json: bool) -> int:
+    from .benchmark import full_benchmark, render
+
+    bench = full_benchmark()
+    print(json.dumps(bench, indent=2) if as_json else render(bench))
+    return 0
+
+
 def _validate_repo_corpus() -> tuple[int, int]:
     """Schema-validate discovery-ground-truth.json across every surface. Returns (errors, count)."""
     schema = json.loads(_DISCOVERY_GT_SCHEMA.read_text(encoding="utf-8"))
@@ -612,6 +620,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "maf", help="run the standard-aligned (MAF) identification recette and print the scorecard"
     )
+    bench = sub.add_parser(
+        "benchmark", help="judge accuracy benchmark per dimension / style / area"
+    )
+    bench.add_argument("--json", action="store_true", help="emit JSON instead of text")
     imp = sub.add_parser(
         "import-maf",
         help="import a Microsoft Agent Framework declarative spec into a unified manifest draft",
@@ -695,6 +707,8 @@ def main(argv: list[str] | None = None) -> int:
             )
     if args.command == "maf":
         return _cmd_maf()
+    if args.command == "benchmark":
+        return _cmd_benchmark(args.json)
     if args.command == "import-maf":
         return _cmd_import_maf(args.spec, args.out)
     if args.command == "publish":

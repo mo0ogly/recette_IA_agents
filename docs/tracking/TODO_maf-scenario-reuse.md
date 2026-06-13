@@ -128,8 +128,12 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       maf_orchestration row on the Corpus page, steps through with prev/next, shows
       verdict dims + Mermaid (real-payload fixture + render-assert, no new CSS).
       tests/test_run_view.py + RunViewer.test.tsx.
-- [ ] **AF Labs benchmark/eval harness** as a scorecard benchmark reference. Source:
-      `python/packages/core/agent_framework/lab/` + core `_evaluation.py`.
+- [x] **AF Labs benchmark/eval harness** -- DONE. recette/benchmark.py: judge
+      accuracy beyond pass/fail -- per-dimension (identity/capabilities/policy/behavior)
+      accuracy per AREA (identification / maf / orchestration) and per STYLE
+      (handoff/sequential/concurrent/group_chat/magentic). full_benchmark() +
+      orchestration_benchmark() + render(); CLI `recette benchmark [--json]`;
+      tests/test_benchmark.py. Pure aggregation over the committed corpus (I4).
 
 ### Deliberately NOT applicable (do not import -- documented so we stop re-litigating)
 - MAF `_mcp.py` runtime (139KB), `_harness/` (agent runtime: loop/memory/todo/
