@@ -19,6 +19,8 @@ describe("DiscoveryPage", () => {
     render(<DiscoveryPage />);
 
     expect(await screen.findByTestId("discovery-verdict")).toHaveTextContent("PASS");
+    // The multi-agent handoff orchestration area is surfaced.
+    expect(screen.getByTestId("discovery-orchestration")).toHaveTextContent("orchestration 5/5");
     // The mcp surface (the feature under test) is present as its own row.
     const mcpRow = screen.getByTestId("discovery-row-mcp");
     expect(mcpRow).toBeInTheDocument();

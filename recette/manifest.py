@@ -17,6 +17,8 @@ _SCHEMAS = {
     "ground_truth": _SCHEMA_DIR / "ground-truth.schema.json",
     "scenario": _SCHEMA_DIR / "scenario.schema.json",
     "maf_actions": _SCHEMA_DIR / "maf-actions.schema.json",
+    "maf_orchestration": _SCHEMA_DIR / "maf-orchestration.schema.json",
+    "maf_orchestration_run": _SCHEMA_DIR / "maf-orchestration-run.schema.json",
 }
 
 

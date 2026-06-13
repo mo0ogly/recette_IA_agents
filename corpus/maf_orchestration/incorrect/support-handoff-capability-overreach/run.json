@@ -1,0 +1,7 @@
+{
+  "agent_id": "support-handoff-capability-overreach",
+  "hops": [
+    { "seq": 1, "from": "triage", "to": "refund" },
+    { "seq": 2, "from": "refund", "to": "billing" }
+  ]
+}

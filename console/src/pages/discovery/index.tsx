@@ -72,6 +72,9 @@ export default function DiscoveryPage(): JSX.Element {
             <span className="discovery-stat">
               maf {card.maf.passed}/{card.maf.agents}
             </span>
+            <span className="discovery-stat" data-testid="discovery-orchestration">
+              orchestration {card.orchestration.passed}/{card.orchestration.teams}
+            </span>
           </div>
 
           <table className="discovery-table">

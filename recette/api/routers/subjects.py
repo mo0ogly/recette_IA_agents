@@ -15,7 +15,8 @@ from fastapi import APIRouter
 
 from ...harness import discover_agent_dirs
 from ...maf_harness import discover_maf_dirs
-from ...manifest import load_manifest
+from ...maf_orchestration_harness import discover_orchestration_dirs
+from ...manifest import load_manifest, load_validated
 
 router = APIRouter(prefix="/subjects", tags=["subjects"])
 
@@ -57,7 +58,27 @@ def _collect() -> list[dict]:
         except (ValueError, FileNotFoundError):
             continue
         subjects.append(_summarize(manifest, _read_ground_truth(d), "spec.json"))
+    for d in discover_orchestration_dirs():
+        try:
+            team = load_validated("maf_orchestration", d / "team.json")
+        except (ValueError, FileNotFoundError):
+            continue
+        subjects.append(_summarize_orchestration(team, _read_ground_truth(d)))
     return subjects
+
+
+def _summarize_orchestration(team: dict, ground_truth: dict) -> dict:
+    """Summarize a handoff team: its participants stand in for target_systems."""
+    return {
+        "agent_id": team.get("agent_id"),
+        "name": team.get("name"),
+        "family": "maf_orchestration",
+        "target_systems": [p["agent_id"] for p in team.get("participants", [])],
+        "manifest_file": "team.json",
+        "category": ground_truth.get("category"),
+        "violation_type": ground_truth.get("violation_type"),
+        "expected_verdict": ground_truth.get("expected_verdict"),
+    }
 
 
 @router.get("")

@@ -18,6 +18,7 @@ from .discovery_harness import (
 from .discovery_scorecard import DiscoveryScorecard
 from .harness import DEFAULT_CORPUS, run_recette
 from .maf_harness import run_maf_recette
+from .maf_orchestration_harness import run_orchestration_recette
 from .scorecard import Scorecard
 
 
@@ -26,18 +27,21 @@ class FullReport:
     identification: Scorecard
     discovery: dict[str, DiscoveryScorecard]
     maf: Scorecard
+    orchestration: Scorecard
 
     @property
     def all_passed(self) -> bool:
         return (
             self.identification.all_passed
             and self.maf.all_passed
+            and self.orchestration.all_passed
             and all(s.all_passed for s in self.discovery.values())
         )
 
     def to_dict(self) -> dict:
         i = self.identification
         m = self.maf
+        o = self.orchestration
         return {
             "identification": {
                 "agents": i.total,
@@ -52,6 +56,13 @@ class FullReport:
                 "false_positives": m.false_positives,
                 "false_negatives": m.false_negatives,
                 "all_passed": m.all_passed,
+            },
+            "orchestration": {
+                "teams": o.total,
+                "passed": o.passed_count,
+                "false_positives": o.false_positives,
+                "false_negatives": o.false_negatives,
+                "all_passed": o.all_passed,
             },
             "discovery": {
                 surface: {
@@ -81,6 +92,12 @@ class FullReport:
             f"FP={m.false_positives} FN={m.false_negatives}  "
             f"{'PASS' if m.all_passed else 'FAIL'}"
         )
+        o = self.orchestration
+        lines.append(
+            f"orchestration  : {o.passed_count}/{o.total} teams  "
+            f"FP={o.false_positives} FN={o.false_negatives}  "
+            f"{'PASS' if o.all_passed else 'FAIL'}"
+        )
         lines.append("")
         lines.append("discovery:")
         for surface in SURFACE_ORDER:
@@ -104,4 +121,9 @@ def build_report() -> FullReport:
     for surface in SURFACE_ORDER:
         if discover_repo_dirs(SURFACE_CORPUS[surface]):
             discovery[surface] = run_discovery_recette(corpus_root=SURFACE_CORPUS[surface])
-    return FullReport(identification=ident, discovery=discovery, maf=run_maf_recette())
+    return FullReport(
+        identification=ident,
+        discovery=discovery,
+        maf=run_maf_recette(),
+        orchestration=run_orchestration_recette(),
+    )

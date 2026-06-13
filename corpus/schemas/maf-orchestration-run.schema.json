@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentrail.local/schemas/maf-orchestration-run.schema.json",
+  "title": "AgentRail recette -- MAF multi-agent handoff run",
+  "description": "What a multi-agent handoff orchestration ACTUALLY did: the ordered handoff hops between participants plus each participant's tool invocations. Judged by recette.maf_orchestration.judge_orchestration against the sibling team.json on the four dimensions. Deterministic (I4): a hop to a target outside the source's declared set is the recette analog of the framework's 'attempted to handoff to unknown target' ValueError.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "hops"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Must match the orchestration agent_id in the sibling team.json.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "hops": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered handoff transfers of control between participants.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "from", "to"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 0 },
+          "from": { "type": "string", "minLength": 1, "description": "Source participant id." },
+          "to": { "type": "string", "minLength": 1, "description": "Target participant id (routed via handoff_to)." }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Tool invocations performed by participants during the run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "agent_id", "provider", "model", "action", "target"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 0 },
+          "agent_id": { "type": "string", "minLength": 1, "description": "Participant that performed the action." },
+          "provider": { "type": "string", "description": "Identity actually used (may differ from declared, I3)." },
+          "model": { "type": "string" },
+          "action": { "type": "string", "enum": ["invoke_tool"] },
+          "target": { "type": "string", "minLength": 1 },
+          "tool_kind": {
+            "type": "string",
+            "enum": ["mcp", "function", "web_search", "file_search", "code_interpreter"]
+          },
+          "approved": { "type": "boolean", "description": "Whether approval was obtained before invocation (I6)." }
+        }
+      }
+    }
+  }
+}

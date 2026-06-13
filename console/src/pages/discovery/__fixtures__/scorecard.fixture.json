@@ -13,6 +13,13 @@
     "false_negatives": 0,
     "all_passed": true
   },
+  "orchestration": {
+    "teams": 5,
+    "passed": 5,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "all_passed": true
+  },
   "discovery": {
     "github": {
       "repos": 4,

@@ -59,13 +59,16 @@ def _cmd_validate(corpus_root: Path) -> int:
     # Validate the standard-aligned (MAF) subject corpus.
     maf_errors, maf_count = _validate_maf_corpus()
     errors += maf_errors
+    # Validate the multi-agent handoff orchestration corpus.
+    orch_errors, orch_count = _validate_orchestration_corpus()
+    errors += orch_errors
 
     if errors:
         print(f"\n{errors} validation error(s)", file=sys.stderr)
         return 1
     print(
         f"OK: {len(agent_dirs)} agents valid, {repo_count} discovery repos valid, "
-        f"{maf_count} MAF subjects valid"
+        f"{maf_count} MAF subjects valid, {orch_count} orchestration teams valid"
     )
     return 0
 
@@ -93,6 +96,35 @@ def _validate_maf_corpus() -> tuple[int, int]:
             if doc.get("agent_id") != d.name:
                 errors += 1
                 print(f"INVALID maf/{d.name}/{fname}: agent_id != dir name", file=sys.stderr)
+    return errors, count
+
+
+def _validate_orchestration_corpus() -> tuple[int, int]:
+    """Schema-validate every handoff team (team/run/ground-truth). Returns (errors, count)."""
+    from .maf_orchestration_harness import discover_orchestration_dirs
+    from .manifest import load_validated
+
+    errors = 0
+    count = 0
+    for d in discover_orchestration_dirs():
+        count += 1
+        for kind, fname in (
+            ("maf_orchestration", "team.json"),
+            ("maf_orchestration_run", "run.json"),
+            ("ground_truth", "ground-truth.json"),
+        ):
+            try:
+                doc = load_validated(kind, d / fname)
+            except (ValueError, FileNotFoundError) as exc:
+                errors += 1
+                print(f"INVALID orchestration/{d.name}/{fname}: {exc}", file=sys.stderr)
+                continue
+            if doc.get("agent_id") != d.name:
+                errors += 1
+                print(
+                    f"INVALID orchestration/{d.name}/{fname}: agent_id != dir name",
+                    file=sys.stderr,
+                )
     return errors, count
 
 

@@ -29,8 +29,14 @@ being implemented now via APEX; everything below is queued.
       (non-deterministic), not a clean recette endpoint. Do not bolt on.
 - [ ] **Run cache for real-mode** -- cache reproducible real-mode LLM runs (cost +
       determinism); overlaps ReplayLlm/recording. Effort: medium.
-- [ ] **Multi-agent handoff scenarios** -- subjects where agent A delegates to B
-      (MAF orchestration: sequential/concurrent/handoff). Effort: medium.
+- [x] **Multi-agent handoff scenarios** -- DONE. The judged unit is a TEAM:
+      recette/maf_orchestration.py (judge_orchestration, grounded on the real MAF
+      HandoffBuilder/HandoffConfiguration + unknown-target rule + termination,
+      deterministic I4) + maf_orchestration_harness.py + two schemas
+      (maf-orchestration[-run]) + corpus/maf_orchestration/ (1 correct + 4 mono-axis
+      negatives) + report/subjects/CLI wiring + console Discovery row +
+      tests/test_maf_orchestration.py (4 dims, single-axis orthogonality,
+      determinism). Concurrent/sequential orchestration kinds remain future work.
 
 ## Platform territory (heavier)
 - [ ] **Middleware pipeline pattern** for the Gateway mediation (I2) -- reference pattern.

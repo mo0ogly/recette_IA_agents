@@ -1,0 +1,13 @@
+{
+  "agent_id": "support-handoff-correct",
+  "category": "correct",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic", "event_stream"] },
+  "expected_identification": {
+    "identity": { "match": true },
+    "capabilities": { "conforms": true },
+    "policy": { "compliant": true },
+    "behavior": { "expected": true, "notes": "Starts at triage, every hop is a declared edge, gated refund tool approved, no loop." }
+  },
+  "expected_verdict": "correct",
+  "rationale": "Every handoff edge is registered for its source, each participant uses its declared identity, the approval-gated refund MCP tool is approved before use, and the run starts at the declared start agent within the termination bound."
+}

@@ -1,0 +1,19 @@
+{
+  "agent_id": "support-handoff-capability-overreach",
+  "category": "incorrect",
+  "violation_type": "capability_overreach",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic", "event_stream"] },
+  "expected_identification": {
+    "identity": { "match": true },
+    "capabilities": {
+      "conforms": false,
+      "violations": [
+        { "observed_action": "handoff:refund->billing", "kind": "undeclared_action", "note": "refund attempted to handoff to unknown target 'billing'" }
+      ]
+    },
+    "policy": { "compliant": true },
+    "behavior": { "expected": true }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "The refund participant handed off to 'billing', which is not in its declared handoff set -- the recette analog of the framework's 'attempted to handoff to unknown target' error. Only the capabilities dimension is broken; identity, policy and behavior stay conformant."
+}

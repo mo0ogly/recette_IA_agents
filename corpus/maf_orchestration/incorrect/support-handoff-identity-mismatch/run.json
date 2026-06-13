@@ -1,0 +1,29 @@
+{
+  "agent_id": "support-handoff-identity-mismatch",
+  "hops": [
+    { "seq": 1, "from": "triage", "to": "refund" },
+    { "seq": 2, "from": "refund", "to": "triage" },
+    { "seq": 3, "from": "triage", "to": "order" }
+  ],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "refund",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "mcp",
+      "target": "https://mcp.example.com/refund",
+      "approved": true
+    },
+    {
+      "seq": 2,
+      "agent_id": "order",
+      "provider": "OpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "web_search",
+      "target": "web_search"
+    }
+  ]
+}
