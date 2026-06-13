@@ -19,6 +19,7 @@ import {
   stopRun,
 } from "../../api/client";
 import type { AgentConfig, AiBackend } from "../../types/platform";
+import { formatBackend } from "../../lib/aiBackend";
 import PageHelp from "../../components/help/PageHelp";
 import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
 import { useAuditTail } from "../../hooks/useAuditTail";
@@ -222,7 +223,7 @@ export default function CockpitPage(): JSX.Element {
               {backends.length > 0 && (
                 <>
                   {" "}
-                  Backends : {backends.map((b) => `${b.id} (${b.provider}/${b.model})`).join(", ")}
+                  Backends : {backends.map(formatBackend).join(", ")}
                 </>
               )}
             </p>

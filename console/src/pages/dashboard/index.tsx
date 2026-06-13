@@ -18,6 +18,7 @@ import {
   stopRun,
 } from "../../api/client";
 import type { AgentConfig, RunSummary } from "../../types/platform";
+import { isRealAi, isRealTarget } from "../../lib/aiBackend";
 import PageHelp from "../../components/help/PageHelp";
 import "./dashboard.css";
 
@@ -34,14 +35,6 @@ interface AgentRow {
   agent: AgentConfig;
   status: string; // "" when never run
   runId: string | null;
-}
-
-function isRealAi(a: AgentConfig): boolean {
-  return a.ai_mode === "real" && Boolean(a.ai_backend_id);
-}
-
-function isRealTarget(a: AgentConfig): boolean {
-  return a.runtime === "real";
 }
 
 export default function DashboardPage(): JSX.Element {
