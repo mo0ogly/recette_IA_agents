@@ -45,6 +45,19 @@ python3 scripts/run_orchestration_live_groq.py --model llama-3.3-70b-versatile
 Per team it prints `decisions=<n> verdict=<correct|incorrect>` and asserts the
 replay reproduces the recorded run.
 
+### Cheap + reproducible live runs (cache)
+
+```
+python3 -m recette orchestrate run <team.json> --provider groq --model llama-3.3-70b-versatile --cache /tmp/llm-cache.json
+```
+
+`--cache` wraps the backend in a content-addressed `CachingLlm` (recette/llm_cache.py):
+each decision is keyed by a digest of (provider:model, system, history, tools) and
+stored in the JSON file. The first run pays the live calls; any later run with the
+same inputs is served from the cache with zero network (verified: run 1 = N misses,
+run 2 = N hits). Unlike `ReplayLlm` (positional replay of one exact run), the cache
+is input-keyed, so it is shared across runs and survives reordering.
+
 ### Single team, by hand
 
 ```

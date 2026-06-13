@@ -371,18 +371,28 @@ def _cmd_agent_freeze(recording_path: str, out_dir: str) -> int:
 
 
 def _cmd_orchestrate_run(
-    team_path: str, provider: str, model: str, base_url: str | None, max_steps: int, out: str | None
+    team_path: str,
+    provider: str,
+    model: str,
+    base_url: str | None,
+    max_steps: int,
+    out: str | None,
+    cache: str | None,
 ) -> int:
-    from .llm import build_llm
+    from .llm import LlmBackend, build_llm
     from .maf_orchestration import judge_orchestration
     from .manifest import load_validated
     from .orchestrate import record
 
     try:
-        llm = build_llm(provider, model, base_url=base_url)  # live; key from env (R8)
+        llm: LlmBackend = build_llm(provider, model, base_url=base_url)  # live; key from env (R8)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    if cache is not None:
+        from .llm_cache import CachingLlm, LlmCache
+
+        llm = CachingLlm(llm, cache=LlmCache(cache), namespace=f"{provider}:{model}")
     team = load_validated("maf_orchestration", Path(team_path))
     rec = record(team, llm, provider=provider, model=model, max_steps=max_steps)
     out_path = Path(out or f"{team['agent_id']}.orchestration.json")
@@ -572,6 +582,9 @@ def build_parser() -> argparse.ArgumentParser:
     o_run.add_argument("--base-url", default=None, help="base URL for openai_compat")
     o_run.add_argument("--max-steps", type=int, default=32)
     o_run.add_argument("--out", default=None, help="recording output path")
+    o_run.add_argument(
+        "--cache", default=None, help="content-addressed LLM cache file (cheap, reproducible)"
+    )
     o_rep = orch_sub.add_parser(
         "replay", help="deterministically replay an orchestration recording"
     )
@@ -662,7 +675,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "orchestrate":
         if args.orch_cmd == "run":
             return _cmd_orchestrate_run(
-                args.team, args.provider, args.model, args.base_url, args.max_steps, args.out
+                args.team,
+                args.provider,
+                args.model,
+                args.base_url,
+                args.max_steps,
+                args.out,
+                args.cache,
             )
         if args.orch_cmd == "replay":
             return _cmd_orchestrate_replay(args.recording)

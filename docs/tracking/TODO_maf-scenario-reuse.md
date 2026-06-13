@@ -90,11 +90,14 @@ Ordered by recette value. Apply with APEX (corpus + judge + tests + doc + help).
       spans too remains a small follow-up.)
 
 ### Medium value
-- [ ] **Generic real-mode run cache** -- a content-addressed cache of LLM calls
-      keyed by (system, history, tools) so a live run is cheap + reproducible across
-      ALL runners (not just orchestration/campaign recordings). Source:
-      `scenario/cache.py` (langwatch). Overlaps ReplayLlm; this is the call-level
-      cache layer under build_llm. Effort: medium.
+- [x] **Generic real-mode run cache** -- DONE. recette/llm_cache.py: CachingLlm
+      wraps ANY LlmBackend and keys each decision on a sha256 of (namespace=provider:model,
+      system, history, tools), persisted to a JSON file (LlmCache, atomic writes;
+      AGENTRAIL_LLM_CACHE_DIR). Dependency-free analog of scenario/cache.py's joblib
+      Memory; content-addressed (vs ReplayLlm positional). `recette orchestrate run
+      --cache <file>`; tests/test_llm_cache.py. Verified live: run 1 = N misses
+      (Groq), run 2 = N hits (zero network). Wiring the live_groq/campaign runners to
+      pass --cache is a trivial follow-up.
 - [x] **Auto workflow viz** -- DONE. recette/viz.py: team_mermaid(team) (declared
       structure per style: handoff edges / sequential chain / concurrent fan-in /
       manager dotted edges for group_chat & magentic) + run_mermaid(team, run) (the
