@@ -35,14 +35,22 @@ Donc : reference/banc-de-test de qualite. Les gaps ci-dessous separent ca d'un
   test d'echec d'auth -> evenement d'audit.
 - Pipeline : PYTHON. Invariants : I3, I2.
 
-### G2 -- Approbation durable (I6) -- HAUTE
-- Constat verifie : `temporalio>=1.7` est un extra optionnel ; `approvals/__init__.py` dit
-  "Temporal durable workflow; ApprovalService is the interface Temporal would [implement]".
-  La durabilite n'est pas cablee -> une approbation `escalate` ne survit pas a un redemarrage.
-- Cible : implementer `ApprovalService` sur un workflow durable (Temporal), timeout =>
-  comportement explicite (escalate/freeze/deny, jamais auto-approve), zero sleep en memoire.
-- Done : kill du process pendant un `pending` -> l'approbation reprend ; test de timeout.
-- Pipeline : PYTHON (+ Temporal). Invariant : I6.
+### G2 -- Approbation durable (I6) -- [LARGEMENT DEJA FAIT -- premisse corrigee R18, branch feat/g2-durable-approval]
+- CORRECTION (R18) : la premisse initiale ("durabilite non cablee, ne survit pas au
+  restart") etait FAUSSE -- deduite du docstring "PLACEHOLDER", pas du comportement. La
+  VERIFICATION du code montre que l'approbation est DEJA event-sourcee et durable :
+  l'inbox = fold sur le log append-only (I1), reconstruit a tout moment ; resolve_approval
+  (anti double-resolution + append APPROVAL_RESOLVED) ; sweep_timeouts (-> TIMEOUT, jamais
+  approve, jamais execute). Aucun sleep memoire.
+- Livre cette vague : `tests/test_approval_durability.py` -- PREUVE de durabilite contre un
+  `SqliteEventStore` PERSISTE au restart (pending survit, resolution survit, double-resolve
+  post-restart refuse 409, timeout post-restart -> TIMEOUT/executed=False). Runbook
+  `docs/runbooks/approval-durability.md` + 2 mermaid.
+- RESIDUEL reel (seul vrai manque) : pas de TIMER autonome -- `POST /approvals/sweep-timeouts`
+  doit etre declenche par un scheduler externe (cron/systemd/k8s CronJob). Un workflow
+  Temporal le ferait nativement ; non implemente faute de serveur Temporal (un stub serait
+  interdit). Ticket de suite : brancher un scheduler du sweep, ou adopter Temporal.
+- Pipeline : PYTHON. Invariant : I6, I1, I4.
 
 ### G3 -- Event store Phase 2 PostgreSQL -- HAUTE (des que distribue)
 - Constat verifie : aucune dep `psycopg/asyncpg/postgres`. Seul `SqliteEventStore`
