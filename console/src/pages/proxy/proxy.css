@@ -212,3 +212,21 @@
   word-break: break-word;
   font-size: 0.8rem;
 }
+
+/* Proxy route selector (shared: wire panel + per-run network log). */
+.proxy-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.proxy-selector-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.proxy-selector-error {
+  font-size: 0.78rem;
+  color: var(--badge-red-fg);
+}

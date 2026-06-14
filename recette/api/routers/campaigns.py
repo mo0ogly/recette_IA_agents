@@ -92,6 +92,7 @@ def run_campaign(request: Request, campaign_id: str) -> dict:
         debug_enabled=request.app.state.proxy_debug_enabled,
         run_id=run.id,
         gateway=request.app.state.gateway,
+        wire_proxy_url=request.app.state.proxy_route_registry.active_proxy_url(),
     )
     mgr.start(run, runner)
     return {"run_id": run.id, "status": run.status}

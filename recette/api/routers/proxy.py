@@ -109,3 +109,32 @@ def clear_wire_flows(request: Request) -> dict:
     """Discard the wire flow buffer (the audit log is untouched, I1)."""
     request.app.state.wire_flow_recorder.clear()
     return {"cleared": True}
+
+
+@router.get("/route")
+def get_proxy_route(request: Request) -> dict:
+    """The selectable transport targets (direct vs wire overlay) + the active one.
+
+    Transport selection only -- it changes how a side effect reaches the target,
+    never the decision (I4). Surfaced in the network-debug consoles."""
+    registry = request.app.state.proxy_route_registry
+    return {
+        "active": registry.active(),
+        "targets": [t.to_dict() for t in registry.targets()],
+    }
+
+
+@router.post("/route")
+def set_proxy_route(request: Request, body: dict) -> dict:
+    """Select the active transport target. Applies to runs started afterwards.
+
+    A missing/unknown target is a 422 (fail-safe: never silently keep the old
+    route on a bad selection)."""
+    target = body.get("target")
+    if not isinstance(target, str) or not target:
+        raise HTTPException(status_code=422, detail="body.target (string) is required")
+    try:
+        chosen = request.app.state.proxy_route_registry.set_active(target)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"active": chosen.id, "proxy_url": chosen.proxy_url}

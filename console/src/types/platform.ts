@@ -606,6 +606,20 @@ export interface WireStatus {
   flow_count: number;
 }
 
+/** One selectable transport target for agent side effects (direct vs wire). */
+export interface ProxyRouteTarget {
+  id: string;
+  label: string;
+  /** null for the direct route; the overlay URL otherwise. */
+  proxy_url: string | null;
+}
+
+/** Response of GET /proxy/route: the targets plus the active selection id. */
+export interface ProxyRouteState {
+  active: string;
+  targets: ProxyRouteTarget[];
+}
+
 /** One judged query in the RAG retrieval recette (GET /rag/scorecard). */
 export interface RagQueryResult {
   query: string;

@@ -338,6 +338,25 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
 
       <form className="agents-form" onSubmit={(e) => void handleCreate(e)}>
         <h2>Create AI backend</h2>
+        <div className="agents-form-row agents-presets" data-testid="backend-presets">
+          <span className="agents-key-hint">Presets :</span>
+          <button
+            type="button"
+            className="agents-btn"
+            data-testid="preset-litellm"
+            title="Pre-remplit un backend openai_compat vers le gateway LiteLLM local (./recette.sh llm-proxy up)"
+            onClick={() =>
+              setForm((p) => ({
+                ...p,
+                provider: "openai_compat",
+                base_url: "http://127.0.0.1:4000",
+                model: p.model || "groq-llama",
+              }))
+            }
+          >
+            LiteLLM gateway (local)
+          </button>
+        </div>
         <div className="agents-form-row">
           <label htmlFor="backend-id">Id</label>
           <input

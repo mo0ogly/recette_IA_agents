@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { clearWireFlows, getWireFlows } from "../../api/client";
+import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import { wireFailureCount, wireFlowToLine } from "./wireFlowModel";
 
@@ -66,6 +67,7 @@ export default function WirePanel(): JSX.Element {
   return (
     <section className="proxy-wire" data-testid="wire-panel">
       <header className="proxy-header">
+        <ProxySelector />
         <span className="proxy-summary">
           {flows.length} flux, {fails} echec(s)
         </span>

@@ -458,4 +458,19 @@ describe("AiBackendsPanel", () => {
     );
     expect(ask).not.toBeDisabled();
   });
+
+  it("preset: LiteLLM gateway fills provider=openai_compat + base_url + model", async () => {
+    renderPanel();
+    // The provider catalog must have loaded so openai_compat shows its base_url field.
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId("preset-litellm"));
+
+    const provider = screen.getByLabelText("Provider") as HTMLSelectElement;
+    expect(provider.value).toBe("openai_compat");
+    const baseUrl = (await screen.findByLabelText("Base URL")) as HTMLInputElement;
+    expect(baseUrl.value).toBe("http://127.0.0.1:4000");
+    const model = screen.getByLabelText("Model") as HTMLInputElement;
+    expect(model.value).toBe("groq-llama");
+  });
 });

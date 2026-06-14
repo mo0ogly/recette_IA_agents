@@ -29,7 +29,6 @@ from ..platform.proxy.lab_proxy import LabHttpProxy, lab_url_from_env
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
 from ..platform.proxy.tracing import TraceRecorder, TracingProxy
-from ..platform.proxy.wire import wire_proxy_url_from_env
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
 
@@ -212,6 +211,7 @@ def forge_for_agent(
     debug_enabled: bool = False,
     run_id: str | None = None,
     gateway: Gateway | None = None,
+    wire_proxy_url: str | None = None,
 ) -> GitForge:
     """Forge for one run. An agent without a ``server`` binding takes the
     lab-mode path; an agent bound to a server executes through the proxy
@@ -237,14 +237,15 @@ def forge_for_agent(
         return GatewayForge(gateway) if gateway is not None else LabForge()
     # Validate the server reference up-front (fail-safe: a dangling or malformed
     # reference must raise, never silently fall back to the wrong target).
-    # When the wire overlay is configured (INSPECT_IA_AGENTS_WIRE_PROXY), route the
-    # lab-mode side effects through it so mitmproxy captures the bytes on the
-    # wire. Unset (the recette default) => None => direct, I4 unchanged.
+    # ``wire_proxy_url`` (the active transport route, supplied by the caller from
+    # the proxy-route registry) routes the lab-mode side effects through the
+    # mitmproxy overlay so it captures the bytes on the wire. None (the recette
+    # default) => direct, I4 unchanged.
     proxy = resolve_proxy(
         agent_cfg,
         servers,
         default_proxy or LabHttpProxy(),
-        wire_proxy_url=wire_proxy_url_from_env(),
+        wire_proxy_url=wire_proxy_url,
     )
     # A mock_local server on the canonical lab port is the SAME target the
     # gateway already mediates (the lab, routed by target_system). When a gateway
@@ -287,6 +288,7 @@ def make_lane_b_runner(
     debug_enabled: bool = False,
     run_id: str | None = None,
     gateway: Gateway | None = None,
+    wire_proxy_url: str | None = None,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
         # Proxy resolution happens inside the runner so a dangling server
@@ -301,6 +303,7 @@ def make_lane_b_runner(
             debug_enabled=debug_enabled,
             run_id=run_id,
             gateway=gateway,
+            wire_proxy_url=wire_proxy_url,
         )
         result = run_lane_b_agent(
             agent_id=agent_cfg["id"],
@@ -352,6 +355,7 @@ def make_campaign_runner(
     debug_enabled: bool = False,
     run_id: str | None = None,
     gateway: Gateway | None = None,
+    wire_proxy_url: str | None = None,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     """Run each campaign step as a Lane B agent, persisting one recording per
     step. A step with a stub_script runs as a mock; otherwise the agent's bound
@@ -423,6 +427,7 @@ def make_campaign_runner(
                     debug_enabled=debug_enabled,
                     run_id=run_id,
                     gateway=gateway,
+                    wire_proxy_url=wire_proxy_url,
                 )
             except ValueError as exc:
                 emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})

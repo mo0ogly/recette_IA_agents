@@ -377,3 +377,9 @@
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
+
+/* AI backend form presets row (one-click backend templates). */
+.agents-presets {
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -84,6 +84,9 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 debug_enabled=request.app.state.proxy_debug_enabled,
                 run_id=run.id,
                 gateway=request.app.state.gateway,
+                # Active transport route selected in the network-debug consoles
+                # (direct vs wire overlay). Transport only -- not the decision (I4).
+                wire_proxy_url=request.app.state.proxy_route_registry.active_proxy_url(),
             ),
         )
         return {"run_id": run.id, "status": run.status}

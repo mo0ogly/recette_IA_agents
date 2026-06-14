@@ -28,6 +28,7 @@ import {
   openRunSocket,
   submitRunVerdict,
 } from "../api/client";
+import ProxySelector from "./ProxySelector";
 import type {
   ProxyTrace,
   ProxyTraceResponse,
@@ -212,39 +213,46 @@ function RunTracesView(props: {
   traces: ProxyTrace[] | null;
 }): JSX.Element {
   const { runId, loading, error, debugEnabled, traces } = props;
+  // The proxy-route selector lives at the top of the network log: an operator
+  // picks the transport (direct vs wire overlay) for the NEXT run from here,
+  // alongside the traces this run produced.
+  let inner: JSX.Element;
   if (runId === null) {
-    return <p className="run-empty">Aucun run courant. Lance l'agent d'abord.</p>;
-  }
-  if (error !== null) {
-    return <p role="alert">Erreur de chargement des traces : {error}</p>;
-  }
-  if (traces === null) {
-    return <p className="run-empty">{loading ? "Chargement des traces..." : "Pas de traces."}</p>;
-  }
-  if (traces.length === 0) {
-    return (
+    inner = <p className="run-empty">Aucun run courant. Lance l'agent d'abord.</p>;
+  } else if (error !== null) {
+    inner = <p role="alert">Erreur de chargement des traces : {error}</p>;
+  } else if (traces === null) {
+    inner = <p className="run-empty">{loading ? "Chargement des traces..." : "Pas de traces."}</p>;
+  } else if (traces.length === 0) {
+    inner = (
       <p className="run-empty" data-testid="run-traces-empty">
         {debugEnabled
           ? "Aucun effet de bord trace pour ce run (agent en memoire ou sans action externe)."
           : "Tracage proxy desactive (INSPECT_IA_AGENTS_PROXY_DEBUG=on cote serveur pour capter la comm)."}
       </p>
     );
+  } else {
+    inner = (
+      <ol className="run-traces" data-testid="run-traces">
+        {traces.map((t) => (
+          <li key={t.seq} className={`run-trace-row ${t.ok ? "tone-ok" : "tone-error"}`}>
+            <span className="run-trace-seq">{t.seq}</span>
+            <span className="run-trace-action mono">
+              {t.action_type} {"->"} {t.target_system}/{t.resource}
+            </span>
+            <span className="run-trace-status">
+              {t.ok ? "ok" : "fail"} {t.status_code}
+            </span>
+          </li>
+        ))}
+      </ol>
+    );
   }
   return (
-    <ol className="run-traces" data-testid="run-traces">
-      {traces.map((t) => (
-        <li
-          key={t.seq}
-          className={`run-trace-row ${t.ok ? "tone-ok" : "tone-error"}`}
-        >
-          <span className="run-trace-seq">{t.seq}</span>
-          <span className="run-trace-action mono">
-            {t.action_type} {"->"} {t.target_system}/{t.resource}
-          </span>
-          <span className="run-trace-status">{t.ok ? "ok" : "fail"} {t.status_code}</span>
-        </li>
-      ))}
-    </ol>
+    <>
+      <ProxySelector />
+      {inner}
+    </>
   );
 }
 

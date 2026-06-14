@@ -26,6 +26,7 @@ from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
+from ..platform.proxy.route import registry_from_env
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
 from ..platform.proxy.wire import WireFlowRecorder, wire_proxy_url_from_env
 from ..platform.realtime import (
@@ -265,6 +266,9 @@ def create_app(
     # the deterministic recette untouched (I4): nothing routes through a proxy.
     app.state.wire_flow_recorder = WireFlowRecorder()
     app.state.wire_proxy_url = wire_proxy_url_from_env()
+    # Runtime-selectable transport route (direct vs wire overlay), surfaced in
+    # the network-debug consoles. Transport only -- never the decision path (I4).
+    app.state.proxy_route_registry = registry_from_env()
     action_catalog = catalog if catalog is not None else load_catalog()
 
     # Policy bootstrap: ensure an active version exists so the gateway never

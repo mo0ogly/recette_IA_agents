@@ -41,8 +41,11 @@ import type {
   VerdictJudgement,
   RagScorecard,
   VerdictScorecard,
+  ProxyRouteState,
   VerdictSubmission,
   VerdictSubmissionRequest,
+  WireFlowResponse,
+  WireStatus,
 } from "../types/platform";
 
 const API_BASE_URL: string =
@@ -550,6 +553,41 @@ export function getProxyDebugStatus(): Promise<ProxyDebugStatus> {
 /** Discard the debug trace buffer (the append-only audit log is untouched, I1). */
 export function clearProxyTraces(): Promise<{ cleared: boolean }> {
   return request<{ cleared: boolean }>("/proxy/traces", { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------------------
+// Wire overlay (optional mitmproxy interception, network-level I5 view)
+// ---------------------------------------------------------------------------
+
+/** Intercepted wire flows (oldest first). tail keeps the last N; runId narrows
+ *  to one run. Empty (and enabled=false) when the overlay is not configured. */
+export function getWireFlows(tail?: number, runId?: string): Promise<WireFlowResponse> {
+  return request<WireFlowResponse>(withQuery("/proxy/wire", { tail, run_id: runId }), {
+    method: "GET",
+  });
+}
+
+/** Overlay state (configured?) plus its proxy URL and buffered flow count. */
+export function getWireStatus(): Promise<WireStatus> {
+  return request<WireStatus>("/proxy/wire/status", { method: "GET" });
+}
+
+/** Discard the wire flow buffer (the append-only audit log is untouched, I1). */
+export function clearWireFlows(): Promise<{ cleared: boolean }> {
+  return request<{ cleared: boolean }>("/proxy/wire", { method: "DELETE" });
+}
+
+/** The selectable transport targets (direct vs wire overlay) + the active one. */
+export function getProxyRoute(): Promise<ProxyRouteState> {
+  return request<ProxyRouteState>("/proxy/route", { method: "GET" });
+}
+
+/** Select the active transport target; applies to runs started afterwards. */
+export function setProxyRoute(target: string): Promise<{ active: string; proxy_url: string | null }> {
+  return request<{ active: string; proxy_url: string | null }>("/proxy/route", {
+    method: "POST",
+    body: JSON.stringify({ target }),
+  });
 }
 
 /**

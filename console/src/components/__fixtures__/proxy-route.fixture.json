@@ -1,0 +1,15 @@
+{
+  "active": "direct",
+  "targets": [
+    {
+      "id": "direct",
+      "label": "Direct (sans proxy)",
+      "proxy_url": null
+    },
+    {
+      "id": "wire",
+      "label": "Wire (mitmproxy)",
+      "proxy_url": "http://127.0.0.1:8083"
+    }
+  ]
+}
