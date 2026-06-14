@@ -55,6 +55,11 @@ CAMPAIGN_REPORTS_DIR="${RUN_DIR}/campaigns"
 # when INSPECT_IA_AGENTS_WIRE_PROXY points at it. Off unless the operator brings it up.
 WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8083}"
 
+# -- LLM gateway (optional LiteLLM overlay, Docker) --------------------------
+# The host port the LiteLLM proxy binds; an ai_backend (openai_compat) targets
+# http://127.0.0.1:${LLM_PROXY_PORT}. Off unless the operator brings it up.
+LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-4000}"
+
 # -- python picker: prefer the project venv, else system python3 ------------
 py() {
     if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then

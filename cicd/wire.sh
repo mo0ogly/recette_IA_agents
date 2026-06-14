@@ -11,15 +11,23 @@ set -euo pipefail
 # replacement: the deterministic recette never routes through it. It runs as a
 # Docker container (no fork/subprocess from the API, R19).
 #
-# Usage: wire.sh up|down|status|logs
+# Usage: wire.sh up|down|status|logs|ca
 #
 #   up      start the mitmproxy container (host network, binds :${WIRE_PORT})
 #   down    stop and remove the container
 #   status  show whether the overlay container is running
 #   logs    tail the mitmproxy logs
+#   ca      print the path to the mitmproxy CA (to trust for HTTPS interception)
 #
-# After `up`, route agents through it:
+# After `up`, route agents through it (HTTP lab targets):
 #   export INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:${WIRE_PORT}
+#   ./recette.sh api restart
+#
+# To intercept HTTPS to real systems (real_saas: slack via StdlibHttpClient,
+# github/gitlab via SDK), also trust the mitmproxy CA:
+#   export INSPECT_IA_AGENTS_WIRE_CA="$(./recette.sh wire ca)"
+#   # SDK forges (PyGithub/python-gitlab) honour the standard env instead:
+#   export HTTPS_PROXY=http://127.0.0.1:${WIRE_PORT} REQUESTS_CA_BUNDLE="$(./recette.sh wire ca)"
 #   ./recette.sh api restart
 # ===========================================================================
 
@@ -32,10 +40,23 @@ case "${action}" in
     up)
         need_docker
         hdr "UP wire overlay (mitmproxy) sur :${WIRE_PORT}"
+        mkdir -p "${RUN_DIR}/mitmproxy"
         dc --profile wire up -d wire-proxy && ok "wire-proxy demarre"
-        info "Pour router les agents au travers:"
+        info "Pour router les agents au travers (cibles HTTP):"
         info "  export INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:${WIRE_PORT}"
-        info "  ./recette.sh api restart"
+        info "Pour le HTTPS des systemes reels, ajouter le CA:"
+        info "  export INSPECT_IA_AGENTS_WIRE_CA=\"\$(./recette.sh wire ca)\""
+        info "Puis: ./recette.sh api restart"
+        ;;
+    ca)
+        # Print the mitmproxy CA path so it can be trusted (INSPECT_IA_AGENTS_WIRE_CA /
+        # REQUESTS_CA_BUNDLE). It appears after the first `wire up` generates it.
+        ca_path="${RUN_DIR}/mitmproxy/mitmproxy-ca-cert.pem"
+        if [ ! -f "${ca_path}" ]; then
+            err "CA absent (${ca_path}). Lancer d'abord: ./recette.sh wire up"
+            exit 1
+        fi
+        echo "${ca_path}"
         ;;
     down)
         need_docker
@@ -55,7 +76,7 @@ case "${action}" in
         ;;
     *)
         err "action wire inconnue: ${action}"
-        echo "  voir: ./recette.sh wire up|down|status|logs"
+        echo "  voir: ./recette.sh wire up|down|status|logs|ca"
         exit 1
         ;;
 esac

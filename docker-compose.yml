@@ -165,6 +165,36 @@ services:
       INSPECT_IA_AGENTS_API_URL: "${INSPECT_IA_AGENTS_API_URL:-http://127.0.0.1:8090}"
     volumes:
       - ./scripts/mitm_wire_addon.py:/addons/mitm_wire_addon.py:ro
+      # Persist mitmproxy's home so its generated CA is readable host-side at
+      # .run/mitmproxy/mitmproxy-ca-cert.pem -- trust it (INSPECT_IA_AGENTS_WIRE_CA)
+      # to let the overlay decrypt HTTPS to real systems (real_saas). `./recette.sh
+      # wire ca` prints the path.
+      - ./.run/mitmproxy:/home/mitmproxy/.mitmproxy
+
+  # --- OPTIONAL LLM gateway overlay (LiteLLM) -------------------------------
+  # An OpenAI-compatible gateway that centralizes and observes the agents' model
+  # calls (the "brain" view, as opposed to the wire overlay's target traffic).
+  # OFF by default (compose profile "llm"). To use it: configure an inspect_ia_agents
+  # ai_backend with provider "openai_compat" and base_url http://127.0.0.1:4000,
+  # model = one of the model_name entries in config/litellm.config.yaml.
+  #
+  # Provider keys come from the environment (R8): the passthrough below forwards
+  # them from the operator's shell / .env into the container, where the config
+  # resolves them via os.environ/<KEY>. Empty defaults keep compose from failing
+  # when a key is absent (that vendor's route just will not authenticate).
+  llm-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    profiles: ["llm"]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "${LLM_PROXY_HOST_PORT:-4000}:4000"
+    volumes:
+      - ./config/litellm.config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-recette-local}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
 
 volumes:
   platform-data:

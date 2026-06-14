@@ -1,0 +1,32 @@
+# LiteLLM proxy config -- OPTIONAL LLM gateway overlay (centralize + observe the
+# agents' model calls). OpenAI-compatible: an inspect_ia_agents ai_backend points at it with
+# provider "openai_compat" and base_url http://127.0.0.1:4000.
+#
+# Keys come from the environment (R8: never hardcode a key). The litellm
+# container receives them via the compose `environment` passthrough, which the
+# operator populates from .env (the project secret source of truth) or the shell.
+# Add a model_list entry per vendor you want to route; the `model` a backend
+# requests is matched against `model_name` here.
+model_list:
+  - model_name: groq-llama
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: openai-gpt
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: anthropic-claude
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+litellm_settings:
+  # Drop params a given vendor does not support instead of erroring -- the
+  # recette sends a uniform request shape across vendors.
+  drop_params: true
+
+general_settings:
+  # The proxy's own auth key (clients send it as the Bearer). Sourced from the
+  # environment so it is not hardcoded; defaults are set in the compose service.
+  master_key: os.environ/LITELLM_MASTER_KEY

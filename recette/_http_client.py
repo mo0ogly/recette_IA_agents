@@ -8,6 +8,7 @@ returning a response object exposing .raise_for_status() and .json().
 from __future__ import annotations
 
 import json as _json
+import ssl
 import urllib.error
 import urllib.request
 from typing import Any
@@ -40,6 +41,12 @@ class StdlibHttpClient:
     from the ambient HTTP_PROXY env) so the routing is deterministic and the
     overlay is opt-in: with ``proxy_url=None`` the client talks to the target
     directly, exactly as before (no behaviour change on the recette path, I4).
+
+    ``ca_bundle`` (optional) is a PEM CA file to trust for TLS verification --
+    the mitmproxy CA, so the overlay can decrypt HTTPS to real systems and LLM
+    providers (real_saas). With ``ca_bundle=None`` the default system trust
+    store is used (verification stays ON either way; the overlay never disables
+    verification, it adds its CA).
     """
 
     def __init__(
@@ -49,20 +56,26 @@ class StdlibHttpClient:
         timeout: float = 30.0,
         *,
         proxy_url: str | None = None,
+        ca_bundle: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.timeout = timeout
         self.proxy_url = proxy_url
-        # A per-client opener bound to the proxy. ProxyHandler with an explicit
-        # mapping ignores the environment, so only callers that pass proxy_url
-        # are proxied. None => use the module default opener (direct).
+        self.ca_bundle = ca_bundle
+        # A per-client opener is needed when proxying and/or trusting a custom CA.
+        # ProxyHandler with an explicit mapping ignores the environment, so only
+        # callers that pass proxy_url are proxied. An HTTPSHandler with a context
+        # built from ca_bundle adds that CA to the trust store (verification stays
+        # on). With neither set, None => the module default opener (direct).
+        handlers: list[urllib.request.BaseHandler] = []
+        if proxy_url:
+            handlers.append(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+        if ca_bundle:
+            context = ssl.create_default_context(cafile=ca_bundle)
+            handlers.append(urllib.request.HTTPSHandler(context=context))
         self._opener: urllib.request.OpenerDirector | None = (
-            urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
-            )
-            if proxy_url
-            else None
+            urllib.request.build_opener(*handlers) if handlers else None
         )
 
     def _open(self, req: urllib.request.Request) -> _Response:

@@ -17,7 +17,8 @@ set -euo pipefail
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
-#   ./recette.sh wire up|down|status|logs              # optional mitmproxy wire-interception overlay (Docker)
+#   ./recette.sh wire up|down|status|logs|ca           # optional mitmproxy wire-interception overlay (Docker)
+#   ./recette.sh llm-proxy up|down|status|logs         # optional LiteLLM LLM-gateway overlay (Docker)
 #   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
 # Auteur : Fabrice Pizzi - ANSSI
@@ -35,6 +36,7 @@ GIT_SH="${CICD_DIR}/git.sh"
 PLATFORM_SH="${CICD_DIR}/platform.sh"
 SMOKE_SH="${CICD_DIR}/smoke.sh"
 WIRE_SH="${CICD_DIR}/wire.sh"
+LLM_PROXY_SH="${CICD_DIR}/llm_proxy.sh"
 
 show_menu() {
     hdr "inspect_ia_agents recette - gestion"
@@ -127,9 +129,10 @@ case "${cmd}" in
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     wire)                              "${WIRE_SH}" "$@" ;;
+    llm-proxy)                         "${LLM_PROXY_SH}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
-        sed -n '4,20p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+        sed -n '4,21p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
     *)  err "commande inconnue: ${cmd}"; \
         echo "  voir: ./recette.sh --help"; exit 1 ;;
 esac

@@ -33,6 +33,9 @@ from dataclasses import asdict, dataclass
 # active (R5: no hardcoded address). Unset/empty => wire OFF, the client talks to
 # the target directly and the deterministic recette path is unchanged (I4).
 WIRE_PROXY_ENV = "INSPECT_IA_AGENTS_WIRE_PROXY"
+# PEM CA file (the mitmproxy CA) to trust so the overlay can decrypt HTTPS to
+# real systems (real_saas) and LLM providers. Unset => default system trust.
+WIRE_CA_ENV = "INSPECT_IA_AGENTS_WIRE_CA"
 
 DEFAULT_RING_CAPACITY = 512
 # Cap each captured body so a large response cannot blow up the in-memory ring.
@@ -45,6 +48,12 @@ TRUNCATION_MARKER = "...[truncated]"
 def wire_proxy_url_from_env() -> str | None:
     """The wire proxy URL from the environment, or None when the overlay is off."""
     raw = os.environ.get(WIRE_PROXY_ENV, "").strip()
+    return raw or None
+
+
+def wire_ca_from_env() -> str | None:
+    """The wire CA PEM path from the environment, or None for default trust."""
+    raw = os.environ.get(WIRE_CA_ENV, "").strip()
     return raw or None
 
 

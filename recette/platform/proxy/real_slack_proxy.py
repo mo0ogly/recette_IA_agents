@@ -29,6 +29,7 @@ import os
 from ..._http_client import StdlibHttpClient
 from ..events import PlatformActionEvent
 from .protocol import ExecutionResult, side_effect_hash
+from .wire import wire_ca_from_env, wire_proxy_url_from_env
 
 DEFAULT_SLACK_API_URL = "https://slack.com/api"
 
@@ -88,9 +89,17 @@ class RealSlackProxy:
         allowlist: frozenset[str],
         enable_writes: bool = False,
         timeout: float = 10.0,
+        proxy_url: str | None = None,
+        ca_bundle: str | None = None,
     ) -> None:
+        # proxy_url/ca_bundle (optional) route the real Slack HTTPS through the
+        # mitmproxy wire overlay so the exchange is captured; None => direct.
         self._client = StdlibHttpClient(
-            base_url, headers={"Authorization": f"Bearer {token}"}, timeout=timeout
+            base_url,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+            proxy_url=proxy_url,
+            ca_bundle=ca_bundle,
         )
         self._allowlist = allowlist
         self._enable_writes = enable_writes
@@ -177,4 +186,11 @@ def build_slack_proxy_from_env(*, enable_writes: bool = False) -> RealSlackProxy
     base_url = os.environ.get("INSPECT_IA_AGENTS_SLACK_API_URL", DEFAULT_SLACK_API_URL)
     _env_writes = os.environ.get("INSPECT_IA_AGENTS_SLACK_ENABLE_WRITES", "").lower() == "true"
     writes = enable_writes or _env_writes
-    return RealSlackProxy(token=token, base_url=base_url, allowlist=allowlist, enable_writes=writes)
+    return RealSlackProxy(
+        token=token,
+        base_url=base_url,
+        allowlist=allowlist,
+        enable_writes=writes,
+        proxy_url=wire_proxy_url_from_env(),
+        ca_bundle=wire_ca_from_env(),
+    )
