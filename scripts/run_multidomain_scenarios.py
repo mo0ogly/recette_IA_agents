@@ -26,7 +26,7 @@ from recette.api.app import create_app
 from recette.api.config_store import ConfigStore
 from recette.campaign import CampaignRunner, HttpClient, load_campaign
 from recette.platform.catalog import Catalog, load_catalog
-from recette.platform.catalog.model import ActionSpec, RiskLevel
+from recette.platform.catalog.model import ActionSpec, Criticality, RiskLevel
 from recette.platform.events import PolicyVerdict
 from recette.platform.eventstore.memory_store import InMemoryEventStore
 from recette.platform.policy.model import PolicyRule, PolicyVersion, baseline_from_catalog
@@ -45,6 +45,7 @@ def _read_spec(target: str, action: str, privileged_role: str, description: str)
         target_system=target,
         action_type=action,
         risk_level=RiskLevel.LOW,
+        criticality=Criticality.C4,
         verdict_privileged=PolicyVerdict.ALLOW,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=(privileged_role,),

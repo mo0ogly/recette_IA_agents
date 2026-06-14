@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover - exercised only without the [api] extra
 
 from recette.api.config_store import ConfigStore
 from recette.platform.catalog import Catalog
-from recette.platform.catalog.model import ActionSpec, RiskLevel
+from recette.platform.catalog.model import ActionSpec, Criticality, RiskLevel
 from recette.platform.events import PolicyVerdict
 from recette.platform.eventstore.memory_store import InMemoryEventStore
 from recette.platform.policy.store import PolicyStore
@@ -34,6 +34,7 @@ SPECS = (
         target_system="okta",
         action_type="suspend_user",
         risk_level=RiskLevel.HIGH,
+        criticality=Criticality.C2,
         verdict_privileged=PolicyVerdict.ESCALATE,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=("identity_admin",),
@@ -43,6 +44,7 @@ SPECS = (
         target_system="okta",
         action_type="list_users",
         risk_level=RiskLevel.LOW,
+        criticality=Criticality.C4,
         verdict_privileged=PolicyVerdict.ALLOW,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=("identity_admin",),

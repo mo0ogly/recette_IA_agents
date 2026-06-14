@@ -5,7 +5,12 @@ from __future__ import annotations
 import importlib
 
 from .domains import DOMAIN_MODULES
-from .model import ActionSpec, RiskLevel  # noqa: F401  (re-export)
+from .model import (  # noqa: F401  (re-export)
+    CRITICALITY_LABEL,
+    ActionSpec,
+    Criticality,
+    RiskLevel,
+)
 
 
 class CatalogError(ValueError):

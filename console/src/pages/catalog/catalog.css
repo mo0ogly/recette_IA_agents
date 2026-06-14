@@ -108,6 +108,12 @@
   color: var(--color-text-muted);
 }
 
+.criticality {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  cursor: help;
+}
+
 /* Policy panel */
 
 .policy-summary {

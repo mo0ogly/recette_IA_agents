@@ -77,6 +77,7 @@ function CatalogTable({ actions }: CatalogTableProps): JSX.Element {
           <th>Target system</th>
           <th>Action type</th>
           <th>Risk</th>
+          <th>Criticality</th>
           <th>Verdict (privileged)</th>
           <th>Verdict (default)</th>
           <th>Privileged roles</th>
@@ -90,6 +91,11 @@ function CatalogTable({ actions }: CatalogTableProps): JSX.Element {
             <td>{spec.action_type}</td>
             <td>
               <StatusBadge kind="risk" value={spec.risk_level} />
+            </td>
+            <td>
+              <span className="criticality" title={spec.criticality_label}>
+                {spec.criticality}
+              </span>
             </td>
             <td>
               <StatusBadge kind="verdict" value={spec.verdict_privileged} />

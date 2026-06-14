@@ -30,7 +30,7 @@ from recette.api.app import create_app
 from recette.api.config_store import ConfigStore
 from recette.campaign import CampaignRunner, HttpClient, load_campaign
 from recette.platform.catalog import Catalog, load_catalog
-from recette.platform.catalog.model import ActionSpec, RiskLevel
+from recette.platform.catalog.model import ActionSpec, Criticality, RiskLevel
 from recette.platform.events import PolicyVerdict
 from recette.platform.eventstore.memory_store import InMemoryEventStore
 from recette.platform.policy.model import PolicyRule, PolicyVersion, baseline_from_catalog
@@ -48,6 +48,7 @@ def _esc_spec(
         target_system=target,
         action_type=action,
         risk_level=risk,
+        criticality=Criticality.C2,
         verdict_privileged=PolicyVerdict.ESCALATE,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=(privileged_role,),
@@ -61,6 +62,7 @@ def _deny_spec(target: str, action: str, risk: RiskLevel, description: str) -> A
         target_system=target,
         action_type=action,
         risk_level=risk,
+        criticality=Criticality.C1,
         verdict_privileged=PolicyVerdict.DENY,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=(),

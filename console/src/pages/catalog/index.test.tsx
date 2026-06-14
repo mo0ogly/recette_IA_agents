@@ -73,6 +73,10 @@ describe("CatalogPage", () => {
     expect(scoped.getByText("suspend_user")).toBeInTheDocument();
     const riskBadge = scoped.getByText("high");
     expect(riskBadge).toHaveClass("badge", "badge-high");
+    // Annex C criticality: suspend_user is C3 (conditional authorization).
+    const criticality = scoped.getByText("C3");
+    expect(criticality).toHaveClass("criticality");
+    expect(criticality).toHaveAttribute("title", "conditional authorization");
     expect(scoped.getByText("escalate")).toHaveClass("badge-escalate");
     expect(scoped.getByText("deny")).toHaveClass("badge-deny");
   });

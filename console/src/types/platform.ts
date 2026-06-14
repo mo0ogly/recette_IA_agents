@@ -11,12 +11,22 @@ export type ApprovalState = "none" | "pending" | "approved" | "denied" | "timeou
 
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 
+/**
+ * AgentRail default governance posture per governed action (Annex C). A separate
+ * axis from risk_level (severity) and verdict (allow/escalate/deny): C1 refuse by
+ * default, C2 systematic escalation, C3 conditional authorization, C4
+ * authorization with logging.
+ */
+export type Criticality = "C1" | "C2" | "C3" | "C4";
+
 /** One entry of the action catalog: what an action is and how policy treats it. */
 export interface ActionSpec {
   target_system: string;
   action_type: string;
   risk_level: RiskLevel;
   risk_score: number;
+  criticality: Criticality;
+  criticality_label: string;
   verdict_privileged: PolicyVerdict;
   verdict_default: PolicyVerdict;
   privileged_roles: string[];
@@ -238,8 +248,19 @@ export interface RecetteCampaignSummary {
   teaching: string | null;
   action_count: number;
   agent_count: number;
+  /** True when the campaign declares a MAF-team link (macro orchestration campaign). */
+  linked?: boolean;
   /** Set only when the file failed to parse/validate (surfaced, not hidden). */
   error?: string;
+}
+
+/** A macro orchestration campaign's binding to a MAF team it agrees with on a gate. */
+export interface RecetteCampaignLink {
+  kind: "maf_orchestration";
+  team: string;
+  shared_action: string;
+  invariant?: string;
+  note?: string;
 }
 
 /** One scored action of a recette campaign (expect = the awaited verdict). */
@@ -261,6 +282,8 @@ export interface RecetteCampaignDetail {
   teaching?: string;
   agents: Array<{ id: string; runtime: string; [key: string]: unknown }>;
   actions: RecetteCampaignAction[];
+  /** Declared MAF-team links (present on a macro orchestration campaign). */
+  links?: RecetteCampaignLink[];
 }
 
 /**

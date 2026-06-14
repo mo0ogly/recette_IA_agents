@@ -22,7 +22,7 @@ from pathlib import Path
 from recette.platform.approvals import ApprovalService, InvalidTransition
 from recette.platform.approvals.state_machine import ApprovalAction
 from recette.platform.catalog import Catalog
-from recette.platform.catalog.model import ActionSpec, RiskLevel
+from recette.platform.catalog.model import ActionSpec, Criticality, RiskLevel
 from recette.platform.events import ApprovalState, EventKind, PolicyVerdict
 from recette.platform.eventstore import EventStore, SqliteEventStore
 from recette.platform.gateway import ActionRequest, AgentResolver, Gateway
@@ -35,6 +35,7 @@ SPECS = (
         target_system="okta",
         action_type="suspend_user",
         risk_level=RiskLevel.HIGH,
+        criticality=Criticality.C2,
         verdict_privileged=PolicyVerdict.ESCALATE,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=("identity_admin",),

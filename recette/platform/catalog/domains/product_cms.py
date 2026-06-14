@@ -1,6 +1,8 @@
-"""product_cms domain action specs -- W11 Product / content (9 actions).
+"""product_cms domain action specs -- W11 Product / content (10 actions).
 
 Source of truth: docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md, section W11.
+Criticality (Annex C) is the AgentRail default posture, independent from the
+implemented verdict; see catalog/model.py::Criticality.
 Verdict mapping convention:
 - ESC and DENY/ESC rows: privileged role escalates, any other role is denied
   (deny-by-default), privileged_roles = ("product_admin",).
@@ -10,19 +12,22 @@ Verdict mapping convention:
 from __future__ import annotations
 
 from ...events import PolicyVerdict
-from ..model import ActionSpec, RiskLevel
+from ..model import ActionSpec, Criticality, RiskLevel
 
 TARGET_SYSTEM = "product_cms"
 
 _PRODUCT_ADMIN = ("product_admin",)
 
 
-def _escalate(action_type: str, risk_level: RiskLevel, description: str) -> ActionSpec:
+def _escalate(
+    action_type: str, criticality: Criticality, risk_level: RiskLevel, description: str
+) -> ActionSpec:
     """ESC / DENY-ESC row: escalate for product_admin, deny for everyone else."""
     return ActionSpec(
         target_system=TARGET_SYSTEM,
         action_type=action_type,
         risk_level=risk_level,
+        criticality=criticality,
         verdict_privileged=PolicyVerdict.ESCALATE,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=_PRODUCT_ADMIN,
@@ -30,12 +35,15 @@ def _escalate(action_type: str, risk_level: RiskLevel, description: str) -> Acti
     )
 
 
-def _allow(action_type: str, risk_level: RiskLevel, description: str) -> ActionSpec:
+def _allow(
+    action_type: str, criticality: Criticality, risk_level: RiskLevel, description: str
+) -> ActionSpec:
     """Routine authorized read row: allow for product_admin, deny for everyone else."""
     return ActionSpec(
         target_system=TARGET_SYSTEM,
         action_type=action_type,
         risk_level=risk_level,
+        criticality=criticality,
         verdict_privileged=PolicyVerdict.ALLOW,
         verdict_default=PolicyVerdict.DENY,
         privileged_roles=_PRODUCT_ADMIN,
@@ -46,39 +54,55 @@ def _allow(action_type: str, risk_level: RiskLevel, description: str) -> ActionS
 ACTIONS: tuple[ActionSpec, ...] = (
     _allow(
         "read_content_draft",
+        Criticality.C4,
         RiskLevel.LOW,
         "Read a content draft in staging (read-only, no publish).",
     ),
     _escalate(
         "publish_production",
+        Criticality.C2,
         RiskLevel.HIGH,
         "Publish content or a release to the production environment.",
     ),
-    _escalate("modify_public_page", RiskLevel.MEDIUM, "Modify a publicly visible page."),
+    _escalate(
+        "modify_public_page", Criticality.C3, RiskLevel.MEDIUM, "Modify a publicly visible page."
+    ),
     _escalate(
         "send_marketing_campaign",
+        Criticality.C2,
         RiskLevel.HIGH,
         "Send a marketing campaign to customers.",
     ),
-    _escalate("modify_pricing", RiskLevel.HIGH, "Modify the pricing displayed to customers."),
-    _escalate("delete_content", RiskLevel.MEDIUM, "Delete existing content from the CMS."),
+    _escalate(
+        "modify_pricing",
+        Criticality.C2,
+        RiskLevel.HIGH,
+        "Modify the pricing displayed to customers.",
+    ),
+    _escalate(
+        "delete_content", Criticality.C3, RiskLevel.MEDIUM, "Delete existing content from the CMS."
+    ),
     _escalate(
         "change_product_config",
+        Criticality.C3,
         RiskLevel.HIGH,
         "Change the configuration of a product.",
     ),
     _escalate(
         "enable_feature_all_customers",
+        Criticality.C2,
         RiskLevel.HIGH,
         "Enable a feature for all customers at once.",
     ),
     _escalate(
         "disable_critical_feature",
+        Criticality.C1,
         RiskLevel.HIGH,
         "Disable a critical feature of the product.",
     ),
     _escalate(
         "modify_user_onboarding",
+        Criticality.C3,
         RiskLevel.MEDIUM,
         "Modify the user onboarding flow.",
     ),
