@@ -1,19 +1,24 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SimPage from "./index";
-import { getSimRuns, getSimView } from "../../api/client";
-import type { SimView } from "../../api/client";
+import { getSimRuns, getSimScenarios, getSimView } from "../../api/client";
+import type { SimScenario, SimView } from "../../api/client";
 import runsFixture from "./__fixtures__/runs.fixture.json";
+import scenariosFixture from "./__fixtures__/scenarios.fixture.json";
 import viewFixture from "./__fixtures__/view.fixture.json";
 
 vi.mock("../../api/client", () => ({
   getSimRuns: vi.fn(),
+  getSimScenarios: vi.fn(),
   getSimView: vi.fn(),
 }));
 
 beforeEach(() => {
   vi.mocked(getSimRuns).mockResolvedValue(runsFixture as { count: number; runs: never[] });
   vi.mocked(getSimView).mockResolvedValue(viewFixture as SimView);
+  vi.mocked(getSimScenarios).mockResolvedValue(
+    scenariosFixture as { count: number; scenarios: SimScenario[] },
+  );
 });
 
 afterEach(() => {

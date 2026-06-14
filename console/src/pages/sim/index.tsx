@@ -9,12 +9,51 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { getSimRuns, getSimView } from "../../api/client";
-import type { SimRunSummary, SimView } from "../../api/client";
+import { getSimRuns, getSimScenarios, getSimView } from "../../api/client";
+import type { SimRunSummary, SimScenario, SimView } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import "../discovery/discovery.css";
 
 const DIMS = ["identity", "capabilities", "policy", "behavior"] as const;
+
+/**
+ * Pure presentational list of red-team scenarios. For each scenario it surfaces,
+ * legibility-first, whether the recette caught the anomaly (a pill-ok "caught" /
+ * pill-bad "missed" badge keyed off anomaly_caught), the predicted-vs-expected
+ * verdict, and the OWASP ASI tag when the scenario carries one. No fetching, no
+ * state -- driven entirely by its props so it is trivially testable (R16).
+ */
+export function ScenarioList({ scenarios }: { scenarios: SimScenario[] }): JSX.Element {
+  if (scenarios.length === 0)
+    return (
+      <p className="discovery-note" data-testid="sim-scn-empty">
+        No red-team scenarios.
+      </p>
+    );
+  return (
+    <ul className="discovery-summary" data-testid="sim-scenarios">
+      {scenarios.map((s) => (
+        <li key={s.scenario_id} data-testid={`sim-scn-${s.scenario_id}`}>
+          <span
+            className={`pill ${s.anomaly_caught ? "pill-ok" : "pill-bad"}`}
+            data-testid={`sim-scn-caught-${s.scenario_id}`}
+          >
+            {s.anomaly_caught ? "caught" : "missed"}
+          </span>{" "}
+          <strong>{s.name}</strong>{" "}
+          <span className="discovery-stat">
+            {s.verdict} (expected {s.expected_verdict})
+          </span>
+          {s.tags.owasp_asi && (
+            <span className="pill" data-testid={`sim-scn-owasp-${s.scenario_id}`}>
+              {s.tags.owasp_asi}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Viewer({ agentId }: { agentId: string }): JSX.Element {
   const [view, setView] = useState<SimView | null>(null);
@@ -118,6 +157,8 @@ export default function SimPage(): JSX.Element {
   const [runs, setRuns] = useState<SimRunSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [scenarios, setScenarios] = useState<SimScenario[] | null>(null);
+  const [scenariosError, setScenariosError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -129,6 +170,16 @@ export default function SimPage(): JSX.Element {
         }
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    getSimScenarios()
+      .then((r) => alive && setScenarios(r.scenarios))
+      .catch((e) => alive && setScenariosError(e instanceof Error ? e.message : String(e)));
     return () => {
       alive = false;
     };
@@ -154,6 +205,21 @@ export default function SimPage(): JSX.Element {
         </div>
       )}
       {!runs && !error && <p className="discovery-loading">Loading runs...</p>}
+
+      <h2>Red-team scenarios</h2>
+      <p className="discovery-note">
+        Each scenario carries an expected verdict; the badge shows whether the
+        recette caught the anomaly, alongside its OWASP ASI tag.
+      </p>
+      {scenariosError && (
+        <div className="discovery-error" role="alert" data-testid="sim-scenarios-error">
+          {scenariosError}
+        </div>
+      )}
+      {!scenarios && !scenariosError && (
+        <p className="discovery-loading">Loading scenarios...</p>
+      )}
+      {scenarios && <ScenarioList scenarios={scenarios} />}
 
       {runs && (
         <div className="discovery-summary">

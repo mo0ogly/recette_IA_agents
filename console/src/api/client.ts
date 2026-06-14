@@ -862,3 +862,31 @@ export function getSimRuns(): Promise<{ count: number; runs: SimRunSummary[] }> 
 export function getSimView(agentId: string): Promise<SimView> {
   return request<SimView>(`/sim/runs/${encodeURIComponent(agentId)}`);
 }
+
+export interface SimScenario {
+  scenario_id: string;
+  name: string;
+  verdict: string;
+  expected_verdict: string;
+  violation_type: string | null;
+  /** True when the recette's predicted verdict matches the scenario's expected
+   *  verdict -- i.e. the red-team anomaly was caught. */
+  anomaly_caught: boolean;
+  /** Standards mapping, e.g. { owasp_asi, mitre_atlas, nist }. May be partial. */
+  tags: Record<string, string>;
+}
+
+export interface SimScenarioView extends SimScenario {
+  transcript: { role: string; content: string; tool_name: string | null }[];
+}
+
+/** GET /sim/scenarios: every red-team scenario with its verdict and whether the
+ *  recette caught the anomaly. */
+export function getSimScenarios(): Promise<{ count: number; scenarios: SimScenario[] }> {
+  return request<{ count: number; scenarios: SimScenario[] }>("/sim/scenarios");
+}
+
+/** GET /sim/scenarios/{id}: one scenario's outcome plus its replayed transcript. */
+export function getSimScenario(id: string): Promise<SimScenarioView> {
+  return request<SimScenarioView>(`/sim/scenarios/${encodeURIComponent(id)}`);
+}
