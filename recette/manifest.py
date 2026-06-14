@@ -20,6 +20,7 @@ _SCHEMAS = {
     "maf_orchestration": _SCHEMA_DIR / "maf-orchestration.schema.json",
     "maf_orchestration_run": _SCHEMA_DIR / "maf-orchestration-run.schema.json",
     "sim_scenario": _SCHEMA_DIR / "sim-scenario.schema.json",
+    "git_sim_scenario": _SCHEMA_DIR / "git-sim-scenario.schema.json",
 }
 
 

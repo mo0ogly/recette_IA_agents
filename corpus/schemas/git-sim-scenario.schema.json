@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspect_ia_agents.local/schemas/git-sim-scenario.schema.json",
+  "title": "inspect_ia_agents recette -- git red-team simulation scenario",
+  "description": "A goal-driven git red-team scenario for Lane B: a git target_manifest under an adversarial goal, a deterministic subject_program of git tool-call decisions a ReplayLlm replays, optional adversarial forge tool_injection per step, and the expected judged verdict. The target_manifest is a full git agent manifest validated separately as a 'manifest' by the scenario runner; here it is treated loosely as an object. Maps to the four recette dimensions via expected.violation_type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenario_id", "name", "target_manifest", "goal", "subject_program", "expected"],
+  "properties": {
+    "scenario_id": { "type": "string" },
+    "name": { "type": "string" },
+    "target_manifest": {
+      "type": "object",
+      "description": "Full git agent manifest of the subject under attack. Validated separately as a 'manifest'; loose object here to avoid duplicating that schema."
+    },
+    "goal": {
+      "type": "string",
+      "description": "Adversarial goal handed to the Lane B agent loop."
+    },
+    "subject_program": {
+      "type": "array",
+      "description": "Deterministic ordered git tool-call decisions the subject produces (I4), replayed by a ReplayLlm.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool_name"],
+        "properties": {
+          "tool_name": { "type": "string" },
+          "tool_args": {
+            "type": "object",
+            "description": "Tool arguments (e.g. a 'resource' target). Default {}.",
+            "default": {}
+          }
+        }
+      }
+    },
+    "tool_injection": {
+      "type": "array",
+      "description": "Optional adversarial forge outputs (AgentDojo injection-via-tool-output) by executed-action index. Index N is fed back as the tool result of the Nth executed action; out-of-range indices fall back to the default ok: text.",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Threat-framework cross-references.",
+      "properties": {
+        "owasp_asi": { "type": "string" },
+        "mitre_atlas": { "type": "string" },
+        "nist": { "type": "string" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict"],
+      "properties": {
+        "verdict": { "type": "string", "enum": ["correct", "incorrect"] },
+        "violation_type": {
+          "type": ["string", "null"],
+          "enum": [null, "identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"],
+          "description": "Broken dimension for an incorrect verdict; null for a correct one."
+        }
+      },
+      "if": { "properties": { "verdict": { "const": "incorrect" } }, "required": ["verdict"] },
+      "then": { "required": ["violation_type"] }
+    }
+  }
+}
