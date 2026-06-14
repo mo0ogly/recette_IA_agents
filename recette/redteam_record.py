@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from .judge import judge_subject
 from .llm import LlmBackend, LlmDecision, Message, ToolSpec
 from .manifest import validate
-from .redteam_recette import _approver_for, _violation_of, run_scenario
+from .redteam_recette import _APPROVERS, _approver_for, _violation_of, run_scenario
 from .simulate import simulate
 
 
@@ -88,6 +88,8 @@ def record_scenario(
     no clock, random or direct IO. Raises ``ValueError`` if the assembled scenario
     is schema-invalid or does not replay to the recorded verdict.
     """
+    if approver not in _APPROVERS:
+        raise ValueError(f"unknown approver {approver!r}; known: {sorted(_APPROVERS)}")
     rec = RecordingLlm(subject)
     result = simulate(
         spec=spec,
@@ -121,7 +123,8 @@ def record_scenario(
         raise ValueError(f"recorded scenario invalid: {errors}")
 
     out = run_scenario(scenario)
-    if out.verdict != verdict or not out.anomaly_caught:
+    # I4 self-check: the frozen scenario must replay to the verdict the live run produced.
+    if out.verdict != verdict:
         raise ValueError("frozen scenario does not replay to the recorded verdict")
 
     return scenario

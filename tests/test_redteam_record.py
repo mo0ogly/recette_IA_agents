@@ -65,6 +65,17 @@ class T(unittest.TestCase):
         self.assertIsNone(out.violation_type)
         self.assertTrue(out.anomaly_caught)
 
+    def test_record_scenario_rejects_unknown_approver(self):
+        from recette.redteam_record import record_scenario
+        subject = StubLlm([LlmDecision(kind="final", text="ok")])
+        with self.assertRaises(ValueError) as ctx:
+            record_scenario(
+                spec=self._spec(), subject=subject,
+                user_turns=["hi"],
+                scenario_id="rt-live-bad", name="Bad", approver="nope",
+            )
+        self.assertIn("unknown approver", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
