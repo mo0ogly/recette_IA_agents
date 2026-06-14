@@ -26,7 +26,10 @@ CAMPAIGNS_DIR = Path(__file__).resolve().parents[1] / "campaigns"
 
 class TestCampaignValidation(unittest.TestCase):
     def test_committed_campaign_files_are_valid(self) -> None:
-        files = sorted(CAMPAIGNS_DIR.glob("*.campaign.json"))
+        # Recursive: the catalog (RecetteCampaignCatalog) reads campaigns/** with
+        # rglob, so this validity gate must too -- otherwise the multidomain/, bnp/,
+        # coverage/, rag/ subdirs ship unvalidated.
+        files = sorted(CAMPAIGNS_DIR.rglob("*.campaign.json"))
         self.assertGreaterEqual(len(files), 3)
         for path in files:
             doc = load_campaign(path)  # raises on invalid

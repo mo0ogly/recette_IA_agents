@@ -80,7 +80,13 @@ class _StubProxy:
 
 
 def build_extended_catalog() -> Catalog:
-    return Catalog(tuple(load_catalog().all()) + EXTRA_SPECS)
+    # Only layer in the EXTRA_SPECS the committed catalog does not already define.
+    # gitlab git-family reads live here because gitlab had no governance catalog;
+    # if a committed gitlab domain later adds them, defer to it (no duplicate).
+    base = tuple(load_catalog().all())
+    known = {(s.target_system, s.action_type) for s in base}
+    extra = tuple(s for s in EXTRA_SPECS if (s.target_system, s.action_type) not in known)
+    return Catalog(base + extra)
 
 
 def build_bundle(catalog: Catalog) -> PolicyVersion:

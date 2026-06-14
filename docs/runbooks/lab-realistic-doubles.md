@@ -84,19 +84,48 @@ Test panel (`ServerTestPanel.tsx`).
 ## Composed campaigns over these doubles
 
 `campaigns/multidomain/*.campaign.json` compose the per-domain agents into
-governed multi-agent scenarios (4 committed): `ops-readonly-sweep` (allow-path
-reads), `insider-exfil-chain` (escalate + deny on evidence deletion),
-`prod-sabotage` (deny-by-default), `collab-content-day` (allow + escalate).
-They run through the real gateway and assert per-action verdicts:
+governed multi-agent scenarios: `ops-readonly-sweep` (allow-path reads),
+`insider-exfil-chain` (escalate + deny on evidence deletion), `prod-sabotage`
+(deny-by-default), `collab-content-day` (allow + escalate), `incident-response-
+bridge` (SOC reads + escalate containment), `release-train` (devops reads +
+escalate deploys + deny backup-delete), `finance-approval-bridge`. They run
+through the real gateway and assert per-action verdicts:
 
 ```
-.venv/bin/python scripts/run_multidomain_scenarios.py     # ALL PASS -- 4 campaigns
+.venv/bin/python scripts/run_multidomain_scenarios.py     # ALL PASS -- 7 campaigns
 ```
 
-The harness layers the gitlab git-family read actions in memory (gitlab has no
-committed governance catalog) and grants them ALLOW for `devops_admin`;
-everything else uses the committed catalog baseline. The verdict is ground
-truth -- a mismatch means the policy mapping is wrong, never weaken the `expect`.
+The harness layers the gitlab git-family read actions in memory ONLY if the
+committed catalog does not already define them (it defers to a committed gitlab
+domain when one exists), and grants them ALLOW for `devops_admin`; everything
+else uses the committed catalog baseline. The verdict is ground truth -- a
+mismatch means the policy mapping is wrong, never weaken the `expect`.
+
+## Macro orchestration campaign (campaign <-> MAF team link)
+
+A campaign may carry a `links` block binding it to a MAF orchestration team
+(`corpus/maf_orchestration/`) on a `shared_action` whose human gate (I6) both
+sides must honour -- a **macro orchestration campaign**. The team PLANS the gate
+(an `approval=always` tool it approves before use); the gateway ENFORCES it (the
+same action escalates to pending). `finance-approval-bridge` links to
+`finance-approval-handoff-correct` on `launch_wire_transfer`.
+
+```json
+"links": [{ "kind": "maf_orchestration", "team": "finance-approval-handoff-correct",
+            "shared_action": "launch_wire_transfer", "invariant": "I6", "note": "..." }]
+```
+
+The link is data, not code: the harness discovers it from the campaign files,
+judges the team, runs the campaign, and asserts the shared action escalates:
+
+```
+.venv/bin/python scripts/run_orchestrated_campaign.py     # ALL PASS -- N macro orchestration campaigns
+```
+
+On the console it surfaces on the recette-campaigns page (an `orchestration`
+badge on the row, an Orchestration tab in the Expliquer modal). Both harnesses
+are also guarded by `tests/test_orchestrated_campaigns.py` so a verdict
+regression fails `./recette.sh test`, not just the CLI.
 
 ## Determinism gate
 

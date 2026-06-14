@@ -143,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             team_ok = team_judged == team_expected
 
             report = runner.run(load_campaign(link.campaign_path))
-            camp_ok = report.ok and report.chain_ok
+            camp_ok = report.ok and bool(report.chain_ok)
 
             # The link assertion: the shared business action escalates in the
             # governed run (its declared approval gate is enforced by the gateway).
