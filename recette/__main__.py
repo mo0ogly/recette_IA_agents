@@ -533,6 +533,30 @@ def _cmd_redteam() -> int:
     return 1 if card["missed"] else 0
 
 
+def _cmd_redteam_promote(scenario_id: str, out: str, overwrite: bool) -> int:
+    """Promote a caught red-team anomaly into a negative corpus subject.
+
+    Locates the scenario (MAF or git), replays it, and -- if the re-judged
+    verdict is ``incorrect`` and a single-axis violation -- freezes the three
+    documents under ``<out>/incorrect/<slug>/``. Returns 0 on success; 2 on a
+    ValueError (correct/true-negative scenario, unknown id, or a multi-axis run)
+    or a FileExistsError (already promoted -- suggests --overwrite)."""
+    from .redteam_promote import promote_scenario
+
+    try:
+        result = promote_scenario(scenario_id, out_root=out, overwrite=overwrite)
+    except FileExistsError as exc:
+        print(f"{exc}\n(re-run with --overwrite to replace the existing subject)", file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"promoted {result['slug']}: verdict={result['verdict']} ({result['violation_type']})")
+    for path in result["created"]:
+        print(f"  wrote {path}")
+    return 0
+
+
 def _cmd_redteam_record(args: argparse.Namespace) -> int:
     """Run a LIVE red-team attack against a target subject, freeze it to a scenario.
 
@@ -748,6 +772,17 @@ def build_parser() -> argparse.ArgumentParser:
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",
     )
+    rtp = sub.add_parser(
+        "redteam-promote",
+        help="freeze a caught red-team anomaly into a negative corpus subject",
+    )
+    rtp.add_argument("--scenario-id", required=True, help="scenario id to promote (MAF or git)")
+    rtp.add_argument(
+        "--out", default="corpus/agents", help="output corpus root (default: corpus/agents)"
+    )
+    rtp.add_argument(
+        "--overwrite", action="store_true", help="replace an existing promoted subject (I1)"
+    )
     rtr = sub.add_parser(
         "redteam-record",
         help="run a LIVE red-team attack and freeze it into a replayable scenario",
@@ -858,6 +893,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_import_maf(args.spec, args.out)
     if args.command == "redteam":
         return _cmd_redteam()
+    if args.command == "redteam-promote":
+        return _cmd_redteam_promote(args.scenario_id, args.out, args.overwrite)
     if args.command == "redteam-record":
         return _cmd_redteam_record(args)
     if args.command == "publish":
