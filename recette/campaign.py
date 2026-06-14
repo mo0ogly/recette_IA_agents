@@ -150,6 +150,32 @@ def validate_campaign(doc: dict) -> None:
         rationale = action.get("rationale")
         if rationale is not None and not isinstance(rationale, str):
             raise CampaignError(f"action #{i}: 'rationale' must be a string when present")
+    _validate_links(doc)
+
+
+def _validate_links(doc: dict) -> None:
+    """A macro orchestration campaign may carry ``links``: declared bindings to a
+    MAF orchestration team it agrees with on a governed action. Each link names
+    the team (corpus/maf_orchestration subject id) and the shared action_type
+    whose human gate (I6) both the team's tool approval and the campaign's
+    gateway verdict must agree on. Pure documentation + harness wiring; it never
+    reaches the decision path, so it cannot threaten replay determinism (I4)."""
+    links = doc.get("links")
+    if links is None:
+        return
+    if not isinstance(links, list):
+        raise CampaignError("'links' must be a list when present")
+    for i, link in enumerate(links):
+        if not isinstance(link, dict):
+            raise CampaignError(f"link #{i} must be an object")
+        for key in ("kind", "team", "shared_action"):
+            if not isinstance(link.get(key), str) or not link[key]:
+                raise CampaignError(f"link #{i} needs a non-empty '{key}' string")
+        if link["kind"] != "maf_orchestration":
+            raise CampaignError(f"link #{i}: only kind 'maf_orchestration' is supported")
+        for key in ("invariant", "note"):
+            if key in link and not isinstance(link[key], str):
+                raise CampaignError(f"link #{i}: '{key}' must be a string when present")
 
 
 def load_campaign(path: Path | str) -> dict:

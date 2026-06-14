@@ -74,6 +74,39 @@ class TestRecetteCampaignCatalog(unittest.TestCase):
     def test_get_unknown_is_none(self) -> None:
         self.assertIsNone(self.catalog.get("nope"))
 
+    def test_macro_orchestration_campaign_is_linked(self) -> None:
+        """A campaign with a 'links' block is flagged linked in the summary and
+        its links survive in the detail (macro orchestration campaign)."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "multidomain").mkdir()
+        doc = {
+            **_CAMPAIGN,
+            "name": "linked-demo",
+            "links": [
+                {
+                    "kind": "maf_orchestration",
+                    "team": "finance-approval-handoff-correct",
+                    "shared_action": "launch_wire_transfer",
+                    "invariant": "I6",
+                }
+            ],
+        }
+        (root / "multidomain" / "linked.campaign.json").write_text(
+            json.dumps(doc), encoding="utf-8"
+        )
+        catalog = RecetteCampaignCatalog(root)
+        summary = next(c for c in catalog.list() if c["id"] == "linked-demo")
+        self.assertTrue(summary["linked"])
+        detail = catalog.get("linked-demo")
+        assert detail is not None
+        self.assertEqual(detail["links"][0]["team"], "finance-approval-handoff-correct")
+
+    def test_plain_campaign_not_linked(self) -> None:
+        summary = next(c for c in self.catalog.list() if c["id"] == "demo-fraud")
+        self.assertFalse(summary["linked"])
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestRecetteCampaignRoutes(unittest.TestCase):

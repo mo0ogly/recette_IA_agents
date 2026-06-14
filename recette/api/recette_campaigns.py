@@ -48,6 +48,9 @@ def _summary(doc: dict, path: Path, root: Path) -> dict:
         "teaching": doc.get("teaching"),
         "action_count": len(doc.get("actions", [])),
         "agent_count": len(doc.get("agents", [])),
+        # A macro orchestration campaign declares links to a MAF team; surfaced
+        # so the console can badge/group it without fetching the full document.
+        "linked": bool(doc.get("links")),
     }
 
 

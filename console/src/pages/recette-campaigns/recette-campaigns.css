@@ -51,6 +51,24 @@
   font-weight: 600;
 }
 
+.rc-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+  vertical-align: middle;
+}
+
+.rc-link-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .rc-objective {
   color: var(--color-text-muted);
   max-width: 38rem;

@@ -385,5 +385,15 @@
     "teaching": "Deny-by-default holds across all 11 domains: an agent with no capability scope cannot reach any C1 action. Every denial is logged and the hash chain stays intact, so the whole sweep is auditable and replayable (I1, I4).",
     "action_count": 9,
     "agent_count": 1
+  },
+  {
+    "id": "finance-approval-bridge",
+    "family": "multidomain",
+    "name": "finance-approval-bridge",
+    "objective": "The governed counterpart of the finance-approval-handoff MAF team.",
+    "teaching": "Team plan and gateway verdict agree on the human gate (I6).",
+    "action_count": 2,
+    "agent_count": 1,
+    "linked": true
   }
 ]

@@ -54,6 +54,52 @@ class TestCampaignValidation(unittest.TestCase):
                 }
             )
 
+    def _doc_with_links(self, links: object) -> dict:
+        return {
+            "name": "x",
+            "links": links,
+            "agents": [{"id": "a", "runtime": "lab"}],
+            "actions": [
+                {
+                    "agent_id": "a",
+                    "target_system": "finance",
+                    "action_type": "launch_wire_transfer",
+                    "resource": "r",
+                    "expect": "escalate",
+                }
+            ],
+        }
+
+    def test_accepts_valid_maf_link(self) -> None:
+        validate_campaign(
+            self._doc_with_links(
+                [
+                    {
+                        "kind": "maf_orchestration",
+                        "team": "finance-approval-handoff-correct",
+                        "shared_action": "launch_wire_transfer",
+                        "invariant": "I6",
+                    }
+                ]
+            )
+        )
+
+    def test_rejects_link_missing_team(self) -> None:
+        with self.assertRaises(CampaignError):
+            validate_campaign(
+                self._doc_with_links(
+                    [{"kind": "maf_orchestration", "shared_action": "launch_wire_transfer"}]
+                )
+            )
+
+    def test_rejects_link_unknown_kind(self) -> None:
+        with self.assertRaises(CampaignError):
+            validate_campaign(
+                self._doc_with_links(
+                    [{"kind": "lane_b", "team": "t", "shared_action": "launch_wire_transfer"}]
+                )
+            )
+
 
 @unittest.skipUnless(HAVE_FASTAPI, "fastapi not installed")
 class TestCampaignRunner(unittest.TestCase):

@@ -79,7 +79,18 @@ export default function RecetteCampaignsPage(): JSX.Element {
                 <td>
                   <span className="rc-family">{c.family}</span>
                 </td>
-                <td className="rc-name">{c.name || c.id}</td>
+                <td className="rc-name">
+                  {c.name || c.id}
+                  {c.linked === true ? (
+                    <span
+                      className="rc-badge"
+                      data-testid={`rc-linked-${c.id}`}
+                      title="Macro-campagne d'orchestration : liee a un team MAF (barriere I6)"
+                    >
+                      orchestration
+                    </span>
+                  ) : null}
+                </td>
                 <td className="rc-objective">
                   {c.error !== undefined ? (
                     <span className="rc-invalid" role="alert">

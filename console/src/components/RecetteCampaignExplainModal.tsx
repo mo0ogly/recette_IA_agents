@@ -12,7 +12,12 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getRecetteCampaign } from "../api/client";
-import type { PolicyVerdict, RecetteCampaignAction, RecetteCampaignDetail } from "../types/platform";
+import type {
+  PolicyVerdict,
+  RecetteCampaignAction,
+  RecetteCampaignDetail,
+  RecetteCampaignLink,
+} from "../types/platform";
 import TabbedModal from "./TabbedModal";
 import type { Tab } from "./TabbedModal";
 import { KvList, RawJson } from "./explainViews";
@@ -49,6 +54,42 @@ function actionsTab(actions: RecetteCampaignAction[]): ReactNode {
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * Orchestration tab: present only on a macro orchestration campaign (a campaign
+ * with a `links` block). It makes the team <-> campaign agreement legible: the
+ * MAF team this campaign is bound to, the shared action both sides gate, and the
+ * invariant (I6) they agree on. The team plans the approval gate; the gateway
+ * enforces it -- this tab is where a reader sees that, not a hidden script.
+ */
+function orchestrationTab(links: RecetteCampaignLink[]): ReactNode {
+  return (
+    <div data-testid="rc-links">
+      <p className="tm-note">
+        Macro-campagne d&apos;orchestration : cette campagne gouvernee est{" "}
+        <strong>liee a un team MAF</strong>. Les deux s&apos;accordent sur la barriere
+        humaine -- le team declare l&apos;approbation sur son outil, la gateway{" "}
+        <strong>escalade</strong> la meme action (I6).
+      </p>
+      <ul className="tm-list">
+        {links.map((link, i) => (
+          <li key={`${link.team}-${i}`} className="rc-link">
+            <div className="rc-link-head">
+              <strong>{link.team}</strong>
+              <span className="tm-pill">{link.shared_action}</span>
+              {link.invariant !== undefined && link.invariant !== "" ? (
+                <span className="tm-pill tm-pill-ok">{link.invariant}</span>
+              ) : null}
+            </div>
+            {link.note !== undefined && link.note !== "" ? (
+              <p className="rc-action-rationale">{link.note}</p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -124,6 +165,15 @@ export default function RecetteCampaignExplainModal({
     },
     { key: "json", label: "JSON", content: <RawJson value={detail} /> },
   ];
+
+  // A macro orchestration campaign gets an extra tab making its MAF-team link legible.
+  if (detail.links !== undefined && detail.links.length > 0) {
+    tabs.splice(1, 0, {
+      key: "orchestration",
+      label: "Orchestration",
+      content: orchestrationTab(detail.links),
+    });
+  }
 
   return (
     <TabbedModal open={open} title={`Campagne recette -- ${detail.name}`} tabs={tabs} onClose={onClose} />

@@ -7,7 +7,7 @@
  * verdict values.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api/client", () => ({ getRecetteCampaign: vi.fn() }));
@@ -16,10 +16,13 @@ import { getRecetteCampaign } from "../api/client";
 import RecetteCampaignExplainModal from "./RecetteCampaignExplainModal";
 import type { RecetteCampaignDetail } from "../types/platform";
 import detailFixture from "./__fixtures__/recetteCampaignDetail.fixture.json";
+import linkedFixture from "./__fixtures__/recetteCampaignDetailLinked.fixture.json";
 
 const DETAIL = detailFixture as unknown as RecetteCampaignDetail;
+const LINKED = linkedFixture as unknown as RecetteCampaignDetail;
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
 });
 
@@ -63,5 +66,24 @@ describe("RecetteCampaignExplainModal", () => {
   it("renders nothing when closed", () => {
     render(<RecetteCampaignExplainModal open={false} campaignId="x" onClose={() => {}} />);
     expect(screen.queryByRole("tab")).toBeNull();
+  });
+
+  it("shows an Orchestration tab on a macro orchestration campaign (links present)", async () => {
+    vi.mocked(getRecetteCampaign).mockResolvedValue(LINKED);
+    render(<RecetteCampaignExplainModal open campaignId={LINKED.name} onClose={() => {}} />);
+    await screen.findByText(LINKED.family);
+    fireEvent.click(screen.getByRole("tab", { name: /Orchestration/ }));
+    const links = await screen.findByTestId("rc-links");
+    const link = LINKED.links?.[0];
+    expect(link).toBeDefined();
+    expect(within(links).getByText(link!.team)).toBeInTheDocument();
+    expect(links.textContent).toContain(link!.shared_action);
+    expect(links.textContent).toContain(link!.invariant ?? "I6");
+  });
+
+  it("has no Orchestration tab on a plain campaign (no links)", async () => {
+    open();
+    await screen.findByText(DETAIL.family);
+    expect(screen.queryByRole("tab", { name: /Orchestration/ })).toBeNull();
   });
 });

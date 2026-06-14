@@ -50,6 +50,20 @@ describe("RecetteCampaignsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("badges a macro orchestration campaign (linked=true)", async () => {
+    vi.mocked(listRecetteCampaigns).mockResolvedValue(CAMPAIGNS);
+    renderPage();
+    const linked = CAMPAIGNS.find((c) => c.linked === true);
+    expect(linked).toBeDefined();
+    expect(await screen.findByTestId(`rc-linked-${linked!.id}`)).toHaveTextContent(
+      "orchestration",
+    );
+    // A non-linked campaign carries no badge.
+    const plain = CAMPAIGNS.find((c) => c.linked !== true && c.error === undefined);
+    expect(plain).toBeDefined();
+    expect(screen.queryByTestId(`rc-linked-${plain!.id}`)).toBeNull();
+  });
+
   it("surfaces a fetch error", async () => {
     vi.mocked(listRecetteCampaigns).mockRejectedValue(new Error("no catalog"));
     renderPage();
