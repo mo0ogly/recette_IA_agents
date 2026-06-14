@@ -60,6 +60,27 @@ def action_mode(action: ActionType) -> Mode:
     return Mode.READ if action in _READ_ACTIONS else Mode.WRITE
 
 
+def scenario_action_entry(
+    *, action: str, resource: str, approved: bool = False, params: dict | None = None
+) -> dict:
+    """Build one ``scenario.json`` action entry (corpus/schemas/scenario.schema.json).
+
+    The single source of truth for the on-disk shape of a scenario action step,
+    shared by the promote path (which reads recording dicts) and the red-team
+    freezer (which reads typed ``AgentAction`` objects). The entry always carries
+    ``action`` + ``resource``; the optional ``approved`` flag (I6) and ``params``
+    are included ONLY when truthy, so the JSON stays minimal and byte-stable. The
+    principal lives once at the scenario level (``credential_principal``), never
+    on the per-action entry.
+    """
+    entry: dict = {"action": action, "resource": resource}
+    if approved:
+        entry["approved"] = True
+    if params:
+        entry["params"] = params
+    return entry
+
+
 # Read-only verbs for the broader multi-system action catalog (okta, finance,
 # slack, ...). A read does not mutate the target; an export reads/exfiltrates,
 # so it is classified read (no mutation), independently of its risk level.

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .events import AgentAction
+from .events import AgentAction, scenario_action_entry
 from .judge import judge_subject, subject_family
 from .llm import LlmBackend, Message
 from .maf_judge import MafAction
@@ -114,12 +114,12 @@ def _git_action_to_dict(action: AgentAction) -> dict:
     scenario.schema.json). The scenario step carries only the declared/real gap
     inputs: the action, its resource, the approval flag (I6) and any params -- the
     principal lives once at the scenario level (credential_principal)."""
-    entry: dict = {"action": action.action_type, "resource": action.resource}
-    if action.approved:
-        entry["approved"] = True
-    if action.params:
-        entry["params"] = action.params
-    return entry
+    return scenario_action_entry(
+        action=action.action_type,
+        resource=action.resource,
+        approved=action.approved,
+        params=action.params,
+    )
 
 
 def _git_actions_doc(action_log: list[AgentAction], *, slug: str) -> dict:

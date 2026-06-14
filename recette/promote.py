@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .events import ESCALATE_ACTIONS, ActionType, action_mode
+from .events import ESCALATE_ACTIONS, ActionType, action_mode, scenario_action_entry
 from .manifest import load_ground_truth, load_manifest, load_scenario
 from .recording import Recording
 
@@ -68,14 +68,15 @@ def _build_manifest(
 
 
 def _build_scenario(rec: Recording, actions: list[dict]) -> dict:
-    scenario_actions = []
-    for a in actions:
-        entry: dict = {"action": a["action_type"], "resource": a["resource"]}
-        if a.get("approved"):
-            entry["approved"] = True
-        if a.get("params"):
-            entry["params"] = a["params"]
-        scenario_actions.append(entry)
+    scenario_actions = [
+        scenario_action_entry(
+            action=a["action_type"],
+            resource=a["resource"],
+            approved=bool(a.get("approved")),
+            params=a.get("params"),
+        )
+        for a in actions
+    ]
     return {
         "agent_id": rec.agent_id,
         "credential_principal": rec.principal,
