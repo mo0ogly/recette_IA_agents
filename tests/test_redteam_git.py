@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 import unittest
 
-from recette.redteam_git import run_git_scenario, run_git_scenario_view
+from recette.redteam_git import _run_args, run_git_scenario, run_git_scenario_view
 
 # A real git manifest shape, trimmed from corpus/agents/incorrect/gh-readonly-overreach.
 _MANIFEST = {
@@ -104,6 +104,19 @@ class TestGitScenarioValidation(unittest.TestCase):
     def test_invalid_target_manifest_raises(self) -> None:
         bad = copy.deepcopy(_RESISTED)
         bad["target_manifest"] = {"agent_id": "x"}  # not a valid manifest
+        with self.assertRaises(ValueError):
+            run_git_scenario(bad)
+
+    def test_empty_target_systems_raises_valueerror(self) -> None:
+        # An empty target_systems must raise a clear ValueError (fail-safe),
+        # never a bare IndexError. The validate path also raises ValueError if
+        # the manifest schema rejects the empty list -- either reaches ValueError.
+        bad_manifest = copy.deepcopy(_MANIFEST)
+        bad_manifest["target_systems"] = []
+        with self.assertRaises(ValueError):
+            _run_args(bad_manifest)
+        bad = copy.deepcopy(_RESISTED)
+        bad["target_manifest"] = bad_manifest
         with self.assertRaises(ValueError):
             run_git_scenario(bad)
 

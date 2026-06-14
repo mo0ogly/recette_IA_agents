@@ -31,11 +31,19 @@ def _run_args(manifest: dict) -> dict:
     make_lane_b_runner derives them from a config agent: agent_id, principal
     (the declared identity), the first declared target_system, and the
     capability_scope flattened to the list of tool-name strings build_tools
-    expects (the git capability_scope is a list of {action, mode, resources})."""
+    expects (the git capability_scope is a list of {action, mode, resources}).
+
+    Fail-safe (legibility-first): an empty target_systems raises a clear
+    ValueError naming the offending agent rather than a bare IndexError."""
+    targets = manifest.get("target_systems") or []
+    if not targets:
+        raise ValueError(
+            f"git scenario manifest {manifest.get('agent_id')!r} has no target_systems"
+        )
     return {
         "agent_id": manifest["agent_id"],
         "principal": manifest["declared_identity"]["principal"],
-        "target_system": manifest["target_systems"][0],
+        "target_system": targets[0],
         "capability_scope": [c["action"] for c in manifest["capability_scope"]],
     }
 
