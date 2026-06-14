@@ -41,13 +41,8 @@ export function ScenarioList({ scenarios }: { scenarios: SimScenario[] }): JSX.E
   const [promoteError, setPromoteError] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
-  if (scenarios.length === 0)
-    return (
-      <p className="discovery-note" data-testid="sim-scn-empty">
-        No red-team scenarios.
-      </p>
-    );
-
+  // Defined before any conditional return so all hooks/handlers precede the early
+  // exit (React rules-of-hooks convention / eslint-plugin-react-hooks cleanliness).
   const onPromote = (id: string): void => {
     setPending((p) => ({ ...p, [id]: true }));
     setPromoteError((e) => {
@@ -65,6 +60,13 @@ export function ScenarioList({ scenarios }: { scenarios: SimScenario[] }): JSX.E
       )
       .finally(() => setPending((p) => ({ ...p, [id]: false })));
   };
+
+  if (scenarios.length === 0)
+    return (
+      <p className="discovery-note" data-testid="sim-scn-empty">
+        No red-team scenarios.
+      </p>
+    );
 
   return (
     <ul className="discovery-summary" data-testid="sim-scenarios">

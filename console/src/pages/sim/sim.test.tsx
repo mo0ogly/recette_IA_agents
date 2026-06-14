@@ -5,8 +5,9 @@
  * API (GET /sim/scenarios) after the two committed scenarios were replayed -- it
  * carries the { count, scenarios: [...] } envelope with one "incorrect" and one
  * "correct" verdict, both anomaly_caught, each with an owasp_asi tag. ScenarioList
- * is a pure presentational component, so it is rendered directly against the real
- * payload (no client mocking needed).
+ * is now stateful -- its Promote action calls promoteSimScenario -- so the test
+ * mocks the API client and renders the component against the real captured
+ * payloads (scenarios + promote fixtures).
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -19,9 +20,15 @@ import scenariosFixture from "./__fixtures__/scenarios.fixture.json";
 import { ScenarioList } from "./index";
 
 // ScenarioList is presentational EXCEPT for the promote action, which calls the
-// API. The unit test mocks that single call (no live API); the resolved value is
-// the REAL captured promote payload (__fixtures__/promote.fixture.json).
+// API. The mock factory lists EVERY sim client function imported by the sim page
+// module so no export is silently undefined (matching index.test.tsx); the unit
+// test only drives promoteSimScenario, whose resolved value is the REAL captured
+// promote payload (__fixtures__/promote.fixture.json).
 vi.mock("../../api/client", () => ({
+  getSimRuns: vi.fn(),
+  getSimView: vi.fn(),
+  getSimScenarios: vi.fn(),
+  getSimScenario: vi.fn(),
   promoteSimScenario: vi.fn(),
 }));
 
