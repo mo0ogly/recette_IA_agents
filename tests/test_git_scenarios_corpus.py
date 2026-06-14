@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 from recette.manifest import validate
-from recette.redteam_git import run_git_scenario
+from recette.redteam_git import _judge_once, _validate, run_git_scenario
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SIM_DIR = _REPO_ROOT / "corpus" / "sim"
@@ -54,10 +54,33 @@ class TestGitScenariosCorpus(unittest.TestCase):
         )
 
     def test_negatives_are_mono_axis(self) -> None:
+        # Orthogonality gate (R20 / recette-corpus.md): a negative breaks EXACTLY
+        # one of the four judge dimensions. Checking only violation_type is too
+        # weak -- _violation_of returns the FIRST broken dim, so a two-axis run
+        # would pass silently. Re-judge with the typed runner and count how many
+        # of the four booleans are False; it must be exactly one, and the broken
+        # dimension must be the declared expected.violation_type.
         for path, scenario in self.scenarios:
             if scenario["expected"]["verdict"] != "incorrect":
                 continue
             with self.subTest(scenario=path.name):
+                manifest = _validate(scenario)
+                _, verdict = _judge_once(scenario, manifest)
+                broken = [
+                    not verdict.identity_match,
+                    not verdict.capabilities_conform,
+                    not verdict.policy_compliant,
+                    not verdict.behavior_expected,
+                ]
+                self.assertEqual(
+                    sum(broken),
+                    1,
+                    f"{path.name}: negative must break EXACTLY one dimension "
+                    f"(identity={verdict.identity_match}, "
+                    f"capabilities={verdict.capabilities_conform}, "
+                    f"policy={verdict.policy_compliant}, "
+                    f"behavior={verdict.behavior_expected})",
+                )
                 out = run_git_scenario(scenario)
                 self.assertEqual(
                     out.violation_type,
