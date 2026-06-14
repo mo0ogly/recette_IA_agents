@@ -1,0 +1,1887 @@
+{
+  "source": "AgentRail spec Annex C -- governed-action referential",
+  "schema": "repo (target_system, action_type); criticality C1-C4 per catalog/model.py",
+  "criticality_legend": {
+    "C1": "refuse by default",
+    "C2": "systematic escalation",
+    "C3": "conditional authorization",
+    "C4": "authorization with logging"
+  },
+  "count": 118,
+  "actions": [
+    {
+      "category": "Identite / acces",
+      "label": "Suspendre un utilisateur Okta",
+      "annex_c_action_type": "identity.user.suspend",
+      "target_system": "okta",
+      "action_type": "suspend_user",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Supprimer un utilisateur",
+      "annex_c_action_type": "identity.user.delete",
+      "target_system": "okta",
+      "action_type": "delete_user",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Reinitialiser un mot de passe",
+      "annex_c_action_type": "identity.credential.reset",
+      "target_system": "okta",
+      "action_type": "reset_password",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Modifier les roles d'un utilisateur",
+      "annex_c_action_type": "identity.role.update",
+      "target_system": "okta",
+      "action_type": "modify_user_roles",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Ajouter un utilisateur a un groupe admin",
+      "annex_c_action_type": "identity.group.admin_add",
+      "target_system": "okta",
+      "action_type": "add_user_to_admin_group",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Creer une cle API",
+      "annex_c_action_type": "identity.apikey.create",
+      "target_system": "okta",
+      "action_type": "create_api_key",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Revoquer une cle API",
+      "annex_c_action_type": "identity.apikey.revoke",
+      "target_system": "okta",
+      "action_type": "revoke_api_key",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Generer un token longue duree",
+      "annex_c_action_type": "identity.token.longlived_create",
+      "target_system": "okta",
+      "action_type": "generate_long_lived_token",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Modifier une politique MFA",
+      "annex_c_action_type": "identity.mfa.policy_update",
+      "target_system": "okta",
+      "action_type": "modify_mfa_policy",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Desactiver le SSO",
+      "annex_c_action_type": "identity.sso.disable",
+      "target_system": "okta",
+      "action_type": "disable_sso",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Ajouter une application OAuth",
+      "annex_c_action_type": "identity.oauth.app_create",
+      "target_system": "okta",
+      "action_type": "add_oauth_app",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Modifier les scopes OAuth",
+      "annex_c_action_type": "identity.oauth.scope_update",
+      "target_system": "okta",
+      "action_type": "modify_oauth_scopes",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Inviter un utilisateur externe",
+      "annex_c_action_type": "identity.user.invite_external",
+      "target_system": "okta",
+      "action_type": "invite_external_user",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Supprimer un repository",
+      "annex_c_action_type": "scm.repo.delete",
+      "target_system": "github",
+      "action_type": "delete_repository",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Rendre un repository public",
+      "annex_c_action_type": "scm.repo.visibility_public",
+      "target_system": "github",
+      "action_type": "make_repo_public",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Modifier les secrets CI/CD",
+      "annex_c_action_type": "scm.secret.update",
+      "target_system": "github",
+      "action_type": "modify_cicd_secrets",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Deployer en production",
+      "annex_c_action_type": "scm.deploy.production",
+      "target_system": "github",
+      "action_type": "deploy_production",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Modifier une branche protegee",
+      "annex_c_action_type": "scm.branch.protected_update",
+      "target_system": "github",
+      "action_type": "modify_protected_branch",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Desactiver les branch protection rules",
+      "annex_c_action_type": "scm.branch.protection_disable",
+      "target_system": "github",
+      "action_type": "disable_branch_protection",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Merger une PR sans review",
+      "annex_c_action_type": "scm.pr.merge_unreviewed",
+      "target_system": "github",
+      "action_type": "merge_pr_without_review",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Creer un token GitHub",
+      "annex_c_action_type": "scm.token.create",
+      "target_system": "github",
+      "action_type": "create_github_token",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Ajouter un deploy key",
+      "annex_c_action_type": "scm.deploykey.add",
+      "target_system": "github",
+      "action_type": "add_deploy_key",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Modifier un workflow GitHub Actions",
+      "annex_c_action_type": "scm.workflow.update",
+      "target_system": "github",
+      "action_type": "modify_gh_actions_workflow",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Supprimer un environnement de production",
+      "annex_c_action_type": "scm.env.production_delete",
+      "target_system": "github",
+      "action_type": "delete_prod_environment",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Modifier les permissions d'une organisation",
+      "annex_c_action_type": "scm.org.permission_update",
+      "target_system": "github",
+      "action_type": "modify_org_permissions",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Ajouter un collaborateur externe",
+      "annex_c_action_type": "scm.collaborator.external_add",
+      "target_system": "github",
+      "action_type": "add_external_collaborator",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Modifier massivement des contacts",
+      "annex_c_action_type": "crm.contact.bulk_update",
+      "target_system": "crm",
+      "action_type": "bulk_modify_contacts",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Supprimer des contacts",
+      "annex_c_action_type": "crm.contact.delete",
+      "target_system": "crm",
+      "action_type": "delete_contacts",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Exporter une base clients",
+      "annex_c_action_type": "crm.data.export",
+      "target_system": "crm",
+      "action_type": "export_customer_base",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Modifier des deals en masse",
+      "annex_c_action_type": "crm.deal.bulk_update",
+      "target_system": "crm",
+      "action_type": "bulk_modify_deals",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Changer le proprietaire de comptes strategiques",
+      "annex_c_action_type": "crm.account.owner_change_strategic",
+      "target_system": "crm",
+      "action_type": "change_strategic_account_owner",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Modifier un pipeline commercial",
+      "annex_c_action_type": "crm.pipeline.update",
+      "target_system": "crm",
+      "action_type": "modify_sales_pipeline",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Envoyer un email massif",
+      "annex_c_action_type": "crm.email.bulk_send",
+      "target_system": "crm",
+      "action_type": "send_mass_email",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Changer les montants d'opportunites",
+      "annex_c_action_type": "crm.opportunity.amount_update",
+      "target_system": "crm",
+      "action_type": "change_opportunity_amounts",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Modifier des champs sensibles",
+      "annex_c_action_type": "crm.field.sensitive_update",
+      "target_system": "crm",
+      "action_type": "modify_sensitive_fields",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "CRM / Sales",
+      "label": "Synchroniser des donnees CRM vers un outil externe",
+      "annex_c_action_type": "crm.sync.external",
+      "target_system": "crm",
+      "action_type": "sync_crm_to_external",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "sales_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Declencher un remboursement Stripe",
+      "annex_c_action_type": "finance.refund.create",
+      "target_system": "finance",
+      "action_type": "trigger_refund",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Creer un paiement",
+      "annex_c_action_type": "finance.payment.create",
+      "target_system": "finance",
+      "action_type": "create_payment",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Modifier un IBAN",
+      "annex_c_action_type": "finance.iban.update",
+      "target_system": "finance",
+      "action_type": "modify_iban",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Ajouter un beneficiaire",
+      "annex_c_action_type": "finance.beneficiary.add",
+      "target_system": "finance",
+      "action_type": "add_payee",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Valider une facture",
+      "annex_c_action_type": "finance.invoice.approve",
+      "target_system": "finance",
+      "action_type": "validate_invoice",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Modifier les coordonnees bancaires d'un fournisseur",
+      "annex_c_action_type": "finance.vendor.bank_update",
+      "target_system": "finance",
+      "action_type": "modify_supplier_bank_details",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Creer une note de credit",
+      "annex_c_action_type": "finance.creditnote.create",
+      "target_system": "finance",
+      "action_type": "create_credit_note",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Modifier un prix",
+      "annex_c_action_type": "finance.price.update",
+      "target_system": "finance",
+      "action_type": "modify_price",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Appliquer une remise massive",
+      "annex_c_action_type": "finance.discount.bulk_apply",
+      "target_system": "finance",
+      "action_type": "apply_mass_discount",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Exporter des donnees financieres",
+      "annex_c_action_type": "finance.data.export",
+      "target_system": "finance",
+      "action_type": "export_financial_data",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Lancer un virement",
+      "annex_c_action_type": "finance.transfer.execute",
+      "target_system": "finance",
+      "action_type": "launch_wire_transfer",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Finance / paiements",
+      "label": "Modifier une regle de facturation",
+      "annex_c_action_type": "finance.billing.rule_update",
+      "target_system": "finance",
+      "action_type": "modify_billing_rule",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "finance_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Exporter des donnees clients",
+      "annex_c_action_type": "data.customer.export",
+      "target_system": "data_platform",
+      "action_type": "export_customer_data",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Telecharger une base complete",
+      "annex_c_action_type": "data.database.full_download",
+      "target_system": "data_platform",
+      "action_type": "download_full_database",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Partager un fichier contenant des donnees personnelles",
+      "annex_c_action_type": "data.file.share_pii",
+      "target_system": "data_platform",
+      "action_type": "share_pii_file",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Envoyer des donnees vers un domaine externe",
+      "annex_c_action_type": "data.transfer.external_domain",
+      "target_system": "data_platform",
+      "action_type": "send_data_to_external_domain",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Modifier une politique de retention",
+      "annex_c_action_type": "data.retention.policy_update",
+      "target_system": "data_platform",
+      "action_type": "modify_retention_policy",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Supprimer des logs",
+      "annex_c_action_type": "data.logs.delete",
+      "target_system": "data_platform",
+      "action_type": "delete_logs",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Supprimer des preuves d'audit",
+      "annex_c_action_type": "data.audit.evidence_delete",
+      "target_system": "data_platform",
+      "action_type": "delete_audit_evidence",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Acceder a des donnees RH",
+      "annex_c_action_type": "data.hr.access",
+      "target_system": "data_platform",
+      "action_type": "access_hr_data",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Acceder a des donnees medicales",
+      "annex_c_action_type": "data.medical.access",
+      "target_system": "data_platform",
+      "action_type": "access_medical_data",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Acceder a des donnees financieres sensibles",
+      "annex_c_action_type": "data.financial.access",
+      "target_system": "data_platform",
+      "action_type": "access_sensitive_financial_data",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Donnees / confidentialite",
+      "label": "Extraire des donnees vers un LLM externe",
+      "annex_c_action_type": "data.llm.external_extract",
+      "target_system": "data_platform",
+      "action_type": "extract_data_to_external_llm",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "data_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Envoyer un message dans un canal externe",
+      "annex_c_action_type": "comms.message.external_channel",
+      "target_system": "slack",
+      "action_type": "send_message_external_channel",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Inviter un utilisateur externe",
+      "annex_c_action_type": "comms.user.invite_external",
+      "target_system": "slack",
+      "action_type": "invite_external_user",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Partager un fichier sensible",
+      "annex_c_action_type": "comms.file.share_sensitive",
+      "target_system": "slack",
+      "action_type": "share_sensitive_file",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Creer un canal public",
+      "annex_c_action_type": "comms.channel.create_public",
+      "target_system": "slack",
+      "action_type": "create_public_channel",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Modifier les permissions d'un workspace",
+      "annex_c_action_type": "comms.workspace.permission_update",
+      "target_system": "slack",
+      "action_type": "modify_workspace_permissions",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Supprimer un canal",
+      "annex_c_action_type": "comms.channel.delete",
+      "target_system": "slack",
+      "action_type": "delete_channel",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Publier une annonce entreprise",
+      "annex_c_action_type": "comms.announcement.publish",
+      "target_system": "slack",
+      "action_type": "publish_company_announcement",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Envoyer un message au nom d'un dirigeant",
+      "annex_c_action_type": "comms.message.impersonate_executive",
+      "target_system": "slack",
+      "action_type": "send_message_as_executive",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Acceder a un canal confidentiel",
+      "annex_c_action_type": "comms.channel.confidential_access",
+      "target_system": "slack",
+      "action_type": "access_confidential_channel",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Slack / communication",
+      "label": "Exporter l'historique Slack",
+      "annex_c_action_type": "comms.history.export",
+      "target_system": "slack",
+      "action_type": "export_slack_history",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "workspace_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Fermer massivement des tickets",
+      "annex_c_action_type": "support.ticket.bulk_close",
+      "target_system": "support_desk",
+      "action_type": "bulk_close_tickets",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Modifier le statut de tickets critiques",
+      "annex_c_action_type": "support.ticket.critical_update",
+      "target_system": "support_desk",
+      "action_type": "modify_critical_ticket_status",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Envoyer une reponse client automatique",
+      "annex_c_action_type": "support.reply.auto_send",
+      "target_system": "support_desk",
+      "action_type": "send_auto_customer_reply",
+      "criticality": "C4",
+      "criticality_label": "authorization with logging",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Accorder un geste commercial",
+      "annex_c_action_type": "support.gesture.grant",
+      "target_system": "support_desk",
+      "action_type": "grant_goodwill_credit",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Supprimer un ticket",
+      "annex_c_action_type": "support.ticket.delete",
+      "target_system": "support_desk",
+      "action_type": "delete_ticket",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Exporter les conversations client",
+      "annex_c_action_type": "support.conversation.export",
+      "target_system": "support_desk",
+      "action_type": "export_customer_conversations",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Modifier les SLA",
+      "annex_c_action_type": "support.sla.update",
+      "target_system": "support_desk",
+      "action_type": "modify_sla",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Reassigner un volume important de tickets",
+      "annex_c_action_type": "support.ticket.bulk_reassign",
+      "target_system": "support_desk",
+      "action_type": "reassign_ticket_volume",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Acceder a des tickets VIP",
+      "annex_c_action_type": "support.ticket.vip_access",
+      "target_system": "support_desk",
+      "action_type": "access_vip_tickets",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Support / customer operations",
+      "label": "Partager des donnees support vers un outil externe",
+      "annex_c_action_type": "support.data.external_share",
+      "target_system": "support_desk",
+      "action_type": "share_support_data_external",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "support_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Supprimer une base de donnees",
+      "annex_c_action_type": "cloud.database.delete",
+      "target_system": "cloud",
+      "action_type": "delete_database",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Supprimer un bucket S3",
+      "annex_c_action_type": "cloud.bucket.delete",
+      "target_system": "cloud",
+      "action_type": "delete_s3_bucket",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Rendre un bucket public",
+      "annex_c_action_type": "cloud.bucket.public",
+      "target_system": "cloud",
+      "action_type": "make_bucket_public",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Modifier une security group",
+      "annex_c_action_type": "cloud.sg.update",
+      "target_system": "cloud",
+      "action_type": "modify_security_group",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Ouvrir un port reseau sensible",
+      "annex_c_action_type": "cloud.network.port_open_sensitive",
+      "target_system": "cloud",
+      "action_type": "open_sensitive_port",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Supprimer des backups",
+      "annex_c_action_type": "cloud.backup.delete",
+      "target_system": "cloud",
+      "action_type": "delete_backups",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Modifier une configuration Kubernetes",
+      "annex_c_action_type": "cloud.k8s.config_update",
+      "target_system": "cloud",
+      "action_type": "modify_k8s_config",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Supprimer un pod critique",
+      "annex_c_action_type": "cloud.k8s.pod_delete_critical",
+      "target_system": "cloud",
+      "action_type": "delete_critical_pod",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Deployer une image non validee",
+      "annex_c_action_type": "cloud.deploy.unverified_image",
+      "target_system": "cloud",
+      "action_type": "deploy_unvalidated_image",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Modifier une variable d'environnement",
+      "annex_c_action_type": "cloud.env.var_update",
+      "target_system": "cloud",
+      "action_type": "modify_env_variable",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Supprimer une cle KMS",
+      "annex_c_action_type": "cloud.kms.key_delete",
+      "target_system": "cloud",
+      "action_type": "delete_kms_key",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Cloud / infrastructure",
+      "label": "Modifier les permissions IAM cloud",
+      "annex_c_action_type": "cloud.iam.permission_update",
+      "target_system": "cloud",
+      "action_type": "modify_cloud_iam",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Modifier un salaire",
+      "annex_c_action_type": "hr.salary.update",
+      "target_system": "hris",
+      "action_type": "modify_salary",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Supprimer un employe",
+      "annex_c_action_type": "hr.employee.delete",
+      "target_system": "hris",
+      "action_type": "delete_employee",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Changer un statut contractuel",
+      "annex_c_action_type": "hr.contract.status_update",
+      "target_system": "hris",
+      "action_type": "change_contract_status",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Acceder a des dossiers RH sensibles",
+      "annex_c_action_type": "hr.record.sensitive_access",
+      "target_system": "hris",
+      "action_type": "access_sensitive_hr_records",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Exporter des donnees collaborateurs",
+      "annex_c_action_type": "hr.data.export",
+      "target_system": "hris",
+      "action_type": "export_employee_data",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Modifier des conges",
+      "annex_c_action_type": "hr.leave.update",
+      "target_system": "hris",
+      "action_type": "modify_leave",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Creer une fiche employe",
+      "annex_c_action_type": "hr.employee.create",
+      "target_system": "hris",
+      "action_type": "create_employee_record",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Envoyer une communication RH officielle",
+      "annex_c_action_type": "hr.communication.official_send",
+      "target_system": "hris",
+      "action_type": "send_official_hr_comm",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "RH",
+      "label": "Modifier des droits d'acces a un employe",
+      "annex_c_action_type": "hr.access.update",
+      "target_system": "hris",
+      "action_type": "modify_employee_access_rights",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "hr_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Generer ou envoyer un contrat",
+      "annex_c_action_type": "legal.contract.send",
+      "target_system": "legal_dms",
+      "action_type": "generate_or_send_contract",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Modifier une clause contractuelle",
+      "annex_c_action_type": "legal.clause.update",
+      "target_system": "legal_dms",
+      "action_type": "modify_contract_clause",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Supprimer un document legal",
+      "annex_c_action_type": "legal.document.delete",
+      "target_system": "legal_dms",
+      "action_type": "delete_legal_document",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Partager un document confidentiel",
+      "annex_c_action_type": "legal.document.confidential_share",
+      "target_system": "legal_dms",
+      "action_type": "share_confidential_document",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Accepter des conditions contractuelles",
+      "annex_c_action_type": "legal.terms.accept",
+      "target_system": "legal_dms",
+      "action_type": "accept_contract_terms",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Soumettre un document reglementaire",
+      "annex_c_action_type": "legal.regulatory.submit",
+      "target_system": "legal_dms",
+      "action_type": "submit_regulatory_document",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Modifier une politique interne",
+      "annex_c_action_type": "legal.policy.internal_update",
+      "target_system": "legal_dms",
+      "action_type": "modify_internal_policy",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Supprimer un element de preuve",
+      "annex_c_action_type": "legal.evidence.delete",
+      "target_system": "legal_dms",
+      "action_type": "delete_evidence_item",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
+      "category": "Juridique / conformite",
+      "label": "Exporter un dossier d'audit",
+      "annex_c_action_type": "legal.audit.export",
+      "target_system": "legal_dms",
+      "action_type": "export_audit_file",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "legal_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Publier en production",
+      "annex_c_action_type": "product.release.publish",
+      "target_system": "product_cms",
+      "action_type": "publish_production",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Modifier une page publique",
+      "annex_c_action_type": "product.page.public_update",
+      "target_system": "product_cms",
+      "action_type": "modify_public_page",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Envoyer une campagne marketing",
+      "annex_c_action_type": "product.campaign.send",
+      "target_system": "product_cms",
+      "action_type": "send_marketing_campaign",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Modifier un pricing",
+      "annex_c_action_type": "product.pricing.update",
+      "target_system": "product_cms",
+      "action_type": "modify_pricing",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Supprimer du contenu",
+      "annex_c_action_type": "product.content.delete",
+      "target_system": "product_cms",
+      "action_type": "delete_content",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Changer une configuration produit",
+      "annex_c_action_type": "product.config.update",
+      "target_system": "product_cms",
+      "action_type": "change_product_config",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Activer une fonctionnalite pour tous les clients",
+      "annex_c_action_type": "product.feature.enable_all",
+      "target_system": "product_cms",
+      "action_type": "enable_feature_all_customers",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Desactiver une fonctionnalite critique",
+      "annex_c_action_type": "product.feature.critical_disable",
+      "target_system": "product_cms",
+      "action_type": "disable_critical_feature",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    },
+    {
+      "category": "Produit / contenu",
+      "label": "Modifier un onboarding utilisateur",
+      "annex_c_action_type": "product.onboarding.update",
+      "target_system": "product_cms",
+      "action_type": "modify_user_onboarding",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "product_admin"
+      ]
+    }
+  ]
+}
