@@ -131,6 +131,23 @@ The `/proxy` page has a source toggle: **traces app** (the `ProxyTrace` list) an
 clear). When the overlay is not configured the panel shows how to enable it
 rather than an empty list.
 
+### Choosing the transport route (proxy selector)
+
+A shared **`ProxySelector`** lets an operator pick the transport agent side
+effects take -- **Direct (sans proxy)** or **Wire (mitmproxy)** -- from the
+windows that have a network console: the `/proxy` wire panel and the per-run
+**Logs reseau** (cockpit `AgentRunModal`). It is backed by `GET`/`POST
+/proxy/route`; the selection is held server-side (so every console reflects the
+same active route) and applies to runs started afterwards. Transport only: the
+route never changes the decision (allow/deny/escalate) or the recorded action
+log (I4). Backed by `recette/platform/proxy/route.py` (`ProxyRouteRegistry`);
+the run routers pass the active route's `wire_proxy_url` into the runner. The
+initial route is `wire` when `INSPECT_IA_AGENTS_WIRE_PROXY` is set, else `direct`.
+
+The console **AI backends** form (Agents tab) also carries a **LiteLLM gateway
+(local)** preset that one-clicks an `openai_compat` backend pointing at the
+LiteLLM overlay (`http://127.0.0.1:4000`); see `llm-gateway-litellm.md`.
+
 ### Architecture
 
 ```
