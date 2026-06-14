@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from ...redteam_promote import promote_scenario
 from ...redteam_recette import run_scenario, run_scenario_view
 from ...sim_view import SimRecording, build_sim_view
 
@@ -148,3 +149,24 @@ def scenario_view(scenario_id: str) -> dict:
     if view is None:
         raise HTTPException(status_code=404, detail=f"no scenario {scenario_id!r}")
     return view
+
+
+@router.post("/scenarios/{scenario_id}/promote")
+def promote(scenario_id: str, overwrite: bool = False) -> dict:
+    """Freeze a caught anomaly (verdict=incorrect, single-axis) into a negative
+    corpus subject, closing the recette loop.
+
+    Returns ``{slug, created, verdict, violation_type}``. Error mapping
+    (legibility-first): an unknown scenario id -> 404; a true-negative scenario
+    or a multi-axis run that cannot be frozen single-axis -> 422 with the reason;
+    an already-promoted subject (without ?overwrite=true) -> 409.
+    """
+    try:
+        return promote_scenario(scenario_id, overwrite=overwrite)
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        message = str(exc)
+        if message.startswith("unknown scenario id"):
+            raise HTTPException(status_code=404, detail=message) from exc
+        raise HTTPException(status_code=422, detail=message) from exc
