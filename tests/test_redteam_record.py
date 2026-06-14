@@ -113,6 +113,7 @@ class T(unittest.TestCase):
     def test_write_scenario_writes_pretty_named_file(self):
         import json
         import tempfile
+        from pathlib import Path
 
         from recette.redteam_record import write_scenario
 
@@ -130,11 +131,15 @@ class T(unittest.TestCase):
             self.assertEqual(p.name, "rt-tmp-write.scenario.json")
             self.assertTrue(p.exists())
             self.assertEqual(json.loads(p.read_text()), scenario)
+            self.assertTrue(p.read_bytes().endswith(b"\n"))
             # refuses overwrite by default
             with self.assertRaises(FileExistsError):
                 write_scenario(scenario, d)
             # overwrite=True succeeds
             write_scenario(scenario, d, overwrite=True)
+            # creates the output directory (parents) when it does not yet exist
+            nested = write_scenario(scenario, Path(d) / "new" / "nested")
+            self.assertTrue(nested.exists())
 
 
 if __name__ == "__main__":

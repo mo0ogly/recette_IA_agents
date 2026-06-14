@@ -136,7 +136,9 @@ def write_scenario(scenario: dict, out_dir: str | Path, *, overwrite: bool = Fal
     artifact is immutable by default, I1). Does NOT validate the scenario shape --
     serialization only; validation is record_scenario's job.
     """
-    out = Path(out_dir) / f"{scenario['scenario_id']}.scenario.json"
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    out = out_path / f"{scenario['scenario_id']}.scenario.json"
     if out.exists() and not overwrite:
         raise FileExistsError(f"{out} exists; pass overwrite=True to replace")
     out.write_text(json.dumps(scenario, indent=2) + "\n", encoding="utf-8")
