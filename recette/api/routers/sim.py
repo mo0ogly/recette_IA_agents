@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from ...redteam_promote import promote_scenario
+from ...redteam_promote import UnknownScenarioError, promote_scenario
 from ...redteam_recette import run_scenario, run_scenario_view
 from ...sim_view import SimRecording, build_sim_view
 
@@ -165,8 +165,7 @@ def promote(scenario_id: str, overwrite: bool = False) -> dict:
         return promote_scenario(scenario_id, overwrite=overwrite)
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except UnknownScenarioError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
-        message = str(exc)
-        if message.startswith("unknown scenario id"):
-            raise HTTPException(status_code=404, detail=message) from exc
-        raise HTTPException(status_code=422, detail=message) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

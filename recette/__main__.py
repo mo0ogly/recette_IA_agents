@@ -533,12 +533,13 @@ def _cmd_redteam() -> int:
     return 1 if card["missed"] else 0
 
 
-def _cmd_redteam_promote(scenario_id: str, out: str, overwrite: bool) -> int:
+def _cmd_redteam_promote(scenario_id: str, out: str | None, overwrite: bool) -> int:
     """Promote a caught red-team anomaly into a negative corpus subject.
 
     Locates the scenario (MAF or git), replays it, and -- if the re-judged
     verdict is ``incorrect`` and a single-axis violation -- freezes the three
-    documents under ``<out>/incorrect/<slug>/``. Returns 0 on success; 2 on a
+    documents under ``<out>/incorrect/<slug>/`` (``out`` defaults to the family's
+    corpus root when omitted). Returns 0 on success; 2 on a
     ValueError (correct/true-negative scenario, unknown id, or a multi-axis run)
     or a FileExistsError (already promoted -- suggests --overwrite)."""
     from .redteam_promote import promote_scenario
@@ -778,7 +779,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rtp.add_argument("--scenario-id", required=True, help="scenario id to promote (MAF or git)")
     rtp.add_argument(
-        "--out", default="corpus/agents", help="output corpus root (default: corpus/agents)"
+        "--out",
+        default=None,
+        help="output corpus root (default: family-derived -- "
+        "corpus/agents for git, corpus/maf_agents for MAF)",
     )
     rtp.add_argument(
         "--overwrite", action="store_true", help="replace an existing promoted subject (I1)"

@@ -37,6 +37,14 @@ from .redteam_recette import _replay
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SIM_DIR = _REPO_ROOT / "corpus" / "sim"
 
+
+class UnknownScenarioError(ValueError):
+    """Raised when no sim scenario matches the requested id. A ValueError subclass
+    so existing ``except ValueError`` callers keep working; the endpoint catches it
+    specifically to map an unknown id to 404 (vs 422 for a malformed/true-negative
+    scenario) without stringly-typed message matching."""
+
+
 # Per-family on-disk layout for the frozen subject. The actions doc returned by
 # to_corpus_subject is written under the family's actions filename; the manifest
 # under the family's manifest filename. These MATCH the real corpus layout:
@@ -44,6 +52,21 @@ _SIM_DIR = _REPO_ROOT / "corpus" / "sim"
 # maf -> corpus/maf_agents/incorrect/<slug>/{spec.json,actions.json}
 _MANIFEST_FILENAME = {"git_agent": "manifest.json", "maf_agent": "spec.json"}
 _ACTIONS_FILENAME = {"git_agent": "scenario.json", "maf_agent": "actions.json"}
+
+# Per-family default corpus root. A frozen subject MUST land in the tree its
+# family's corpus lives in, so that `recette validate` sees it: git subjects in
+# corpus/agents/, MAF subjects in corpus/maf_agents/. An explicit caller-supplied
+# out_root (e.g. a test tmp dir) always wins over this default.
+_DEFAULT_OUT_ROOT = {"git_agent": "corpus/agents", "maf_agent": "corpus/maf_agents"}
+
+
+def _default_out_root(family: str) -> str:
+    """The corpus root a family's frozen subject must be written under when the
+    caller does not pin one. Raises ValueError on an unknown family (fail-safe)."""
+    try:
+        return _DEFAULT_OUT_ROOT[family]
+    except KeyError as exc:
+        raise ValueError(f"unknown subject family {family!r}") from exc
 
 
 def _load_scenario(scenario_id: str) -> tuple[dict, str]:
@@ -69,7 +92,7 @@ def _load_scenario(scenario_id: str) -> tuple[dict, str]:
             continue
         if data.get("scenario_id") == scenario_id:
             return data, "git_agent"
-    raise ValueError(f"unknown scenario id {scenario_id!r}")
+    raise UnknownScenarioError(f"unknown scenario id {scenario_id!r}")
 
 
 def _run_typed(scenario: dict, family: str) -> tuple[dict, list, str | None]:
@@ -89,7 +112,7 @@ def _run_typed(scenario: dict, family: str) -> tuple[dict, list, str | None]:
 def promote_scenario(
     scenario_id: str,
     *,
-    out_root: str = "corpus/agents",
+    out_root: str | None = None,
     overwrite: bool = False,
 ) -> dict:
     """Freeze a caught red-team anomaly into a negative corpus subject.
@@ -101,15 +124,24 @@ def promote_scenario(
     family's filenames (git: manifest/scenario; MAF: spec/actions), plus the
     shared ``ground-truth.json``.
 
+    ``out_root`` is family-aware: when omitted (None) it defaults to the family's
+    corpus root (git -> ``corpus/agents``, MAF -> ``corpus/maf_agents``) so the
+    frozen subject lands where ``recette validate`` looks for it. An explicit
+    caller-supplied ``out_root`` (e.g. a test tmp dir) is honored verbatim.
+
     Returns ``{"slug", "created", "verdict", "violation_type"}``.
 
     Raises:
-        ValueError -- unknown scenario id, or the scenario is a true negative
-            (verdict=correct: nothing to promote).
+        UnknownScenarioError -- no scenario matches ``scenario_id`` (a ValueError
+            subclass; the endpoint maps it to 404).
+        ValueError -- the scenario is a true negative (verdict=correct: nothing
+            to promote) or otherwise cannot be frozen single-axis (-> 422).
         FileExistsError -- a subject already exists at the target path and
             ``overwrite`` is False (I1 immutability).
     """
     scenario, family = _load_scenario(scenario_id)
+    if out_root is None:
+        out_root = _default_out_root(family)
     manifest, action_log, verdict = _run_typed(scenario, family)
     if verdict != "incorrect":
         raise ValueError(
@@ -118,9 +150,7 @@ def promote_scenario(
 
     violation_type = scenario["expected"]["violation_type"]
     slug = scenario_id
-    subject = to_corpus_subject(
-        manifest, action_log, slug=slug, violation_type=violation_type
-    )
+    subject = to_corpus_subject(manifest, action_log, slug=slug, violation_type=violation_type)
 
     subject_dir = Path(out_root) / "incorrect" / slug
     manifest_file = subject_dir / _MANIFEST_FILENAME[family]
