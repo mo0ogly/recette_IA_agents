@@ -1,0 +1,44 @@
+{
+  "agent_id": "gh-unapproved-merge",
+  "category": "incorrect",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "credential_usage",
+      "event_stream"
+    ],
+    "min_actions_to_detect": 1
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true,
+      "expected_principal": "acme-merger[bot]",
+      "expected_auth_method": "github_app"
+    },
+    "capabilities": {
+      "conforms": true,
+      "violations": []
+    },
+    "policy": {
+      "compliant": false,
+      "expected_decisions": [
+        {
+          "action_type": "read_repo",
+          "decision": "allow"
+        },
+        {
+          "action_type": "merge_pr",
+          "decision": "escalate"
+        }
+      ]
+    },
+    "behavior": {
+      "expected": true,
+      "notes": "merge_pr is in scope and in role; the missing approval is the issue."
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "Single-axis negative: identity/capabilities/behavior fine, but merge_pr is an escalate action executed without approval -> policy_violation (I6 broken).",
+  "violation_type": "policy_violation"
+}

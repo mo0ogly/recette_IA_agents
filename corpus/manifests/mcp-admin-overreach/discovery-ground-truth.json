@@ -1,0 +1,10 @@
+{
+  "agent_repo": "mcp-admin-overreach",
+  "target_system": "mcp",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["manage_webhook", "push"],
+  "risk_rank": 3,
+  "policy_generated": true,
+  "notes": "MCP infra syncer declared in .inspect_ia_agents/manifest.json: pushes and installs webhooks (high blast radius). Scanner should detect one agent, surface push + manage_webhook, rank it highest, and emit a policy."
+}

@@ -1,0 +1,144 @@
+# inspect_ia_agents recette discovery lab + governed-execution platform lab.
+#
+#   docker compose up discovery-mock        # start the mock Discovery :8081
+#   docker compose run --rm recette         # run the discovery recette over HTTP
+#   docker compose run --rm gates           # run the strict Python gates
+#   docker compose run --rm tests           # run the full test suite
+#   docker compose up -d lab-mock api       # start the platform lab (API :8090)
+#   docker compose run --rm e2e             # end-to-end governed-flow recette
+#
+# discovery-mock + recette use the lean "runtime" image; gates + tests use the
+# "audit" image (adds ruff/mypy/bandit/pytest + tests/ + scripts/). The mock is a
+# lab double of the colleague's Discovery/Enrichment Plane, backed by the reference
+# oracle. Swap INSPECT_IA_AGENTS_DISCOVERY_URL to point recette at the real service.
+
+services:
+  discovery-mock:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    command: python -m recette.discovery_mock
+    # Host port is overridable so parallel sessions don't fight over 8081.
+    # Default 8081 for interactive `make lab`; install.sh sets 0 (ephemeral).
+    ports:
+      - "${DISCOVERY_HOST_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  recette:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    depends_on:
+      discovery-mock:
+        condition: service_healthy
+    environment:
+      INSPECT_IA_AGENTS_DISCOVERY_URL: http://discovery-mock:8081
+      INSPECT_IA_AGENTS_TENANT: dev
+    command: python -m recette discovery --adapter http
+
+  gates:
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
+    command: >
+      sh -c "ruff check recette tests scripts &&
+             ruff format --check recette tests scripts &&
+             mypy recette &&
+             bandit -q -r recette --severity-level medium &&
+             echo 'gates: PASS'"
+
+  tests:
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
+    command: python -m unittest discover -s tests
+
+  # --- governed-execution platform lab (L1) ---
+
+  # One-shot root chown: a fresh named volume mountpoint is root-owned, while
+  # the runtime image runs as the non-root 'recette' user (least privilege).
+  # The API service itself stays non-root.
+  platform-init:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    user: root
+    command: chown -R recette:recette /data
+    volumes:
+      - platform-data:/data
+
+  # Lab double of the 11 external systems (recette/lab) -- the only place the
+  # platform's side effects land (I5).
+  lab-mock:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    command: python -m recette.lab.mock_server
+    environment:
+      INSPECT_IA_AGENTS_LAB_PORT: "8082"
+    ports:
+      - "${LAB_HOST_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/healthz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # Gateway + Control/Audit Plane API. All state (event store, policies,
+  # agent config) lives on the platform-data volume so it survives restarts (I1).
+  api:
+    build:
+      context: .
+      target: runtime
+    image: railgun-recette:runtime
+    command: python -m recette.api
+    depends_on:
+      lab-mock:
+        condition: service_healthy
+      platform-init:
+        condition: service_completed_successfully
+    environment:
+      INSPECT_IA_AGENTS_API_HOST: 0.0.0.0
+      INSPECT_IA_AGENTS_API_PORT: "8090"
+      INSPECT_IA_AGENTS_LAB_URL: http://lab-mock:8082
+      INSPECT_IA_AGENTS_EVENT_STORE_PATH: /data/events.db
+      INSPECT_IA_AGENTS_POLICIES_DIR: /data/policies
+      INSPECT_IA_AGENTS_CONFIG_PATH: /data/config.json
+    volumes:
+      - platform-data:/data
+    ports:
+      - "${API_HOST_PORT:-8090}:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # End-to-end governed-flow recette (tests/e2e) against the live api service.
+  e2e:
+    build:
+      context: .
+      target: audit
+    image: railgun-recette:audit
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      INSPECT_IA_AGENTS_E2E_API_URL: http://api:8090
+    command: python -m unittest tests.e2e.test_governed_flow -v
+
+volumes:
+  platform-data:

@@ -1,0 +1,26 @@
+{
+  "kind": "maf_orchestration",
+  "style": "group_chat",
+  "agent_id": "groupchat-triage-correct",
+  "name": "Group Chat Incident Triage",
+  "description": "A moderated round-table: responder, analyst and scribe take turns until the incident is triaged.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "GroupChatBuilder" },
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "responder",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "analyst",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "web_search", "target": "web_search", "approval": "never" }
+      ]
+    },
+    {
+      "agent_id": "scribe",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

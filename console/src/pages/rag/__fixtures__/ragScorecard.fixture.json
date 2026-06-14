@@ -1,0 +1,12 @@
+{
+  "total": 3,
+  "passed": 3,
+  "all_passed": true,
+  "mean_precision": 0.6667,
+  "mean_recall": 1.0,
+  "results": [
+    {"query": "approval before deleting documents", "retrieved": ["kb-approval", "kb-ranking"], "precision": 0.5, "recall": 1.0, "top_ok": true, "passed": true},
+    {"query": "ranks documents relevance query", "retrieved": ["kb-ranking", "kb-approval"], "precision": 0.5, "recall": 1.0, "top_ok": true, "passed": true},
+    {"query": "ingesting indexes document", "retrieved": ["kb-ingest"], "precision": 1.0, "recall": 1.0, "top_ok": true, "passed": true}
+  ]
+}

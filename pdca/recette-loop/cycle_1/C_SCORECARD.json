@@ -1,0 +1,26 @@
+{
+  "scope": "recette-loop closure (dashboard campaign launch + GatewayForge governance + auto-verdict-submit)",
+  "cycle": 1,
+  "date": "2026-06-14",
+  "rescoring_mode": "evidence-based-estimate",
+  "global_score": 89,
+  "verdict": "COMPLETE-below-100 (module target reached; residuals structural/out-of-scope)",
+  "domains": {
+    "security":         {"score": 90, "weight": 20, "src": "I2 mediation via GatewayForge, deny-by-default JWT present, no secrets, campaign verdict-submit fails safe (400 not 500), no new attack surface"},
+    "testing":          {"score": 93, "weight": 15, "src": "54 python scope tests pass (test_runners/test_verdict/test_api_campaigns/test_campaign), 41 console scope tests pass, R16 fixture dashboard.fixture.json"},
+    "architecture":     {"score": 93, "weight": 15, "src": "GatewayForge phase-behind-trait (GitForge), shared judge_and_store path, I4 LogicalClock+evt-seq (byte-stable replay), I5 proxy mediation"},
+    "code_hygiene":     {"score": 93, "weight": 15, "src": "extensive doc-comments, no wallclock/random in decision path, no print-debug, conventional structure"},
+    "completeness":     {"score": 80, "weight": 15, "src": "campaign-run verdict-submit not supported (single-agent only); fail-safe + dashboard filters it out; extension not bug"},
+    "documentation":    {"score": 90, "weight": 10, "src": "module docstrings explain invariants + bench semantics; G1-G7 retrospective present"},
+    "benchmark_parity": {"score": 80, "weight": 10, "src": "N/A no external benchmark; neutral"}
+  },
+  "residuals": [
+    "campaign-run -> verdict submission (iterate steps, judge each) -- completeness extension, currently 400 fail-safe",
+    "full python suite single-run total unobtainable: concurrent session running suite + live platform contention (environmental, not a test failure; 736 consecutive OK, 0 FAIL/ERROR observed)"
+  ],
+  "live_proof": {
+    "gateway_governance": "POST /campaigns/finance-payment-run/run -> +2 governed events in audit log (visible to /flux,/live)",
+    "verdict_loop": "single-agent run -> POST /runs/{id}/submit-verdict -> PASS judged vs ground_truth, evidence_event_ids audit-linked (I1), submitted_seq append-only",
+    "fail_safe": "campaign run submit-verdict -> 400 'no agent_id', dashboard guards r.agent_id + .catch swallow"
+  }
+}

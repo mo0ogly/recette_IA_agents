@@ -1,0 +1,167 @@
+/**
+ * Corpus browser: every test subject across families in one list.
+ *
+ * Renders GET /subjects -- the unified corpus after the git/MAF fusion:
+ * git_agent (github/gitlab action-logs), maf_agent (standard-aligned subjects)
+ * and maf_orchestration (multi-agent handoff/sequential/concurrent teams). Each
+ * row shows its family, ground-truth category, the broken axis for negatives
+ * (violation_type) and the expected verdict. Read-only; the backend is
+ * deterministic (I4). Reuses the discovery table styling -- no new CSS.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { listSubjects } from "../../api/client";
+import type { CorpusListing, CorpusSubject } from "../../api/client";
+import PageHelp from "../../components/help/PageHelp";
+import SubjectExplainModal from "../../components/SubjectExplainModal";
+import RunViewer from "./RunViewer";
+import "../discovery/discovery.css";
+
+const ALL = "all";
+
+export default function CorpusPage(): JSX.Element {
+  const [listing, setListing] = useState<CorpusListing | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [family, setFamily] = useState<string>(ALL);
+  const [openRun, setOpenRun] = useState<string | null>(null);
+  const [explainId, setExplainId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    listSubjects()
+      .then((l) => {
+        if (alive) {
+          setListing(l);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (alive) {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const families = useMemo(
+    () => (listing ? Object.keys(listing.families).sort() : []),
+    [listing],
+  );
+
+  const rows = useMemo<CorpusSubject[]>(() => {
+    if (!listing) return [];
+    return family === ALL
+      ? listing.subjects
+      : listing.subjects.filter((s) => s.family === family);
+  }, [listing, family]);
+
+  return (
+    <section className="discovery-page">
+      <div className="page-head">
+        <h1>Corpus</h1>
+        <PageHelp topic="corpus" />
+      </div>
+      <p className="discovery-note">
+        Tous les sujets de test, toutes familles confondues : agents git, sujets
+        MAF alignes sur le standard, et equipes d'orchestration multi-agents
+        (handoff, sequentiel, concurrent). Les negatifs portent l'unique axe
+        casse (violation_type).
+      </p>
+
+      {loading && <p className="discovery-loading">Chargement du corpus...</p>}
+      {error && (
+        <div className="discovery-error" role="alert" data-testid="corpus-error">
+          {error}
+        </div>
+      )}
+
+      {listing && (
+        <>
+          <div className="discovery-summary">
+            <span className="discovery-stat" data-testid="corpus-count">
+              {listing.count} sujets
+            </span>
+            {families.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`pill ${family === f ? "pill-ok" : ""}`}
+                data-testid={`corpus-filter-${f}`}
+                onClick={() => setFamily(family === f ? ALL : f)}
+              >
+                {f} {listing.families[f]}
+              </button>
+            ))}
+          </div>
+
+          <table className="discovery-table">
+            <thead>
+              <tr>
+                <th>Sujet</th>
+                <th>Famille</th>
+                <th>Categorie</th>
+                <th>Axe casse</th>
+                <th>Verdict attendu</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => {
+                const isOrch = s.family === "maf_orchestration";
+                return (
+                  <tr key={`${s.family}-${s.agent_id}`} data-testid={`corpus-row-${s.agent_id}`}>
+                    <td>
+                      {isOrch ? (
+                        <button
+                          type="button"
+                          className="pill"
+                          data-testid={`corpus-open-${s.agent_id}`}
+                          onClick={() => setOpenRun(s.agent_id)}
+                        >
+                          {s.agent_id}
+                        </button>
+                      ) : (
+                        s.agent_id
+                      )}
+                    </td>
+                    <td>{s.family}</td>
+                    <td>{s.category ?? "-"}</td>
+                    <td>{s.violation_type ?? "-"}</td>
+                    <td className={s.expected_verdict === "correct" ? "ok" : "fail"}>
+                      {s.expected_verdict ?? "-"}
+                    </td>
+                    <td>
+                      {!isOrch && (
+                        <button
+                          type="button"
+                          className="pill"
+                          aria-label={`Expliquer ${s.agent_id}`}
+                          data-testid={`corpus-explain-${s.agent_id}`}
+                          onClick={() => setExplainId(s.agent_id)}
+                        >
+                          Expliquer
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {openRun && <RunViewer agentId={openRun} />}
+
+          <SubjectExplainModal
+            open={explainId !== null}
+            subjectId={explainId}
+            onClose={() => setExplainId(null)}
+          />
+        </>
+      )}
+    </section>
+  );
+}

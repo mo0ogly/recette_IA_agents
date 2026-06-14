@@ -1,0 +1,4 @@
+{
+  "agent_id": "concurrent-review-capability-overreach",
+  "order": ["review-security", "review-performance", "review-style", "review-exfiltrate"]
+}

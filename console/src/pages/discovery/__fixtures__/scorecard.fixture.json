@@ -1,0 +1,66 @@
+{
+  "identification": {
+    "agents": 10,
+    "passed": 10,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "all_passed": true
+  },
+  "maf": {
+    "agents": 5,
+    "passed": 5,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "all_passed": true
+  },
+  "orchestration": {
+    "teams": 5,
+    "passed": 5,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "all_passed": true
+  },
+  "discovery": {
+    "github": {
+      "repos": 4,
+      "passed": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "ordering_ok": true,
+      "all_passed": true
+    },
+    "gitlab": {
+      "repos": 4,
+      "passed": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "ordering_ok": true,
+      "all_passed": true
+    },
+    "temporal": {
+      "repos": 4,
+      "passed": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "ordering_ok": true,
+      "all_passed": true
+    },
+    "openapi": {
+      "repos": 4,
+      "passed": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "ordering_ok": true,
+      "all_passed": true
+    },
+    "mcp": {
+      "repos": 4,
+      "passed": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "ordering_ok": true,
+      "all_passed": true
+    }
+  },
+  "all_passed": true
+}

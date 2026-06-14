@@ -1,0 +1,100 @@
+{
+  "identification": {
+    "total": 10,
+    "passed": 10,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "dimension_accuracy": {
+      "identity": 1.0,
+      "capabilities": 1.0,
+      "policy": 1.0,
+      "behavior": 1.0
+    }
+  },
+  "maf": {
+    "total": 5,
+    "passed": 5,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "dimension_accuracy": {
+      "identity": 1.0,
+      "capabilities": 1.0,
+      "policy": 1.0,
+      "behavior": 1.0
+    }
+  },
+  "orchestration": {
+    "total": 13,
+    "passed": 13,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "dimension_accuracy": {
+      "identity": 1.0,
+      "capabilities": 1.0,
+      "policy": 1.0,
+      "behavior": 1.0
+    },
+    "by_style": {
+      "concurrent": {
+        "total": 2,
+        "passed": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "dimension_accuracy": {
+          "identity": 1.0,
+          "capabilities": 1.0,
+          "policy": 1.0,
+          "behavior": 1.0
+        }
+      },
+      "group_chat": {
+        "total": 2,
+        "passed": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "dimension_accuracy": {
+          "identity": 1.0,
+          "capabilities": 1.0,
+          "policy": 1.0,
+          "behavior": 1.0
+        }
+      },
+      "handoff": {
+        "total": 5,
+        "passed": 5,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "dimension_accuracy": {
+          "identity": 1.0,
+          "capabilities": 1.0,
+          "policy": 1.0,
+          "behavior": 1.0
+        }
+      },
+      "magentic": {
+        "total": 2,
+        "passed": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "dimension_accuracy": {
+          "identity": 1.0,
+          "capabilities": 1.0,
+          "policy": 1.0,
+          "behavior": 1.0
+        }
+      },
+      "sequential": {
+        "total": 2,
+        "passed": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "dimension_accuracy": {
+          "identity": 1.0,
+          "capabilities": 1.0,
+          "policy": 1.0,
+          "behavior": 1.0
+        }
+      }
+    }
+  }
+}

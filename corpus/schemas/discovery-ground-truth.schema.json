@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspect_ia_agents.local/schemas/discovery-ground-truth.schema.json",
+  "title": "inspect_ia_agents recette -- discovery ground-truth",
+  "description": "What the recette EXPECTS the Discovery/Enrichment GitHubScanner to conclude for a test-agent repository. Because canonical_agent_id and estimated_risk are computed internally (opaque, arch invariant 2 + fingerprinting), this asserts INVARIANT PROPERTIES, never exact opaque values: detection, count/dedup, action-pattern coverage, target_system, relative risk ordering (risk_rank), and policy presence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_repo", "target_system", "detected"],
+  "properties": {
+    "agent_repo": {
+      "type": "string",
+      "description": "Repo slug; must match the parent corpus/repos/<slug> directory.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "target_system": {
+      "type": "string",
+      "enum": ["github", "gitlab", "temporal", "openapi", "mcp"]
+    },
+    "detected": {
+      "type": "boolean",
+      "description": "Should the scanner discover an agent in this repo at all? (false = true-negative repo)."
+    },
+    "agent_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Distinct agents the scanner should resolve (distinct canonical_agent_id)."
+    },
+    "action_patterns": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Action patterns the scanner must surface for this repo (from the canonical action vocabulary).",
+      "items": {
+        "type": "string",
+        "enum": ["read_repo", "list_repos", "open_issue", "comment_issue", "open_pr", "merge_pr", "push", "manage_webhook", "manage_release", "read_ci", "trigger_ci"]
+      }
+    },
+    "risk_rank": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Ordinal for RELATIVE risk ordering across the corpus (0 = benign/none, higher = more dangerous). The recette checks monotonicity vs the scanner's estimated_risk, never the absolute opaque score."
+    },
+    "policy_generated": {
+      "type": "boolean",
+      "description": "Whether the scanner should emit a non-empty generated_policy for this agent."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Human-readable ground-truth justification."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "detected": { "const": false } } },
+      "then": {
+        "properties": {
+          "agent_count": { "const": 0 },
+          "action_patterns": { "maxItems": 0 }
+        }
+      }
+    }
+  ]
+}

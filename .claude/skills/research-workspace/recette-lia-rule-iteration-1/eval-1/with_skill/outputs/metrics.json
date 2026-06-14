@@ -1,0 +1,83 @@
+{
+  "eval_id": 1,
+  "skill": "recette-lia-rule",
+  "rule": "A-S-WFTP-WingFTP-CVE-2025-47812",
+  "rule_path": "/home/mo0ogly/Bureau/vscode_lia_audit/lia_rules/rule_analysis/WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812",
+  "note_path_mismatch": "Tâche demandait TECH/VULN/A-VULN-WFTPS-RemoteCodeExecution - règle réelle trouvée sous WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812",
+  "tool_calls": {
+    "Read": 5,
+    "Glob": 2,
+    "Bash": 22,
+    "Write": 3,
+    "total_tool_calls": 32
+  },
+  "skill_compliance": {
+    "engine_test_first": true,
+    "recipe_after_engine": true,
+    "ultimate_after_recipe": true,
+    "reportrule_checked": true,
+    "order_respected": true
+  },
+  "execution_results": {
+    "engine": {
+      "exit_code": 0,
+      "matches": 10,
+      "expected_matches": 10,
+      "safe_cases": 6,
+      "verdict": "PASS",
+      "duration_seconds": 0.01
+    },
+    "recipe": {
+      "exit_code": 2,
+      "score": 83,
+      "total_checks": 85,
+      "passed": 71,
+      "critical_failures": 0,
+      "high_warnings": 3,
+      "medium_info": 11,
+      "verdict": "RECETTE INCOMPLETE - HIGH warnings",
+      "high_issues": [
+        "required_fields manquants dans data_source",
+        "RESEARCH_EVIDENCE.md manquant",
+        "Domaines fictifs corp.example.com (16 occurrences)"
+      ]
+    },
+    "ultimate": {
+      "exit_code": 0,
+      "score": 98,
+      "total_checks": 91,
+      "v6_bash_checks": 76,
+      "v5_python_checks": 15,
+      "critical_failures": 0,
+      "high_warnings": 0,
+      "medium_info": 0,
+      "verdict": "ALL PASS"
+    },
+    "reportrule": {
+      "exit_code": 1,
+      "total_validators": 9,
+      "passed": 4,
+      "failed": 5,
+      "critical_failures": 2,
+      "high_warnings": 2,
+      "medium_info": 1,
+      "verdict": "FAIL - CRITICAL blockers",
+      "critical_issues": [
+        "compliance_mapping: frameworks en strings au lieu d'objets {id, name, description}",
+        "vulnerability.cve_id manquant dans le JSON"
+      ],
+      "high_issues": [
+        "risk_level absent",
+        "vulnerability.rationale absent"
+      ]
+    }
+  },
+  "commit_authorized": false,
+  "commit_blockers": [
+    "ReportRule CRITICAL: compliance_mapping format incorrect (strings vs objects)",
+    "ReportRule CRITICAL: vulnerability.cve_id manquant",
+    "Recipe HIGH: RESEARCH_EVIDENCE.md manquant",
+    "Recipe HIGH: required_fields non documentés"
+  ],
+  "timestamp": "2026-03-02T22:31:00Z"
+}

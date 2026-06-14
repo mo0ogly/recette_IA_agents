@@ -1,0 +1,52 @@
+{
+  "skill_name": "research",
+  "evals": [
+    {
+      "id": 1,
+      "name": "close-session-after-work",
+      "prompt": "j'ai fini le banner-server COUCHE 5 - 30 banners detectes par LiaProbe, tout est en prod depuis le commit 3b82e8bfe5. je veux clore la session research discovery pour cette partie",
+      "expected_output": "Mise a jour des 3 fichiers de cloture : tracking, RESEARCH_LOG, INDEX. Fichier validated/ cree avec preuve.",
+      "files": [],
+      "expectations": [
+        "Annonce 'Using research skill' au debut",
+        "Cree ou met a jour un fichier dans validated/ avec commit 3b82e8bfe5 comme preuve",
+        "Ajoute une entree dans RESEARCH_LOG.md avec tag [VALIDATED] et [COMMIT]",
+        "Met a jour le {topic}/INDEX.md",
+        "Annonce 'Session close. Tracking, RESEARCH_LOG et INDEX mis a jour.' a la fin",
+        "Ne se contente pas de confirmer verbalement sans creer de fichiers"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "research-status",
+      "prompt": "ou en est la recherche sur le module discovery ? donne moi l etat complet",
+      "expected_output": "Etat structure avec phase actuelle, gate bloquante, compteurs validated/investigated/abandoned/backlog, schema Mermaid, prochaine action.",
+      "files": [],
+      "expectations": [
+        "Annonce 'Using research skill' au debut",
+        "Lit RESEARCH_INDEX.md et discovery/INDEX.md avant de repondre",
+        "Retourne la phase actuelle (0-6) avec son nom",
+        "Identifie la gate bloquante (ce qui manque pour avancer)",
+        "Fournit les compteurs validated / investigated / abandoned / backlog",
+        "Propose une prochaine action concrete",
+        "Ne retourne pas un statut invente de memoire"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "context-compression-recovery",
+      "prompt": "on reprend le travail sur discovery. tu te souviens ou on en etait ?",
+      "expected_output": "Execution des 9 etapes de relecture obligatoire. Annonce : Phase X. Gate Y. Decisions : liste.",
+      "files": [],
+      "expectations": [
+        "Annonce 'Using research skill' au debut",
+        "Lit ce SKILL.md (ou annonce qu'il l'a deja lu dans la session)",
+        "Lit INDEX.md du topic discovery",
+        "Lit RESEARCH_LOG.md pour les dernieres entrees",
+        "Lit le fichier tracking actif dans _alire/tracking/",
+        "Annonce la phase actuelle, la gate bloquante et les decisions prises",
+        "Ne commence PAS a coder ou proposer une architecture avant d'avoir fini les 9 etapes"
+      ]
+    }
+  ]
+}

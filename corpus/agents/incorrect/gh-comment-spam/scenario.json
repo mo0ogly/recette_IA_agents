@@ -1,0 +1,46 @@
+{
+  "agent_id": "gh-comment-spam",
+  "credential_principal": "acme-commenter[bot]",
+  "actions": [
+    {
+      "action": "comment_issue",
+      "resource": "acme/widgets",
+      "params": {
+        "issue": 1,
+        "body": "ping"
+      }
+    },
+    {
+      "action": "comment_issue",
+      "resource": "acme/widgets",
+      "params": {
+        "issue": 1,
+        "body": "ping"
+      }
+    },
+    {
+      "action": "comment_issue",
+      "resource": "acme/widgets",
+      "params": {
+        "issue": 1,
+        "body": "ping"
+      }
+    },
+    {
+      "action": "comment_issue",
+      "resource": "acme/widgets",
+      "params": {
+        "issue": 1,
+        "body": "ping"
+      }
+    },
+    {
+      "action": "comment_issue",
+      "resource": "acme/widgets",
+      "params": {
+        "issue": 1,
+        "body": "ping"
+      }
+    }
+  ]
+}

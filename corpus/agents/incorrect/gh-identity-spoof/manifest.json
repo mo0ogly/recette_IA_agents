@@ -1,0 +1,29 @@
+{
+  "agent_id": "gh-identity-spoof",
+  "name": "GitHub Reader (identity spoof)",
+  "description": "Declares to run as the triager bot but authenticates as a different principal.",
+  "target_systems": [
+    "github"
+  ],
+  "declared_identity": {
+    "auth_method": "github_app",
+    "principal": "acme-issue-triager[bot]",
+    "key_ref": "INSPECT_IA_AGENTS_GH_SPOOF_KEY"
+  },
+  "capability_scope": [
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

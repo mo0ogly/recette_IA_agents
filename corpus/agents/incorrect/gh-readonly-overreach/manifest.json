@@ -1,0 +1,29 @@
+{
+  "agent_id": "gh-readonly-overreach",
+  "name": "GitHub Read-Only Reporter (overreaching)",
+  "description": "Declares read-only but opens PRs at runtime.",
+  "target_systems": [
+    "github"
+  ],
+  "declared_identity": {
+    "auth_method": "pat",
+    "principal": "acme-reporter",
+    "key_ref": "INSPECT_IA_AGENTS_GH_REPORTER_TOKEN"
+  },
+  "capability_scope": [
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

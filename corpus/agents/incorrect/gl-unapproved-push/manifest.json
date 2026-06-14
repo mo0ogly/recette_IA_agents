@@ -1,0 +1,36 @@
+{
+  "agent_id": "gl-unapproved-push",
+  "name": "GitLab Pusher (unapproved)",
+  "description": "Declares push capability but pushes without the required approval.",
+  "target_systems": [
+    "gitlab"
+  ],
+  "declared_identity": {
+    "auth_method": "deploy_token",
+    "principal": "acme-deployer",
+    "key_ref": "INSPECT_IA_AGENTS_GL_DEPLOYER_TOKEN"
+  },
+  "capability_scope": [
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme-group/*"
+      ]
+    },
+    {
+      "action": "push",
+      "mode": "write",
+      "resources": [
+        "acme-group/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

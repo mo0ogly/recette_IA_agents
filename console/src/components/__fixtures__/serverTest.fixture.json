@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "latency_ms": 3,
+  "status_code": 200,
+  "response": {
+    "action": "suspend_user",
+    "resource": "user/alice",
+    "result_id": "1d0678545dcf",
+    "status": "simulated",
+    "user_status": "SUSPENDED"
+  },
+  "side_effect_hash": "c5da32c23da0de37131edcf2d1784754d3a53bfe836f58a34f96020b4b85eeda",
+  "error": null
+}

@@ -1,0 +1,27 @@
+{
+  "evals": [
+    {
+      "eval_id": 1,
+      "name": "close-session-after-work",
+      "with_skill": {"duration_ms": 181733, "total_tool_calls": 20},
+      "without_skill": {"duration_ms": 107997, "total_tool_calls": 11}
+    },
+    {
+      "eval_id": 2,
+      "name": "research-status",
+      "with_skill": {"duration_ms": 167381, "total_tool_calls": 15},
+      "without_skill": {"duration_ms": 122370, "total_tool_calls": 12}
+    },
+    {
+      "eval_id": 3,
+      "name": "context-compression-recovery",
+      "with_skill": {"duration_ms": 156101, "total_tool_calls": 13},
+      "without_skill": {"duration_ms": 190846, "total_tool_calls": 14}
+    }
+  ],
+  "summary": {
+    "avg_with_skill_ms": 168405,
+    "avg_without_skill_ms": 140404,
+    "overhead_pct": 20
+  }
+}

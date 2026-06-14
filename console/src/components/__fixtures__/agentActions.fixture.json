@@ -1,0 +1,77 @@
+{
+  "actions": [
+    {
+      "target_system": "github",
+      "action": "list_repos",
+      "description": "List repositories/projects (read-only).",
+      "kind": "read"
+    },
+    {
+      "target_system": "github",
+      "action": "read_ci",
+      "description": "Read CI/CD pipeline status (read-only).",
+      "kind": "read"
+    },
+    {
+      "target_system": "github",
+      "action": "read_repo",
+      "description": "Read repository/project metadata (read-only).",
+      "kind": "read"
+    },
+    {
+      "target_system": "github",
+      "action": "comment_issue",
+      "description": "Comment on an issue (bounded write).",
+      "kind": "bounded_write"
+    },
+    {
+      "target_system": "github",
+      "action": "open_issue",
+      "description": "Open an issue (bounded write).",
+      "kind": "bounded_write"
+    },
+    {
+      "target_system": "github",
+      "action": "open_pr",
+      "description": "Open a pull/merge request (bounded write).",
+      "kind": "bounded_write"
+    },
+    {
+      "target_system": "github",
+      "action": "manage_release",
+      "description": "Create or modify a release (high blast-radius write).",
+      "kind": "high_write"
+    },
+    {
+      "target_system": "github",
+      "action": "manage_webhook",
+      "description": "Create or modify a webhook (high blast-radius write).",
+      "kind": "high_write"
+    },
+    {
+      "target_system": "github",
+      "action": "merge_pr",
+      "description": "Merge a pull/merge request (high blast-radius write).",
+      "kind": "high_write"
+    },
+    {
+      "target_system": "github",
+      "action": "push",
+      "description": "Commit to the default branch (high blast-radius write).",
+      "kind": "high_write"
+    },
+    {
+      "target_system": "github",
+      "action": "trigger_ci",
+      "description": "Trigger a CI/CD pipeline run (high blast-radius write).",
+      "kind": "high_write"
+    },
+    {
+      "target_system": "okta",
+      "action": "revoke_api_key",
+      "description": "Revoke an existing API key.",
+      "kind": "bounded_write"
+    }
+  ],
+  "count": 12
+}

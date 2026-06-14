@@ -1,0 +1,16 @@
+{
+  "pending": [
+    {
+      "event_id": "EV000000000000000001000001",
+      "seq": 1,
+      "requested_at": "2026-06-13T10:00:00Z",
+      "agent_id": "maf-agent",
+      "role": "tool_operator",
+      "target_system": "mcp",
+      "action_type": "invoke_tool",
+      "resource": "mcp/diagnostic-server",
+      "risk_level": "high",
+      "policy_version": "v1"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "metadata": {
+    "skill_name": "create-lia-rule",
+    "skill_version": "2.0",
+    "iteration": 3,
+    "date": "2026-03-03",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "self-assessed",
+    "evals_run": ["cve-postgresql-first", "missing-deliverables-trap"],
+    "runs_per_configuration": 1,
+    "changes_since_iter2": [
+      "P4: eval-2 redesignee: safe-description-cveid-trap -> missing-deliverables-trap",
+      "Nouveaux criteres discriminants: RESEARCH_EVIDENCE.md (absent CLAUDE.md) + RETEX 5 questions (absent CLAUDE.md)",
+      "Changement d'approche: tester les livrables obligatoires absents du baseline plutot que la detection de pieges"
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "cve-postgresql-first",
+      "note": "Carried over from iteration 1 - eval non modifiee",
+      "with_skill": {
+        "passed": 6,
+        "total": 6,
+        "pass_rate": 1.0,
+        "total_tool_calls": 18
+      },
+      "without_skill": {
+        "passed": 3,
+        "total": 6,
+        "pass_rate": 0.5,
+        "total_tool_calls": 13
+      },
+      "delta_pass_rate_pct": 50.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "postgresql_first: PostgreSQL tente APRES exploration YAML (ordre inverse)",
+        "script_level1_gate: scripts/collect/ ignore - collection_script copie de la regle existante sans verification",
+        "test_data_14_cases: Aucun test_data.json produit (livrable obligatoire absent)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "missing-deliverables-trap",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 9
+      },
+      "without_skill": {
+        "passed": 3,
+        "total": 5,
+        "pass_rate": 0.6,
+        "total_tool_calls": 12
+      },
+      "delta_pass_rate_pct": 40.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "creates_research_evidence: RESEARCH_EVIDENCE.md non genere (specifique au skill Phase 6, absent du CLAUDE.md)",
+        "presents_retex: RETEX 5 questions absent (mandate par le skill, absent du CLAUDE.md)"
+      ],
+      "notable_finding": "EVAL DISCRIMINANTE (+40pp). Le baseline produit un YAML correct (Sigma Extended, risk_score juste, test_data 14+ cas) mais omet systematiquement les 2 livrables skill-exclusifs: RESEARCH_EVIDENCE.md et RETEX. Finding bonus: WITH_SKILL a corrige l'ObjectClass (panos_instance -> paloalto_device) en lisant OBJECTCLASS_REFERENCE.md via la gate - le skill apporte une rigueur epistemique que le baseline n'a pas."
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 1.0,
+    "without_skill_avg_pass_rate": 0.55,
+    "delta": {
+      "pass_rate": "+45.0%",
+      "tool_calls": "+1.0"
+    },
+    "verdict": "STRONG_IMPROVEMENT"
+  },
+  "key_findings": [
+    "Eval-1 toujours discriminante (+50pp): workflow structure (PostgreSQL FIRST + gate Level 1 + test_data) non respecte par le baseline.",
+    "Eval-2 DISCRIMINANTE iter 3 (+40pp): RESEARCH_EVIDENCE.md et RETEX sont les 2 livrables systematiquement omis par le baseline car absents de CLAUDE.md.",
+    "Delta global iter 3: +45pp vs +25pp iter 1-2. Amelioration significative grace au redesign eval-2.",
+    "Finding critique: le skill corrige meme les erreurs introductes par l'utilisateur (ObjectClass incorrect dans le prompt) grace a la gate de verification. Valeur ajoutee au-dela du workflow.",
+    "RETEX est le critere le plus discriminant: baseline produisait 'evolutions possibles' (CLAUDE.md BLOC 9) mais jamais le template RETEX 5 questions specifique au skill.",
+    "risk_score echelle (0-100 vs 0-10) n'est PAS discriminant: le baseline utilise correctement l'echelle 0-100 pour R-*.json (96 pour CRITICAL) sans avoir besoin du skill."
+  ],
+  "top_improvements_needed": [
+    "Evaluer si le ratio 53% (WITHOUT_SKILL eval-2) devrait echouer le critere test_data_14_ratio (fourchette attendue: 55-65%)",
+    "Ajouter une eval-3 testant la correction du YAML après echec recette (comportement correction iterative)",
+    "Documenter dans SKILL.md que le skill peut corriger les erreurs du prompt via la gate (finding critique iter 3)",
+    "Envisager un eval 'objectclass-correction' testant que le skill verifie et corrige les ObjectClass incorrects fournis par l'utilisateur"
+  ]
+}

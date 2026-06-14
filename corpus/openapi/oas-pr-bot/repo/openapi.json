@@ -1,0 +1,47 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "acme-dependency-pr-bot",
+    "version": "1.0.0",
+    "description": "Agent service that reads repositories and opens dependency-bump pull requests.",
+    "x-inspect_ia_agents-principal": "acme-dependency-pr-bot@openapi"
+  },
+  "paths": {
+    "/repos/{repo}": {
+      "get": {
+        "operationId": "read_repo",
+        "summary": "Read repository metadata (read-only).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Repository metadata" } }
+      }
+    },
+    "/repos/{repo}/pulls": {
+      "post": {
+        "operationId": "open_pr",
+        "summary": "Open a pull request (bounded write).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "head"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "head": { "type": "string" },
+                  "body": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Pull request created" } }
+      }
+    }
+  }
+}

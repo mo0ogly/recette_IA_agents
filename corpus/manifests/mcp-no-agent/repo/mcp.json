@@ -1,0 +1,10 @@
+{
+  "name": "acme-calculator",
+  "version": "1.0.0",
+  "transport": "stdio",
+  "description": "A plain MCP server exposing arithmetic tools. No inspect_ia_agents manifest, no target-system capability.",
+  "tools": [
+    { "name": "add", "description": "Add two numbers." },
+    { "name": "multiply", "description": "Multiply two numbers." }
+  ]
+}

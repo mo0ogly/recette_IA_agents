@@ -1,0 +1,17 @@
+{
+  "agent_id": "gh-readonly-overreach",
+  "credential_principal": "acme-reporter",
+  "actions": [
+    {
+      "action": "read_repo",
+      "resource": "acme/widgets"
+    },
+    {
+      "action": "open_pr",
+      "resource": "acme/widgets",
+      "params": {
+        "title": "docs: typo"
+      }
+    }
+  ]
+}

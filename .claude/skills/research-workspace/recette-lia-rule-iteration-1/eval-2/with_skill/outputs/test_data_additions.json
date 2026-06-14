@@ -1,0 +1,35 @@
+[
+  {
+    "ObjectClass": "WingFTPServer",
+    "Hostname": "ftp-patched-boundary.corp.local",
+    "Version": "7.4.4",
+    "VersionNormalized": "7.4.4.0",
+    "Platform": "Windows",
+    "AdminPort": 5466,
+    "AnonymousFTPEnabled": false,
+    "_expected_match": false,
+    "_test_description": "SAFE - Version 7.4.4 exact patch boundary - version_lt(7.4.4.0, 7.4.4.0) = false - MUST NOT MATCH"
+  },
+  {
+    "ObjectClass": "WingFTPServer",
+    "Hostname": "ftp-legacy-branch-02.corp.local",
+    "Version": "6.0.0",
+    "VersionNormalized": "6.0.0.0",
+    "Platform": "Linux",
+    "AdminPort": 5466,
+    "AnonymousFTPEnabled": false,
+    "_expected_match": true,
+    "_test_description": "VULNERABLE - Version 6.0.0 very old major release - well below patch threshold 7.4.4 - MUST MATCH"
+  },
+  {
+    "ObjectClass": "GenericFTPServer",
+    "Hostname": "ftp-competitor-01.corp.local",
+    "Version": "7.4.3",
+    "VersionNormalized": "7.4.3.0",
+    "Platform": "Windows",
+    "AdminPort": 21,
+    "AnonymousFTPEnabled": false,
+    "_expected_match": false,
+    "_test_description": "SAFE - Wrong ObjectClass GenericFTPServer (not WingFTPServer) - match condition on ObjectClass must reject this - MUST NOT MATCH"
+  }
+]

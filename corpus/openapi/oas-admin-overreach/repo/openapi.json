@@ -1,0 +1,58 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "acme-infra-syncer",
+    "version": "1.0.0",
+    "description": "Agent service that pushes config files and installs webhooks across repos.",
+    "x-inspect_ia_agents-principal": "acme-infra-syncer@openapi"
+  },
+  "paths": {
+    "/repos/{repo}/contents": {
+      "put": {
+        "operationId": "push",
+        "summary": "Commit a file to the default branch (high blast-radius write).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["path", "content"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "content": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "File committed" } }
+      }
+    },
+    "/repos/{repo}/hooks": {
+      "post": {
+        "operationId": "manage_webhook",
+        "summary": "Install a push webhook (high blast-radius write).",
+        "parameters": [
+          { "name": "repo", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": { "url": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Webhook installed" } }
+      }
+    }
+  }
+}

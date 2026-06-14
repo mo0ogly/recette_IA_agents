@@ -1,0 +1,11 @@
+stages:
+  - sync
+
+infra-sync:
+  stage: sync
+  image: python:3.11-slim
+  script:
+    - pip install python-gitlab
+    - python agent/main.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

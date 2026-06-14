@@ -1,0 +1,35 @@
+{
+  "kind": "maf_orchestration",
+  "agent_id": "support-handoff-correct",
+  "name": "Customer Support Handoff",
+  "description": "A triage agent dispatches to refund and order specialists, who hand control back.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "HandoffBuilder" },
+  "start_agent": "triage",
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "triage",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "refund", "description": "refund requests" },
+        { "target": "order", "description": "delivery and order issues" }
+      ]
+    },
+    {
+      "agent_id": "refund",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage", "description": "return control to the dispatcher" }],
+      "tools": [
+        { "tool_kind": "mcp", "target": "https://mcp.example.com/refund", "approval": "always" }
+      ]
+    },
+    {
+      "agent_id": "order",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage", "description": "return control to the dispatcher" }],
+      "tools": [
+        { "tool_kind": "web_search", "target": "web_search", "approval": "never" }
+      ]
+    }
+  ]
+}

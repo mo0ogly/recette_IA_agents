@@ -1,0 +1,22 @@
+[
+    {
+        "id": "gh-mock",
+        "system": "github",
+        "mode": "mock_local",
+        "port": 9101
+    },
+    {
+        "id": "gl-staging",
+        "system": "gitlab",
+        "mode": "declared_url",
+        "base_url": "http://127.0.0.1:9555",
+        "auth_env": "INSPECT_IA_AGENTS_EXTERNAL_GITLAB_TOKEN"
+    },
+    {
+        "id": "gh-saas",
+        "system": "github",
+        "mode": "real_saas",
+        "owner": "inspect_ia_agents-recette",
+        "auth_env": "INSPECT_IA_AGENTS_EXTERNAL_GITHUB_TOKEN"
+    }
+]

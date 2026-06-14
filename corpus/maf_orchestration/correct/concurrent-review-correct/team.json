@@ -1,0 +1,25 @@
+{
+  "kind": "maf_orchestration",
+  "style": "concurrent",
+  "agent_id": "concurrent-review-correct",
+  "name": "Concurrent Code Review",
+  "description": "Three reviewers fan out on the same diff and their findings are aggregated.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "ConcurrentBuilder" },
+  "participants": [
+    {
+      "agent_id": "review-security",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "code_interpreter", "target": "code_interpreter", "approval": "never" }
+      ]
+    },
+    {
+      "agent_id": "review-performance",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "review-style",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

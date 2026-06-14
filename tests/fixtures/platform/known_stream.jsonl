@@ -1,0 +1,6 @@
+{"op": "submit", "request": {"agent_id": "agent-admin", "action_type": "list_users", "target_system": "okta", "resource": "org/acme", "payload": {}, "timestamp": "2026-06-12T08:00:00Z"}}
+{"op": "submit", "request": {"agent_id": "agent-admin", "action_type": "suspend_user", "target_system": "okta", "resource": "user/jdoe", "payload": {"reason": "offboarding"}, "timestamp": "2026-06-12T08:01:00Z"}}
+{"op": "submit", "request": {"agent_id": "agent-bot", "action_type": "suspend_user", "target_system": "okta", "resource": "user/jdoe", "payload": {}, "timestamp": "2026-06-12T08:02:00Z"}}
+{"op": "submit", "request": {"agent_id": "agent-admin", "action_type": "delete_logs", "target_system": "data_platform", "resource": "logs/2026-06", "payload": {}, "timestamp": "2026-06-12T08:03:00Z"}}
+{"op": "submit", "request": {"agent_id": "ghost", "action_type": "list_users", "target_system": "okta", "resource": "org/acme", "payload": {}, "timestamp": "2026-06-12T08:04:00Z"}}
+{"op": "sweep_timeouts", "now": "2026-06-12T10:30:00Z"}

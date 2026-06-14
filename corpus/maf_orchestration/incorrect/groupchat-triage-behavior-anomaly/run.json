@@ -1,0 +1,4 @@
+{
+  "agent_id": "groupchat-triage-behavior-anomaly",
+  "order": ["responder", "responder", "responder", "responder", "responder", "responder"]
+}

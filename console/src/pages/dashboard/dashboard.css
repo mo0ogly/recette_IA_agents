@@ -1,0 +1,218 @@
+/* Dashboard: agent control board. Reuses .pill from index.css. */
+
+.dash-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.dash-reset {
+  margin-left: auto;
+  border: 1px solid var(--badge-red-fg);
+  background: transparent;
+  color: var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.dash-reset:hover {
+  background: var(--badge-red-bg);
+}
+
+.dash-summary {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.dash-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  min-width: 92px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.dash-num-active {
+  color: var(--badge-green-fg);
+}
+
+.dash-num-ok {
+  color: var(--badge-green-fg);
+}
+
+.dash-num-fail {
+  color: var(--badge-red-fg);
+}
+
+.dash-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dash-table th,
+.dash-table td {
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.dash-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dash-agent strong {
+  font-size: 0.95rem;
+}
+
+.dash-goal {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.dash-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+/* Launch (.btn-primary) and eye (.dash-eye) own their look via shared
+ * primitives; only the danger "Arreter" needs a row-local override. */
+.dash-stop {
+  color: var(--badge-red-fg);
+  border-color: var(--badge-red-fg);
+}
+
+.dash-stop:hover:not(:disabled) {
+  background-color: var(--badge-red-bg);
+  border-color: var(--badge-red-fg);
+  color: var(--badge-red-fg);
+}
+
+/* Precise-launch button: outline style to read as a secondary action next to
+ * the primary "Lancer", without competing with it. */
+.dash-precise {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  border-radius: 4px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.dash-precise:hover {
+  background: var(--color-bg);
+}
+
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+}
+
+.dot-on {
+  background-color: #2f9e44;
+  box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.18);
+}
+
+.dot-off {
+  background-color: var(--color-border);
+}
+
+.pill-mock {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.pill-warn {
+  background-color: var(--badge-orange-bg);
+  color: var(--badge-orange-fg);
+}
+
+.dash-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 0.75rem;
+}
+
+.dash-notice {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  border: 1px solid var(--badge-green-fg);
+  font-size: 0.85rem;
+}
+
+.btn-primary:disabled {
+  cursor: progress;
+}
+
+.dash-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  line-height: 0;
+  background: transparent;
+  border: 1px solid var(--color-border, #3a3a3a);
+  border-radius: 6px;
+  color: var(--color-text, #cfd3dc);
+  cursor: pointer;
+}
+
+.dash-eye:hover:not(:disabled) {
+  color: #7ee2a8;
+  border-color: #2e6b44;
+}
+
+.dash-eye:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dash-camp-head {
+  margin-top: 2rem;
+}

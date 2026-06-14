@@ -1,0 +1,14 @@
+{
+  "agent_id": "support-handoff-behavior-anomaly",
+  "hops": [
+    { "seq": 1, "from": "triage", "to": "refund" },
+    { "seq": 2, "from": "refund", "to": "triage" },
+    { "seq": 3, "from": "triage", "to": "refund" },
+    { "seq": 4, "from": "refund", "to": "triage" },
+    { "seq": 5, "from": "triage", "to": "refund" },
+    { "seq": 6, "from": "refund", "to": "triage" },
+    { "seq": 7, "from": "triage", "to": "refund" },
+    { "seq": 8, "from": "refund", "to": "triage" },
+    { "seq": 9, "from": "triage", "to": "refund" }
+  ]
+}

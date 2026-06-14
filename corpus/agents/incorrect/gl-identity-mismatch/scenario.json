@@ -1,0 +1,10 @@
+{
+  "agent_id": "gl-identity-mismatch",
+  "credential_principal": "intern-personal-token",
+  "actions": [
+    {
+      "action": "read_repo",
+      "resource": "acme-group/service-b"
+    }
+  ]
+}

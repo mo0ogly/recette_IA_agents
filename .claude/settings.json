@@ -1,0 +1,84 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/frustration-detector.cjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/secret-scanner.cjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__playwright__.*|mcp__chromium-arm64__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'H=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/track_playwright_verify.sh\"; [ -x \"$H\" ] && \"$H\" || true'",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'H=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/track_curl_verify.sh\"; [ -x \"$H\" ] && \"$H\" || true'",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'H=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/anti_rationalization.sh\"; [ -x \"$H\" ] && \"$H\" || true'",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'H=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/no_fix_without_live_verify.sh\"; [ -x \"$H\" ] && \"$H\" || true'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'H=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/untracked_source_guard.sh\"; [ -x \"$H\" ] && \"$H\" || true'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "claude-hud@claude-hud": true,
+    "claude-mem@thedotmack": false,
+    "oh-my-claudecode@omc": true
+  },
+  "env": {
+    "DISABLE_OMC": "1"
+  }
+}

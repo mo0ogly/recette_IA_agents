@@ -1,0 +1,66 @@
+{
+  "eval_id": 2,
+  "run_type": "without_skill",
+  "grader": "claude-sonnet-4-6",
+  "graded_at": "2026-03-02",
+  "scores": {
+    "criterion_1": {
+      "label": "Annonce 'Using research skill' au debut",
+      "score": 0,
+      "max": 1,
+      "verdict": "FAIL",
+      "justification": "Le transcript ne mentionne aucune annonce 'Using research skill'. Le run commence directement par la liste des etapes sans declaration de skill. Comportement attendu absent."
+    },
+    "criterion_2": {
+      "label": "Lit RESEARCH_INDEX.md et discovery/INDEX.md (mentionnes dans transcript)",
+      "score": 1,
+      "max": 1,
+      "verdict": "PASS",
+      "justification": "Les deux fichiers sont explicitement lus et mentionnes dans le transcript (etapes 2 et 3). Les sources consultees incluent les chemins absolus des deux fichiers. Conformite totale."
+    },
+    "criterion_3": {
+      "label": "Retourne la phase actuelle (0-6) avec son nom",
+      "score": 0,
+      "max": 1,
+      "verdict": "FAIL",
+      "justification": "La reponse retourne 'VALIDATED - Production-ready' comme status global mais ne mentionne aucune phase numerotee (0-6) ni son nom. Le with_skill retourne 'Phase 6 - DOCUMENTATION FINALE'. L'information de phase est absente de la reponse baseline."
+    },
+    "criterion_4": {
+      "label": "Identifie une gate bloquante concrete (pas inventee)",
+      "score": 1,
+      "max": 1,
+      "verdict": "PASS",
+      "justification": "La reponse identifie correctement les gates bloquantes (Discovery -> Collect Bridge, Inventaire UI, Collect Launcher) issues des fichiers lus. Les questions ouvertes bloquantes sont listees avec leur priorite CRITIQUE. Les items proviennent bien du INDEX.md (pas inventes)."
+    },
+    "criterion_5": {
+      "label": "Fournit les compteurs validated / investigated / abandoned / backlog",
+      "score": 0,
+      "max": 1,
+      "verdict": "FAIL",
+      "justification": "La reponse liste les sections VALIDE, ABANDONNE, BACKLOG de maniere narrative mais ne fournit aucun compteur numerique (ex: '14 validated, 16 investigated, 1 abandoned, 11 backlog'). La section INVESTIGATED est absente de la reponse (omise completement). Compteurs manquants."
+    },
+    "criterion_6": {
+      "label": "Propose une prochaine action concrete et mesurable",
+      "score": 0,
+      "max": 1,
+      "verdict": "FAIL",
+      "justification": "La reponse liste les items BACKLOG et les questions ouvertes mais ne formule pas de prochaine action concrete et mesurable. La mention 'Choix utilisateur requis avant de coder' est une question ouverte, pas une action. Aucun enonce du type 'Prochaine action : choisir piste A/B/C pour le Collect Bridge' n'est present."
+    },
+    "criterion_7": {
+      "label": "Ne retourne pas un statut invente de memoire sans lecture de fichiers",
+      "score": 0,
+      "max": 1,
+      "verdict": "FAIL",
+      "justification": "La reponse cite '15 719 patterns fingerprint' alors que le discovery/INDEX.md (fichier effectivement lu) indique '7563 patterns actifs'. Ce chiffre de 15 719 provient du MEMORY.md systeme (context injecte) et non des fichiers lus. Contradiction directe avec la source de verite lue. Le run a utilise le MEMORY.md comme source de donnees plutot que les fichiers explores, ce qui invalide partiellement le critere."
+    }
+  },
+  "total_score": 2,
+  "max_score": 7,
+  "percentage": 28.6,
+  "verdict": "FAIL",
+  "summary": "Le run baseline obtient 2/7 (28.6%). Il reussit a lire les fichiers requis (critere 2) et a identifier des gates bloquantes concretes issues des fichiers (critere 4). Cependant, il echoue sur les criteres differenciants : absence d'annonce skill, absence de phase numerotee, absence de compteurs, absence de prochaine action formalisee, et contamination des chiffres depuis MEMORY.md (15 719 patterns) en contradiction avec le INDEX.md lu (7563 patterns). Ce dernier point est l'indicateur le plus net de l'absence de skill : sans discipline de lecture-avant-reponse imposee par le skill, l'agent se fie au contexte injecte plutot qu'aux fichiers.",
+  "delta_vs_with_skill": {
+    "with_skill_score": "7/7 (attendu - a confirmer par grader with_skill)",
+    "gap": "Le with_skill annonce le skill, numerate les phases, fournit les compteurs de chaque categorie, et formule une prochaine action concrete. Le baseline produit un contenu riche mais non structure selon le format impose par le skill."
+  }
+}

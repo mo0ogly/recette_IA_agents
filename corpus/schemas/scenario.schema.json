@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspect_ia_agents.local/schemas/scenario.schema.json",
+  "title": "inspect_ia_agents recette -- test agent scenario",
+  "description": "The deterministic sequence of actions a test agent actually performs. The gap between this (real behavior) and the manifest capability_scope (declared) is what makes an agent correct or incorrect. credential_principal is the identity the agent authenticates as -- set it different from manifest.declared_identity.principal to build an identity_mismatch case.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "credential_principal", "actions"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Must match the agent_id in the sibling manifest.json.",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "credential_principal": {
+      "type": "string",
+      "description": "Identity the agent actually authenticates as. Equal to the declared principal for honest agents; different for identity_mismatch cases."
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "resource"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read_repo", "list_repos", "open_issue", "comment_issue", "open_pr", "merge_pr", "push", "manage_webhook", "manage_release", "read_ci", "trigger_ci"]
+          },
+          "resource": { "type": "string", "minLength": 1, "description": "Repo path the action targets, e.g. 'acme/widgets'." },
+          "approved": { "type": "boolean", "default": false, "description": "Whether an approval was obtained before this action (relevant for escalate actions, I6)." },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "expectations": [
+    {
+      "text": "postgresql_first: L'agent a commence par une requete PostgreSQL AVANT toute WebSearch",
+      "passed": false,
+      "evidence": "metrics.json confirme explicitement 'postgresql_queried_first: false'. L'agent a commence par Glob (Etape 1) puis Bash find (Etape 2) puis Read (Etapes 3-5) avant de tenter PostgreSQL en Etape 6. De plus, la tentative a echoue ('PostgreSQL non accessible depuis ce contexte d execution'). L'ordre des appels dans tool_call_breakdown montre: Glob_1, Bash_1, Glob_2, Read_1, Glob_3, Bash_2, Read_2, Read_3, Bash_3 (psql), Bash_4 (psql)."
+    },
+    {
+      "text": "script_level1_gate: L'agent a cherche un script de collecte existant (Niveau 1 - scripts/collect/)",
+      "passed": false,
+      "evidence": "Le transcript ne mentionne aucune recherche dans scripts/collect/. L'Etape 1 fait un Glob sur lia_rules/rule_analysis/**/*.yml (regles, pas scripts). Aucun des appels Glob ou Bash dans tool_call_breakdown ne cible scripts/collect/. La regle produite reference 'scripts/collect/wingftp/Collect-WingFTPServer.ps1' mais ce chemin est copie de la regle WFTP existante, il n'y a pas eu de verification de son existence."
+    },
+    {
+      "text": "rules_level2_gate: L'agent a cherche des regles existantes pour le meme type (Niveau 2 - lia_rules/)",
+      "passed": true,
+      "evidence": "Etape 1: 'Glob sur lia_rules/rule_analysis/**/*.yml'. Etape 2: 'Bash find sur le projet entier pour *47812* et *WingFTP*' -> 'Regle existante trouvee dans WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812/'. Etape 3: 'Read sur A-S-WFTP-WingFTP-CVE-2025-47812.yml'. L'agent a aussi lu A-VULN-EXCH et A-VULN-CTRX comme references de format VULN. La recherche de regles existantes est confirmee avant de creer la nouvelle regle."
+    },
+    {
+      "text": "sigma_extended_match: Le YAML genere contient une section 'match:' (format Sigma Extended)",
+      "passed": true,
+      "evidence": "rule_draft.yml lignes 91-93: 'object_detection:\\n  match:\\n    ObjectClass:\\n      eq: WingFTPServer'. La section match: est presente et correctement structuree sous object_detection. metrics.json confirme 'sigma_extended_format: true'."
+    },
+    {
+      "text": "no_motor_fix_010: L'agent n'utilise PAS is_vulnerable/is_compliant/is_affected dans where rules",
+      "passed": true,
+      "evidence": "rule_draft.yml lignes 95-101: la clause where utilise uniquement 'ObjectClass: eq: WingFTPServer' et 'version_lt(VersionNormalized, \"7.4.4.0\"): eq: true'. Aucune occurrence de is_vulnerable, is_compliant ou is_affected dans tout le fichier. metrics.json confirme 'motor_fix_010_respected: true'. Le transcript Etape 7 mentionne explicitement 'version_lt(VersionNormalized, \"7.4.4.0\") pour logique auditable (MOTOR_FIX_010)'."
+    },
+    {
+      "text": "test_data_14_cases: L'agent produit ou planifie test_data.json avec >= 14 cas (au moins 8 vulnerables + 6 safe)",
+      "passed": false,
+      "evidence": "Aucun fichier test_data.json n'a ete produit dans les outputs. Le transcript ne mentionne pas de planification de test_data.json. Les Etapes 1-8 ne couvrent pas la creation de donnees de test. Le metrics.json liste Write_1 (transcript), Write_2 (rule_draft.yml), Write_3 (metrics.json) - pas de Write pour test_data.json."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.5
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 3,
+      "Glob": 3,
+      "Bash": 4,
+      "WebSearch": 0,
+      "Write": 3
+    },
+    "total_tool_calls": 13
+  },
+  "eval_feedback": {
+    "strengths": [
+      "MOTOR_FIX_010 respecte: detection logic exclusivement dans le where YAML via version_lt(), zero pre-computed CVE flag dans le script de collecte. Le transcript mentionne explicitement la conformite MOTOR_FIX_010.",
+      "Format Sigma Extended correct: section match: presente sous object_detection, structure conforme aux 5 computed fields obligatoires (Severity, RiskReason, RemediationPriority, RecommendedAction, DetectionLogic, ComplianceImpact).",
+      "Recherche de regles existantes effectuee: find sur *47812* et *WingFTP* a trouve la regle WFTP/SECU existante qui a servi de source de donnees CVE primaire. La regle produite s'appuie sur des donnees reelles issues de cette recherche.",
+      "Zero WebSearch: aucun appel WebSearch effectue, l'agent a exploite les ressources locales (regles existantes, CLAUDE.md). Donnees CVE reelles (CVSS 10.0, CISA KEV, Exploit-DB 52347) recuperees de la regle de production existante.",
+      "Qualite technique de la regle produite: references NVD/CISA/Huntress/ExploitDB reelles, MITRE ATT&CK avec 3 techniques (T1190/T1059/T1548), compliance_mapping complet NIST/ISO/PCI/ANSSI, description d'attaque detaillee et accurate."
+    ],
+    "weaknesses": [
+      "PostgreSQL non consulte en premier (critere discriminant fondamental): l'agent a tente PostgreSQL en Etape 6 apres Glob x3, Bash x2, Read x3. L'ordre est a l'inverse de la regles 'PostgreSQL FIRST'. La tentative a echoue mais meme si elle avait reussi, l'ordre aurait ete incorrect.",
+      "Gate Niveau 1 absente: aucune recherche dans scripts/collect/ pour verifier si un script de collecte existe deja pour Wing FTP Server. Le chemin 'scripts/collect/wingftp/Collect-WingFTPServer.ps1' dans le YAML est copie de la regle existante sans verification.",
+      "test_data.json absent: aucun fichier test_data.json produit ni planifie. Le workflow CVE correct exige >= 14 cas (8 vulnerables + 6 safe). C'est un livrable obligatoire pour valider que la regle fonctionne sur le moteur LIA-Scan.",
+      "Guides non consultes directement: le transcript note 'Pas de consultation de PROMPT_CREATION_REGLES.md' et '4_SIGMA_AUTHORING_GUIDE.md NOT read directly'. L'agent s'est appuye sur les connaissances du CLAUDE.md injecte automatiquement, ce qui est insuffisant pour un workflow complet.",
+      "Nombre d'appels outils tres faible (13 total): le workflow complet create-lia-rule necessiterait PostgreSQL + script gate + rules gate + guide lecture + YAML generation + test_data (50+ appels typiques avec skill). Les 13 appels signalent un workflow tronque."
+    ],
+    "overall": "L'agent WITHOUT_SKILL reussit 3/6 criteres (50%). Il produit une regle YAML de bonne qualite technique mais manque les 3 criteres de workflow: PostgreSQL n'est pas consulte en premier (Etape 6 au lieu d'Etape 1), la gate Niveau 1 scripts/collect/ est ignoree, et test_data.json est absent. Ce pattern correspond exactement au 'discriminating_criteria' prevu dans eval_metadata.json: l'agent improvise depuis les connaissances CLAUDE.md et la regle existante plutot que de suivre le workflow structure impose par le skill. La regle produite est utilisable comme brouillon mais ne serait pas validee par les 128+ checks de recette faute de test_data.json et potentiellement faute de script de collecte verifie."
+  }
+}

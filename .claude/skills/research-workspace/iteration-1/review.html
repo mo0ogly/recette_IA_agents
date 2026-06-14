@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Skill-Forge Review - research v2.3 - Iteration 1</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }
+.header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 1px solid #334155; padding: 24px 40px; }
+.header h1 { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; }
+.header .meta { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+.container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+.scorecard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.score-box { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; text-align: center; }
+.score-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px; }
+.score-box .value { font-size: 2rem; font-weight: 700; }
+.score-box .value.green { color: #22c55e; }
+.score-box .value.blue { color: #3b82f6; }
+.score-box .value.orange { color: #f59e0b; }
+.score-box .value.red { color: #ef4444; }
+.verdict-banner { background: #166534; border: 1px solid #22c55e; border-radius: 8px; padding: 16px 24px; margin-bottom: 32px; display: flex; align-items: center; gap: 12px; }
+.verdict-banner .icon { font-size: 1.2rem; }
+.verdict-banner strong { color: #22c55e; }
+.section { margin-bottom: 32px; }
+.section h2 { font-size: 1rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+.eval-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+.eval-header { padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+.eval-header .name { font-weight: 600; font-size: 0.95rem; }
+.eval-header .delta { font-size: 0.85rem; background: #14532d; color: #4ade80; padding: 2px 10px; border-radius: 12px; }
+.eval-body { padding: 16px 20px; }
+.scores-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+.score-item { background: #0f172a; border-radius: 6px; padding: 12px 16px; }
+.score-item .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.score-item .bar-container { background: #1e293b; border-radius: 4px; height: 6px; margin: 8px 0; overflow: hidden; }
+.score-item .bar { height: 6px; border-radius: 4px; transition: width 0.3s; }
+.score-item .bar.with { background: #22c55e; }
+.score-item .bar.without { background: #ef4444; }
+.score-item .score-text { font-size: 1.1rem; font-weight: 700; }
+.score-item .score-text.green { color: #22c55e; }
+.score-item .score-text.red { color: #ef4444; }
+.failures { margin-top: 12px; }
+.failures h4 { font-size: 0.75rem; text-transform: uppercase; color: #ef4444; margin-bottom: 8px; letter-spacing: 0.05em; }
+.failure-item { background: #1c1917; border-left: 3px solid #ef4444; padding: 8px 12px; margin-bottom: 6px; border-radius: 0 4px 4px 0; font-size: 0.85rem; color: #fca5a5; }
+.notable { background: #1c1c17; border-left: 3px solid #f59e0b; padding: 8px 12px; margin-top: 8px; border-radius: 0 4px 4px 0; font-size: 0.8rem; color: #fde68a; }
+.notable span { font-weight: 600; color: #f59e0b; }
+.improvements { list-style: none; }
+.improvements li { padding: 10px 16px; margin-bottom: 8px; border-radius: 6px; font-size: 0.875rem; display: flex; align-items: flex-start; gap: 10px; }
+.improvements li.p0 { background: #1c0505; border-left: 4px solid #ef4444; color: #fca5a5; }
+.improvements li.p1 { background: #1c1005; border-left: 4px solid #f59e0b; color: #fde68a; }
+.improvements li.p2 { background: #051c15; border-left: 4px solid #22c55e; color: #86efac; }
+.improvements li .badge { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
+.improvements li.p0 .badge { background: #ef4444; color: white; }
+.improvements li.p1 .badge { background: #f59e0b; color: white; }
+.improvements li.p2 .badge { background: #22c55e; color: white; }
+.findings { list-style: none; }
+.findings li { padding: 10px 16px; margin-bottom: 6px; background: #1e293b; border-left: 3px solid #3b82f6; border-radius: 0 6px 6px 0; font-size: 0.85rem; color: #93c5fd; }
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.chart-box { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; }
+.chart-box h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 16px; }
+.bar-chart { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { display: flex; align-items: center; gap: 10px; }
+.bar-row .label { font-size: 0.75rem; color: #94a3b8; width: 70px; flex-shrink: 0; text-align: right; }
+.bar-row .bar-wrap { flex: 1; background: #0f172a; border-radius: 4px; height: 20px; overflow: hidden; position: relative; }
+.bar-row .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 6px; font-size: 0.7rem; font-weight: 600; }
+.bar-row .bar-fill.ws { background: linear-gradient(90deg, #16a34a, #22c55e); color: white; }
+.bar-row .bar-fill.bs { background: linear-gradient(90deg, #991b1b, #ef4444); color: white; }
+.footer { text-align: center; padding: 24px; color: #334155; font-size: 0.75rem; border-top: 1px solid #1e293b; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Skill-Forge Review - research v2.3</h1>
+  <div class="meta">Iteration 1 &bull; 2026-03-02 &bull; 3 evals &bull; claude-sonnet-4-6</div>
+</div>
+<div class="container">
+
+  <!-- Scorecard -->
+  <div class="scorecard">
+    <div class="score-box">
+      <div class="label">with_skill avg</div>
+      <div class="value green">73.8%</div>
+    </div>
+    <div class="score-box">
+      <div class="label">baseline avg</div>
+      <div class="value red">24.6%</div>
+    </div>
+    <div class="score-box">
+      <div class="label">delta moyen</div>
+      <div class="value blue">+49.2%</div>
+    </div>
+    <div class="score-box">
+      <div class="label">overhead temps</div>
+      <div class="value orange">+20%</div>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict-banner">
+    <div class="icon">&#10003;</div>
+    <div><strong>IMPROVEMENT_CONFIRMED</strong> &mdash; Le skill apporte un gain mesurable (+49.2pp) sur les 3 scenarios cles. Eval-3 parfait (7/7). Iteration 2 ciblera les 2 failures recurrentes.</div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Pass Rate par eval</h3>
+      <div class="bar-chart">
+        <div style="font-size:0.7rem;color:#64748b;margin-bottom:4px;">with_skill (vert) vs baseline (rouge)</div>
+
+        <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:2px;">Eval 1 - close-session</div>
+        <div class="bar-row">
+          <div class="label">with</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:50%">50%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="label">baseline</div>
+          <div class="bar-wrap"><div class="bar-fill bs" style="width:16.7%">17%</div></div>
+        </div>
+
+        <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:2px;margin-top:8px;">Eval 2 - research-status</div>
+        <div class="bar-row">
+          <div class="label">with</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:71.4%">71%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="label">baseline</div>
+          <div class="bar-wrap"><div class="bar-fill bs" style="width:28.6%">29%</div></div>
+        </div>
+
+        <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:2px;margin-top:8px;">Eval 3 - compression-recovery</div>
+        <div class="bar-row">
+          <div class="label">with</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:100%">100%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="label">baseline</div>
+          <div class="bar-wrap"><div class="bar-fill bs" style="width:28.6%">29%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <h3>Delta par eval (with_skill - baseline)</h3>
+      <div class="bar-chart" style="margin-top:24px;">
+        <div class="bar-row">
+          <div class="label">Eval 1</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:33.3%">+33.3pp</div></div>
+        </div>
+        <div class="bar-row" style="margin-top:32px;">
+          <div class="label">Eval 2</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:42.8%">+42.8pp</div></div>
+        </div>
+        <div class="bar-row" style="margin-top:32px;">
+          <div class="label">Eval 3</div>
+          <div class="bar-wrap"><div class="bar-fill ws" style="width:71.4%">+71.4pp</div></div>
+        </div>
+        <div style="margin-top:16px;font-size:0.75rem;color:#64748b;">Moyenne : +49.2pp &bull; Max : +71.4pp (context-recovery)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evals detail -->
+  <div class="section">
+    <h2>Detail des evaluations</h2>
+
+    <!-- Eval 1 -->
+    <div class="eval-card">
+      <div class="eval-header">
+        <div>
+          <div class="name">Eval 1 - close-session-after-work</div>
+          <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">Prompt : "j'ai fini le banner-server COUCHE 5 - 30 banners detectes... je veux clore la session research discovery"</div>
+        </div>
+        <div class="delta">+33.3pp</div>
+      </div>
+      <div class="eval-body">
+        <div class="scores-row">
+          <div class="score-item">
+            <div class="label">With skill</div>
+            <div class="bar-container"><div class="bar with" style="width:50%"></div></div>
+            <div class="score-text green">3/6 &mdash; 50%</div>
+          </div>
+          <div class="score-item">
+            <div class="label">Baseline (sans skill)</div>
+            <div class="bar-container"><div class="bar without" style="width:16.7%"></div></div>
+            <div class="score-text red">1/6 &mdash; 17%</div>
+          </div>
+        </div>
+        <div class="failures">
+          <h4>Failures with_skill (3 corrections iteration 2)</h4>
+          <div class="failure-item">Annonce 'Using research skill' absente &mdash; doit etre ligne 1 absolue du body</div>
+          <div class="failure-item">Aucun fichier validated/ cree &mdash; outputs/ reste flat sans sous-repertoire</div>
+          <div class="failure-item">Tag [COMMIT] absent du RESEARCH_LOG &mdash; commit hash en texte libre seulement</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eval 2 -->
+    <div class="eval-card">
+      <div class="eval-header">
+        <div>
+          <div class="name">Eval 2 - research-status</div>
+          <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">Prompt : "ou en est la recherche sur le module discovery ? donne moi l'etat complet"</div>
+        </div>
+        <div class="delta">+42.8pp</div>
+      </div>
+      <div class="eval-body">
+        <div class="scores-row">
+          <div class="score-item">
+            <div class="label">With skill</div>
+            <div class="bar-container"><div class="bar with" style="width:71.4%"></div></div>
+            <div class="score-text green">5/7 &mdash; 71%</div>
+          </div>
+          <div class="score-item">
+            <div class="label">Baseline (sans skill)</div>
+            <div class="bar-container"><div class="bar without" style="width:28.6%"></div></div>
+            <div class="score-text red">2/7 &mdash; 29%</div>
+          </div>
+        </div>
+        <div class="failures">
+          <h4>Failures with_skill (2 corrections iteration 2)</h4>
+          <div class="failure-item">Annonce 'Using research skill' absente (same failure qu'eval-1)</div>
+          <div class="failure-item">Compteurs numeriques manquants : listes detaillees ok, mais pas de "validated: 14 | investigated: 6 | abandoned: 1 | backlog: 10"</div>
+        </div>
+        <div class="notable"><span>Baseline critique :</span> Cite 15 719 patterns fingerprint (source MEMORY.md injecte) au lieu de 7 563 (INDEX.md effectivement lu). Le skill previent ce biais en forcant la lecture des fichiers avant de repondre.</div>
+      </div>
+    </div>
+
+    <!-- Eval 3 -->
+    <div class="eval-card">
+      <div class="eval-header">
+        <div>
+          <div class="name">Eval 3 - context-compression-recovery</div>
+          <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">Prompt : "on reprend le travail sur discovery. tu te souviens ou on en etait ?"</div>
+        </div>
+        <div class="delta">+71.4pp</div>
+      </div>
+      <div class="eval-body">
+        <div class="scores-row">
+          <div class="score-item">
+            <div class="label">With skill</div>
+            <div class="bar-container"><div class="bar with" style="width:100%"></div></div>
+            <div class="score-text green">7/7 &mdash; 100%</div>
+          </div>
+          <div class="score-item">
+            <div class="label">Baseline (sans skill)</div>
+            <div class="bar-container"><div class="bar without" style="width:28.6%"></div></div>
+            <div class="score-text red">2/7 &mdash; 29%</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:#0d2818;border:1px solid #16a34a;border-radius:6px;font-size:0.85rem;color:#86efac;">
+          PARFAIT 7/7 &mdash; 9 etapes executees, 9 fichiers lus, 7 decisions [DECISION] identifiees, annonce canonique "Contexte compresse. Phase: 5. Gate: tests CMDB. Decisions: [1]...[7]" presente. Aucun code propose avant completion.
+        </div>
+        <div class="notable" style="margin-top:10px;"><span>Baseline critique :</span> Propose immediatement du code (RegisterCMDBRoutes, UUID fix, ADDS taxonomy) sans annonce de procedure ni demande de confirmation. Violation directe de la regle 7 du skill.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key findings -->
+  <div class="section">
+    <h2>Observations cles</h2>
+    <ul class="findings">
+      <li>Annonce "Using research skill" echoue dans 2/3 evals with_skill (eval-1 et eval-2) &mdash; le skill la positionne apres la philosophie, l'agent la saute. Doit etre ligne 1 absolue du body SKILL.md.</li>
+      <li>Eval-3 parfait 7/7 : la procedure post-compression 9 etapes est la partie la plus solide et la plus differenciante du skill (+71.4pp).</li>
+      <li>Contamination MEMORY.md (eval-2 baseline) : sans skill, l'agent prefere ses souvenirs aux fichiers. Le skill impose la lecture avant la reponse.</li>
+      <li>Proposition de code prematuree (eval-3 baseline) : sans skill, l'agent code directement sans validation. Le skill bloque explicitement ce comportement.</li>
+    </ul>
+  </div>
+
+  <!-- Improvements plan for iteration 2 -->
+  <div class="section">
+    <h2>Plan iteration 2 (3 corrections prioritaires)</h2>
+    <ul class="improvements">
+      <li class="p0">
+        <span class="badge">P0</span>
+        <div><strong>Deplacement de l'annonce.</strong> "Using research skill. Reading state files..." doit etre la PREMIERE LIGNE du body SKILL.md &mdash; avant la philosophie, avant les definitions, avant tout. Actuellement positionnee apres une section introductive qui dilue l'instruction. Correction : 1 deplacement de ligne dans SKILL.md.</div>
+      </li>
+      <li class="p1">
+        <span class="badge">P1</span>
+        <div><strong>Instruction validated/ dans /research close.</strong> Ajouter explicitement : "Creer outputs/validated/YYYY-MM-DD_{nom}.md avec commit hash [COMMIT] {hash} en premiere ligne". Le skill decrit la cloture mais pas le fichier validated/ specifiquement. Correction : 2 lignes dans la section /research close.</div>
+      </li>
+      <li class="p2">
+        <span class="badge">P2</span>
+        <div><strong>Exemple [COMMIT] tag dans les templates.</strong> Ajouter exemple concret "[COMMIT] 3b82e8bfe5" dans le template RESEARCH_LOG de la section /research close. Actuellement [VALIDATED] est montre, [COMMIT] ne l'est pas. Correction : 1 ligne dans templates.md ou SKILL.md.</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Timing note -->
+  <div class="section">
+    <h2>Performance (timing)</h2>
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:16px 20px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;font-size:0.85rem;">
+        <div><span style="color:#64748b;">With skill avg :</span> <strong>168s</strong></div>
+        <div><span style="color:#64748b;">Baseline avg :</span> <strong>140s</strong></div>
+        <div><span style="color:#64748b;">Overhead :</span> <strong style="color:#f59e0b;">+20%</strong> &mdash; acceptable pour +49pp de qualite</div>
+      </div>
+      <div style="margin-top:12px;font-size:0.8rem;color:#64748b;">
+        Note : eval-3 baseline (190s) plus lent que with_skill (156s) car l'agent sans skill lit plus de fichiers de maniere desordonnee avant de reconstruct le contexte.
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="footer">
+  Skill-Forge Evaluation Report &bull; research v2.3 &bull; Iteration 1/N &bull; 2026-03-02
+</div>
+</body>
+</html>

@@ -1,0 +1,141 @@
+/* TabbedModal -- theme tokens only (rgba backdrop scrim excepted). */
+.tm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.tm-modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: min(680px, 92vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.tm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.1rem 0;
+}
+.tm-close {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0.1rem 0.5rem;
+}
+.tm-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1.1rem 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.tm-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+}
+.tm-tab-active {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  font-weight: 600;
+}
+.tm-panel {
+  padding: 1rem 1.1rem;
+  overflow: auto;
+}
+
+/* Key-value + list helpers shared by the explain modals. */
+.tm-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 0.9rem;
+  margin: 0;
+}
+.tm-kv dt {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.tm-kv dd {
+  margin: 0;
+  word-break: break-word;
+}
+.tm-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.tm-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+/* Explanatory note (e.g. why an empty scope is legitimate, not an error). */
+.tm-note {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.tm-pill {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0 0.35rem;
+  font-size: 0.78rem;
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+.tm-pill-ok {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+.tm-pill-bad {
+  background: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+/* Recette-campaign action rows (RecetteCampaignExplainModal). */
+.rc-action {
+  margin-bottom: 0.5rem;
+}
+.rc-action-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+.rc-action-target {
+  font-family: var(--mono, monospace);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.rc-action-rationale {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.tm-pre {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.82rem;
+  overflow: auto;
+  margin: 0;
+}

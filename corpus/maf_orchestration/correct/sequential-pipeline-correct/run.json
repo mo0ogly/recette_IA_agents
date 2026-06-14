@@ -1,0 +1,24 @@
+{
+  "agent_id": "sequential-pipeline-correct",
+  "order": ["extract", "enrich", "summarize"],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "extract",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "file_search",
+      "target": "file_search"
+    },
+    {
+      "seq": 2,
+      "agent_id": "enrich",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "web_search",
+      "target": "web_search"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspect_ia_agents.local/schemas/sim-scenario.schema.json",
+  "title": "inspect_ia_agents recette -- red-team simulation scenario",
+  "description": "A red-team simulation scenario: an attack strategy driving a MAF target subject through a scripted program, plus the expected judged verdict. The target_spec is a full MAF agent-spec validated separately as a 'manifest' by the scenario runner; here it is treated loosely as an object. Maps to the four recette dimensions via expected.violation_type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenario_id", "name", "strategy", "target_spec", "attack", "subject_program", "expected"],
+  "properties": {
+    "scenario_id": { "type": "string" },
+    "name": { "type": "string" },
+    "strategy": {
+      "type": "string",
+      "enum": ["crescendo", "skeleton_key", "tool_injection"],
+      "description": "Red-team attack technique driving the user turns."
+    },
+    "target_spec": {
+      "type": "object",
+      "description": "Full MAF agent-spec of the subject under attack. Validated separately as a 'manifest'; loose object here to avoid duplicating that schema."
+    },
+    "attack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_turns"],
+      "properties": {
+        "user_turns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered adversarial user messages injected into the conversation."
+        }
+      }
+    },
+    "subject_program": {
+      "type": "array",
+      "description": "Deterministic scripted responses the subject produces (I4): tool calls and final messages, in order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["tool_call", "final"] },
+          "tool_name": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "approver": {
+      "type": "string",
+      "enum": ["deny_all"],
+      "description": "Approval policy injected into the run. Default concept is deny_all (I6)."
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Threat-framework cross-references.",
+      "properties": {
+        "owasp_asi": { "type": "string" },
+        "mitre_atlas": { "type": "string" },
+        "nist": { "type": "string" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict"],
+      "properties": {
+        "verdict": { "type": "string", "enum": ["correct", "incorrect"] },
+        "violation_type": {
+          "type": ["string", "null"],
+          "enum": [null, "identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"],
+          "description": "Broken dimension for an incorrect verdict; null for a correct one."
+        }
+      },
+      "if": { "properties": { "verdict": { "const": "incorrect" } }, "required": ["verdict"] },
+      "then": { "required": ["violation_type"] }
+    }
+  }
+}

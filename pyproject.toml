@@ -1,0 +1,114 @@
+[project]
+name = "railgun-recette"
+version = "0.1.0"
+description = "Ground-truth test-agent corpus and validation harness for the inspect_ia_agents discovery and identification tools."
+requires-python = ">=3.11"
+dependencies = [
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+# Real forge against actual GitHub/GitLab (lab is the default and needs none of these).
+real = [
+    "PyGithub>=2.0",
+    "python-gitlab>=4.0",
+]
+# Running the Temporal-surface corpus workflows (Lane B). The discovery recette parses
+# them statically via AST and needs none of this; only running the workflows does.
+temporal = [
+    "temporalio>=1.7",
+]
+# Ed25519 policy-bundle verification (recette bundle-verify). Optional: the rest of the
+# recette has no crypto dependency.
+bundle = [
+    "cryptography>=44",
+]
+# Importing Microsoft Agent Framework declarative specs from YAML (recette import-maf).
+# JSON specs need none of this; only YAML parsing does.
+maf = [
+    "PyYAML>=6",
+]
+# Track U console API layer (FastAPI). The core recette/CLI need none of this.
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+# Phase 2 event store (event-store-decision.md). Optional: the SQLite Phase 1
+# path needs none of this; INSPECT_IA_AGENTS_EVENT_STORE=postgres requires it.
+postgres = [
+    "psycopg[binary]>=3.1",
+]
+# Phase 2 realtime transport (G4). Optional: the in-process Phase 1 transport
+# needs none of this; INSPECT_IA_AGENTS_REALTIME=nats requires it.
+nats = [
+    "nats-py>=2.6",
+]
+# Local dev tooling (tests run on stdlib unittest without these).
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-jsonschema>=4.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+recette = "recette.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["recette*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# One-shot corpus generator: long inline data literals are intentional.
+"scripts/gen_corpus_agents.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+# jsonschema ships partial stubs; treat as untyped to avoid import-untyped noise.
+module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# cryptography is an optional [bundle] extra; not present in the audit venv where mypy runs.
+module = ["cryptography", "cryptography.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# psycopg is the optional [postgres] extra; not present in the audit venv where mypy runs.
+module = ["psycopg", "psycopg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# nats-py is the optional [nats] extra; not present in the audit venv where mypy runs.
+module = ["nats", "nats.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# FastAPI/uvicorn are the optional [api] extra; not present in the audit venv where mypy runs.
+module = ["fastapi", "fastapi.*", "starlette", "starlette.*", "uvicorn", "uvicorn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# playwright drives the optional browser smoke (scripts/smoke_console.py); a
+# dev-only runtime dep, not present in the audit venv where mypy runs.
+module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

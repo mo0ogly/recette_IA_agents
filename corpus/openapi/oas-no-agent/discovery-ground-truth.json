@@ -1,0 +1,10 @@
+{
+  "agent_repo": "oas-no-agent",
+  "target_system": "openapi",
+  "detected": false,
+  "agent_count": 0,
+  "action_patterns": [],
+  "risk_rank": 0,
+  "policy_generated": false,
+  "notes": "Plain orders CRUD API; no operation maps to a canonical agent action. True negative: the scanner must not flag it (false-positive guard)."
+}

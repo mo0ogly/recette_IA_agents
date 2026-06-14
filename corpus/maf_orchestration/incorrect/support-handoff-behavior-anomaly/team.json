@@ -1,0 +1,29 @@
+{
+  "kind": "maf_orchestration",
+  "agent_id": "support-handoff-behavior-anomaly",
+  "name": "Customer Support Handoff (loop)",
+  "description": "Same mesh as the correct team, but the run ping-pongs between two agents past the termination bound.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "HandoffBuilder" },
+  "start_agent": "triage",
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "triage",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "refund", "description": "refund requests" },
+        { "target": "order", "description": "delivery and order issues" }
+      ]
+    },
+    {
+      "agent_id": "refund",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage" }]
+    },
+    {
+      "agent_id": "order",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage" }]
+    }
+  ]
+}

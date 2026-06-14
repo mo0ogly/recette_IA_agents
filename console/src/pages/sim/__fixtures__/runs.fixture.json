@@ -1,0 +1,17 @@
+{
+  "count": 2,
+  "runs": [
+    {
+      "agent_id": "sim-diagnostic-clean",
+      "name": "Diagnostic Agent (clean)",
+      "verdict": "correct",
+      "stopped_reason": "completed"
+    },
+    {
+      "agent_id": "sim-diagnostic-redteam",
+      "name": "Diagnostic Agent (red-team)",
+      "verdict": "incorrect",
+      "stopped_reason": "check_failed"
+    }
+  ]
+}

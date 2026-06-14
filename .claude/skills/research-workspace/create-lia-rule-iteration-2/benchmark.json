@@ -1,0 +1,87 @@
+{
+  "metadata": {
+    "skill_name": "create-lia-rule",
+    "skill_version": "2.0",
+    "iteration": 2,
+    "date": "2026-03-03",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "claude-sonnet-4-6",
+    "evals_run": ["cve-postgresql-first", "safe-description-cveid-trap"],
+    "runs_per_configuration": 1,
+    "changes_since_iter1": [
+      "P0: Annonce 'Using create-lia-rule skill. Reading reference files...' ajoutee en ligne 1",
+      "P1: Frontmatter migre vers metadata section",
+      "P2: SKILL.md splitte 966L -> 354L core + references/ (motor-fix-010.md, yaml-format.md, test-data-guide.md, retex-guide.md)",
+      "P3: Section RATIONALISATIONS INVALIDES ajoutee",
+      "P4: eval-2 redesignee: motor-fix-010-trap -> safe-description-cveid-trap"
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "cve-postgresql-first",
+      "note": "Carried over from iteration 1 - eval non modifiee",
+      "with_skill": {
+        "passed": 6,
+        "total": 6,
+        "pass_rate": 1.0,
+        "total_tool_calls": 18
+      },
+      "without_skill": {
+        "passed": 3,
+        "total": 6,
+        "pass_rate": 0.5,
+        "total_tool_calls": 13
+      },
+      "delta_pass_rate_pct": 50.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "postgresql_first: PostgreSQL tente APRES exploration YAML (ordre inverse)",
+        "script_level1_gate: scripts/collect/ ignore - collection_script copie de la regle existante sans verification",
+        "test_data_14_cases: Aucun test_data.json produit (livrable obligatoire absent)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "safe-description-cveid-trap",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 4
+      },
+      "without_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 3
+      },
+      "delta_pass_rate_pct": 0.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [],
+      "notable_finding": "EVAL NON DISCRIMINANTE - La detection de mots-cles CVE/CRITICAL/Vulnerable dans les descriptions SAFE est deductible par raisonnement general. Sans skill, l'agent identifie le probleme par inspection directe du JSON (3 tool calls vs 4). La connaissance du validateur de ratio est suffisamment generale pour etre deduite sans lecture du skill."
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 1.0,
+    "without_skill_avg_pass_rate": 0.75,
+    "delta": {
+      "pass_rate": "+25.0%",
+      "tool_calls": "+2.5"
+    },
+    "verdict": "IMPROVEMENT_CONFIRMED"
+  },
+  "key_findings": [
+    "Eval-1 toujours discriminante (+50pp): le skill impose PostgreSQL FIRST + gate scripts/collect/ + test_data >= 14 cas. Le baseline saute ces 3 etapes obligatoires.",
+    "Eval-2 toujours non discriminante (0pp) malgre redesign: safe-description-cveid-trap est resolu par raisonnement general sans skill (3 tool calls suffisent).",
+    "Le skill ajoute de la valeur principalement sur le workflow structure (gates, livrables obligatoires), pas sur les checks deductibles par inspection.",
+    "Annonce skill presente dans WITH_SKILL (correction P0 validee). Verification: to be confirmed dans iter 3.",
+    "Iteration 2 identique en delta (+25pp) a iteration 1 - redesign eval-2 n'a pas change l'efficacite globale du skill."
+  ],
+  "top_improvements_needed": [
+    "P4 CRITIQUE ITER3: Redesigner eval-2 avec comportement UNIQUE au skill non deductible sans lecture SKILL.md",
+    "Candidats discriminants identifies: RESEARCH_EVIDENCE.md (absent CLAUDE.md), RETEX 5 questions (absent CLAUDE.md), risk_score echelle 0-100 vs 0-10",
+    "Approche iter 3 eval-2: 'missing-deliverables-trap' - donner CVE + gate result + demander TOUS les livrables -> baseline skips RESEARCH_EVIDENCE.md + RETEX systematiquement",
+    "Objectif iter 3: atteindre delta +30pp minimum sur eval-2 (actuellement 0pp)"
+  ]
+}

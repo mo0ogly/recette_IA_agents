@@ -1,0 +1,6 @@
+{
+  "scenarios": [
+    "exfil-finance",
+    "invalid-command-ops"
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "expectations": [
+    {
+      "text": "Annonce 'Using research skill' au debut",
+      "passed": false,
+      "evidence": "Le transcript commence directement par 'Etape 1 : Lister les repertoires disponibles' sans aucune annonce 'Using research skill'. La response.md commence par 'Reprise Discovery - Etat au 2026-03-02' sans mention du skill. Aucune occurrence du texte 'Using research skill' ou equivalent dans le transcript ou la reponse."
+    },
+    {
+      "text": "Lit au moins 4 fichiers distincts (SKILL.md, INDEX.md, RESEARCH_LOG.md, tracking)",
+      "passed": true,
+      "evidence": "Le transcript documente la lecture de 7 fichiers distincts : INDEX.md (etape 2), RESEARCH_LOG.md (etape 2), DISCOVERY_ACTION_PLAN_2026-03-01.md (etape 3), DISCOVERY_AUDIT_2026-03-01.md (etape 3), BANNER_INTEGRATION_2026-03-02.md (etape 4), backlog/discovery-to-collect-bridge.md (etape 5), RESEARCH_INDEX.md (etape 7). Metrics.json confirme 8 appels Read. NOTE : SKILL.md n'a pas ete lu (sans skill = comportement attendu du run BASELINE), mais 4+ fichiers distincts ont bien ete lus incluant INDEX.md, RESEARCH_LOG.md, et 2 fichiers tracking."
+    },
+    {
+      "text": "Annonce la phase actuelle numerotee (ex: Phase 5 - Implementation)",
+      "passed": false,
+      "evidence": "La synthese (etape 8 du transcript) et la reponse finale n'annoncent jamais de phase numerotee. Le transcript liste des etats (DONE/EN ATTENTE/BACKLOG) mais sans numero de phase. La reponse.md identifie 'Ce qui est TERMINE', 'Ce qui est EN ATTENTE' mais aucun 'Phase N - Nom' n'apparait. Le format attendu 'Phase X' est absent."
+    },
+    {
+      "text": "Annonce la gate bloquante",
+      "passed": true,
+      "evidence": "La reponse.md identifie clairement les elements bloquants : '1. CMDB Routes non enregistrees (CRITICAL)' avec 'Tests 14 + 16 : HTTP 404 sur /api/discovery/cmdb/assets et /api/discovery/cmdb/stats'. Le transcript etape 3 mentionne 'Action 1 critique : RegisterCMDBRoutes manquante dans backend_8081.go. Tests 14 + 16 bloquants.' La gate bloquante est identifiee meme si pas etiquetee explicitement 'gate'."
+    },
+    {
+      "text": "Liste au moins une decision [DECISION] trouvee dans RESEARCH_LOG",
+      "passed": false,
+      "evidence": "Le RESEARCH_LOG.md contient 7 entrees [DECISION] verifiees (dont 'CRITIQUE : Le Fingerprinting Engine EST le scanner reseau', 'SUPPRESSION : 14 fichiers Go', 'Procedure post-compression renforcee', etc.). Le transcript indique avoir lu RESEARCH_LOG.md (etape 2) mais ni le transcript ni la reponse.md ne citent ou listent aucune entree [DECISION] explicitement. La synthese ne mentionne pas de decisions utilisateur."
+    },
+    {
+      "text": "Annonce 'Contexte compresse. Phase: X. Gate: Y. Decisions: ...' (format exact ou equivalent)",
+      "passed": false,
+      "evidence": "Aucune annonce de ce format dans le transcript ou la reponse. Le transcript se termine par une 'Synthese' qui liste des etats sans utiliser la formulation canonique. La reponse.md commence par 'Reprise Discovery - Etat au 2026-03-02' et ne contient jamais une ligne de type 'Contexte compresse. Phase: X. Gate: Y. Decisions: ...' ni aucun equivalent structure."
+    },
+    {
+      "text": "Ne propose pas de coder ou d'implementer avant d'avoir termine les 9 etapes",
+      "passed": false,
+      "evidence": "La reponse.md propose directement du code et des implementations specifiques avant toute validation : 'Fix CMDB routes dans backend_8081.go (10 min, Critical)', 'Fix UUID validation dans discovery_scan_handler.go (5 min, Critical)', 'Fix ADDS taxonomy dans discovery_taxonomy_liaprobe.go (20 min, High)', avec des fichiers cibles et des estimations de temps. Ces propositions apparaissent sans avoir annonce la procedure obligatoire des 9 etapes ni demande de confirmation utilisateur."
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 5,
+    "total": 7,
+    "pass_rate": 0.286
+  },
+  "execution_metrics": {
+    "total_tool_calls": 15,
+    "errors": 0
+  },
+  "timing": {
+    "executor_duration_seconds": null
+  },
+  "claims": [],
+  "eval_feedback": {
+    "suggestions": [
+      "Le run BASELINE sans skill echoue principalement sur les criteres de procedure formelle : pas d'annonce 'Using research skill', pas de phase numerotee, pas de decisions [DECISION] citees explicitement, pas de formule canonique 'Contexte compresse. Phase: X.'",
+      "Le contenu technique reconstitue est de bonne qualite (gate bloquante identifiee, 7 fichiers lus) mais la forme procedurale est absente.",
+      "La proposition de coder immediatement en fin de reponse est la violation la plus severe : elle va directement a l'encontre de la regle 7 (ne pas proposer de code avant les 9 etapes).",
+      "Ce run BASELINE confirme l'utilite du skill : sans lui, le modele reconstruit bien le contexte mais ignore completement le protocole de reprise formel (annonce, phase, gate, decisions, formule canonique)."
+    ],
+    "overall": "Run BASELINE (sans skill) : 2/7 expectations passees (28.6%). Le modele reconstitue correctement le contexte technique (fichiers lus, gate identifiee) mais ne suit aucun des protocoles formels definis par le skill : pas d'annonce de skill, pas de phase numerotee, pas de decisions [DECISION] listees, pas de formule canonique, et propose du code immediatement en violation de la regle 7. Ce resultat etablit la baseline de reference pour mesurer l'apport du skill."
+  }
+}

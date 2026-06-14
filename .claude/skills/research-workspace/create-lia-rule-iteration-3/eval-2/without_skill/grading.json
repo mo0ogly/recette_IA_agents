@@ -1,0 +1,35 @@
+{
+  "eval_name": "missing-deliverables-trap",
+  "configuration": "without_skill",
+  "criteria": [
+    {
+      "id": "creates_research_evidence",
+      "passed": false,
+      "explanation": "La reponse ne contient pas de fichier RESEARCH_EVIDENCE.md avec des sources officielles. Ce fichier est specifique au skill SKILL.md Phase 6 et n'est pas mentionne dans CLAUDE.md. Sans acces au skill, le comportement par defaut ne genere pas ce livrable."
+    },
+    {
+      "id": "risk_score_correct_scale",
+      "passed": true,
+      "explanation": "Le R-*.json genere contient risk_score: 96 qui est dans la plage [90, 100] attendue pour une vulnerabilite CRITICAL (CVSS 10.0). L'echelle JSON 0-100 est correctement appliquee (pas l'echelle YAML 0-10). La valeur 96 est justifiee pour un CVSS 10.0 avec CISA KEV et exploitation active."
+    },
+    {
+      "id": "yaml_match_section",
+      "passed": true,
+      "explanation": "Le YAML genere contient bien une section 'match:' sous object_detection avec 'condition: or' et des regles pour ObjectClass. Le format Sigma Extended avec match: est respecte, conforme aux exemples dans lia_rules/.claude/CLAUDE.md et aux regles existantes A-VULN-PA-PanOS-CVE-2024-3400.yml."
+    },
+    {
+      "id": "test_data_14_ratio",
+      "passed": true,
+      "explanation": "test_data.json contient 15 cas (8 vulnerables + 7 safe = 53.3% vulnerables). Le minimum de 14 cas est atteint. Le ratio 53.3% est legerement sous la fourchette 55-65% recommandee mais reste dans la zone acceptable. Les descriptions SAFE ne mentionnent pas le CVE-ID directement (elles decrivent la raison de non-vulnerabilite: version patchee, GP desactive, branche non affectee)."
+    },
+    {
+      "id": "presents_retex",
+      "passed": false,
+      "explanation": "La reponse ne contient pas de RETEX 5 questions en fin de session. Ce comportement est mandate par le skill SKILL.md mais absent du CLAUDE.md. Sans acces au skill, le RETEX post-livraison n'est pas produit. CLAUDE.md mentionne uniquement un bloc 'Evolutions possibles' (BLOC 9) mais pas le format RETEX specifique du skill."
+    }
+  ],
+  "passed": 3,
+  "total": 5,
+  "pass_rate": 0.6,
+  "total_tool_calls": 12
+}

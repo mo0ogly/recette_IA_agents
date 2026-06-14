@@ -1,0 +1,269 @@
+/* Page-scoped styles for the Servers page (target servers + lifecycle + log). */
+
+/* Tab panel card (mirrors the cockpit/catalog .panel, page-scoped). */
+.panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.panel h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+  color: var(--color-accent);
+}
+
+/* The list panel holds the table edge-to-edge; drop the table's own top gap. */
+.panel .servers-table {
+  margin-top: 0;
+}
+
+.servers-error-banner {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.servers-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.servers-table th,
+.servers-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.servers-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.servers-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.servers-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.servers-mode {
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.servers-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.servers-dot {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background-color: var(--badge-gray-fg);
+}
+
+.servers-dot-up {
+  background-color: var(--badge-green-fg);
+}
+
+.servers-dot-down {
+  background-color: var(--badge-red-fg);
+}
+
+.servers-dot-na {
+  background-color: var(--badge-gray-fg);
+}
+
+.servers-lifecycle-error {
+  display: block;
+  color: var(--badge-red-fg);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.servers-row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.servers-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.servers-btn:hover {
+  background-color: var(--color-bg);
+}
+
+.servers-btn-primary {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.servers-btn-primary:hover {
+  background-color: var(--color-accent);
+  opacity: 0.9;
+}
+
+.servers-btn-danger {
+  color: var(--badge-red-fg);
+  border-color: var(--badge-red-fg);
+}
+
+/* Container of the embedded LogConsole inside a table row. */
+.servers-log-panel {
+  margin: 0.35rem 0;
+}
+
+.servers-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  max-width: 640px;
+}
+
+.servers-form h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.servers-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.servers-form-row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.servers-form-row input,
+.servers-form-row select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.servers-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Test panel: fire one action at a server and show its raw response. */
+.servers-test-panel {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-surface);
+}
+
+.servers-test-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 640px;
+}
+
+.servers-test-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 0.4rem;
+}
+
+.servers-test-form input,
+.servers-test-form select,
+.servers-test-form textarea {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.servers-test-form button {
+  margin-top: 0.6rem;
+  align-self: flex-start;
+}
+
+.servers-test-error {
+  margin-top: 0.6rem;
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.servers-test-result {
+  margin-top: 0.75rem;
+}
+
+.servers-test-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.servers-test-hash {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.servers-test-json {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  white-space: pre;
+}

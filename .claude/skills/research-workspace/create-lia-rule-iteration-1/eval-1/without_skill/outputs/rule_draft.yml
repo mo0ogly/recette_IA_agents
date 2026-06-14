@@ -1,0 +1,197 @@
+---
+id: A-VULN-WFTP-WingFTP-CVE-2025-47812
+title: "Wing FTP Server - Null Byte Lua Code Injection RCE (CVE-2025-47812) - CVSS 10.0 CRITICAL - CISA KEV"
+status: stable
+target: WingFTPServer
+
+object_type_field: ObjectClass
+
+data_source:
+  type: collection
+  collection_script: "scripts/collect/wingftp/Collect-WingFTPServer.ps1"
+  collection_type: "STANDARD"
+  format: json
+  required_files:
+    - pattern: "wingftp_server_*.json"
+      object_class: "WingFTPServer"
+      description: "Wing FTP Server version and configuration information"
+  fields:
+    - ObjectClass
+    - Hostname
+    - Version
+    - VersionNormalized
+    - Platform
+    - AdminPort
+    - AnonymousFTPEnabled
+
+taxonomy:
+  taxonomy: WFTP
+  taxonomy_short: WFTP
+  axis: Vulnerability Management
+  axis_short: VULN
+  block: CVE Detection
+  block_short: CVE
+  component: CVE-2025-47812
+  component_short: CVE47812
+
+cve_info:
+  cve_id: "CVE-2025-47812"
+  cvss_version: "3.1"
+  cvss_score: 10.0
+  cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+  cvss_severity: "CRITICAL"
+  is_kev: true
+  kev_vendor: "Wing FTP Server"
+  kev_product: "Wing FTP Server"
+  cwe:
+    - "CWE-158"
+  exploit_available: true
+  exploit_maturity: "WEAPONIZED"
+  exploit_db_id: "52347"
+  patch_available: true
+  permanent_patch_version: "7.4.4"
+  published_date: "2025-07-10"
+  remediation_priority: "P0_EMERGENCY"
+  threat_actors:
+    - "Multiple threat actors (exploitation within 24h of disclosure)"
+
+description: |
+  Detects Wing FTP Server installations vulnerable to CVE-2025-47812, a CVSS 10.0 CRITICAL
+  unauthenticated Remote Code Execution vulnerability (Null Byte Lua Code Injection).
+
+  The user and admin web interfaces mishandle null byte characters (\0) in the username field.
+  The null byte terminates strlen() validation prematurely (CWE-158). Lua code following the
+  null byte is written into the session file and executed by SessionModule.load() as root/SYSTEM.
+
+  ATTACK FLOW:
+  1. POST to /loginok.html with username="validuser\x00<lua_payload>"
+  2. Null byte truncates authentication check - valid user portion passes
+  3. Full username string written to session file
+  4. SessionModule.load() executes session file - Lua payload triggers
+  5. Arbitrary system commands execute via io.popen() as root/SYSTEM
+
+  DETECTION LOGIC (MOTOR_FIX_010 compliant):
+  - Collection: Collect-WingFTPServer.ps1 collects raw VersionNormalized field only
+  - YAML Rule: version_lt(VersionNormalized, "7.4.4.0") detects vulnerable versions
+  - No CVE flags pre-computed in PowerShell - logic fully auditable in this YAML rule
+
+  AFFECTED: Wing FTP Server all versions before 7.4.4 (Linux, Windows, macOS)
+  FIXED IN: Wing FTP Server 7.4.4 (patched July 10, 2025)
+  CISA KEV: Active exploitation confirmed - multiple threat actors within 24h of disclosure
+
+author: mo0ogly@proton.me
+date: "2026-03-02"
+modified: "2026-03-02"
+version: "1.0.0"
+level: critical
+risk_score: 100
+severity: critical
+
+object_detection:
+  match:
+    ObjectClass:
+      eq: WingFTPServer
+
+  where:
+    condition: and
+    rules:
+      - ObjectClass:
+          eq: WingFTPServer
+      - version_lt(VersionNormalized, "7.4.4.0"):
+          eq: true
+
+output:
+  fields:
+    Hostname: Hostname
+    Version: Version
+    VersionNormalized: VersionNormalized
+    Platform: Platform
+    AdminPort: AdminPort
+    AnonymousFTPEnabled: AnonymousFTPEnabled
+
+  computed:
+    Severity: "if(version_lt(VersionNormalized, '7.4.4.0'), 'CRITICAL - CVE-2025-47812 Wing FTP Server Null Byte RCE on ' + Hostname + ' (version ' + Version + ') - CVSS 10.0 - CISA KEV - Total server compromise risk', 'SECURE - Wing FTP Server is patched against CVE-2025-47812')"
+    RiskReason: "if(version_lt(VersionNormalized, '7.4.4.0'), 'NULL_BYTE_LUA_INJECTION - CWE-158 - CVSS 10.0 - Null byte in username field injects Lua code into session file executed by SessionModule.load() as root/SYSTEM - Exploitable via anonymous FTP - Active exploitation confirmed July 1 2025 - Exploit-DB 52347 weaponized', 'COMPLIANT - Version >= 7.4.4 patched against null byte Lua injection')"
+    RemediationPriority: "if(version_lt(VersionNormalized, '7.4.4.0'), 'P0_EMERGENCY - Upgrade Wing FTP Server to 7.4.4+ IMMEDIATELY - CISA KEV active exploitation - Disable anonymous FTP as interim measure - Version detected: ' + Version, 'P4_LOW - No action required - Version ' + Version + ' is patched')"
+    RecommendedAction: "if(version_lt(VersionNormalized, '7.4.4.0'), 'PATCH NOW - Upgrade to Wing FTP Server 7.4.4+ from https://www.wftpserver.com/download.htm - Interim: Block web interface ports externally - Disable anonymous FTP - Audit session directory for Lua payloads', 'MONITOR - Maintain current patch level >= 7.4.4')"
+    DetectionLogic: "if(version_lt(VersionNormalized, '7.4.4.0'), 'VULNERABLE: version_lt(' + VersionNormalized + ', 7.4.4.0) = true - CVE-2025-47812 null byte Lua injection confirmed on ' + Hostname + ' (platform: ' + Platform + ')', 'SAFE: version_lt(' + VersionNormalized + ', 7.4.4.0) = false - version ' + VersionNormalized + ' is patched (>= 7.4.4.0)')"
+    ComplianceImpact: "if(version_lt(VersionNormalized, '7.4.4.0'), 'CRITICAL - CISA KEV active exploitation violates federal patching mandates - CVSS 10.0 breaches NIST CSF ID.RA-1, ISO 27001 A.8.8 vulnerability management, PCI DSS 6.3.3 critical patch requirements', 'LOW - No compliance impact - Wing FTP Server 7.4.4+ applied')"
+
+references:
+  - "https://nvd.nist.gov/vuln/detail/CVE-2025-47812"
+  - "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+  - "https://www.huntress.com/blog/wing-ftp-server-remote-code-execution-cve-2025-47812-exploited-in-wild"
+  - "https://www.exploit-db.com/exploits/52347"
+  - "https://cwe.mitre.org/data/definitions/158.html"
+  - "https://attack.mitre.org/techniques/T1190/"
+
+mitre_attack:
+  - technique: T1190
+    name: "Exploit Public-Facing Application"
+    tactic: "Initial Access"
+    description: "Null byte injection in /loginok.html bypasses authentication and injects Lua code via Wing FTP username parameter"
+  - technique: T1059
+    name: "Command and Scripting Interpreter"
+    tactic: "Execution"
+    description: "Injected Lua code executes arbitrary system commands via io.popen() with root/SYSTEM privileges"
+  - technique: T1548
+    name: "Abuse Elevation Control Mechanism"
+    tactic: "Privilege Escalation"
+    description: "Wing FTP Server runs as root/SYSTEM by default - exploitation immediately grants highest privileges"
+
+compliance_mapping:
+  nist_csf:
+    - id: "ID.RA-1"
+      function: "Identify"
+      category: "Risk Assessment"
+      description: "CVE-2025-47812 CVSS 10.0 identified in Wing FTP Server inventory"
+    - id: "PR.IP-12"
+      function: "Protect"
+      category: "Information Protection Processes"
+      description: "Emergency patch required - Wing FTP Server 7.4.4 upgrade mandatory"
+    - id: "DE.CM-8"
+      function: "Detect"
+      category: "Detection Processes"
+      description: "Vulnerability scanning for Wing FTP Server version compliance"
+  iso_27001:
+    - id: "A.8.8"
+      name: "Management of Technical Vulnerabilities"
+      description: "Emergency patch required - CVSS 10.0 unauthenticated RCE vulnerability"
+  pci_dss:
+    - id: "6.3.3"
+      name: "Security Patch Installation"
+      description: "Critical CVSS 10.0 patch must be applied immediately (CISA KEV)"
+  anssi:
+    - id: "ANSSI-Measure-19"
+      name: "Vulnerability Identification and Assessment"
+      description: "CVE-2025-47812 identified via NVD and CISA KEV catalog - CVSS 10.0"
+    - id: "ANSSI-Measure-21"
+      name: "Patch Deployment"
+      description: "Upgrade to Wing FTP Server 7.4.4 required immediately"
+
+tags:
+  - wingftp
+  - ftp_server
+  - cve.2025-47812
+  - null_byte_injection
+  - lua_injection
+  - rce
+  - unauthenticated_rce
+  - cisa_kev
+  - cwe-158
+  - critical
+  - cvss_10
+
+falsepositives:
+  - "Wing FTP Server already upgraded to version 7.4.4 or later"
+  - "Test or development environment with non-production Wing FTP installation"
+  - "Decommissioned Wing FTP Server with no active network exposure"
+
+fields:
+  - ObjectClass
+  - Hostname
+  - Version
+  - VersionNormalized
+  - Platform
+  - AdminPort
+  - AnonymousFTPEnabled

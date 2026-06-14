@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gl-admin-overreach",
+  "target_system": "gitlab",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["manage_webhook", "push"],
+  "risk_rank": 3,
+  "policy_generated": true,
+  "notes": "GitLab infra syncer: commits to default branches and installs webhooks (high blast radius). Scanner should detect one agent, surface push + manage_webhook, rank it highest of the GitLab corpus, and emit a policy."
+}

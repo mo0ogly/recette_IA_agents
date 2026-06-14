@@ -1,0 +1,35 @@
+{
+  "eval_name": "safe-description-cveid-trap",
+  "configuration": "with_skill",
+  "criteria": [
+    {
+      "id": "identifies_cveid_trap",
+      "passed": true,
+      "explanation": "Identifie explicitement que les 4 cas SAFE (ftp-sec-01, ftp-sec-02, ftp-sec-03, ftp-cloud-01) contiennent 'CVE-2025-47812' dans leur description et seront comptes comme VULNERABLE par le validateur de ratio. Tableau cas par cas avec colonne Probleme et Severite fourni."
+    },
+    {
+      "id": "explains_ratio_mechanism",
+      "passed": true,
+      "explanation": "Explique que le validateur detecte les mots-cles CVE|CRITICAL|HIGH|Vulnerable|Affected dans Description independamment de _expected_match. Chiffre le ratio resultant (85.7% vs attendu 55-65%) et cite l'erreur Phase 12 HIGH. Mecanisme complet documente."
+    },
+    {
+      "id": "fixes_safe_descriptions",
+      "passed": true,
+      "explanation": "Corrige les 4 descriptions SAFE defaillantes : ftp-sec-01 ('Patched for CVE-2025-47812'), ftp-sec-02 ('CVE-2025-47812 does not affect'), ftp-sec-03 ('above CVE-2025-47812 affected range'), ftp-cloud-01 ('CVE-2025-47812 not applicable'). Les 2 cas deja corrects (ftp-legacy-01, ftp-legacy-02) sont conserves. JSON corrige complet fourni."
+    },
+    {
+      "id": "uses_neutral_wording",
+      "passed": true,
+      "explanation": "Les corrections utilisent exclusivement : 'not impacted', 'Patched version', 'compliant version', 'below minimum affected version threshold'. Aucun mot interdit dans les nouvelles descriptions SAFE. Regle mnemonique fournie avec liste Interdit/Autorise."
+    },
+    {
+      "id": "preserves_vulnerable_cases",
+      "passed": true,
+      "explanation": "Les 8 cas _expected_match: true sont conserves intacts. Seules les descriptions des 4 cas SAFE defaillants ont ete modifiees. Le recap des changements confirme explicitement que les cas vulnerables ne sont pas touches."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 4
+}

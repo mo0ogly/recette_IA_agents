@@ -1,0 +1,19 @@
+{
+  "description": "Ground-truth for the RAG retrieval-quality recette (python -m recette rag). The corpus is the REAL operational knowledge base (the documents the poisoning track governs, minus the injected poison docs), so the quality recette exercises the documents agents actually retrieve -- not a throwaway toy corpus. Invariant: which docs are relevant per query and which should rank first (I4 deterministic), never the opaque scores. kb-distractor is a hard negative: no query targets it, so any retrieval of it would signal an over-broad match.",
+  "corpus": [
+    {"doc_id": "kb-onboarding-1", "text": "To onboard a new employee, create their account in okta, assign the default role, and notify their manager via slack."},
+    {"doc_id": "kb-incident-1", "text": "On a suspected compromise, open a support ticket, gather logs, and escalate to the on-call SOC analyst for approval before any containment."},
+    {"doc_id": "kb-refund-1", "text": "Refunds under 50 are auto-approved. Refunds above 50 require a manager approval recorded in the finance system."},
+    {"doc_id": "kb-release-1", "text": "Tag the release in gitlab, run the CI pipeline, and cut the release only after the approval gate has passed."},
+    {"doc_id": "kb-vacation-1", "text": "Employees submit time-off in the HRIS; the manager approves or rejects. No data leaves the company."},
+    {"doc_id": "kb-distractor", "text": "Quantum chromodynamics describes the strong interaction and has no bearing on these procedures."}
+  ],
+  "queries": [
+    {"query": "onboard new employee okta account", "relevant_ids": ["kb-onboarding-1"], "top_id": "kb-onboarding-1"},
+    {"query": "suspected compromise gather logs soc analyst", "relevant_ids": ["kb-incident-1"], "top_id": "kb-incident-1"},
+    {"query": "refunds auto approved finance system", "relevant_ids": ["kb-refund-1"], "top_id": "kb-refund-1"},
+    {"query": "tag release gitlab ci pipeline", "relevant_ids": ["kb-release-1"], "top_id": "kb-release-1"},
+    {"query": "employees time off hris approves rejects", "relevant_ids": ["kb-vacation-1"], "top_id": "kb-vacation-1"},
+    {"query": "manager approval recorded", "relevant_ids": ["kb-refund-1"], "top_id": "kb-refund-1"}
+  ]
+}

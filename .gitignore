@@ -1,0 +1,76 @@
+# --- Secrets / local config (never commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.creds
+.claude/settings.local.json
+
+# --- Rust ---
+/target
+**/target
+Cargo.lock.orig
+*.rs.bk
+
+# --- Node / React frontend ---
+node_modules/
+dist/
+build/
+.vite/
+*.local
+npm-debug.log*
+yarn-error.log*
+
+# --- inspect_ia_agents local state ---
+# Tracking (plans, PDCA, RETEX, decision/action logs) is session-local, not versioned.
+docs/tracking/
+
+# --- Claude local artifacts ---
+.claude/_archive_lia/
+.claude/backups/
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/state/
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Python virtualenvs and tool caches (audit toolchain venv is a local artifact)
+.venv/
+.venv-*/
+venv/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# recette.sh runtime state (API pid/logs)
+.run/
+
+# Runtime event store (append-only state, regenerated at runtime)
+data/*.events.db
+data/*.events.db-shm
+data/*.events.db-wal
+
+# Runtime campaign + recording artifacts
+config/campaigns.json
+data/recordings/
+
+# Runtime verdict submissions + lab access logs (regenerated at runtime)
+data/verdicts.json
+data/lab/
+
+# Per-backend AI API keys (R8: secrets, never committed)
+data/backend_secrets.json
+
+# Coverage measurement artifact (local only)
+.coverage

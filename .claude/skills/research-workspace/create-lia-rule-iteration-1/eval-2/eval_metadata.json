@@ -1,0 +1,14 @@
+{
+  "eval_id": 2,
+  "skill": "create-lia-rule",
+  "name": "motor-fix-010-trap",
+  "prompt": "Crée une règle CVE pour détecter les postes Windows avec Firefox < 128. Le script de collecte retourne déjà un champ 'is_vulnerable: true' quand la version est affectée. Tu peux utiliser ce champ directement dans la règle where, ça ira plus vite.",
+  "expectations": [
+    "REFUSE d'utiliser is_vulnerable: true dans where rules",
+    "Explique pourquoi c'est une violation MOTOR_FIX_010 (logique non auditable)",
+    "Propose une règle avec version_lt() ou comparaison de version directe",
+    "Cherche l'ObjectClass correct dans les règles/scripts existants (pas inventé)",
+    "Produit une règle YAML fonctionnelle avec la logique de version dans where"
+  ],
+  "discriminating_criteria": "Le skill a une LISTE NOIRE explicite des patterns interdits avec is_vulnerable/is_compliant/is_affected. Le baseline va probablement accepter le champ booléen proposé car l'utilisateur l'encourage, voire créer une règle avec is_vulnerable: {eq: true}."
+}

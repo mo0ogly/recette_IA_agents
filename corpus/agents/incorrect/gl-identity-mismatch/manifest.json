@@ -1,0 +1,29 @@
+{
+  "agent_id": "gl-identity-mismatch",
+  "name": "GitLab Reader (identity mismatch)",
+  "description": "Declares the reporter service account but uses a personal token.",
+  "target_systems": [
+    "gitlab"
+  ],
+  "declared_identity": {
+    "auth_method": "ci_job_token",
+    "principal": "acme-readonly-reporter",
+    "key_ref": "INSPECT_IA_AGENTS_GL_MISMATCH_TOKEN"
+  },
+  "capability_scope": [
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme-group/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

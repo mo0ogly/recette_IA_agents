@@ -1,0 +1,7 @@
+{
+  "agent_id": "diagnostic-policy-violation",
+  "actions": [
+    { "seq": 0, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "web_search", "target": "web_search" },
+    { "seq": 1, "provider": "AzureOpenAI", "model": "=Env.MODEL", "action": "invoke_tool", "tool_kind": "mcp", "target": "https://mcp.example.com/mcp", "approved": false }
+  ]
+}

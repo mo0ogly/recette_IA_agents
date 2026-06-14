@@ -1,0 +1,61 @@
+.rc-intro {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: 0.2rem 0 1rem;
+}
+
+.rc-muted {
+  color: var(--color-text-muted);
+}
+
+.rc-error {
+  color: var(--badge-red-fg);
+  background: var(--badge-red-bg);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.rc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.rc-table th,
+.rc-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.rc-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rc-family {
+  display: inline-block;
+  font-size: 0.76rem;
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.rc-name {
+  font-weight: 600;
+}
+
+.rc-objective {
+  color: var(--color-text-muted);
+  max-width: 38rem;
+}
+
+.rc-invalid {
+  color: var(--badge-red-fg);
+}

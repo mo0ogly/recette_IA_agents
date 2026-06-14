@@ -1,0 +1,142 @@
+/* Flux page: header controls + two-pane analysis grid. */
+
+.flux-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.flux-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.flux-header h1 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.flux-agent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.flux-agent-select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.flux-mode {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.flux-mode-btn {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.flux-mode-btn[data-active="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.flux-launch {
+  margin-left: auto;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background-color: var(--color-accent);
+  color: var(--color-bg, #fff);
+  cursor: pointer;
+}
+
+.flux-launch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.flux-launch-error {
+  color: var(--badge-red-fg);
+  font-size: 0.78rem;
+}
+
+.flux-export {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.flux-export:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.flux-error {
+  color: var(--badge-red-fg);
+  margin: 0;
+}
+
+/* Stream filter / diff selection row (shown only in the relevant mode). */
+.flux-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.flux-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #9aa3ad);
+}
+
+.flux-filter-input {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  min-width: 6rem;
+}
+
+.flux-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .flux-grid {
+    grid-template-columns: 1fr;
+  }
+}

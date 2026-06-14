@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-infra-syncer-gl",
+    "description": "Pushes config files to default branches and installs project webhooks.",
+    "target_system": "gitlab",
+    "identity": {
+      "auth_method": "gitlab_token",
+      "principal": "acme-infra-syncer@gitlab"
+    },
+    "capabilities": [
+      { "action": "push", "mode": "write", "resources": ["acme/*"] },
+      { "action": "manage_webhook", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}

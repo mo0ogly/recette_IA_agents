@@ -1,0 +1,35 @@
+{
+  "eval_name": "safe-description-cveid-trap",
+  "configuration": "without_skill",
+  "criteria": [
+    {
+      "id": "identifies_cveid_trap",
+      "passed": true,
+      "explanation": "The response correctly identifies that the 4 SAFE descriptions containing 'CVE-2025-47812' (ftp-sec-01, ftp-sec-02, ftp-sec-03, ftp-cloud-01) will be detected as vulnerable by the ratio validator, independently of _expected_match. A table is provided listing exactly which entries are problematic."
+    },
+    {
+      "id": "explains_ratio_mechanism",
+      "passed": true,
+      "explanation": "The response explicitly explains that the validator scans the Description field for keywords (CVE-, CRITICAL, HIGH, Vulnerable, Affected, RCE, exposed) independently of the _expected_match field, and that this causes the ratio to be computed as 14/0 instead of 8/6, triggering a validation failure."
+    },
+    {
+      "id": "fixes_safe_descriptions",
+      "passed": true,
+      "explanation": "All 6 SAFE descriptions (_expected_match: false) are corrected in the proposed JSON. The CVE-ID is removed from all 4 entries that contained it, and the 'SAFE -' prefix is removed from all 6 entries. The corrected JSON is complete and directly usable."
+    },
+    {
+      "id": "uses_neutral_wording",
+      "passed": true,
+      "explanation": "Corrected descriptions use neutral formulations: 'Compliant version - patched, not impacted', 'above minimum affected version range', 'below minimum affected version boundary, not impacted', 'compliant version, rule does not apply', 'version not available, excluded from scope', 'empty version field, not impacted'. These match the expected neutral vocabulary."
+    },
+    {
+      "id": "preserves_vulnerable_cases",
+      "passed": true,
+      "explanation": "The response explicitly states 'AUCUNE modification' for the 8 _expected_match: true cases and the corrected JSON preserves all 8 VULNERABLE descriptions byte-for-byte, including all CVE-ID references, CRITICAL/RCE terms, and VULNERABLE prefixes."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 3
+}

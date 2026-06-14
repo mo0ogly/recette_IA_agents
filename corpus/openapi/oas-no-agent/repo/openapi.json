@@ -1,0 +1,32 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "acme-orders-api",
+    "version": "1.0.0",
+    "description": "Plain CRUD API for customer orders. NOT an agent (true-negative subject)."
+  },
+  "paths": {
+    "/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "summary": "List orders.",
+        "responses": { "200": { "description": "Orders" } }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "summary": "Create an order.",
+        "responses": { "201": { "description": "Order created" } }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "summary": "Get an order.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Order" } }
+      }
+    }
+  }
+}

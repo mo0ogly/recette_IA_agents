@@ -1,0 +1,35 @@
+{
+  "eval_name": "retex-mandatory",
+  "configuration": "with_skill",
+  "criteria": [
+    {
+      "id": "presents_retex_template",
+      "passed": true,
+      "explanation": "La reponse presente le template RETEX complet avec la structure Q1-Q5, conformement a l'Etape 7 du skill qui stipule 'OBLIGATOIRE - toujours presenter a l'utilisateur' et 'meme si tout est vert'. Le bloc RETEX est affiche avec l'en-tete 'RETEX - {RULE_ID} ({DATE})' et les 5 questions."
+    },
+    {
+      "id": "answers_q1_prevenus",
+      "passed": true,
+      "explanation": "La reponse repond explicitement a Q1 avec 'Aucun - tous les checks prevenus en amont' et explique que le score 100/100 au premier passage confirme que les patterns de reference ont ete respectes (MOTOR_FIX, format computed fields, version 3 segments, etc.)."
+    },
+    {
+      "id": "answers_q3_engines",
+      "passed": true,
+      "explanation": "La reponse repond a Q3 en confirmant la coherence entre Python v5 et Go, en mentionnant les 91 checks Ultimate (76 V6 Bash + 15 V5 Python), et en notant specifiquement le pitfall connu VALID_OPERATORS vs VALID_FUNCTIONS pour version_lt qui ne s'est pas manifeste."
+    },
+    {
+      "id": "answers_q4_capitalize",
+      "passed": true,
+      "explanation": "La reponse repond a Q4 en indiquant qu'aucune erreur nouvelle n'est a capitaliser (regle 100% verte), cite les erreurs frequentes deja documentees qui ne se sont pas manifestees, et conclut explicitement 'Rien a ajouter dans CORRECTIONS_REFERENCE.md pour cette session'."
+    },
+    {
+      "id": "answers_q5_actions",
+      "passed": true,
+      "explanation": "La reponse repond a Q5 avec 3 actions concretes et des estimations d'effort S/M/L: Action 1 (git commit, effort S), Action 2 (verifier JSON proof, effort S), Action 3 (creer regle Aggregate, effort M). Les actions sont actionnables et contextualisees pour la regle CVE-2024-1086."
+    }
+  ],
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "total_tool_calls": 2
+}

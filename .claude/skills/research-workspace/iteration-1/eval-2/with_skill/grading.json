@@ -1,0 +1,61 @@
+{
+  "expectations": [
+    {
+      "text": "Annonce 'Using research skill' au debut",
+      "passed": false,
+      "evidence": "Le transcript commence directement par 'Etape 1 : Lecture du SKILL.md' sans aucune annonce explicite 'Using research skill'. response.md commence par '# Etat de la Recherche - Module Discovery' sans mention du skill. La phrase exacte attendue est absente."
+    },
+    {
+      "text": "Lit RESEARCH_INDEX.md et discovery/INDEX.md (mentionnes dans transcript)",
+      "passed": true,
+      "evidence": "Etape 2 du transcript confirme lecture en parallele : '_alire/research_discovery/RESEARCH_INDEX.md : 1 sujet actif (discovery, EN COURS, 2026-02-28)' et '_alire/research_discovery/discovery/INDEX.md : etat complet VALIDATED/INVESTIGATED/ABANDONED/BACKLOG'. Les deux fichiers sont explicitement nommes avec leur contenu resume."
+    },
+    {
+      "text": "Retourne la phase actuelle (0-6) avec son nom",
+      "passed": true,
+      "evidence": "Transcript ligne 52 : 'Phase actuelle : Phase 5 DONE -> Phase 6 en cours (doc ingenierie v2.0 ecrite 2026-03-01)'. response.md ligne 12 : 'Phase actuelle : Phase 6 - DOCUMENTATION FINALE (engineering doc v2.0 ecrite)'. Phase numerotee et nommee presente dans les deux outputs."
+    },
+    {
+      "text": "Identifie une gate bloquante concrete (pas inventee)",
+      "passed": true,
+      "evidence": "Transcript ligne 53 : 'Gate bloquante pour completion du pipeline : Inventaire UI + Collect Bridge + Collect Launcher (3 items CRITIQUE non demarres)'. Ces items sont issus de la lecture de 'discovery/backlog/discovery-to-collect-bridge.md' (Etape 4 transcript). response.md confirme avec la section 'Ce qui bloque le pipeline complet' detaillant les 3 items concrets avec justification technique."
+    },
+    {
+      "text": "Fournit les compteurs validated / investigated / abandoned / backlog",
+      "passed": false,
+      "evidence": "response.md presente les 4 sections VALIDATED / INVESTIGATED / ABANDONED / BACKLOG sous forme de tableaux avec items listes, mais aucun compteur numerique synthetique n'est fourni (ex: 'validated: 14, investigated: 6, abandoned: 1, backlog: 10'). L'expectation demande des 'compteurs', c'est-a-dire des chiffres recapitulatifs. Les listes detaillees sont presentes mais le format compteur manque."
+    },
+    {
+      "text": "Propose une prochaine action concrete et mesurable",
+      "passed": true,
+      "evidence": "Transcript ligne 54 : 'Prochaine action : choisir piste A/B/C pour Collect Bridge avec l'utilisateur.' response.md Question Ouverte [CRITIQUE] : 'Quelle approche pour le Collect Launcher ? Pistes A (heuristique ports), B (table PostgreSQL configurable), C (UI manuelle avec suggestion). Choix utilisateur requis AVANT de coder.' Action concrete (choix piste), mesurable (decision binaire A/B/C), avec prerequis identifie."
+    },
+    {
+      "text": "Ne retourne pas un statut invente de memoire sans lecture de fichiers",
+      "passed": true,
+      "evidence": "Le transcript documente 14 appels d'outils (6 Read, 3 Glob, 2 Bash, 3 Write), tous les fichiers sources sont nommes explicitement. Les donnees de response.md (commits cles d0ba5ebdfb/867b2d780e/etc., dates 2026-02-26/28/03-01, chiffres 15719 patterns/65MB/10 fichiers Go) correspondent aux fichiers lus. Aucune invention detectee : metrics.json confirme 0 erreurs."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 2,
+    "total": 7,
+    "pass_rate": 0.714
+  },
+  "execution_metrics": {
+    "total_tool_calls": 14,
+    "errors": 0
+  },
+  "timing": {
+    "executor_duration_seconds": null
+  },
+  "claims": [],
+  "eval_feedback": {
+    "suggestions": [
+      "Ajouter une annonce explicite 'Using research skill' en premiere ligne de la reponse - c'est une convention de traçabilite, pas une obligation fonctionnelle mais elle signale clairement l'usage du skill.",
+      "Fournir un bloc de compteurs synthetiques au debut ou en fin de reponse : 'VALIDATED: 14 | INVESTIGATED: 6 | ABANDONED: 1 | BACKLOG: 10' - les tableaux detailles sont presents mais le resume chiffre manque pour une lecture rapide.",
+      "Le contenu produit est de haute qualite : pipeline, commits, chiffres, gates, prochaine action sont tous sourcés depuis les fichiers lus. La structure response.md est claire et exploitable. Les 2 echecs sont des problemes de forme, pas de fond."
+    ],
+    "overall": "Run de bonne qualite : 5/7 expectations passees. Le contenu est riche, source depuis les vrais fichiers, et la gate bloquante identifiee est concrete et actionnable. Les 2 echecs sont formels : absence d'annonce 'Using research skill' et absence de compteurs numeriques recapitulatifs. Le fond est correct, la forme manque de deux conventions attendues."
+  }
+}

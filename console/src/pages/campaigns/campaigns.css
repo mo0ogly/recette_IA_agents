@@ -1,0 +1,199 @@
+/* Campaigns page. Reuses .pill and .frame styles from index.css / cockpit.css. */
+
+.camp-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.camp-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.camp-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.camp-h2-spaced {
+  margin-top: 1.5rem;
+}
+
+.camp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.camp-table th,
+.camp-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.camp-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.camp-mono {
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.78rem;
+}
+
+.camp-table button,
+.camp-grid > .panel > button {
+  padding: 0.3rem 0.7rem;
+  margin-right: 0.4rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.camp-table button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.camp-danger {
+  background-color: var(--color-surface) !important;
+  color: var(--badge-red-fg) !important;
+  border-color: var(--badge-red-fg) !important;
+}
+
+/* The campaign run "eye": a transparent icon button, like the dashboard eye. */
+.camp-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem !important;
+  line-height: 0;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text, #cfd3dc) !important;
+  border-color: var(--color-border, #3a3a3a) !important;
+}
+
+.camp-field {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.camp-field > span {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+.camp-field input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.camp-agents {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.camp-agents legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+.camp-agent-row {
+  display: block;
+  margin: 0.25rem 0;
+}
+
+.camp-status {
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.camp-replay {
+  font-weight: 500;
+}
+
+.camp-desc {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* status dot (shared look with dashboard) */
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+}
+.dot-on {
+  background-color: #2f9e44;
+  box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.18);
+}
+.dot-off {
+  background-color: var(--color-border);
+}
+
+.camp-templates {
+  margin-bottom: 1.25rem;
+}
+
+/* Activity-domain group inside the templates tab */
+.camp-domain {
+  margin-bottom: 1.5rem;
+}
+
+.camp-domain + .camp-domain {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+}
+
+.camp-domain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.camp-domain-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.camp-runconsole {
+  margin-top: 1.25rem;
+}
+
+/* Campaign profile pills */
+.pill-profile-legit {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+.pill-profile-suspect {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+.pill-profile-destructive {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}

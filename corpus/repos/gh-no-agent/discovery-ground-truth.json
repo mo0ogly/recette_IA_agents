@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gh-no-agent",
+  "target_system": "github",
+  "detected": false,
+  "agent_count": 0,
+  "action_patterns": [],
+  "risk_rank": 0,
+  "policy_generated": false,
+  "notes": "Plain string library: no agent code, no .inspect_ia_agents manifest, only a test CI workflow. True negative -- any agent/risk reported here is a false positive."
+}

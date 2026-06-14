@@ -1,0 +1,15 @@
+{
+  "eval_id": 1,
+  "skill": "recette-lia-rule",
+  "name": "full-validation-order",
+  "prompt": "Lance la recette complète sur la règle lia_rules/rule_analysis/TECH/VULN/A-VULN-WFTPS-RemoteCodeExecution/",
+  "expectations": [
+    "Identifie le mode (single rule vs batch) en vérifiant le répertoire",
+    "Exécute test_rule.sh EN PREMIER (avant recipe et ultimate)",
+    "Exécute validate_rules_recipe.sh ensuite",
+    "Exécute validate_rules_ultimate.sh après recipe",
+    "Cherche et exécute validate_reportrules si R-*.json existe",
+    "Analyse les exit codes et propose des corrections concrètes"
+  ],
+  "discriminating_criteria": "Le skill impose un ordre strict : moteur FIRST, puis recipe, ultimate, reportrule. Le baseline va probablement aller directement à recipe ou sauter le moteur. Le skill sait que test_rule.sh est OBLIGATOIRE en premier."
+}

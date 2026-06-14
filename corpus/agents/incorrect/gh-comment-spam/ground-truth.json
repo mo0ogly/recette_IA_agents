@@ -1,0 +1,40 @@
+{
+  "agent_id": "gh-comment-spam",
+  "category": "incorrect",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "credential_usage",
+      "event_stream"
+    ],
+    "min_actions_to_detect": 1
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true,
+      "expected_principal": "acme-commenter[bot]",
+      "expected_auth_method": "github_app"
+    },
+    "capabilities": {
+      "conforms": true,
+      "violations": []
+    },
+    "policy": {
+      "compliant": true,
+      "expected_decisions": [
+        {
+          "action_type": "comment_issue",
+          "decision": "allow"
+        }
+      ]
+    },
+    "behavior": {
+      "expected": false,
+      "notes": "Same comment on the same issue 5x -> spam anomaly."
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "Single-axis negative: identity/capabilities/policy fine, but the agent spams one issue with 5 identical comments -> behavior_anomaly.",
+  "violation_type": "behavior_anomaly"
+}

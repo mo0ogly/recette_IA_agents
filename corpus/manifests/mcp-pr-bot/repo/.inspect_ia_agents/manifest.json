@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-dependency-pr-bot-mcp",
+    "description": "MCP server that reads repositories and opens dependency-bump pull requests.",
+    "target_system": "mcp",
+    "identity": {
+      "auth_method": "mcp_oauth",
+      "principal": "acme-dependency-pr-bot@mcp"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "open_pr", "mode": "write", "resources": ["acme/*"] }
+    ]
+  },
+  "mcp": {
+    "server": "acme-dependency-pr-bot",
+    "transport": "stdio",
+    "tools": ["read_repo", "open_pr"]
+  }
+}

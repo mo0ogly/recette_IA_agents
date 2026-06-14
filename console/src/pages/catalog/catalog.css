@@ -1,0 +1,199 @@
+/* Catalog + Policy editor page styles. Plain CSS, neutral palette. */
+
+.catalog-page h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.catalog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .catalog-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+}
+
+/* Banners */
+
+.error-banner {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--badge-red-fg);
+  border-radius: 4px;
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.notice-banner {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--badge-green-fg);
+  border-radius: 4px;
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  font-weight: 500;
+}
+
+/* Catalog toolbar + table */
+
+.catalog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.catalog-toolbar label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.catalog-toolbar select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.catalog-count {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.catalog-table,
+.policy-rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.catalog-table th,
+.catalog-table td,
+.policy-rules-table th,
+.policy-rules-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.catalog-table th,
+.policy-rules-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.catalog-description {
+  color: var(--color-text-muted);
+}
+
+/* Policy panel */
+
+.policy-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.policy-summary dt {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.policy-summary dd {
+  margin: 0;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* Policy editor */
+
+.policy-editor {
+  margin-top: 0.5rem;
+}
+
+.policy-publish-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.policy-version-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.policy-version-input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: 8rem;
+}
+
+.policy-rules-table select {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+/* Buttons */
+
+.btn {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background-color: var(--color-bg);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #243d5b;
+}

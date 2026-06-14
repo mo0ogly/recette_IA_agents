@@ -1,0 +1,27 @@
+{
+  "agent_id": "gl-release-bot",
+  "credential_principal": "acme-release-bot",
+  "actions": [
+    {
+      "action": "read_repo",
+      "resource": "acme-group/service-a"
+    },
+    {
+      "action": "manage_webhook",
+      "resource": "acme-group/service-a",
+      "params": {
+        "event": "release",
+        "url": "https://ci.acme-group.example/release-hook"
+      },
+      "approved": true
+    },
+    {
+      "action": "manage_release",
+      "resource": "acme-group/service-a",
+      "params": {
+        "tag": "v1.2.0"
+      },
+      "approved": true
+    }
+  ]
+}

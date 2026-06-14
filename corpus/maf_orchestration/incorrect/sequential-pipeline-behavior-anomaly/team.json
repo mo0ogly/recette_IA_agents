@@ -1,0 +1,22 @@
+{
+  "kind": "maf_orchestration",
+  "style": "sequential",
+  "agent_id": "sequential-pipeline-behavior-anomaly",
+  "name": "Sequential Review Pipeline (out of order)",
+  "description": "Same chain as the correct pipeline, but the stages run out of their declared order.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "SequentialBuilder" },
+  "participants": [
+    {
+      "agent_id": "extract",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "enrich",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    },
+    {
+      "agent_id": "summarize",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" }
+    }
+  ]
+}

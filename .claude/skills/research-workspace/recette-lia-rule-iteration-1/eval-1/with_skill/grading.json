@@ -1,0 +1,65 @@
+{
+  "expectations": [
+    {
+      "text": "mode_identified: L'agent identifie le mode (single rule vs batch) en vérifiant si le répertoire contient directement un .yml",
+      "passed": true,
+      "evidence": "Etape 0: Identification de la cible - L'agent effectue un Glob sur le répertoire demandé, constate que le chemin TECH/VULN/A-VULN-WFTPS-RemoteCodeExecution n'existe pas, puis localise la règle réelle sous WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812 et liste explicitement le contenu : 'A-S-WFTP-WingFTP-CVE-2025-47812.yml (10749 bytes)' - confirmant un mode single rule."
+    },
+    {
+      "text": "engine_first: L'agent exécute test_rule.sh EN PREMIER, avant recipe et ultimate",
+      "passed": true,
+      "evidence": "Etape 2a intitulée 'TEST MOTEUR EN PREMIER (OBLIGATOIRE)' précède les étapes 2b (Recipe) et 2c (Ultimate). La commande './test_rule.sh' est exécutée avec exit code 0, matches 10/16, avant toute invocation de validate_rules_recipe.sh."
+    },
+    {
+      "text": "recipe_after_engine: L'agent exécute validate_rules_recipe.sh après le test moteur",
+      "passed": true,
+      "evidence": "Etape 2b: Recipe Validation (41 checks) - 'bash recette_rule_cli/validate_rules_recipe.sh \"$RULE_DIR\"' exécuté après le moteur. Exit code 2, score 83/100, 3 HIGH warnings identifiés."
+    },
+    {
+      "text": "ultimate_after_recipe: L'agent exécute validate_rules_ultimate.sh après recipe",
+      "passed": true,
+      "evidence": "Etape 2c: Ultimate Validation (91 checks) - '/home/mo0ogly/Bureau/vscode_lia_audit/recette/validate_rules_ultimate.sh \"$RULE_DIR\"' exécuté après recipe. Exit code 0, score 98/100, ALL PASS."
+    },
+    {
+      "text": "reportrule_checked: L'agent cherche et exécute validate_reportrules si R-*.json existe",
+      "passed": true,
+      "evidence": "Etape 2d: 'ReportRule trouvé: R-S-WFTP-WingFTP-CVE-2025-47812.json (18075 bytes)' - L'agent détecte le fichier R-*.json et exécute les 9 validators Python. Résultat: 4 passed, 5 failed (2 CRITICAL, 2 HIGH, 1 MEDIUM). Exit code effectif: 1."
+    },
+    {
+      "text": "exit_codes_analyzed: L'agent analyse les exit codes et propose des corrections concrètes",
+      "passed": true,
+      "evidence": "Etape 3 RETEX et Corrections Recommandées - tableau récapitulatif des 4 exit codes (0, 2, 0, 1), 6 corrections numérotées avec exemples YAML/JSON concrets (ex: reformatage compliance_mapping de strings vers objets {id, name, description}, ajout vulnerability.cve_id, création RESEARCH_EVIDENCE.md). Verdict global 'COMMIT INTERDIT' avec liste précise des blockers."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 5,
+      "Glob": 2,
+      "Bash": 22,
+      "Write": 3
+    },
+    "total_tool_calls": 32
+  },
+  "eval_feedback": {
+    "strengths": [
+      "Ordre d'exécution parfaitement respecté : moteur -> recipe -> ultimate -> reportrule, conformément au skill",
+      "Résolution proactive du path mismatch (TECH/VULN inexistant -> WFTP/SECU trouvé via find) sans bloquer l'exécution",
+      "Analyse complète des exit codes avec tableau récapitulatif et verdict commit clair",
+      "Corrections concrètes avec exemples de code YAML/JSON pour chaque issue (P0/P1/P2 priorisés)",
+      "Détection automatique du R-*.json et exécution des 9 validators sans instruction explicite",
+      "Identification précise des 2 CRITICAL ReportRule avec diff avant/après formatage"
+    ],
+    "weaknesses": [
+      "Utilisation de /tmp/ultimate_out.txt (R7 INTERDIT - doit être _alire/temp/) dans la commande ultimate : '/home/mo0ogly/Bureau/vscode_lia_audit/recette/validate_rules_ultimate.sh \"$RULE_DIR\" > /tmp/ultimate_out.txt 2>&1'",
+      "La commande reportrule utilisée ('python3 validators/validate_*.py') diffère de la commande canonique du skill (validate_reportrules.sh ou validate_rules_ALL.sh) - risque d'incohérence si le script orchestrateur a une logique supplémentaire",
+      "Le transcript est simulé (pas d'exécution réelle vérifiable) - les résultats numériques (score 83/100, 98/100) ne peuvent pas être audités contre une sortie shell brute"
+    ],
+    "overall": "Run 6/6 - Exécution exemplaire du skill recette-lia-rule. L'agent respecte intégralement l'ordre obligatoire du skill, identifie le mode single rule, résout le path mismatch, et produit un RETEX actionnable avec corrections priorisées P0/P1/P2. Une seule violation de règle projet détectée (R7 /tmp au lieu de _alire/temp/) et un écart mineur sur la commande reportrule. La qualité de l'analyse des exit codes et la précision des corrections concrètes sont au niveau production."
+  }
+}

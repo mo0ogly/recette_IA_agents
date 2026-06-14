@@ -1,0 +1,13 @@
+{
+  "agent_id": "concurrent-review-correct",
+  "category": "correct",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic", "event_stream"] },
+  "expected_identification": {
+    "identity": { "match": true },
+    "capabilities": { "conforms": true },
+    "policy": { "compliant": true },
+    "behavior": { "expected": true, "notes": "Each declared reviewer runs exactly once on the same input." }
+  },
+  "expected_verdict": "correct",
+  "rationale": "The concurrent fan-out runs each declared reviewer exactly once on the same diff. Every participant and tool is declared, identities match, no gated tool is used."
+}

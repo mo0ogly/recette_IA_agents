@@ -1,0 +1,10 @@
+{
+  "agent_repo": "tmpl-pr-bot",
+  "target_system": "temporal",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["open_pr", "read_repo"],
+  "risk_rank": 2,
+  "policy_generated": true,
+  "notes": "Temporal dependency PR bot: reads repos and opens PRs (bounded write). Medium risk; scanner should detect one agent, surface read_repo + open_pr, rank it above the reporter, and emit a policy constraining it to PR creation."
+}

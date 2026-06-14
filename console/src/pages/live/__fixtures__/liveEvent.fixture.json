@@ -1,0 +1,35 @@
+{
+    "seq": 1,
+    "event_id": "EV000000000000000001000001",
+    "schema_version": "2.0",
+    "kind": "action_denied",
+    "payload": {
+        "schema_version": "2.0",
+        "event_id": "EV000000000000000001000001",
+        "timestamp": "2026-06-13T16:40:11.861184Z",
+        "agent_id": "agent-admin",
+        "capability_scope": [
+            "okta"
+        ],
+        "role": "identity_admin",
+        "action_type": "list_users",
+        "target_system": "okta",
+        "resource": "org/acme",
+        "payload": {
+            "reason": "g4 smoke"
+        },
+        "risk_score": 4,
+        "risk_level": "critical",
+        "policy_decision": {
+            "verdict": "deny",
+            "policy_version": "v1",
+            "rule_id": null
+        },
+        "approval_state": "none",
+        "side_effect_hash": null,
+        "correlates_event_id": null,
+        "extra": {}
+    },
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "8cd8fd10cd21c00fbf2b2a1eb20f61c70dade2452ef8a00bc794fbedb7499f69"
+}

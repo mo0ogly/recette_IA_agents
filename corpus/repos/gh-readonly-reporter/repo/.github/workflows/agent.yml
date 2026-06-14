@@ -1,0 +1,22 @@
+name: weekly-readonly-report
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install PyGithub
+      - run: python agent/main.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.READONLY_REPORTER_TOKEN }}

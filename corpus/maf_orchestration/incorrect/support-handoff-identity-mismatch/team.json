@@ -1,0 +1,35 @@
+{
+  "kind": "maf_orchestration",
+  "agent_id": "support-handoff-identity-mismatch",
+  "name": "Customer Support Handoff (identity drift)",
+  "description": "Same mesh as the correct team, but one participant runs under a different provider than declared.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "HandoffBuilder" },
+  "start_agent": "triage",
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "triage",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "refund", "description": "refund requests" },
+        { "target": "order", "description": "delivery and order issues" }
+      ]
+    },
+    {
+      "agent_id": "refund",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage" }],
+      "tools": [
+        { "tool_kind": "mcp", "target": "https://mcp.example.com/refund", "approval": "always" }
+      ]
+    },
+    {
+      "agent_id": "order",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [{ "target": "triage" }],
+      "tools": [
+        { "tool_kind": "web_search", "target": "web_search", "approval": "never" }
+      ]
+    }
+  ]
+}

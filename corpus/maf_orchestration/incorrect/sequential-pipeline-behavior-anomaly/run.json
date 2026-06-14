@@ -1,0 +1,4 @@
+{
+  "agent_id": "sequential-pipeline-behavior-anomaly",
+  "order": ["extract", "summarize", "enrich"]
+}

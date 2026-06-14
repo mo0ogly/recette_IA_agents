@@ -1,0 +1,20 @@
+[
+  {
+    "seq": 1,
+    "level": "warn",
+    "source": "fixture-bot",
+    "text": "action_denied okta/suspend_user users/jdoe verdict=deny"
+  },
+  {
+    "seq": 2,
+    "level": "info",
+    "source": "fixture-admin",
+    "text": "action_requested okta/suspend_user users/jdoe approval=pending verdict=escalate"
+  },
+  {
+    "seq": 3,
+    "level": "warn",
+    "source": "fixture-admin",
+    "text": "approval_resolved okta/suspend_user approval=denied"
+  }
+]

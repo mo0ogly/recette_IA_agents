@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "skill_name": "recette-lia-rule",
+    "skill_version": "2.0",
+    "iteration": 2,
+    "date": "2026-03-03",
+    "executor_model": "claude-sonnet-4-6",
+    "grader_model": "claude-sonnet-4-6",
+    "evals_run": ["taxonomy-block-mismatch", "diagnose-critical-error"],
+    "runs_per_configuration": 1,
+    "changes_since_iter1": [
+      "P0: Annonce 'Using recette-lia-rule skill. Reading reference files...' ajoutee en ligne 1",
+      "P1: Frontmatter migre vers metadata section",
+      "P3: Rappel R7 ajoute dans section Chemins critiques (JAMAIS /tmp/, toujours _alire/temp/)",
+      "P4: eval-1 redesignee: full-validation-order -> taxonomy-block-mismatch"
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "name": "taxonomy-block-mismatch",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 33
+      },
+      "without_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 18
+      },
+      "delta_pass_rate_pct": 0.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [],
+      "notable_finding": "EVAL NON DISCRIMINANTE - Le message d'erreur contient 'Expected path: UBUNTU/{AXIS}/SYSC/ (suggested)' qui revele directement la solution. L'agent WITHOUT_SKILL (18 appels) recherche le JSON taxonomie et deduit VULN->SYSC independamment. Le piege etait dans le message d'erreur, pas dans la connaissance du skill."
+    },
+    {
+      "id": 2,
+      "name": "diagnose-critical-error",
+      "note": "Carried over from iteration 1 - eval non modifiee",
+      "with_skill": {
+        "passed": 5,
+        "total": 5,
+        "pass_rate": 1.0,
+        "total_tool_calls": 16
+      },
+      "without_skill": {
+        "passed": 4,
+        "total": 5,
+        "pass_rate": 0.8,
+        "total_tool_calls": 16
+      },
+      "delta_pass_rate_pct": 20.0,
+      "failures_with_skill": [],
+      "failures_without_skill": [
+        "critical_before_medium: Baseline inverse l'ordre - Phase 8 (URL HTTP) traitee EN PREMIER car 'correction la plus rapide (1 caractere)' au lieu de respecter l'ordre par severite (Phase 4 HIGH avant Phase 8 MEDIUM)"
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill_avg_pass_rate": 1.0,
+    "without_skill_avg_pass_rate": 0.9,
+    "delta": {
+      "pass_rate": "+10.0%",
+      "tool_calls": "+17.5"
+    },
+    "verdict": "MARGINAL_IMPROVEMENT"
+  },
+  "key_findings": [
+    "Eval-1 toujours non discriminante (0pp) malgre redesign: le message d'erreur 'Expected path: UBUNTU/{AXIS}/SYSC/ (suggested)' revele la solution. Lecon: les messages d'erreur contenant la solution ne peuvent pas discriminer.",
+    "Eval-2 toujours discriminante (+20pp): la priorite par severite (HIGH avant MEDIUM) vs l'effort minimal reste la seule divergence reproductible.",
+    "Comportement cle identifie pour iter 3: RETEX apres validation reussie. Le skill le mandate ('OBLIGATOIRE - meme si tout est vert'). Le baseline ne le fait JAMAIS quand validation passe.",
+    "Violation R7 non detectee dans iter 2 car aucun fichier temporaire cree dans les evals actuels."
+  ],
+  "top_improvements_needed": [
+    "P4 CRITIQUE ITER3: Redesigner eval-1 avec le comportement RETEX obligatoire (comportement 100% skill-exclusif)",
+    "Scenario cible: 'La validation passe avec exit 0, score 100/100. Que presentes-tu a l'utilisateur ?'",
+    "Prediction: WITHOUT_SKILL dira 'commit autorise, pas d'actions supplementaires' (0/5). WITH_SKILL presentera le template RETEX 5 questions (5/5). Delta attendu: +100pp.",
+    "Objectif iter 3: atteindre delta global +55pp minimum (eval-1 +100pp + eval-2 +20pp) / 2 = +60pp"
+  ]
+}

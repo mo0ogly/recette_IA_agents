@@ -1,0 +1,14 @@
+{
+    "total": 1,
+    "passed": 1,
+    "skipped": 0,
+    "detection_rate": 1.0,
+    "accuracy_by_dimension": {
+        "identity": null,
+        "capabilities": null,
+        "policy": null,
+        "behavior": null
+    },
+    "false_positives": 0,
+    "false_negatives": 0
+}

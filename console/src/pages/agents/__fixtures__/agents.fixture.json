@@ -1,0 +1,1 @@
+[{"id":"gh-pr-bot","runtime":"lab","principal":"bot@acme","target_system":"github","goal":"open a pull request on acme/x","capability_scope":["github"],"ai_backend_id":"backend-1"}]

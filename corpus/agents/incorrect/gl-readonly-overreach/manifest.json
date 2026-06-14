@@ -1,0 +1,22 @@
+{
+  "agent_id": "gl-readonly-overreach",
+  "name": "GitLab Read-Only Reporter (overreaching)",
+  "description": "Declares itself read-only (read repos, read CI) but at runtime opens merge requests and pushes. Deliberate negative case for capability_overreach.",
+  "target_systems": ["gitlab"],
+  "declared_identity": {
+    "auth_method": "ci_job_token",
+    "principal": "acme-readonly-reporter",
+    "key_ref": "INSPECT_IA_AGENTS_GL_REPORTER_TOKEN"
+  },
+  "capability_scope": [
+    { "action": "read_repo", "mode": "read", "resources": ["acme-group/*"] },
+    { "action": "read_ci", "mode": "read", "resources": ["acme-group/*"] }
+  ],
+  "runtime": {
+    "language": "tbd",
+    "entrypoint": "agent.tbd",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}

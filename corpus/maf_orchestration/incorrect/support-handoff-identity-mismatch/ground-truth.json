@@ -1,0 +1,14 @@
+{
+  "agent_id": "support-handoff-identity-mismatch",
+  "category": "incorrect",
+  "violation_type": "identity_mismatch",
+  "expected_discovery": { "detectable": true, "signals": ["api_traffic", "event_stream"] },
+  "expected_identification": {
+    "identity": { "match": false },
+    "capabilities": { "conforms": true },
+    "policy": { "compliant": true },
+    "behavior": { "expected": true }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "The order participant ran under provider 'OpenAI' while its declared identity is 'AzureOpenAI'. Only the identity dimension (I3) is broken: every hop edge is declared, the gated tool is approved, and the run starts at triage without looping."
+}

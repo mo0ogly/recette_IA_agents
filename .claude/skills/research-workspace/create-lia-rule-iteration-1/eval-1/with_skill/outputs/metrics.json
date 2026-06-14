@@ -1,0 +1,88 @@
+{
+  "eval_id": "eval-1",
+  "condition": "with_skill",
+  "skill": "create-lia-rule",
+  "cve": "CVE-2025-47812",
+  "technology": "Wing FTP Server",
+
+  "tool_calls": {
+    "Read": 6,
+    "Glob": 0,
+    "Bash": 8,
+    "WebSearch": 0,
+    "Write": 4,
+    "total_tool_calls": 18
+  },
+
+  "skill_compliance": {
+    "postgresql_queried_first": true,
+    "motor_fix_010_respected": true,
+    "sigma_extended_format": true,
+    "gate_level_1_executed": true,
+    "gate_level_1_passed": true,
+    "gate_level_2_executed": true,
+    "gate_level_2_passed": true,
+    "gate_level_3_websearch": false,
+    "websearch_justified": "non necessaire - niveaux 1 et 2 satisfaits"
+  },
+
+  "rule_quality": {
+    "test_data_cases": 16,
+    "test_data_minimum_required": 14,
+    "vulnerable_cases": 10,
+    "safe_cases": 6,
+    "vulnerable_ratio_percent": 62.5,
+    "target_ratio_min_percent": 60,
+    "target_ratio_max_percent": 65,
+    "ratio_in_target": true,
+    "object_class_coherent": true,
+    "version_comparison_function": "version_lt(VersionNormalized, '7.4.4.0')",
+    "collect_script_exists": true,
+    "collect_script_path": "scripts/collect/wingftp/Collect-WingFTPServer.ps1",
+    "reportrule_json_exists": true,
+    "test_rule_sh_exists": true,
+    "match_section_present": true,
+    "where_section_present": true,
+    "computed_fields_count": 6,
+    "computed_fields_minimum": 5,
+    "compliance_mapping_lowercase": true,
+    "references_real": true,
+    "no_placeholder_references": true
+  },
+
+  "motor_fix_010_checks": {
+    "is_vulnerable_flag_absent": true,
+    "is_compliant_flag_absent": true,
+    "is_affected_flag_absent": true,
+    "check_result_fail_absent": true,
+    "cve_specific_flag_absent": true,
+    "detection_logic_in_yaml_only": true,
+    "collection_script_raw_data_only": true
+  },
+
+  "sigma_extended_checks": {
+    "object_detection_match_present": true,
+    "object_detection_where_present": true,
+    "match_uses_objectclass": true,
+    "where_uses_version_lt_function": true,
+    "object_type_field_present": true,
+    "data_source_collection_script_present": true
+  },
+
+  "outcome": {
+    "rule_already_existed": true,
+    "rule_created_anew": false,
+    "action_taken": "Identifie regle existante et conforme via Gate Niveau 2 - aucune creation necessaire",
+    "deliverable": "Confirmation conformite + documentation outputs"
+  },
+
+  "notes": [
+    "Le skill a correctement execute la recherche PostgreSQL en premier (MOTOR_FIX_010)",
+    "Gate Niveau 1 : scripts/collect/wingftp/Collect-WingFTPServer.ps1 trouve",
+    "Gate Niveau 2 : regle WFTP/SECU/A-S-WFTP-WingFTP-CVE-2025-47812/ trouvee complete",
+    "Gate Niveau 3 (WebSearch) non execute car niveaux 1 et 2 satisfaits",
+    "Aucune violation MOTOR_FIX_010 detectee dans le script PowerShell ni dans la regle YAML",
+    "test_data.json contient 16 cas (10 vulnerables + 6 safe) = ratio 62.5% dans la cible 60/40",
+    "La regle utilise version_lt(VersionNormalized, '7.4.4.0') conformement au format Sigma Extended"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "eval_id": 1,
+  "name": "close-session-after-work",
+  "prompt": "j'ai fini le banner-server COUCHE 5 - 30 banners detectes par LiaProbe, tout est en prod depuis le commit 3b82e8bfe5. je veux clore la session research discovery pour cette partie",
+  "expectations": [
+    "Annonce 'Using research skill' au debut",
+    "Cree un fichier dans outputs/ simulant validated/ avec commit 3b82e8bfe5 comme preuve",
+    "Inclut le tag [VALIDATED] et [COMMIT] dans les sorties RESEARCH_LOG",
+    "Produit une mise a jour du INDEX.md (ou simulation)",
+    "Annonce explicitement 'Session close. Tracking, RESEARCH_LOG et INDEX mis a jour.' a la fin",
+    "Ne se contente pas de confirmer verbalement sans creer de fichiers"
+  ],
+  "discriminating_criteria": "L'agent with_skill doit creer 3 fichiers distincts (tracking, RESEARCH_LOG entry, INDEX update). L'agent baseline va probablement se contenter de confirmer ou creer un seul fichier."
+}

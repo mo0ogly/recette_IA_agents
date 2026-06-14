@@ -1,0 +1,49 @@
+{
+  "_comment": "Real payloads captured from GET /campaigns and GET /runs on 127.0.0.1:8090 (2026-06-14). Used by the dashboard render-and-assert test (R16 contract gate) for the campaign-launch section.",
+  "campaigns": [
+    {
+      "id": "camp-pr",
+      "description": "PR bot campaign",
+      "steps": [
+        {
+          "agent_id": "gh-pr-bot",
+          "stub_script": [
+            { "kind": "tool_call", "tool_name": "read_repo", "tool_args": { "resource": "acme/x" } },
+            { "kind": "tool_call", "tool_name": "open_pr", "tool_args": { "resource": "acme/x" } },
+            { "kind": "final", "text": "done" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "finance-wire-fraud",
+      "description": "Finance -- fraude au virement (destructive)",
+      "steps": [{ "agent_id": "finance-wire-fraud-agent" }]
+    },
+    {
+      "id": "identity-offboarding-clean",
+      "description": "Identity -- offboarding propre (legit)",
+      "steps": [{ "agent_id": "identity-offboarding-clean-agent" }]
+    }
+  ],
+  "runs": [
+    {
+      "id": "621c45c1a0144c869c05ddcd3f5e7f7d",
+      "kind": "lane_b",
+      "status": "completed",
+      "created_at": "2026-06-14T10:18:07+00:00",
+      "agent_id": "finance-wire-fraud-agent",
+      "campaign_id": "finance-wire-fraud",
+      "error": null
+    },
+    {
+      "id": "8c9ab824bdf44bd883dfd090b44f26cf",
+      "kind": "lane_b",
+      "status": "running",
+      "created_at": "2026-06-14T09:56:18+00:00",
+      "agent_id": "gh-pr-bot",
+      "campaign_id": "camp-pr",
+      "error": null
+    }
+  ]
+}

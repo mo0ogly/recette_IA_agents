@@ -1,0 +1,15 @@
+{
+  "eval_id": 2,
+  "name": "research-status",
+  "prompt": "ou en est la recherche sur le module discovery ? donne moi l etat complet",
+  "expectations": [
+    "Annonce 'Using research skill' au debut",
+    "Lit RESEARCH_INDEX.md et discovery/INDEX.md (mentionnes dans transcript)",
+    "Retourne la phase actuelle (0-6) avec son nom",
+    "Identifie une gate bloquante concrete (pas inventee)",
+    "Fournit les compteurs validated / investigated / abandoned / backlog",
+    "Propose une prochaine action concrete et mesurable",
+    "Ne retourne pas un statut invente de memoire sans lecture de fichiers"
+  ],
+  "discriminating_criteria": "L'agent with_skill lit les fichiers AVANT de repondre et structure selon le format impose. Le baseline va probablement inventer ou approximer l'etat sans lire les fichiers."
+}

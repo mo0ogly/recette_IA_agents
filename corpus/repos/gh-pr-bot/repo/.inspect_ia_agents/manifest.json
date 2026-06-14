@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-dependency-pr-bot",
+    "description": "Opens pull requests to bump outdated dependencies in acme repositories.",
+    "target_system": "github",
+    "identity": {
+      "auth_method": "github_app",
+      "principal": "acme-dependency-pr-bot[bot]"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "open_pr", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}

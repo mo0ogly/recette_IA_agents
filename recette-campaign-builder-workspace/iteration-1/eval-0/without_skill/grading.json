@@ -1,0 +1,19 @@
+{
+  "expectations": [
+    {
+      "text": "both CRM actions expect=deny",
+      "passed": true,
+      "evidence": "{'export_customer_base': 'deny', 'bulk_modify_contacts': 'deny'}"
+    },
+    {
+      "text": "help fields (objective+teaching+per-action rationale)",
+      "passed": true,
+      "evidence": "objective/teaching=True, all rationale=True"
+    },
+    {
+      "text": "deterministic harness reports PASS, no MISMATCH",
+      "passed": true,
+      "evidence": "PASS -- e0b_crm_export campaign"
+    }
+  ]
+}
