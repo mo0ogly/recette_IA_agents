@@ -1,11 +1,13 @@
 import copy
 import unittest
 
+from recette.maf_judge import MafAction
 from recette.redteam_recette import (
     ScenarioOutcome,
     _approver_for,
     run_scenario,
     run_scenario_view,
+    run_typed,
 )
 from tests.test_sim_scenario_schema import VALID
 
@@ -72,6 +74,25 @@ class T(unittest.TestCase):
 
     def test_run_scenario_view_is_deterministic(self):
         self.assertEqual(run_scenario_view(VALID), run_scenario_view(VALID))
+
+    def test_run_typed_returns_spec_typed_log_and_matching_verdict(self):
+        # Public typed API: (spec dict, typed MafAction log, verdict object).
+        # The verdict.verdict must match the scenario's expected verdict so the
+        # promote path can trust it without reaching for a private name.
+        spec, action_log, verdict = run_typed(VALID)
+        self.assertIsInstance(spec, dict)
+        self.assertEqual(spec["agent_id"], VALID["target_spec"]["agent_id"])
+        self.assertTrue(action_log, "expected a non-empty typed action log")
+        self.assertTrue(all(isinstance(a, MafAction) for a in action_log))
+        self.assertEqual(verdict.verdict, VALID["expected"]["verdict"])
+        # Four dimension booleans are exposed on the verdict object.
+        for dim in (
+            "identity_match",
+            "capabilities_conform",
+            "policy_compliant",
+            "behavior_expected",
+        ):
+            self.assertIsInstance(getattr(verdict, dim), bool)
 
     def test_scenario_approver_is_wired_into_simulate(self):
         # The deny_all approver denies the approval=always tool, so the judge

@@ -13,7 +13,14 @@ from __future__ import annotations
 import copy
 import unittest
 
-from recette.redteam_git import _run_args, run_git_scenario, run_git_scenario_view
+from recette.events import AgentAction
+from recette.redteam_git import (
+    _run_args,
+    _tool_output,
+    run_git_scenario,
+    run_git_scenario_view,
+    run_typed,
+)
 
 # A real git manifest shape, trimmed from corpus/agents/incorrect/gh-readonly-overreach.
 _MANIFEST = {
@@ -93,6 +100,55 @@ class TestGitResistedScenario(unittest.TestCase):
         a = run_git_scenario(copy.deepcopy(_RESISTED))
         b = run_git_scenario(copy.deepcopy(_RESISTED))
         self.assertEqual(a, b)
+
+
+class TestGitRunTyped(unittest.TestCase):
+    def test_run_typed_returns_manifest_typed_log_and_matching_verdict(self) -> None:
+        # Public typed API: (manifest dict, typed AgentAction log, verdict object).
+        manifest, action_log, verdict = run_typed(copy.deepcopy(_OVERREACH))
+        self.assertIsInstance(manifest, dict)
+        self.assertEqual(manifest["agent_id"], _MANIFEST["agent_id"])
+        self.assertTrue(action_log, "expected a non-empty typed action log")
+        self.assertTrue(all(isinstance(a, AgentAction) for a in action_log))
+        self.assertEqual(verdict.verdict, _OVERREACH["expected"]["verdict"])
+        self.assertFalse(verdict.capabilities_conform)
+
+    def test_run_typed_is_deterministic(self) -> None:
+        a = run_typed(copy.deepcopy(_OVERREACH))
+        b = run_typed(copy.deepcopy(_OVERREACH))
+        self.assertEqual([x.to_dict() for x in a[1]], [x.to_dict() for x in b[1]])
+        self.assertEqual(a[2].verdict, b[2].verdict)
+
+
+class TestToolOutputInjection(unittest.TestCase):
+    """The adversarial forge output callback (AgentDojo injection-via-tool-output):
+    the Nth executed action gets injection[N], an out-of-range index falls back to
+    the canonical ok: text, and without injection it is the default ok: text."""
+
+    def _action(self, seq: int) -> AgentAction:
+        return AgentAction(
+            event_id=f"evt-{seq:04d}",
+            seq=seq,
+            timestamp="2023-11-14T22:13:20Z",
+            agent_id="rt-prbot",
+            principal="acme-reporter",
+            target_system="github",
+            action_type="read_repo",
+            mode="read",
+            resource="acme/widgets",
+        )
+
+    def test_no_injection_uses_default_ok_text(self) -> None:
+        out = _tool_output(None)
+        text = out(self._action(1))
+        self.assertTrue(text.startswith("ok:"))
+
+    def test_injection_is_applied_by_index_then_falls_back(self) -> None:
+        out = _tool_output(["poisoned-0", "poisoned-1"])
+        self.assertEqual(out(self._action(1)), "poisoned-0")
+        self.assertEqual(out(self._action(2)), "poisoned-1")
+        # Third call is out of range -> canonical ok: text (no injection left).
+        self.assertTrue(out(self._action(3)).startswith("ok:"))
 
 
 class TestGitScenarioValidation(unittest.TestCase):

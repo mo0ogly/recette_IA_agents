@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .adapters import IdentificationResult
 from .judge import judge_subject
 from .llm import LlmDecision, ReplayLlm
 from .manifest import validate
@@ -89,6 +90,23 @@ def _replay(scenario: dict):
     )
     verdict = judge_subject(spec, result.action_log)
     return spec, result, verdict
+
+
+def run_typed(scenario: dict) -> tuple[dict, list, IdentificationResult]:
+    """Replay a MAF scenario and return the TYPED triple ``(spec, action_log,
+    verdict)``.
+
+    Public wrapper over the private ``_replay`` core: validates, replays and
+    re-judges the scenario, then exposes the embedded ``target_spec`` (manifest
+    dict), the typed ``MafAction`` log and the ``IdentificationResult`` verdict
+    object (``.verdict`` plus the four dimension booleans). The freezer
+    (``redteam.to_corpus_subject``) needs the TYPED action log, which the *_view
+    functions do not return -- this is the supported way to obtain it without
+    reaching for a private name. Pure + deterministic (I4); raises ValueError on
+    an invalid scenario or target_spec.
+    """
+    spec, result, verdict = _replay(scenario)
+    return spec, result.action_log, verdict
 
 
 def run_scenario(scenario: dict) -> ScenarioOutcome:

@@ -31,8 +31,8 @@ import json
 from pathlib import Path
 
 from .redteam import to_corpus_subject
-from .redteam_git import _judge_once, _validate
-from .redteam_recette import _replay
+from .redteam_git import run_typed as _git_run_typed
+from .redteam_recette import run_typed as _maf_run_typed
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SIM_DIR = _REPO_ROOT / "corpus" / "sim"
@@ -97,16 +97,14 @@ def _load_scenario(scenario_id: str) -> tuple[dict, str]:
 
 def _run_typed(scenario: dict, family: str) -> tuple[dict, list, str | None]:
     """Replay a scenario with its typed runner and return ``(manifest,
-    action_log, verdict)``. The action_log is the TYPED log (MafAction /
+    action_log, verdict_str)``. The action_log is the TYPED log (MafAction /
     AgentAction) that ``to_corpus_subject`` expects -- the *_view functions only
-    return dicts, so we drive the typed runners directly.
+    return dicts, so we drive the PUBLIC typed runners (``run_typed``) directly,
+    family-aware (no cross-module private reach).
     """
-    if family == "maf_agent":
-        spec, result, verdict = _replay(scenario)
-        return spec, result.action_log, verdict.verdict
-    manifest = _validate(scenario)
-    result, verdict = _judge_once(scenario, manifest)
-    return manifest, result.actions, verdict.verdict
+    runner = _maf_run_typed if family == "maf_agent" else _git_run_typed
+    manifest, action_log, verdict = runner(scenario)
+    return manifest, action_log, verdict.verdict
 
 
 def promote_scenario(

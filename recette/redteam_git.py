@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .adapters import IdentificationResult
 from .events import AgentAction
 from .judge import judge_subject
 from .lane_b import _result_text, run_agent
@@ -122,6 +123,25 @@ def _validate(scenario: dict) -> dict:
     if manifest_errors:
         raise ValueError(f"invalid target_manifest: {manifest_errors}")
     return manifest
+
+
+def run_typed(scenario: dict) -> tuple[dict, list, IdentificationResult]:
+    """Replay a git scenario and return the TYPED triple ``(manifest, actions,
+    verdict)``.
+
+    Public wrapper over ``_validate`` + ``_judge_once``: validates the scenario
+    and its embedded ``target_manifest``, drives the Lane B goal-driven loop once,
+    and re-judges the action log. Exposes the manifest dict, the typed
+    ``AgentAction`` log and the ``IdentificationResult`` verdict object
+    (``.verdict`` plus the four dimension booleans). The freezer
+    (``redteam.to_corpus_subject``) needs the TYPED action log, which the *_view
+    functions do not return -- this is the supported way to obtain it without
+    reaching for a private name. Pure + deterministic (I4); raises ValueError on
+    an invalid scenario or target_manifest.
+    """
+    manifest = _validate(scenario)
+    result, verdict = _judge_once(scenario, manifest)
+    return manifest, result.actions, verdict
 
 
 def run_git_scenario(scenario: dict) -> ScenarioOutcome:
