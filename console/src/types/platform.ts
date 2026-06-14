@@ -569,6 +569,43 @@ export interface ProxyDebugStatus {
   trace_count: number;
 }
 
+/**
+ * One intercepted request/response pair from the OPTIONAL mitmproxy wire
+ * overlay -- the NETWORK-level view of an I5 side effect (the bytes on the
+ * wire), as opposed to ProxyTrace's application-level intent. Read-only (I1).
+ */
+export interface WireFlow {
+  seq: number;
+  method: string;
+  scheme: string;
+  host: string;
+  port: number;
+  path: string;
+  status_code: number;
+  ok: boolean;
+  content_type: string;
+  request_body: string;
+  response_body: string;
+  /** Originating run when the addon could attribute it; null otherwise. */
+  run_id: string | null;
+}
+
+/** Response of GET /proxy/wire: the captured flows plus the overlay state. */
+export interface WireFlowResponse {
+  /** True when INSPECT_IA_AGENTS_WIRE_PROXY is configured (the overlay is wired). */
+  enabled: boolean;
+  /** The proxy URL agents route through, or null when the overlay is off. */
+  proxy_url: string | null;
+  flows: WireFlow[];
+}
+
+/** Response of GET /proxy/wire/status: overlay state and buffered flow count. */
+export interface WireStatus {
+  enabled: boolean;
+  proxy_url: string | null;
+  flow_count: number;
+}
+
 /** One judged query in the RAG retrieval recette (GET /rag/scorecard). */
 export interface RagQueryResult {
   query: string;

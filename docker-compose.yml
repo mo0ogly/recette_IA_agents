@@ -140,5 +140,31 @@ services:
       INSPECT_IA_AGENTS_E2E_API_URL: http://api:8090
     command: python -m unittest tests.e2e.test_governed_flow -v
 
+  # --- OPTIONAL wire-interception overlay (mitmproxy) -----------------------
+  # A real HTTP(S) interception proxy that captures the bytes on the wire of the
+  # agent -> target-system traffic (the network-level view of the I5 side
+  # effects). OFF by default: it lives behind the "wire" compose profile, so a
+  # plain `up` never starts it. Observability only -- it never alters traffic;
+  # its addon POSTs each flow to the API wire ring (POST /proxy/wire).
+  #
+  # network_mode: host because the platform runs on the HOST (./recette.sh
+  # platform up): host networking lets mitmproxy bind :8083 on the host, reach
+  # the host lab servers on 127.0.0.1:91xx, and POST back to the host API :8090,
+  # all without container/host loopback translation (Linux). To route agents
+  # through it: set INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:8083 for the API
+  # process, then restart the API (./recette.sh api restart).
+  wire-proxy:
+    image: mitmproxy/mitmproxy:11.1.3
+    profiles: ["wire"]
+    network_mode: host
+    command: >
+      mitmdump --listen-host 127.0.0.1 --listen-port 8083
+      --set stream_large_bodies=2m
+      -s /addons/mitm_wire_addon.py
+    environment:
+      INSPECT_IA_AGENTS_API_URL: "${INSPECT_IA_AGENTS_API_URL:-http://127.0.0.1:8090}"
+    volumes:
+      - ./scripts/mitm_wire_addon.py:/addons/mitm_wire_addon.py:ro
+
 volumes:
   platform-data:

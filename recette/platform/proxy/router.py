@@ -48,12 +48,20 @@ def resolve_proxy(
     default: ExternalSystemProxy,
     *,
     real_proxy_factory: RealProxyFactory | None = None,
+    wire_proxy_url: str | None = None,
 ) -> ExternalSystemProxy:
     """Resolve the proxy for one agent run from the server registry.
 
     ``real_proxy_factory`` (optional) builds the ExternalSystemProxy for a
     ``real_saas`` server entry; it is invoked with that server dict. When omitted,
     a ``real_saas`` entry raises ValueError (this module holds no credentials).
+
+    ``wire_proxy_url`` (optional) routes the lab-mode proxies (mock_local,
+    declared_url) through the mitmproxy wire overlay. It is INJECTED by the
+    impure call-site (which reads the env), keeping this module pure: None ->
+    direct, exactly the previous behaviour (I4). real_saas is unaffected (its
+    proxy is built by the factory; real targets are HTTPS and would need the
+    overlay CA, out of the phase-1 lab scope).
 
     Raises ValueError on a dangling server reference, an unsupported mode,
     or a malformed server entry (fail-safe: the run must fail, never
@@ -70,13 +78,13 @@ def resolve_proxy(
         port = server.get("port")
         if not isinstance(port, int) or isinstance(port, bool):
             raise ValueError(f"server {server_id!r} (mock_local) requires an integer 'port'")
-        return LabHttpProxy(f"http://127.0.0.1:{port}")
+        return LabHttpProxy(f"http://127.0.0.1:{port}", proxy_url=wire_proxy_url)
     if mode == "declared_url":
         base_url = server.get("base_url")
         if not isinstance(base_url, str) or not base_url:
             raise ValueError(f"server {server_id!r} (declared_url) requires a non-empty 'base_url'")
         # The declared server must implement the lab wire format (module docstring).
-        return LabHttpProxy(base_url)
+        return LabHttpProxy(base_url, proxy_url=wire_proxy_url)
     if mode == "real_saas":
         if real_proxy_factory is None:
             raise ValueError("real_saas execution requires realmode wiring")

@@ -36,8 +36,14 @@ def _transport_error(base_url: str, exc: Exception) -> str:
 
 
 class LabHttpProxy:
-    def __init__(self, base_url: str | None = None, *, timeout: float = 10.0) -> None:
-        self._client = StdlibHttpClient(base_url or lab_url_from_env(), timeout=timeout)
+    def __init__(
+        self, base_url: str | None = None, *, timeout: float = 10.0, proxy_url: str | None = None
+    ) -> None:
+        # ``proxy_url`` (optional) routes the side effect through the mitmproxy
+        # wire overlay; None (default) talks to the lab directly (I4 unchanged).
+        self._client = StdlibHttpClient(
+            base_url or lab_url_from_env(), timeout=timeout, proxy_url=proxy_url
+        )
 
     def execute(self, event: PlatformActionEvent) -> ExecutionResult:
         body = {

@@ -30,10 +30,14 @@ import {
 import "./proxy.css";
 
 const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
+const WirePanel = lazy(() => import("./WirePanel"));
 
 const POLL_INTERVAL_MS = 2000;
 
 type ViewerMode = "trace" | "stream";
+/** Which side-effect altitude the page shows: the application-level ProxyTrace
+ *  list ("app"), or the network-level mitmproxy flows ("wire"). */
+type Source = "app" | "wire";
 
 interface BoundaryState {
   error: Error | null;
@@ -64,6 +68,7 @@ class ViewerBoundary extends Component<{ children: ReactNode }, BoundaryState> {
 }
 
 export default function ProxyPage(): JSX.Element {
+  const [source, setSource] = useState<Source>("app");
   const [traces, setTraces] = useState<ProxyTrace[]>([]);
   const [debugEnabled, setDebugEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,36 +142,66 @@ export default function ProxyPage(): JSX.Element {
       <header className="proxy-header">
         <h1>Proxy</h1>
         <PageHelp topic="proxy" />
-        <span className="proxy-summary">
-          {traces.length} trace(s), {fails} echec(s)
-        </span>
-        <span className="proxy-mode" role="group" aria-label="viewer mode">
+        <span className="proxy-source" role="group" aria-label="source">
           <button
             type="button"
             className="proxy-mode-btn"
-            data-active={mode === "trace"}
-            onClick={() => setMode("trace")}
+            data-active={source === "app"}
+            onClick={() => setSource("app")}
           >
-            trace
+            traces app
           </button>
           <button
             type="button"
             className="proxy-mode-btn"
-            data-active={mode === "stream"}
-            onClick={() => setMode("stream")}
+            data-active={source === "wire"}
+            onClick={() => setSource("wire")}
           >
-            stream
+            wire (mitmproxy)
           </button>
         </span>
-        <button type="button" className="proxy-export" onClick={onExport}>
-          Export JSONL
-        </button>
-        <button type="button" className="proxy-clear" onClick={() => void onClear()}>
-          Vider le tampon
-        </button>
+        {source === "app" && (
+          <>
+            <span className="proxy-summary">
+              {traces.length} trace(s), {fails} echec(s)
+            </span>
+            <span className="proxy-mode" role="group" aria-label="viewer mode">
+              <button
+                type="button"
+                className="proxy-mode-btn"
+                data-active={mode === "trace"}
+                onClick={() => setMode("trace")}
+              >
+                trace
+              </button>
+              <button
+                type="button"
+                className="proxy-mode-btn"
+                data-active={mode === "stream"}
+                onClick={() => setMode("stream")}
+              >
+                stream
+              </button>
+            </span>
+            <button type="button" className="proxy-export" onClick={onExport}>
+              Export JSONL
+            </button>
+            <button type="button" className="proxy-clear" onClick={() => void onClear()}>
+              Vider le tampon
+            </button>
+          </>
+        )}
       </header>
 
-      <div className="proxy-filter" role="group" aria-label="trace filter">
+      {source === "wire" && (
+        <Suspense fallback={<div className="proxy-viewer-msg">loading wire panel...</div>}>
+          <WirePanel />
+        </Suspense>
+      )}
+
+      {source === "app" && (
+        <>
+          <div className="proxy-filter" role="group" aria-label="trace filter">
         <label className="proxy-filter-label">
           agent_id
           <select
@@ -246,16 +281,18 @@ export default function ProxyPage(): JSX.Element {
             </li>
           ))}
         </ul>
-        <div className="proxy-viewer">
-          <ViewerBoundary>
-            <Suspense
-              fallback={<div className="proxy-viewer-msg">loading editor...</div>}
-            >
-              <MonacoJsonViewer value={viewerValue} />
-            </Suspense>
-          </ViewerBoundary>
-        </div>
-      </div>
+            <div className="proxy-viewer">
+              <ViewerBoundary>
+                <Suspense
+                  fallback={<div className="proxy-viewer-msg">loading editor...</div>}
+                >
+                  <MonacoJsonViewer value={viewerValue} />
+                </Suspense>
+              </ViewerBoundary>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

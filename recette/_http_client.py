@@ -33,12 +33,43 @@ DEFAULT_USER_AGENT = "inspect_ia_agents-recette/0.1"
 
 
 class StdlibHttpClient:
-    """Tiny urllib-based client with a base_url and default headers."""
+    """Tiny urllib-based client with a base_url and default headers.
 
-    def __init__(self, base_url: str, headers: dict[str, str] | None = None, timeout: float = 30.0):
+    ``proxy_url`` (optional) routes every request through an explicit HTTP(S)
+    proxy -- the seam the mitmproxy wire overlay uses. It is explicit (never read
+    from the ambient HTTP_PROXY env) so the routing is deterministic and the
+    overlay is opt-in: with ``proxy_url=None`` the client talks to the target
+    directly, exactly as before (no behaviour change on the recette path, I4).
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        headers: dict[str, str] | None = None,
+        timeout: float = 30.0,
+        *,
+        proxy_url: str | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.timeout = timeout
+        self.proxy_url = proxy_url
+        # A per-client opener bound to the proxy. ProxyHandler with an explicit
+        # mapping ignores the environment, so only callers that pass proxy_url
+        # are proxied. None => use the module default opener (direct).
+        self._opener: urllib.request.OpenerDirector | None = (
+            urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+            )
+            if proxy_url
+            else None
+        )
+
+    def _open(self, req: urllib.request.Request) -> _Response:
+        # url is built from a caller-supplied base_url (http/https), not user input
+        opener = self._opener.open if self._opener is not None else urllib.request.urlopen
+        with opener(req, timeout=self.timeout) as resp:  # noqa: S310  # nosec B310
+            return _Response(resp.status, resp.read())
 
     def _request(self, method: str, path: str, body: dict | None) -> _Response:
         url = f"{self.base_url}{path}"
@@ -49,9 +80,7 @@ class StdlibHttpClient:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            # url is built from a caller-supplied base_url (http/https), not user input
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310  # nosec B310
-                return _Response(resp.status, resp.read())
+            return self._open(req)
         except urllib.error.HTTPError as exc:
             return _Response(exc.code, exc.read())
 

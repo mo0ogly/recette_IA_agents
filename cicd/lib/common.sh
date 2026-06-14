@@ -50,6 +50,11 @@ CONSOLE_LOG_FILE="${RUN_DIR}/console.log"
 CAMPAIGNS_DIR="${REPO_ROOT}/campaigns"
 CAMPAIGN_REPORTS_DIR="${RUN_DIR}/campaigns"
 
+# -- wire proxy (optional mitmproxy interception overlay, Docker) ------------
+# The host port mitmdump binds; agents route through http://127.0.0.1:${WIRE_PORT}
+# when INSPECT_IA_AGENTS_WIRE_PROXY points at it. Off unless the operator brings it up.
+WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8083}"
+
 # -- python picker: prefer the project venv, else system python3 ------------
 py() {
     if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then

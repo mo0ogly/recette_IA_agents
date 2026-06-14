@@ -27,6 +27,7 @@ from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
+from ..platform.proxy.wire import WireFlowRecorder, wire_proxy_url_from_env
 from ..platform.realtime import (
     PublishingEventStore,
     RealtimeTransport,
@@ -257,6 +258,13 @@ def create_app(
     side_effect_proxy: ExternalSystemProxy = TracingProxy(
         base_proxy, trace_recorder, enabled=proxy_debug_enabled
     )
+    # Wire overlay (OPTIONAL, off by default): the network-level view of the same
+    # I5 side effects, fed by the mitmproxy Docker overlay via POST /proxy/wire.
+    # The recorder always exists (so the endpoints work); the overlay is only
+    # "enabled" when INSPECT_IA_AGENTS_WIRE_PROXY names a proxy URL (R5). OFF keeps
+    # the deterministic recette untouched (I4): nothing routes through a proxy.
+    app.state.wire_flow_recorder = WireFlowRecorder()
+    app.state.wire_proxy_url = wire_proxy_url_from_env()
     action_catalog = catalog if catalog is not None else load_catalog()
 
     # Policy bootstrap: ensure an active version exists so the gateway never

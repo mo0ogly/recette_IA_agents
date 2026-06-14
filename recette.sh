@@ -17,6 +17,7 @@ set -euo pipefail
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
+#   ./recette.sh wire up|down|status|logs              # optional mitmproxy wire-interception overlay (Docker)
 #   ./recette.sh git status|pull|push|sync|branches|clean-merged
 #
 # Auteur : Fabrice Pizzi - ANSSI
@@ -33,6 +34,7 @@ CHECKS_SH="${CICD_DIR}/checks.sh"
 GIT_SH="${CICD_DIR}/git.sh"
 PLATFORM_SH="${CICD_DIR}/platform.sh"
 SMOKE_SH="${CICD_DIR}/smoke.sh"
+WIRE_SH="${CICD_DIR}/wire.sh"
 
 show_menu() {
     hdr "inspect_ia_agents recette - gestion"
@@ -124,9 +126,10 @@ case "${cmd}" in
     test|gates|report|validate|run|discovery|console-build|console-test)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
+    wire)                              "${WIRE_SH}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
-        sed -n '4,19p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+        sed -n '4,20p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
     *)  err "commande inconnue: ${cmd}"; \
         echo "  voir: ./recette.sh --help"; exit 1 ;;
 esac

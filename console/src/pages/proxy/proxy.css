@@ -169,3 +169,46 @@
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
+
+/* Source toggle (app traces vs wire overlay) and the wire panel. */
+.proxy-source {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.proxy-wire-proxy {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.proxy-wire-detail {
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.proxy-wire-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.proxy-wire-kv dt {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.proxy-wire-kv dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.proxy-wire-body {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+}

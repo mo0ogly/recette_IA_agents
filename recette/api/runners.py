@@ -29,6 +29,7 @@ from ..platform.proxy.lab_proxy import LabHttpProxy, lab_url_from_env
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
 from ..platform.proxy.tracing import TraceRecorder, TracingProxy
+from ..platform.proxy.wire import wire_proxy_url_from_env
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
 
@@ -236,7 +237,15 @@ def forge_for_agent(
         return GatewayForge(gateway) if gateway is not None else LabForge()
     # Validate the server reference up-front (fail-safe: a dangling or malformed
     # reference must raise, never silently fall back to the wrong target).
-    proxy = resolve_proxy(agent_cfg, servers, default_proxy or LabHttpProxy())
+    # When the wire overlay is configured (INSPECT_IA_AGENTS_WIRE_PROXY), route the
+    # lab-mode side effects through it so mitmproxy captures the bytes on the
+    # wire. Unset (the recette default) => None => direct, I4 unchanged.
+    proxy = resolve_proxy(
+        agent_cfg,
+        servers,
+        default_proxy or LabHttpProxy(),
+        wire_proxy_url=wire_proxy_url_from_env(),
+    )
     # A mock_local server on the canonical lab port is the SAME target the
     # gateway already mediates (the lab, routed by target_system). When a gateway
     # is available, govern that path through it (GatewayForge): identical

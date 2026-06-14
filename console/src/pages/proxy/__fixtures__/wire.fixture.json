@@ -1,0 +1,34 @@
+{
+  "enabled": false,
+  "proxy_url": null,
+  "flows": [
+    {
+      "seq": 1,
+      "method": "POST",
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 9101,
+      "path": "/github/execute",
+      "status_code": 201,
+      "ok": true,
+      "content_type": "application/json",
+      "request_body": "{\"action_type\":\"open_pr\",\"resource\":\"acme/widgets\"}",
+      "response_body": "{\"success\":true,\"data\":{\"number\":42}}",
+      "run_id": "run-demo"
+    },
+    {
+      "seq": 2,
+      "method": "POST",
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 9101,
+      "path": "/github/execute",
+      "status_code": 403,
+      "ok": false,
+      "content_type": "application/json",
+      "request_body": "{\"action_type\":\"merge_pr\",\"resource\":\"acme/widgets#42\"}",
+      "response_body": "{\"success\":false,\"error\":\"policy deny\"}",
+      "run_id": "run-demo"
+    }
+  ]
+}
