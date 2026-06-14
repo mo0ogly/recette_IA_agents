@@ -928,3 +928,24 @@ export function getSimScenarios(): Promise<{ count: number; scenarios: SimScenar
 export function getSimScenario(id: string): Promise<SimScenarioView> {
   return request<SimScenarioView>(`/sim/scenarios/${encodeURIComponent(id)}`);
 }
+
+/** The corpus subject created by promoting a caught anomaly. */
+export interface SimPromoteResult {
+  slug: string;
+  created: string[];
+  verdict: string;
+  violation_type: string | null;
+}
+
+/**
+ * POST /sim/scenarios/{id}/promote: freeze a caught anomaly (verdict=incorrect,
+ * single-axis) into a negative corpus subject, closing the recette loop.
+ * Resolves with the created corpus paths. Rejects (ApiError) on 404 (unknown
+ * scenario), 422 (true-negative / multi-axis), or 409 (already promoted).
+ */
+export function promoteSimScenario(id: string): Promise<SimPromoteResult> {
+  return request<SimPromoteResult>(`/sim/scenarios/${encodeURIComponent(id)}/promote`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}

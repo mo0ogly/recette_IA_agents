@@ -9,8 +9,18 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { getSimRuns, getSimScenarios, getSimView } from "../../api/client";
-import type { SimRunSummary, SimScenario, SimView } from "../../api/client";
+import {
+  getSimRuns,
+  getSimScenarios,
+  getSimView,
+  promoteSimScenario,
+} from "../../api/client";
+import type {
+  SimPromoteResult,
+  SimRunSummary,
+  SimScenario,
+  SimView,
+} from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import "../discovery/discovery.css";
 
@@ -20,37 +30,110 @@ const DIMS = ["identity", "capabilities", "policy", "behavior"] as const;
  * Pure presentational list of red-team scenarios. For each scenario it surfaces,
  * legibility-first, whether the recette caught the anomaly (a pill-ok "caught" /
  * pill-bad "missed" badge keyed off anomaly_caught), the predicted-vs-expected
- * verdict, and the OWASP ASI tag when the scenario carries one. No fetching, no
- * state -- driven entirely by its props so it is trivially testable (R16).
+ * verdict, and the OWASP ASI tag when the scenario carries one. A CAUGHT anomaly
+ * (verdict=incorrect) carries a "Promote to corpus" action that freezes it into a
+ * negative corpus subject (POST /sim/scenarios/{id}/promote) and surfaces the
+ * created paths; a true negative (verdict=correct) shows the action disabled --
+ * nothing to promote. Promote state is kept locally per scenario id (R16).
  */
 export function ScenarioList({ scenarios }: { scenarios: SimScenario[] }): JSX.Element {
+  const [promoted, setPromoted] = useState<Record<string, SimPromoteResult>>({});
+  const [promoteError, setPromoteError] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+
   if (scenarios.length === 0)
     return (
       <p className="discovery-note" data-testid="sim-scn-empty">
         No red-team scenarios.
       </p>
     );
+
+  const onPromote = (id: string): void => {
+    setPending((p) => ({ ...p, [id]: true }));
+    setPromoteError((e) => {
+      const next = { ...e };
+      delete next[id];
+      return next;
+    });
+    promoteSimScenario(id)
+      .then((res) => setPromoted((p) => ({ ...p, [id]: res })))
+      .catch((err) =>
+        setPromoteError((e) => ({
+          ...e,
+          [id]: err instanceof Error ? err.message : String(err),
+        })),
+      )
+      .finally(() => setPending((p) => ({ ...p, [id]: false })));
+  };
+
   return (
     <ul className="discovery-summary" data-testid="sim-scenarios">
-      {scenarios.map((s) => (
-        <li key={s.scenario_id} data-testid={`sim-scn-${s.scenario_id}`}>
-          <span
-            className={`pill ${s.anomaly_caught ? "pill-ok" : "pill-bad"}`}
-            data-testid={`sim-scn-caught-${s.scenario_id}`}
-          >
-            {s.anomaly_caught ? "caught" : "missed"}
-          </span>{" "}
-          <strong>{s.name}</strong>{" "}
-          <span className="discovery-stat">
-            {s.verdict} (expected {s.expected_verdict})
-          </span>
-          {s.tags.owasp_asi && (
-            <span className="pill" data-testid={`sim-scn-owasp-${s.scenario_id}`}>
-              {s.tags.owasp_asi}
+      {scenarios.map((s) => {
+        const caughtAnomaly = s.verdict === "incorrect";
+        const result = promoted[s.scenario_id];
+        const error = promoteError[s.scenario_id];
+        return (
+          <li key={s.scenario_id} data-testid={`sim-scn-${s.scenario_id}`}>
+            <span
+              className={`pill ${s.anomaly_caught ? "pill-ok" : "pill-bad"}`}
+              data-testid={`sim-scn-caught-${s.scenario_id}`}
+            >
+              {s.anomaly_caught ? "caught" : "missed"}
+            </span>{" "}
+            <strong>{s.name}</strong>{" "}
+            <span className="discovery-stat">
+              {s.verdict} (expected {s.expected_verdict})
             </span>
-          )}
-        </li>
-      ))}
+            {s.tags.owasp_asi && (
+              <span className="pill" data-testid={`sim-scn-owasp-${s.scenario_id}`}>
+                {s.tags.owasp_asi}
+              </span>
+            )}{" "}
+            {caughtAnomaly ? (
+              <button
+                type="button"
+                className="pill"
+                data-testid={`sim-scn-promote-${s.scenario_id}`}
+                disabled={pending[s.scenario_id] || result !== undefined}
+                onClick={() => onPromote(s.scenario_id)}
+              >
+                Promote to corpus
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="pill"
+                data-testid={`sim-scn-promote-${s.scenario_id}`}
+                disabled
+                title="nothing to promote"
+              >
+                Promote to corpus
+              </button>
+            )}
+            {result && (
+              <ul
+                className="discovery-summary"
+                data-testid={`sim-scn-promoted-${s.scenario_id}`}
+              >
+                {result.created.map((path) => (
+                  <li key={path}>
+                    <code>{path}</code>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {error && (
+              <span
+                className="discovery-error"
+                role="alert"
+                data-testid={`sim-scn-promote-error-${s.scenario_id}`}
+              >
+                {error}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

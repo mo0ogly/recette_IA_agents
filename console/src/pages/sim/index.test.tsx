@@ -11,6 +11,7 @@ vi.mock("../../api/client", () => ({
   getSimRuns: vi.fn(),
   getSimScenarios: vi.fn(),
   getSimView: vi.fn(),
+  promoteSimScenario: vi.fn(),
 }));
 
 beforeEach(() => {
