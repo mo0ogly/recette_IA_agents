@@ -1,0 +1,27 @@
+{
+  "agent_id": "finance-approval-handoff-capability-overreach",
+  "hops": [
+    {
+      "seq": 1,
+      "from": "intake",
+      "to": "wire"
+    },
+    {
+      "seq": 2,
+      "from": "intake",
+      "to": "payroll"
+    }
+  ],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "wire",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "mcp",
+      "target": "https://mcp.example.com/finance/wire",
+      "approved": true
+    }
+  ]
+}

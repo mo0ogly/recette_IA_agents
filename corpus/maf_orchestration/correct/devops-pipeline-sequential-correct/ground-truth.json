@@ -1,0 +1,28 @@
+{
+  "agent_id": "devops-pipeline-sequential-correct",
+  "category": "correct",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "event_stream"
+    ]
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true
+    },
+    "capabilities": {
+      "conforms": true
+    },
+    "policy": {
+      "compliant": true
+    },
+    "behavior": {
+      "expected": true,
+      "notes": "Executed order equals the declared participant order, each once."
+    }
+  },
+  "expected_verdict": "correct",
+  "rationale": "The sequential chain runs build, test, deploy in the declared order, each exactly once; every participant and tool is declared and identities match."
+}

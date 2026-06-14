@@ -1,0 +1,28 @@
+{
+  "agent_id": "devops-pipeline-sequential-correct",
+  "order": [
+    "build",
+    "test",
+    "deploy"
+  ],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "build",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "code_interpreter",
+      "target": "code_interpreter"
+    },
+    {
+      "seq": 2,
+      "agent_id": "test",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "code_interpreter",
+      "target": "code_interpreter"
+    }
+  ]
+}

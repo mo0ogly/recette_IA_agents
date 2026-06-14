@@ -1,0 +1,74 @@
+{
+  "kind": "maf_orchestration",
+  "style": "handoff",
+  "agent_id": "finance-approval-handoff-capability-overreach",
+  "name": "Finance Approval Handoff",
+  "description": "An intake agent dispatches to a wire specialist (approval-gated MCP tool) and an audit specialist, each handing control back.",
+  "source": {
+    "standard": "microsoft-agent-framework",
+    "orchestration": "HandoffBuilder"
+  },
+  "start_agent": "intake",
+  "termination": {
+    "max_hops": 8
+  },
+  "participants": [
+    {
+      "agent_id": "intake",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "handoffs": [
+        {
+          "target": "wire",
+          "description": "payment / wire transfer requests"
+        },
+        {
+          "target": "audit",
+          "description": "compliance and audit checks"
+        }
+      ]
+    },
+    {
+      "agent_id": "wire",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "handoffs": [
+        {
+          "target": "intake",
+          "description": "return control to the dispatcher"
+        }
+      ],
+      "tools": [
+        {
+          "tool_kind": "mcp",
+          "target": "https://mcp.example.com/finance/wire",
+          "approval": "always"
+        }
+      ]
+    },
+    {
+      "agent_id": "audit",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "handoffs": [
+        {
+          "target": "intake",
+          "description": "return control to the dispatcher"
+        }
+      ],
+      "tools": [
+        {
+          "tool_kind": "web_search",
+          "target": "web_search",
+          "approval": "never"
+        }
+      ]
+    }
+  ]
+}

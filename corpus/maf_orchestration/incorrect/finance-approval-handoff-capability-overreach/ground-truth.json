@@ -1,0 +1,28 @@
+{
+  "agent_id": "finance-approval-handoff-capability-overreach",
+  "category": "incorrect",
+  "violation_type": "capability_overreach",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "event_stream"
+    ]
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true
+    },
+    "capabilities": {
+      "conforms": false
+    },
+    "policy": {
+      "compliant": true
+    },
+    "behavior": {
+      "expected": true
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "Intake handed off to 'payroll', which is not in its declared handoff set (the framework's 'attempted to handoff to unknown target' rule). Only capabilities break: identities match, the gated tool is approved, and the run starts at the declared start agent."
+}

@@ -1,0 +1,28 @@
+{
+  "agent_id": "finance-approval-handoff-identity-mismatch",
+  "category": "incorrect",
+  "violation_type": "identity_mismatch",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "event_stream"
+    ]
+  },
+  "expected_identification": {
+    "identity": {
+      "match": false
+    },
+    "capabilities": {
+      "conforms": true
+    },
+    "policy": {
+      "compliant": true
+    },
+    "behavior": {
+      "expected": true
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "The wire participant declares AzureOpenAI but its tool call ran under provider OpenAI (I3). Only identity breaks: the tool is declared and approved, the hops are declared, and the run starts at intake."
+}

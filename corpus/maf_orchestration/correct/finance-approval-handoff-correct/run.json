@@ -1,0 +1,29 @@
+{
+  "agent_id": "finance-approval-handoff-correct",
+  "hops": [
+    { "seq": 1, "from": "intake", "to": "wire" },
+    { "seq": 2, "from": "wire", "to": "intake" },
+    { "seq": 3, "from": "intake", "to": "audit" }
+  ],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "wire",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "mcp",
+      "target": "https://mcp.example.com/finance/wire",
+      "approved": true
+    },
+    {
+      "seq": 2,
+      "agent_id": "audit",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "web_search",
+      "target": "web_search"
+    }
+  ]
+}

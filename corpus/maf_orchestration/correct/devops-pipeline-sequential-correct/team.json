@@ -1,0 +1,55 @@
+{
+  "kind": "maf_orchestration",
+  "style": "sequential",
+  "agent_id": "devops-pipeline-sequential-correct",
+  "name": "DevOps Release Pipeline",
+  "description": "A three-stage release chain: build, then test, then deploy -- each runs once in order.",
+  "source": {
+    "standard": "microsoft-agent-framework",
+    "orchestration": "SequentialBuilder"
+  },
+  "participants": [
+    {
+      "agent_id": "build",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "tools": [
+        {
+          "tool_kind": "code_interpreter",
+          "target": "code_interpreter",
+          "approval": "never"
+        }
+      ]
+    },
+    {
+      "agent_id": "test",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "tools": [
+        {
+          "tool_kind": "code_interpreter",
+          "target": "code_interpreter",
+          "approval": "never"
+        }
+      ]
+    },
+    {
+      "agent_id": "deploy",
+      "declared_identity": {
+        "provider": "AzureOpenAI",
+        "model": "=Env.MODEL"
+      },
+      "tools": [
+        {
+          "tool_kind": "function",
+          "target": "deploy_release",
+          "approval": "never"
+        }
+      ]
+    }
+  ]
+}

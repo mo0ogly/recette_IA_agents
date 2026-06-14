@@ -1,0 +1,28 @@
+{
+  "agent_id": "finance-approval-handoff-behavior-anomaly",
+  "category": "incorrect",
+  "violation_type": "behavior_anomaly",
+  "expected_discovery": {
+    "detectable": true,
+    "signals": [
+      "api_traffic",
+      "event_stream"
+    ]
+  },
+  "expected_identification": {
+    "identity": {
+      "match": true
+    },
+    "capabilities": {
+      "conforms": true
+    },
+    "policy": {
+      "compliant": true
+    },
+    "behavior": {
+      "expected": false
+    }
+  },
+  "expected_verdict": "incorrect",
+  "rationale": "The first hop originates at 'wire', not the declared start agent 'intake' -- the run did not begin where HandoffBuilder.with_start_agent says it must. Only behavior breaks: the edge itself is declared, identities match, the gated tool is approved."
+}

@@ -1,0 +1,22 @@
+{
+  "agent_id": "finance-approval-handoff-policy-violation",
+  "hops": [
+    {
+      "seq": 1,
+      "from": "intake",
+      "to": "wire"
+    }
+  ],
+  "actions": [
+    {
+      "seq": 1,
+      "agent_id": "wire",
+      "provider": "AzureOpenAI",
+      "model": "=Env.MODEL",
+      "action": "invoke_tool",
+      "tool_kind": "mcp",
+      "target": "https://mcp.example.com/finance/wire",
+      "approved": false
+    }
+  ]
+}
