@@ -222,9 +222,17 @@ Equivalents ligne de commande (memes sous-programmes) :
 ./recette.sh console start|stop|status|logs
 ./recette.sh campaign list|run <nom> [--json]
 ./recette.sh test|gates|report|validate|run|discovery [--docker]
+./recette.sh wire up|down|status|logs|ca       # overlay mitmproxy (interception wire, optionnel)
+./recette.sh llm-proxy up|down|status|logs     # overlay LiteLLM (gateway LLM, optionnel)
 ./recette.sh git status|pull|push|sync|branches|clean-merged
 ./recette.sh --help
 ```
+
+Les deux overlays sont optionnels, OFF par defaut, et n'entrent jamais dans le
+chemin deterministe (I4). `wire` = vue reseau des appels agent -> systemes cibles
+(voir [proxy-debug-console.md](proxy-debug-console.md)) ; `llm-proxy` = gateway
+OpenAI-compatible centralisant les appels LLM (voir
+[llm-gateway-litellm.md](llm-gateway-litellm.md)).
 
 `campaign run` accepte un nom court (`identity-offboarding`), un nom de fichier
 ou un chemin ; `--json` ecrit le rapport dans `.run/campaigns/`.

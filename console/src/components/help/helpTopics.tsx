@@ -1004,6 +1004,27 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             touche jamais le journal d'audit immuable (I1), qui reste la verite.
           </li>
         </ul>
+        <h3>Deux altitudes : traces app vs wire (mitmproxy)</h3>
+        <p>
+          Le selecteur en haut bascule la <strong>source</strong> :
+        </p>
+        <ul>
+          <li>
+            <strong>traces app</strong> : la vue applicative ci-dessus
+            (<code>ProxyTrace</code>, l'intention au niveau du proxy I5).
+          </li>
+          <li>
+            <strong>wire (mitmproxy)</strong> : la vue <strong>reseau</strong> —
+            les octets reellement sur le fil, captures par une surcouche{" "}
+            <strong>mitmproxy</strong> optionnelle (conteneur Docker). Affiche la
+            requete/reponse HTTP(S) brute par echange. Surcouche OFF par defaut :
+            tant qu'elle n'est pas active, le panneau explique comment l'activer
+            (<code>./recette.sh wire up</code> puis exporter{" "}
+            <code>INSPECT_IA_AGENTS_WIRE_PROXY</code> et relancer l'API). Pour le HTTPS
+            des systemes reels, faire confiance au CA mitmproxy
+            (<code>./recette.sh wire ca</code> {"->"} <code>INSPECT_IA_AGENTS_WIRE_CA</code>).
+          </li>
+        </ul>
         <h3>Champ par champ d'une trace</h3>
         <ul>
           <li><code>seq</code> : ordre global monotone (I4), stable meme apres rotation du tampon.</li>

@@ -111,3 +111,89 @@ allowlisted test orgs.
 - Debug off -> no recording, no console data, banner shown.
 - Buffer full -> oldest traces drop (bounded ring); `seq` stays monotone; the
   audit log remains complete.
+
+## Wire interception overlay (mitmproxy) -- the network-level view
+
+The `ProxyTrace` above is the **application-level** view (the agent's intent at
+the `ExternalSystemProxy` boundary). The **wire overlay** adds the
+**network-level** view: the bytes actually on the wire of the agent -> target
+traffic, captured by a real interception proxy (**mitmproxy**) running as an
+OPTIONAL Docker overlay. Two altitudes of the same I5 side effect.
+
+It is **off by default** and a SURCHARGE, never a replacement: the deterministic
+recette never routes through it (I4 unchanged), the home-grown `TracingProxy`
+stays the default.
+
+### In the UX
+
+The `/proxy` page has a source toggle: **traces app** (the `ProxyTrace` list) and
+**wire (mitmproxy)** (`WirePanel`: status, flow list, request/response detail,
+clear). When the overlay is not configured the panel shows how to enable it
+rather than an empty list.
+
+### Architecture
+
+```
+agent --(HTTP proxy)--> [mitmproxy container] --> lab / real system
+                             | addon POSTs each flow
+                             v
+                     API POST /proxy/wire --> WireFlowRecorder (bounded ring, I1)
+                             ^
+                Proxy page <--GET /proxy/wire (status + flows)
+```
+
+- `recette/platform/proxy/wire.py` -- `WireFlow` + `WireFlowRecorder` (mirrors
+  the trace ring: bounded, monotone `seq`, jettable) + pure `normalize_flow`.
+- `scripts/mitm_wire_addon.py` -- mitmdump addon: normalizes each flow and POSTs
+  it to the API ingest (fail-safe, never alters traffic).
+- Endpoints: `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`, `run_id`),
+  `DELETE /proxy/wire`, `GET /proxy/wire/status`.
+
+### Bring it up (R19, never hand-launch)
+
+```
+./recette.sh wire up
+export INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:8083
+./recette.sh api restart
+```
+
+The agent's lab-mode side effects (mock_local / declared_url) then route through
+mitmproxy and show up in the wire panel. `./recette.sh wire down|status|logs`
+manage the container; `wire ca` prints the CA path.
+
+### HTTPS to real systems (real_saas)
+
+mitmproxy decrypts HTTPS only if the client trusts its CA:
+
+```
+export INSPECT_IA_AGENTS_WIRE_CA="$(./recette.sh wire ca)"
+# SDK forges (PyGithub / python-gitlab) honour the standard env instead:
+export HTTPS_PROXY=http://127.0.0.1:8083 REQUESTS_CA_BUNDLE="$(./recette.sh wire ca)"
+./recette.sh api restart
+```
+
+- `StdlibHttpClient` gained a `ca_bundle` seam; `RealSlackProxy` (Slack over
+  StdlibHttpClient) routes through the overlay + CA from `INSPECT_IA_AGENTS_WIRE_*`.
+- TLS verification stays ON -- the CA is **added**, never disabled.
+
+### Determinism (I4)
+
+The overlay is OFF in every deterministic recette and never sits in the
+decision/replay path. A `WireFlow` carries no wall-clock value; ordering is the
+recorder's monotone `seq`, exactly like `ProxyTrace`.
+
+### Live proof
+
+`scripts/smoke_wire.py` -- self-skips without Docker; otherwise brings the
+overlay up, drives a request through it to the lab, and asserts the flow reaches
+`GET /proxy/wire`.
+
+### Wire tests
+
+| Test | Proves |
+|------|--------|
+| `tests/test_wire_proxy.py` | WireFlow normalize/clamp, bounded ring, monotone seq, immutability |
+| `tests/test_api_wire.py` | `/proxy/wire*` endpoints; ingest/list/clear/status; tail; run_id; 422 |
+| `tests/test_wire_routing.py` | proxy_url + ca_bundle seam; resolve_proxy threading; Slack wire env |
+| `tests/test_mitm_addon.py` | addon flow normalization + fail-safe guards (no mitmproxy runtime) |
+| `console/src/pages/proxy/WirePanel.contract.test.tsx` | R16 panel contract (real fixture, enabled/disabled) |
