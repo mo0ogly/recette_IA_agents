@@ -14,6 +14,7 @@ Dimensions guarded:
   D5 every corpus identification enum action is exercised, except the frozen set
   D6 no campaign action without an expected verdict; no orphan declared agent
   D7 every red-team violation_type has a corpus scenario (anti-silence gate)
+  D8 every git red-team violation_type has a corpus git scenario
 """
 
 from __future__ import annotations
@@ -46,6 +47,12 @@ REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset(
 
 ALL_VIOLATION_TYPES: frozenset[str] = frozenset(
     {"identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"}
+)
+
+# Git red-team violation_types not yet exercised by a corpus git scenario
+# (corpus/sim/*.git-scenario.json). Frozen so the gap cannot grow / close silently.
+GIT_REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset(
+    {"identity_mismatch", "policy_violation", "behavior_anomaly"}
 )
 
 
@@ -152,6 +159,35 @@ class TestCoverageGuard(unittest.TestCase):
             REDTEAM_PENDING_VIOLATIONS <= ALL_VIOLATION_TYPES,
             "REDTEAM_PENDING_VIOLATIONS holds an unknown violation_type: "
             f"{sorted(REDTEAM_PENDING_VIOLATIONS - ALL_VIOLATION_TYPES)}",
+        )
+
+    def test_d8_git_redteam_violation_type_coverage(self) -> None:
+        covered: set[str] = set()
+        for path in (REPO / "corpus" / "sim").glob("*.git-scenario.json"):
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            violation = doc.get("expected", {}).get("violation_type")
+            if violation is not None:
+                covered.add(violation)
+        # Every non-pending violation type must have at least one git scenario
+        # (this bites if the git overreach seed is removed).
+        required = ALL_VIOLATION_TYPES - GIT_REDTEAM_PENDING_VIOLATIONS
+        self.assertTrue(
+            required <= covered,
+            f"git red-team violation_types with no git scenario: {sorted(required - covered)}",
+        )
+        # Adding a git scenario for a pending type without removing it from the
+        # frozen set fails: forces an explicit constant update, no silent closure.
+        self.assertEqual(
+            GIT_REDTEAM_PENDING_VIOLATIONS & covered,
+            frozenset(),
+            "pending git violation_type now covered -- remove it from "
+            f"GIT_REDTEAM_PENDING_VIOLATIONS: {sorted(GIT_REDTEAM_PENDING_VIOLATIONS & covered)}",
+        )
+        # Sanity: every pending name is a real violation type (catches a typo).
+        self.assertTrue(
+            GIT_REDTEAM_PENDING_VIOLATIONS <= ALL_VIOLATION_TYPES,
+            "GIT_REDTEAM_PENDING_VIOLATIONS holds an unknown violation_type: "
+            f"{sorted(GIT_REDTEAM_PENDING_VIOLATIONS - ALL_VIOLATION_TYPES)}",
         )
 
     def test_d6_every_campaign_action_has_verdict_and_no_orphan_agent(self) -> None:

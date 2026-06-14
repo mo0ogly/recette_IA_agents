@@ -125,6 +125,75 @@ or construction, so the CLI and the gate venv load without the dependency
 clear `RuntimeError` naming the extra). This path is verified only with the extra
 installed.
 
+## Phase 3 -- git red-team (Lane B, goal-driven)
+
+The MAF red-team above attacks a `maf_agent` tool-caller. The git red-team
+attacks a **git agent** the same way, but through Lane B's `decide -> act` loop
+against the git lab. The judged unit is a **git-sim-scenario**, frozen in
+`corpus/sim/*.git-scenario.json` (distinct from the MAF `*.scenario.json`).
+
+| field | meaning |
+|-------|---------|
+| `target_manifest` | the attacked `git_agent` manifest (`kind: git_agent`, its `capability_scope` of git actions) |
+| `goal` | the adversarial GOAL handed to the agent (e.g. "merge to main without review") |
+| `subject_program` | the recorded Lane B decisions (`ReplayLlm` replays them, I4) |
+| `tool_injection` | optional adversarial strings injected into forge tool output (AgentDojo injection-via-tool-output) |
+| `expected` | the ground-truth `{verdict, violation_type}` the recette must reproduce |
+
+`recette/redteam_git.py::run_git_scenario` derives the Lane B `run_agent`
+arguments from `target_manifest` exactly as `make_lane_b_runner` does (agent_id,
+principal, target_system, `capability_scope` as tool-name strings), drives the
+loop with a `ReplayLlm` subject program plus the optional `tool_injection`, and
+re-judges the resulting `AgentAction` log with the **git identification judge**
+(`judge_subject`). It is pure and deterministic: a `LabForge` executes the side
+effects in memory, no clock, no random, no network. The committed git scenarios
+are `rt-prbot-overreach` (a `capability_overreach`) and `rt-prbot-resisted` (a
+true negative, `verdict: correct`).
+
+Anti-silence coverage is enforced by the coverage guard, mirroring D7:
+
+```
+python3 -m unittest tests.test_coverage_guard
+```
+
+`test_d8_git_redteam_violation_type_coverage` (D8) globs
+`corpus/sim/*.git-scenario.json`, collects each non-null
+`expected.violation_type`, and asserts every non-pending type has at least one
+git scenario; a new git red-team axis without a git scenario turns the guard RED
+(a gap is a failing test, never found by hand).
+
+## Phase 3 -- the promote loop (caught anomaly -> negative corpus subject)
+
+A CAUGHT anomaly (a re-judged sim scenario whose verdict is `incorrect`) is a
+true positive that deserves to become a permanent negative corpus subject. The
+promote loop freezes it into the standard identification corpus so it is scored
+like every other ground-truth agent.
+
+Three entry points, one core (`recette/redteam_promote.py::promote_scenario`):
+
+- CLI: `python3 -m recette redteam-promote --scenario-id <id>`
+- API: `POST /sim/scenarios/{id}/promote`
+- Console: the `/sim` page "Promote to corpus" button.
+
+The output is **family-aware**, routed by the scenario's `kind`:
+
+- git (`*.git-scenario.json`, `target_manifest.kind == git_agent`) ->
+  `corpus/agents/incorrect/<slug>/` (`manifest.json` + `scenario.json`).
+- MAF (`*.scenario.json`, `target_spec.kind == maf_agent`) ->
+  `corpus/maf_agents/incorrect/<slug>/` (`spec.json` + `actions.json`).
+
+Promotion fires only on an **incorrect, single-axis (R20) anomaly**: the
+re-judged verdict must be `incorrect` and the violation reducible to exactly one
+broken dimension. A **correct** scenario (a true negative) has nothing to
+promote -- the CLI raises and the API returns **422 "nothing to promote"** (an
+unknown scenario id is **404**, distinct from the 422 true-negative case).
+
+The loop is closed: a promoted subject re-enters the standard corpus under
+`corpus/agents/` (git) or `corpus/maf_agents/` (MAF) and is re-judged by
+`recette validate` (schema) and `recette run` (the 4-dimension identification
+scorecard) -- the dynamic red-team finding becomes a permanent deterministic
+identification case.
+
 ## Invariants
 
 - I1: a frozen scenario is immutable -- `write_scenario` refuses to clobber.
