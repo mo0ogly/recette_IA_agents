@@ -171,6 +171,32 @@ def _seed(api: str, server_port: int) -> None:
     _expect(status == 201, f"seed ai_backend -> {status}")
 
 
+def _verify_sim_redteam(page: Page, console: str) -> None:
+    # /sim renders the frozen red-team scenarios: per scenario, a pill-ok
+    # "caught" / pill-bad "missed" badge keyed off anomaly_caught, fed live from
+    # GET /sim/scenarios. This is the red-team feature's browser-to-API proof:
+    # assert at least one anomaly-caught badge renders and that the known caught
+    # scenario rt-diagnostic-overreach shows its badge with the pill-ok class.
+    page.goto(f"{console}/sim", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    badges = page.locator('[data-testid^="sim-scn-caught-"]')
+    badges.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    count = badges.count()
+    _expect(count >= 1, f"no red-team anomaly-caught badge rendered (got {count})")
+    print(f"[sim] /sim: {count} red-team scenario badge(s) rendered (live from /sim/scenarios)")
+    caught = page.get_by_test_id("sim-scn-caught-rt-diagnostic-overreach")
+    caught.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    classes = caught.get_attribute("class") or ""
+    _expect(
+        "pill-ok" in classes,
+        f"rt-diagnostic-overreach badge is not pill-ok (caught); class={classes!r}",
+    )
+    _expect(
+        (caught.inner_text() or "").strip() == "caught",
+        "rt-diagnostic-overreach badge text is not 'caught'",
+    )
+    print("[sim] /sim: rt-diagnostic-overreach shows pill-ok 'caught' badge (anomaly caught)")
+
+
 def _drive_ai_backends(page: Page, console: str) -> None:
     # The IA (backends) tab: assert the provider dropdown is fed by the dynamic
     # catalog (GET /config/ai-providers) and that the per-row "Test" button does
@@ -347,6 +373,9 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_live_flux(page, console, api)
             _stop_server(page, console)
             _verify_recording_and_replay(page, console)
+            # Independent of the server lifecycle: the red-team /sim view renders
+            # the frozen scenarios' anomaly-caught badges live from the API.
+            _verify_sim_redteam(page, console)
             # Independent of the server lifecycle: the IA tab drives the LLM
             # backend catalog + per-backend probe wiring.
             _drive_ai_backends(page, console)
