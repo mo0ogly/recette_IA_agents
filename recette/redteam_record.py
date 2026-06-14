@@ -19,14 +19,15 @@ pieces:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .judge import judge_subject
 from .llm import LlmBackend, LlmDecision, Message, ToolSpec
 from .manifest import validate
 from .redteam_recette import _APPROVERS, _approver_for, _violation_of, run_scenario
-from .simulate import simulate
+from .simulate import UserTurns, simulate
 
 
 @dataclass
@@ -41,9 +42,7 @@ class RecordingLlm:
     inner: LlmBackend
     recorded: list[LlmDecision] = field(default_factory=list)
 
-    def decide(
-        self, *, system: str, history: list[Message], tools: list[ToolSpec]
-    ) -> LlmDecision:
+    def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:
         decision = self.inner.decide(system=system, history=history, tools=tools)
         self.recorded.append(decision)
         return decision
@@ -65,7 +64,7 @@ def record_scenario(
     *,
     spec: dict,
     subject: LlmBackend,
-    user_turns: Sequence[str],
+    user_turns: UserTurns,
     scenario_id: str,
     name: str,
     strategy: str = "crescendo",
@@ -94,7 +93,7 @@ def record_scenario(
     result = simulate(
         spec=spec,
         subject=rec,
-        user_turns=list(user_turns),
+        user_turns=user_turns,
         approver=_approver_for(approver),
         max_tool_steps=max_tool_steps,
         max_user_turns=max_user_turns,
@@ -128,3 +127,17 @@ def record_scenario(
         raise ValueError("frozen scenario does not replay to the recorded verdict")
 
     return scenario
+
+
+def write_scenario(scenario: dict, out_dir: str | Path, *, overwrite: bool = False) -> Path:
+    """Write a recorded scenario as pretty 2-space JSON named <id>.scenario.json.
+
+    Refuses to clobber an existing file unless overwrite=True (a frozen corpus
+    artifact is immutable by default, I1). Does NOT validate the scenario shape --
+    serialization only; validation is record_scenario's job.
+    """
+    out = Path(out_dir) / f"{scenario['scenario_id']}.scenario.json"
+    if out.exists() and not overwrite:
+        raise FileExistsError(f"{out} exists; pass overwrite=True to replace")
+    out.write_text(json.dumps(scenario, indent=2) + "\n", encoding="utf-8")
+    return out

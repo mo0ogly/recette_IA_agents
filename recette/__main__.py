@@ -533,6 +533,70 @@ def _cmd_redteam() -> int:
     return 1 if card["missed"] else 0
 
 
+def _cmd_redteam_record(args: argparse.Namespace) -> int:
+    """Run a LIVE red-team attack against a target subject, freeze it to a scenario.
+
+    A real LLM provider (key from .env, R18) drives both the attacker
+    (RedTeamSimulator) and the target subject; the run is recorded and frozen via
+    the Phase-2 recorder into corpus/sim/<id>.scenario.json -- a deterministic,
+    replayable artifact. This live path is NOT a gate (it needs a real key)."""
+    from .api._dotenv import load_dotenv
+    from .llm import LlmBackend, build_llm
+    from .manifest import load_validated
+    from .redteam import RedTeamSimulator
+    from .redteam_record import record_scenario, write_scenario
+
+    load_dotenv()  # R18: keys resolve from .env
+
+    try:
+        spec = load_validated("manifest", Path(args.spec))
+    except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"invalid target spec: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        subject: LlmBackend = build_llm(args.subject_provider, args.subject_model)
+        attacker_backend: LlmBackend = build_llm(args.attacker_provider, args.attacker_model)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if args.cache is not None:
+        from .llm_cache import CachingLlm, LlmCache
+
+        cache = LlmCache(args.cache)
+        subject = CachingLlm(
+            subject, cache=cache, namespace=f"{args.subject_provider}:{args.subject_model}"
+        )
+        attacker_backend = CachingLlm(
+            attacker_backend,
+            cache=cache,
+            namespace=f"{args.attacker_provider}:{args.attacker_model}",
+        )
+
+    attacker = RedTeamSimulator(attacker_backend, max_turns=args.max_turns)
+
+    tags = {
+        k: v for k, v in (("owasp", args.owasp), ("mitre", args.mitre), ("nist", args.nist)) if v
+    }
+
+    scenario = record_scenario(
+        spec=spec,
+        subject=subject,
+        user_turns=attacker,
+        scenario_id=args.scenario_id,
+        name=args.name,
+        strategy=args.strategy,
+        tags=tags,
+        max_user_turns=args.max_turns,
+    )
+
+    out = write_scenario(scenario, args.out, overwrite=args.overwrite)
+    print(f"froze red-team scenario: {out}")
+    print(f"expected: {scenario['expected']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="recette", description="inspect_ia_agents harness")
     parser.add_argument(
@@ -659,6 +723,31 @@ def build_parser() -> argparse.ArgumentParser:
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",
     )
+    rtr = sub.add_parser(
+        "redteam-record",
+        help="run a LIVE red-team attack and freeze it into a replayable scenario",
+    )
+    rtr.add_argument("--spec", required=True, help="target manifest JSON (subject under attack)")
+    rtr.add_argument("--attacker-provider", default="groq", choices=list(_LLM_PROVIDERS))
+    rtr.add_argument("--attacker-model", required=True)
+    rtr.add_argument("--subject-provider", default="groq", choices=list(_LLM_PROVIDERS))
+    rtr.add_argument("--subject-model", required=True)
+    rtr.add_argument(
+        "--strategy",
+        choices=["crescendo", "skeleton_key", "tool_injection"],
+        default="crescendo",
+    )
+    rtr.add_argument("--max-turns", type=int, default=4, help="attacker turns (and recorder cap)")
+    rtr.add_argument("--scenario-id", required=True, help="frozen scenario id (file stem)")
+    rtr.add_argument("--name", required=True, help="human-readable scenario name")
+    rtr.add_argument("--owasp", default=None, help="OWASP ASI tag (optional)")
+    rtr.add_argument("--mitre", default=None, help="MITRE ATLAS tag (optional)")
+    rtr.add_argument("--nist", default=None, help="NIST tag (optional)")
+    rtr.add_argument("--out", default="corpus/sim", help="output dir (default: corpus/sim)")
+    rtr.add_argument(
+        "--cache", default=None, help="content-addressed LLM cache file (cheap, reproducible)"
+    )
+    rtr.add_argument("--overwrite", action="store_true", help="replace an existing frozen scenario")
     pub = sub.add_parser("publish", help="publish a corpus repo tree to a real GitHub repo")
     pub.add_argument("slug", help="repo slug under corpus/repos/")
     pub.add_argument("--owner", required=True, help="GitHub owner/org for the new repo")
@@ -730,6 +819,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_import_maf(args.spec, args.out)
     if args.command == "redteam":
         return _cmd_redteam()
+    if args.command == "redteam-record":
+        return _cmd_redteam_record(args)
     if args.command == "publish":
         return _cmd_publish(args.slug, args.owner, args.visibility, args.apply)
     parser.error(f"unknown command {args.command}")
