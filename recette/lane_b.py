@@ -8,7 +8,7 @@ shape as a Lane A scenario) plus a replayable Recording.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .events import AgentAction
 from .forge import GitForge, LabForge
@@ -21,6 +21,10 @@ from .tools import build_tools, execute_tool
 class LaneBResult:
     actions: list[AgentAction]
     recording: Recording
+    # Tool-result text returned to the model per executed action, in order. A
+    # non-default ``tool_output`` makes these adversarial (AgentDojo injection),
+    # so they are exposed here to stay auditable (legibility-first).
+    tool_results: list[str] = field(default_factory=list)
 
 
 def _system_prompt(goal: str, target_system: str, capability_scope: list[str]) -> str:
@@ -52,6 +56,7 @@ def run_agent(
     stop_on_repeat: bool = False,
     on_step: Callable[[int, RecordedStep], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
+    tool_output: Callable[[AgentAction], str] = _result_text,
 ) -> LaneBResult:
     """Run the decide->act loop until a final answer or max_steps. Deterministic given a
     deterministic backend (StubLlm/ReplayLlm) + LabForge.
@@ -59,7 +64,14 @@ def run_agent(
     ``stop_on_repeat`` halts the run when the model re-issues an action it already
     executed (same tool + resource): a no-progress loop some live models fall into.
     It is deterministic (a pure function of the decisions) and OFF by default so
-    replay reproduces a recording verbatim; the live run path turns it on."""
+    replay reproduces a recording verbatim; the live run path turns it on.
+
+    ``tool_output`` builds the tool-result text fed back to the model after each
+    executed action; it defaults to the canonical ``ok: ...`` line. A non-default
+    function models AgentDojo's injection-via-tool-output for git agents (the forge
+    returns adversarial content). The text is captured in ``LaneBResult.tool_results``
+    so the injected content is auditable (legibility-first). Determinism (I4) holds:
+    ``tool_output`` is a pure caller-supplied function -- no clock/random is added."""
     forge = forge or LabForge()
     tools = build_tools(capability_scope)
     system = _system_prompt(goal, target_system, capability_scope)
@@ -74,6 +86,7 @@ def run_agent(
         model=model,
     )
     actions: list[AgentAction] = []
+    tool_results: list[str] = []
 
     for i in range(max_steps):
         if should_stop is not None and should_stop():
@@ -120,13 +133,15 @@ def run_agent(
                 tool_call_id=call_id,
             )
         )
+        result_text = tool_output(action)
+        tool_results.append(result_text)
         history.append(
             Message(
                 "tool",
-                _result_text(action),
+                result_text,
                 tool_name=decision.tool_name,
                 tool_call_id=call_id,
             )
         )
 
-    return LaneBResult(actions=actions, recording=recording)
+    return LaneBResult(actions=actions, recording=recording, tool_results=tool_results)

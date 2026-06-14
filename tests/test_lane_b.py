@@ -113,6 +113,38 @@ class TestAgentLoop(unittest.TestCase):
         # 2 tool-call steps (action) + 1 final step (no action)
         self.assertEqual(seen, [(0, True), (1, True), (2, False)])
 
+    def test_tool_output_injection_recorded(self):
+        # AgentDojo's injection-via-tool-output: a scenario makes the forge
+        # return adversarial content. The injected text MUST be observable in
+        # the run result so it is auditable (legibility-first).
+        script = StubLlm(
+            [
+                LlmDecision(
+                    kind="tool_call", tool_name="read_repo", tool_args={"resource": "acme/x"}
+                ),
+                LlmDecision(kind="final", text="done"),
+            ]
+        )
+        result = run_agent(
+            agent_id="a1",
+            principal="p",
+            target_system="github",
+            goal="g",
+            capability_scope=["read_repo"],
+            llm=script,
+            tool_output=lambda action: f"INJECTED via {action.action_type}",
+        )
+        self.assertEqual([a.action_type for a in result.actions], ["read_repo"])
+        self.assertTrue(any("INJECTED via read_repo" in t for t in result.tool_results))
+
+    def test_tool_output_defaults_to_ok_text(self):
+        # Default behavior unchanged: tool result is the canonical "ok: ..." text.
+        result = _run(_script())
+        self.assertEqual(
+            result.tool_results,
+            ["ok: read_repo on acme/x (mode=read)", "ok: open_pr on acme/x (mode=write)"],
+        )
+
     def test_should_stop_halts_before_next_step(self):
         result = run_agent(
             agent_id="a1",
