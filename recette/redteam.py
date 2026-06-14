@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .judge import judge_subject
+from .events import AgentAction
+from .judge import judge_subject, subject_family
 from .llm import LlmBackend, Message
 from .maf_judge import MafAction
 from .manifest import validate
@@ -108,16 +109,52 @@ def _action_to_dict(action: MafAction) -> dict:
     return doc
 
 
+def _git_action_to_dict(action: AgentAction) -> dict:
+    """Freeze one git AgentAction into a scenario action entry (corpus/schemas/
+    scenario.schema.json). The scenario step carries only the declared/real gap
+    inputs: the action, its resource, the approval flag (I6) and any params -- the
+    principal lives once at the scenario level (credential_principal)."""
+    entry: dict = {"action": action.action_type, "resource": action.resource}
+    if action.approved:
+        entry["approved"] = True
+    if action.params:
+        entry["params"] = action.params
+    return entry
+
+
+def _git_actions_doc(action_log: list[AgentAction], *, slug: str) -> dict:
+    """Build a scenario document for a git-family action log. The credential
+    principal is the identity the agent actually authenticated as -- taken from
+    the log (consistent across actions); empty logs fall back to the slug so the
+    document stays schema-valid (the verdict guard already rejected empty/correct
+    runs upstream)."""
+    credential_principal = action_log[0].principal if action_log else slug
+    return {
+        "agent_id": slug,
+        "credential_principal": credential_principal,
+        "actions": [_git_action_to_dict(a) for a in action_log],
+    }
+
+
 def to_corpus_subject(
-    manifest: dict, action_log: list[MafAction], *, slug: str, violation_type: str
+    manifest: dict,
+    action_log: list[AgentAction] | list[MafAction],
+    *,
+    slug: str,
+    violation_type: str,
 ) -> dict[str, dict]:
     """Freeze a red-team run into a negative corpus subject (3 validated docs).
+
+    Family-aware over the unified agent model: a git_agent log (AgentAction) is
+    frozen as a ``scenario`` document, a maf_agent log (MafAction) as a
+    ``maf_actions`` document. ``action_log`` must match the manifest family.
 
     Returns ``{"manifest": ..., "actions": ..., "ground-truth": ...}``. The
     ground-truth is derived from ``judge_subject`` so it matches what the run
     actually did. Raises ValueError if any document fails its schema, or if the
     run is not actually a single-axis violation of ``violation_type``.
     """
+    family = subject_family(manifest)
     result = judge_subject(manifest, action_log)
     if result.verdict != "incorrect":
         raise ValueError("red-team run did not produce an incorrect subject (nothing to freeze)")
@@ -135,7 +172,15 @@ def to_corpus_subject(
         raise ValueError(f"run breaks {broken}, not exactly [{violation_type}] (single-axis rule)")
 
     subject_manifest = {**manifest, "agent_id": slug}
-    actions_doc = {"agent_id": slug, "actions": [_action_to_dict(a) for a in action_log]}
+    if family == "maf_agent":
+        actions_kind = "maf_actions"
+        actions_doc = {
+            "agent_id": slug,
+            "actions": [_action_to_dict(a) for a in action_log],  # type: ignore[arg-type]
+        }
+    else:
+        actions_kind = "scenario"
+        actions_doc = _git_actions_doc(action_log, slug=slug)  # type: ignore[arg-type]
     ground_truth = {
         "agent_id": slug,
         "category": "incorrect",
@@ -153,7 +198,7 @@ def to_corpus_subject(
 
     for kind, doc in (
         ("manifest", subject_manifest),
-        ("maf_actions", actions_doc),
+        (actions_kind, actions_doc),
         ("ground_truth", ground_truth),
     ):
         errors = validate(kind, doc)
