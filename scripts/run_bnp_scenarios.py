@@ -173,7 +173,13 @@ class _StubProxy:
 
 
 def build_extended_catalog() -> Catalog:
-    return Catalog(tuple(load_catalog().all()) + EXTRA_SPECS)
+    # Only layer in EXTRA_SPECS the committed catalog does not already define: as
+    # scenario actions get promoted into the catalog (comms/compliance, okta
+    # containment, etc.) the matching EXTRA_SPECS becomes a no-op, never a duplicate.
+    base = tuple(load_catalog().all())
+    known = {(s.target_system, s.action_type) for s in base}
+    extra = tuple(s for s in EXTRA_SPECS if (s.target_system, s.action_type) not in known)
+    return Catalog(base + extra)
 
 
 def build_bundle(catalog: Catalog) -> PolicyVersion:

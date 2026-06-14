@@ -131,4 +131,16 @@ ACTIONS: tuple[ActionSpec, ...] = (
         RiskLevel.HIGH,
         "Invite an external user into the organization.",
     ),
+    _escalate(
+        "revoke_long_lived_token",
+        Criticality.C2,
+        RiskLevel.HIGH,
+        "Revoke a long-lived authentication token (defensive containment).",
+    ),
+    _deny(
+        "assume_delegation",
+        Criticality.C1,
+        RiskLevel.CRITICAL,
+        "Act on behalf of another agent via delegation.",
+    ),
 )

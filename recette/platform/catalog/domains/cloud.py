@@ -135,4 +135,10 @@ ACTIONS: tuple[ActionSpec, ...] = (
         RiskLevel.CRITICAL,
         "Modify cloud IAM roles or permission bindings.",
     ),
+    _escalate(
+        "isolate_host",
+        Criticality.C2,
+        RiskLevel.HIGH,
+        "Network-isolate a host (incident containment).",
+    ),
 )

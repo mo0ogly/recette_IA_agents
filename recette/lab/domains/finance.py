@@ -43,6 +43,7 @@ _KNOWN_ACTIONS = frozenset(
         "export_financial_data",
         "launch_wire_transfer",
         "modify_billing_rule",
+        "freeze_operation",
     )
 )
 
@@ -286,6 +287,13 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "dataset": resource,
             "format": str(payload.get("format") or "csv"),
             "row_count": 1 + int(digest[16:22], 16) % 1000000,
+        }
+    if action_type == "freeze_operation":
+        return {
+            **base,
+            "status": "frozen",
+            "operation": resource or "operation/unknown",
+            "freeze_id": _ref("frz_", digest),
         }
     # modify_billing_rule
     return {**base, "status": "updated", "rule_id": resource or _ref("rule_", digest)}

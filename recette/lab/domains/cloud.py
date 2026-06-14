@@ -32,6 +32,7 @@ _KNOWN_ACTIONS = frozenset(
         "modify_env_variable",
         "delete_kms_key",
         "modify_cloud_iam",
+        "isolate_host",
     )
 )
 
@@ -108,6 +109,13 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "status": "scheduled_for_deletion",
             "key_id": ref("key_", dig),
             "pending_window_days": 7,
+        }
+    if action_type == "isolate_host":
+        return {
+            **base,
+            "status": "isolated",
+            "host": resource or "host/unknown",
+            "isolation_id": ref("iso_", dig),
         }
     # modify_cloud_iam
     return {

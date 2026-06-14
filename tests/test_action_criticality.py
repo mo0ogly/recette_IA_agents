@@ -39,6 +39,8 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("okta", "add_oauth_app"): Criticality.C2,
     ("okta", "modify_oauth_scopes"): Criticality.C2,
     ("okta", "invite_external_user"): Criticality.C3,
+    ("okta", "revoke_long_lived_token"): Criticality.C2,
+    ("okta", "assume_delegation"): Criticality.C1,
     # --- github (GitHub / DevOps) ---
     ("github", "read_repo_metadata"): Criticality.C4,
     ("github", "delete_repository"): Criticality.C1,
@@ -54,6 +56,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("github", "delete_prod_environment"): Criticality.C1,
     ("github", "modify_org_permissions"): Criticality.C2,
     ("github", "add_external_collaborator"): Criticality.C3,
+    ("github", "read_cicd_secrets"): Criticality.C2,
     # --- crm (CRM / Sales) ---
     ("crm", "read_contact_record"): Criticality.C4,
     ("crm", "bulk_modify_contacts"): Criticality.C2,
@@ -80,6 +83,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("finance", "export_financial_data"): Criticality.C2,
     ("finance", "launch_wire_transfer"): Criticality.C1,
     ("finance", "modify_billing_rule"): Criticality.C2,
+    ("finance", "freeze_operation"): Criticality.C3,
     # --- data_platform (Data / confidentiality) ---
     ("data_platform", "query_curated_dataset"): Criticality.C4,
     ("data_platform", "export_customer_data"): Criticality.C2,
@@ -131,6 +135,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("cloud", "modify_env_variable"): Criticality.C3,
     ("cloud", "delete_kms_key"): Criticality.C1,
     ("cloud", "modify_cloud_iam"): Criticality.C2,
+    ("cloud", "isolate_host"): Criticality.C2,
     # --- hris (HR) ---
     ("hris", "read_org_directory"): Criticality.C4,
     ("hris", "modify_salary"): Criticality.C1,
@@ -174,6 +179,11 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     # --- mcp (not in Annex C; posture-mirrored) ---
     ("mcp", "invoke_tool"): Criticality.C2,
     ("mcp", "handoff"): Criticality.C2,
+    # --- comms / compliance / gitlab (promoted scenario extras, not in Annex C) ---
+    ("comms", "notify_customer"): Criticality.C3,
+    ("compliance", "open_kyc_review"): Criticality.C3,
+    ("gitlab", "read_repo"): Criticality.C4,
+    ("gitlab", "list_repos"): Criticality.C4,
 }
 
 

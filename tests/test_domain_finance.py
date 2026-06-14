@@ -34,6 +34,7 @@ W4_TABLE = (
     ("export_financial_data", RiskLevel.CRITICAL, PolicyVerdict.ESCALATE, PolicyVerdict.DENY),
     ("launch_wire_transfer", RiskLevel.CRITICAL, PolicyVerdict.ESCALATE, PolicyVerdict.DENY),
     ("modify_billing_rule", RiskLevel.HIGH, PolicyVerdict.ESCALATE, PolicyVerdict.DENY),
+    ("freeze_operation", RiskLevel.HIGH, PolicyVerdict.ESCALATE, PolicyVerdict.DENY),
 )
 
 
@@ -181,7 +182,7 @@ class TestFinanceInLoadedCatalog(unittest.TestCase):
                 spec = catalog.get("finance", action_type)
                 self.assertIsNotNone(spec)
         finance_specs = [s for s in catalog.all() if s.target_system == "finance"]
-        self.assertEqual(len(finance_specs), 13)
+        self.assertEqual(len(finance_specs), 14)
 
 
 if __name__ == "__main__":

@@ -38,6 +38,9 @@ _PRIV_ROLE = {
     "product_cms": "product_admin",
     "knowledge_base": "rag_agent",
     "mcp": "tool_operator",
+    "comms": "comms_admin",
+    "compliance": "compliance_admin",
+    "gitlab": "devops_admin",
 }
 
 

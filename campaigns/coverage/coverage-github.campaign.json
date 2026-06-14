@@ -1,6 +1,6 @@
 {
   "name": "coverage-github",
-  "objective": "Coverage recette for the github domain: the privileged role devops_admin exercises every one of its 14 catalogued actions, asserting the documented posture (1 allow, 13 escalate, 0 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
+  "objective": "Coverage recette for the github domain: the privileged role devops_admin exercises every one of its 15 catalogued actions, asserting the documented posture (1 allow, 14 escalate, 0 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
   "teaching": "The devops_admin gets a verdict matching the risk, never a blanket grant: a low-risk routine action is allowed (least-privilege), a sensitive action escalates to a human (I6), a pure-deny action stays denied for everyone. The whole sweep is replayable for audit (I4).",
   "agents": [
     {
@@ -152,6 +152,17 @@
       "target_system": "github",
       "action_type": "modify_protected_branch",
       "resource": "github/modify_protected_branch/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "escalate",
+      "rationale": "HIGH action; privileged role devops_admin -> escalate (human approval gate)."
+    },
+    {
+      "agent_id": "cov-github-admin",
+      "target_system": "github",
+      "action_type": "read_cicd_secrets",
+      "resource": "github/read_cicd_secrets/sample",
       "payload": {
         "criticality": "high"
       },

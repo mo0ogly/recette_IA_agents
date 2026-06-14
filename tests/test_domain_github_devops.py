@@ -28,6 +28,7 @@ W2_TABLE: tuple[tuple[str, PolicyVerdict, PolicyVerdict, RiskLevel], ...] = (
     ("delete_prod_environment", PolicyVerdict.ESCALATE, PolicyVerdict.DENY, RiskLevel.CRITICAL),
     ("modify_org_permissions", PolicyVerdict.ESCALATE, PolicyVerdict.DENY, RiskLevel.CRITICAL),
     ("add_external_collaborator", PolicyVerdict.ESCALATE, PolicyVerdict.DENY, RiskLevel.HIGH),
+    ("read_cicd_secrets", PolicyVerdict.ESCALATE, PolicyVerdict.DENY, RiskLevel.HIGH),
 )
 
 
@@ -59,7 +60,7 @@ class TestGithubDevopsCatalog(unittest.TestCase):
     def test_load_catalog_contains_the_14_github_actions(self) -> None:
         catalog = load_catalog()
         github_specs = [s for s in catalog.all() if s.target_system == "github"]
-        self.assertEqual(len(github_specs), 14)
+        self.assertEqual(len(github_specs), 15)
         for action_type, _, _, _ in W2_TABLE:
             self.assertIsNotNone(catalog.get("github", action_type))
 

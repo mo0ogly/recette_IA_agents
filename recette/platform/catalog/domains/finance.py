@@ -104,4 +104,10 @@ ACTIONS: tuple[ActionSpec, ...] = (
     _escalate(
         "modify_billing_rule", Criticality.C2, RiskLevel.HIGH, "Modify an automated billing rule."
     ),
+    _escalate(
+        "freeze_operation",
+        Criticality.C3,
+        RiskLevel.HIGH,
+        "Temporarily freeze a financial operation (fraud hold).",
+    ),
 )

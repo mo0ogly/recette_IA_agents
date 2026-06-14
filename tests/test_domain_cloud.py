@@ -34,6 +34,7 @@ W8_TABLE: tuple[tuple[str, PolicyVerdict, PolicyVerdict, RiskLevel], ...] = (
     ("modify_env_variable", ESC, DENY, RiskLevel.HIGH),
     ("delete_kms_key", DENY, DENY, RiskLevel.CRITICAL),
     ("modify_cloud_iam", ESC, DENY, RiskLevel.CRITICAL),
+    ("isolate_host", ESC, DENY, RiskLevel.HIGH),
 )
 
 
@@ -43,13 +44,13 @@ class TestCloudCatalog(unittest.TestCase):
         for spec in ACTIONS:
             self.assertEqual(spec.target_system, "cloud")
 
-    def test_exactly_13_specs(self) -> None:
-        self.assertEqual(len(ACTIONS), 13)
-        self.assertEqual(len(W8_TABLE), 13)
+    def test_exactly_14_specs(self) -> None:
+        self.assertEqual(len(ACTIONS), 14)
+        self.assertEqual(len(W8_TABLE), 14)
 
     def test_specs_match_w8_table_literally(self) -> None:
         by_action = {spec.action_type: spec for spec in ACTIONS}
-        self.assertEqual(len(by_action), 13, "duplicate action_type in ACTIONS")
+        self.assertEqual(len(by_action), 14, "duplicate action_type in ACTIONS")
         for action_type, verdict_priv, verdict_def, risk in W8_TABLE:
             with self.subTest(action_type=action_type):
                 spec = by_action.get(action_type)
@@ -119,7 +120,7 @@ class TestCatalogIntegration(unittest.TestCase):
     def test_load_catalog_contains_13_cloud_actions(self) -> None:
         catalog = load_catalog()
         cloud_specs = [spec for spec in catalog.all() if spec.target_system == "cloud"]
-        self.assertEqual(len(cloud_specs), 13)
+        self.assertEqual(len(cloud_specs), 14)
         for action_type, _, _, _ in W8_TABLE:
             self.assertIsNotNone(catalog.get("cloud", action_type))
 

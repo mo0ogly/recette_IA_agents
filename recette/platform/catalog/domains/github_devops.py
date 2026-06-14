@@ -133,4 +133,10 @@ ACTIONS: tuple[ActionSpec, ...] = (
         RiskLevel.HIGH,
         "Grant repository access to an external collaborator.",
     ),
+    _spec(
+        "read_cicd_secrets",
+        Criticality.C2,
+        RiskLevel.HIGH,
+        "Read a secret from the CI/CD environment.",
+    ),
 )

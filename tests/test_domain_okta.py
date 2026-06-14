@@ -36,6 +36,8 @@ W1_TABLE: tuple[tuple[str, PolicyVerdict, PolicyVerdict, RiskLevel], ...] = (
     ("add_oauth_app", ESC, DENY, RiskLevel.HIGH),
     ("modify_oauth_scopes", ESC, DENY, RiskLevel.HIGH),
     ("invite_external_user", ESC, DENY, RiskLevel.HIGH),
+    ("revoke_long_lived_token", ESC, DENY, RiskLevel.HIGH),
+    ("assume_delegation", DENY, DENY, RiskLevel.CRITICAL),
 )
 
 
@@ -46,12 +48,12 @@ class TestOktaCatalog(unittest.TestCase):
             self.assertEqual(spec.target_system, "okta")
 
     def test_exactly_14_specs(self) -> None:
-        self.assertEqual(len(ACTIONS), 14)
-        self.assertEqual(len(W1_TABLE), 14)
+        self.assertEqual(len(ACTIONS), 16)
+        self.assertEqual(len(W1_TABLE), 16)
 
     def test_specs_match_w1_table_literally(self) -> None:
         by_action = {spec.action_type: spec for spec in ACTIONS}
-        self.assertEqual(len(by_action), 14, "duplicate action_type in ACTIONS")
+        self.assertEqual(len(by_action), 16, "duplicate action_type in ACTIONS")
         for action_type, verdict_priv, verdict_def, risk in W1_TABLE:
             with self.subTest(action_type=action_type):
                 spec = by_action.get(action_type)
@@ -152,7 +154,7 @@ class TestCatalogIntegration(unittest.TestCase):
     def test_load_catalog_contains_14_okta_actions(self) -> None:
         catalog = load_catalog()
         okta_specs = [spec for spec in catalog.all() if spec.target_system == "okta"]
-        self.assertEqual(len(okta_specs), 14)
+        self.assertEqual(len(okta_specs), 16)
         for action_type, _, _, _ in W1_TABLE:
             self.assertIsNotNone(catalog.get("okta", action_type))
 

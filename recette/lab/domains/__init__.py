@@ -23,4 +23,6 @@ HANDLER_MODULES: dict[str, str] = {
     "product_cms": "product_cms",
     "knowledge_base": "knowledge_base",
     "mcp": "mcp",
+    "comms": "comms",
+    "compliance": "compliance",
 }

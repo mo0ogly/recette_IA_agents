@@ -34,9 +34,10 @@ class TestKnowledgeBaseCatalog(unittest.TestCase):
 
     def test_allow_path_is_one_low_risk_action_per_domain(self) -> None:
         # Allow-path coverage (PLAN_APEX_catalog-allow-path_2026-06-14.md): every
-        # business domain (plus knowledge_base) declares exactly ONE low-risk
-        # routine action allowed for its privileged role; mcp has none. This pins
-        # the allow set so it can neither shrink nor grow silently.
+        # business domain (plus knowledge_base) declares ONE low-risk routine
+        # action allowed for its privileged role; mcp/comms/compliance have none;
+        # gitlab is a git-family read domain with two read actions. This pins the
+        # allow set so it can neither shrink nor grow silently.
         expected = {
             ("knowledge_base", "query_knowledge_base"),
             ("okta", "read_user_profile"),
@@ -50,6 +51,8 @@ class TestKnowledgeBaseCatalog(unittest.TestCase):
             ("hris", "read_org_directory"),
             ("legal_dms", "read_published_policy"),
             ("product_cms", "read_content_draft"),
+            ("gitlab", "read_repo"),
+            ("gitlab", "list_repos"),
         }
         allows = [s for s in load_catalog().all() if s.verdict_privileged == PolicyVerdict.ALLOW]
         self.assertEqual({(s.target_system, s.action_type) for s in allows}, expected)

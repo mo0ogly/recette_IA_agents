@@ -1,6 +1,6 @@
 {
   "name": "role-matrix-rag_agent",
-  "objective": "Role-matrix recette for rag_agent: the role is submitted against ALL 137 catalogued actions, asserting its role-specific verdict. In-scope (knowledge_base): 1 allow, 4 escalate, 0 deny. Out-of-mandate: 132 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
+  "objective": "Role-matrix recette for rag_agent: the role is submitted against ALL 146 catalogued actions, asserting its role-specific verdict. In-scope (knowledge_base): 1 allow, 4 escalate, 0 deny. Out-of-mandate: 141 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: rag_agent is allowed only its low-risk routine actions, escalates the sensitive ones it is privileged for, and every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [
     {
@@ -84,6 +84,17 @@
     {
       "agent_id": "rm-rag_agent",
       "target_system": "cloud",
+      "action_type": "isolate_host",
+      "resource": "cloud/isolate_host/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE rag_agent's mandate (cloud); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "cloud",
       "action_type": "make_bucket_public",
       "resource": "cloud/make_bucket_public/sample",
       "payload": {
@@ -157,6 +168,28 @@
       },
       "expect": "deny",
       "rationale": "LOW action OUTSIDE rag_agent's mandate (cloud); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "comms",
+      "action_type": "notify_customer",
+      "resource": "comms/notify_customer/sample",
+      "payload": {
+        "criticality": "medium"
+      },
+      "expect": "deny",
+      "rationale": "MEDIUM action OUTSIDE rag_agent's mandate (comms); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "compliance",
+      "action_type": "open_kyc_review",
+      "resource": "compliance/open_kyc_review/sample",
+      "payload": {
+        "criticality": "medium"
+      },
+      "expect": "deny",
+      "rationale": "MEDIUM action OUTSIDE rag_agent's mandate (compliance); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-rag_agent",
@@ -469,6 +502,17 @@
     {
       "agent_id": "rm-rag_agent",
       "target_system": "finance",
+      "action_type": "freeze_operation",
+      "resource": "finance/freeze_operation/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE rag_agent's mandate (finance); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "finance",
       "action_type": "launch_wire_transfer",
       "resource": "finance/launch_wire_transfer/sample",
       "payload": {
@@ -700,6 +744,17 @@
     {
       "agent_id": "rm-rag_agent",
       "target_system": "github",
+      "action_type": "read_cicd_secrets",
+      "resource": "github/read_cicd_secrets/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE rag_agent's mandate (github); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "github",
       "action_type": "read_repo_metadata",
       "resource": "github/read_repo_metadata/sample",
       "payload": {
@@ -707,6 +762,28 @@
       },
       "expect": "deny",
       "rationale": "LOW action OUTSIDE rag_agent's mandate (github); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "gitlab",
+      "action_type": "list_repos",
+      "resource": "gitlab/list_repos/sample",
+      "payload": {
+        "criticality": "low"
+      },
+      "expect": "deny",
+      "rationale": "LOW action OUTSIDE rag_agent's mandate (gitlab); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "gitlab",
+      "action_type": "read_repo",
+      "resource": "gitlab/read_repo/sample",
+      "payload": {
+        "criticality": "low"
+      },
+      "expect": "deny",
+      "rationale": "LOW action OUTSIDE rag_agent's mandate (gitlab); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-rag_agent",
@@ -1041,6 +1118,17 @@
     {
       "agent_id": "rm-rag_agent",
       "target_system": "okta",
+      "action_type": "assume_delegation",
+      "resource": "okta/assume_delegation/sample",
+      "payload": {
+        "criticality": "critical"
+      },
+      "expect": "deny",
+      "rationale": "CRITICAL action OUTSIDE rag_agent's mandate (okta); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "okta",
       "action_type": "create_api_key",
       "resource": "okta/create_api_key/sample",
       "payload": {
@@ -1158,6 +1246,17 @@
       },
       "expect": "deny",
       "rationale": "MEDIUM action OUTSIDE rag_agent's mandate (okta); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-rag_agent",
+      "target_system": "okta",
+      "action_type": "revoke_long_lived_token",
+      "resource": "okta/revoke_long_lived_token/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "deny",
+      "rationale": "HIGH action OUTSIDE rag_agent's mandate (okta); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-rag_agent",
