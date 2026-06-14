@@ -29,6 +29,13 @@ from .manifest import validate
 from .redteam_recette import _APPROVERS, _approver_for, _violation_of, run_scenario
 from .simulate import UserTurns, simulate
 
+# Raised by the PyRIT attacker when the optional dependency is absent. Kept as a
+# module constant so the message has a single source of truth (and the guard test
+# asserts the "real" extra hint is present).
+_PYRIT_MISSING = (
+    "PyRIT attacker requires the [real] extra: pip install inspect_ia_agents[redteam]"
+)
+
 
 @dataclass
 class RecordingLlm:
@@ -58,6 +65,80 @@ class RecordingLlm:
                 step["text"] = decision.text
             steps.append(step)
         return steps
+
+
+@dataclass
+class PyritAttacker:
+    """An OPTIONAL PyRIT-backed adversarial ``UserTurns`` provider (the [real] extra).
+
+    A drop-in alternative to the native ``RedTeamSimulator`` (recette.redteam):
+    both are ``UserTurns`` callables ``(history) -> str | None`` that the
+    ``simulate()`` loop drives turn by turn. This one delegates adversarial prompt
+    generation to Microsoft PyRIT (``pyrit``, MIT) instead of the in-repo Crescendo
+    phase text, so an operator with the optional dependency installed can attack a
+    target with PyRIT's curated jailbreak corpus.
+
+    Approach -- PyRIT-SEEDED (not the adaptive async orchestrator).
+    -----------------------------------------------------------------
+    PyRIT's red-teaming orchestrator is async and multi-turn; wiring its adaptive
+    loop synchronously into our turn-by-turn ``simulate()`` callable is brittle
+    (event-loop reentrancy, target adapters). So on the FIRST call this attacker
+    asks PyRIT to materialize an ORDERED list of ``max_turns`` adversarial seed
+    prompts for ``objective`` (from PyRIT's built-in jailbreak ``SeedPromptDataset``
+    plus the objective), caches them on the instance, and returns one per call --
+    deterministic given a fixed PyRIT dataset version. This is the documented
+    "seeded" mode; it is NOT the adaptive orchestrator.
+
+    Import guard (R20): pyrit is NEVER imported at module top, and NOT at
+    construction -- only inside ``__call__`` (via ``_seed_prompts``). When pyrit is
+    absent, ``__call__`` raises a clear ``RuntimeError`` naming the extra (never a
+    bare ImportError), so the deterministic gate venv stays dependency-free and the
+    failure mode is legible. Constructing the attacker is always safe.
+    """
+
+    objective: str
+    provider: str = "groq"
+    model: str = "x"
+    max_turns: int = 4
+    _seeds: list[str] | None = field(default=None, init=False, repr=False, compare=False)
+
+    def _seed_prompts(self) -> list[str]:
+        """Build (and cache) the ordered adversarial seed prompts via PyRIT.
+
+        Lazily imports pyrit; raises RuntimeError naming the [real] extra if it is
+        not installed. Returns up to ``max_turns`` prompts derived from PyRIT's
+        built-in jailbreak seed corpus, each framed toward ``objective``.
+        """
+        if self._seeds is not None:
+            return self._seeds
+        try:
+            from pyrit.datasets import fetch_decoding_trust_stereotypes_dataset
+            from pyrit.models import SeedPromptDataset
+        except ImportError:
+            raise RuntimeError(_PYRIT_MISSING) from None
+
+        # Load PyRIT's built-in adversarial seed corpus and frame each toward the
+        # objective. PyRIT's dataset API has churned across releases; both the
+        # dataset loader and SeedPromptDataset are resolved lazily above so any
+        # surface change is contained to this method, not the import-guard seam.
+        dataset: SeedPromptDataset = fetch_decoding_trust_stereotypes_dataset()
+        prompts = [str(p.value) for p in dataset.prompts]
+        framed = [f"{self.objective}: {p}" for p in prompts[: self.max_turns]]
+        # Guarantee at least one turn so the seam is usable even on an empty corpus.
+        if not framed:
+            framed = [self.objective]
+        self._seeds = framed
+        return self._seeds
+
+    def __call__(self, history: list[Message]) -> str | None:
+        # One user message already sits in history per completed turn; count them.
+        turn = sum(1 for m in history if m.role == "user")
+        if turn >= self.max_turns:
+            return None
+        seeds = self._seed_prompts()
+        if turn >= len(seeds):
+            return None
+        return seeds[turn]
 
 
 def record_scenario(

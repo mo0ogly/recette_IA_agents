@@ -43,6 +43,12 @@ postgres = [
 nats = [
     "nats-py>=2.6",
 ]
+# Optional PyRIT-backed adversarial attacker for the red-team recorder
+# (recette redteam-record --attacker pyrit). The native RedTeamSimulator and the
+# deterministic gate need none of this; pyrit is import-guarded (lazy import).
+redteam = [
+    "pyrit>=0.5",
+]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [
     "pytest>=8.0",
@@ -108,6 +114,12 @@ ignore_missing_imports = true
 # playwright drives the optional browser smoke (scripts/smoke_console.py); a
 # dev-only runtime dep, not present in the audit venv where mypy runs.
 module = ["playwright", "playwright.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pyrit is the optional [redteam] extra (import-guarded PyritAttacker); not present
+# in the audit venv where mypy runs.
+module = ["pyrit", "pyrit.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

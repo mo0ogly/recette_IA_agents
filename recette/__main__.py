@@ -544,7 +544,8 @@ def _cmd_redteam_record(args: argparse.Namespace) -> int:
     from .llm import LlmBackend, build_llm
     from .manifest import load_validated
     from .redteam import RedTeamSimulator
-    from .redteam_record import record_scenario, write_scenario
+    from .redteam_record import PyritAttacker, record_scenario, write_scenario
+    from .simulate import UserTurns
 
     load_dotenv()  # R18: keys resolve from .env
 
@@ -556,7 +557,6 @@ def _cmd_redteam_record(args: argparse.Namespace) -> int:
 
     try:
         subject: LlmBackend = build_llm(args.subject_provider, args.subject_model)
-        attacker_backend: LlmBackend = build_llm(args.attacker_provider, args.attacker_model)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -568,13 +568,33 @@ def _cmd_redteam_record(args: argparse.Namespace) -> int:
         subject = CachingLlm(
             subject, cache=cache, namespace=f"{args.subject_provider}:{args.subject_model}"
         )
-        attacker_backend = CachingLlm(
-            attacker_backend,
-            cache=cache,
-            namespace=f"{args.attacker_provider}:{args.attacker_model}",
-        )
 
-    attacker = RedTeamSimulator(attacker_backend, max_turns=args.max_turns)
+    attacker: UserTurns
+    if args.attacker == "pyrit":
+        # Optional PyRIT driver ([real] extra); pyrit is imported lazily inside the
+        # attacker's __call__, never here, so the CLI loads without the dependency.
+        attacker = PyritAttacker(
+            objective=args.objective or args.name,
+            provider=args.attacker_provider,
+            model=args.attacker_model,
+            max_turns=args.max_turns,
+        )
+    else:
+        try:
+            attacker_backend: LlmBackend = build_llm(args.attacker_provider, args.attacker_model)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if args.cache is not None:
+            from .llm_cache import CachingLlm, LlmCache
+
+            cache = LlmCache(args.cache)
+            attacker_backend = CachingLlm(
+                attacker_backend,
+                cache=cache,
+                namespace=f"{args.attacker_provider}:{args.attacker_model}",
+            )
+        attacker = RedTeamSimulator(attacker_backend, max_turns=args.max_turns)
 
     tags = {
         k: v for k, v in (("owasp", args.owasp), ("mitre", args.mitre), ("nist", args.nist)) if v
@@ -738,6 +758,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="crescendo",
     )
     rtr.add_argument("--max-turns", type=int, default=4, help="attacker turns (and recorder cap)")
+    rtr.add_argument(
+        "--attacker",
+        choices=["native", "pyrit"],
+        default="native",
+        help="attack driver: native RedTeamSimulator (default) or optional PyRIT ([real] extra)",
+    )
+    rtr.add_argument(
+        "--objective",
+        default=None,
+        help="adversarial objective for the pyrit attacker (defaults to the scenario name)",
+    )
     rtr.add_argument("--scenario-id", required=True, help="frozen scenario id (file stem)")
     rtr.add_argument("--name", required=True, help="human-readable scenario name")
     rtr.add_argument("--owasp", default=None, help="OWASP ASI tag (optional)")
