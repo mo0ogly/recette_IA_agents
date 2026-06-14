@@ -30,7 +30,7 @@ class T(unittest.TestCase):
 
     def test_import_guard_message_when_absent(self):
         # When pyrit is NOT installed, constructing/using the attacker must raise
-        # a clear RuntimeError pointing at the [real] extra (not a bare ImportError).
+        # a clear RuntimeError pointing at the [redteam] extra (not a bare ImportError).
         from recette.redteam_record import PyritAttacker
 
         att = PyritAttacker(objective="out-of-scope write", provider="groq", model="x")
@@ -38,7 +38,7 @@ class T(unittest.TestCase):
             self.skipTest("pyrit installed; guard path not exercised")
         with self.assertRaises(RuntimeError) as ctx:
             att([])
-        self.assertIn("real", str(ctx.exception).lower())
+        self.assertIn("redteam", str(ctx.exception).lower())
 
     @unittest.skipUnless(_HAS_PYRIT, "pyrit not installed")
     def test_pyrit_attacker_yields_first_message(self):

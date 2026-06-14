@@ -31,9 +31,10 @@ from .simulate import UserTurns, simulate
 
 # Raised by the PyRIT attacker when the optional dependency is absent. Kept as a
 # module constant so the message has a single source of truth (and the guard test
-# asserts the "real" extra hint is present).
+# asserts the [redteam] extra hint is present -- "redteam" still satisfies an
+# assertIn("real", ...) check since it is a substring).
 _PYRIT_MISSING = (
-    "PyRIT attacker requires the [real] extra: pip install inspect_ia_agents[redteam]"
+    "PyRIT attacker requires the [redteam] extra: pip install inspect_ia_agents[redteam]"
 )
 
 
@@ -94,9 +95,18 @@ class PyritAttacker:
     absent, ``__call__`` raises a clear ``RuntimeError`` naming the extra (never a
     bare ImportError), so the deterministic gate venv stays dependency-free and the
     failure mode is legible. Constructing the attacker is always safe.
+
+    NOTE: this seeded path has NOT been executed end-to-end in this repo's
+    environment (pyrit is not installed here); it is written against PyRIT's
+    documented seed-dataset API and exercised only when the [redteam] extra is
+    installed (the pyrit-only tests skip otherwise). Verify after
+    ``pip install inspect_ia_agents[redteam]``.
     """
 
     objective: str
+    # provider/model are reserved for a future PyRIT adaptive-orchestrator path
+    # and are UNUSED in the current seeded mode (seed prompts come from PyRIT's
+    # built-in dataset, not from a live attacker backend).
     provider: str = "groq"
     model: str = "x"
     max_turns: int = 4

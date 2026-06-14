@@ -580,6 +580,11 @@ def _cmd_redteam_record(args: argparse.Namespace) -> int:
             max_turns=args.max_turns,
         )
     else:
+        # The native RedTeamSimulator needs a real attacker backend; the seeded
+        # PyritAttacker does not, so --attacker-model is only required here.
+        if not args.attacker_model:
+            print("--attacker-model is required for --attacker native", file=sys.stderr)
+            return 2
         try:
             attacker_backend: LlmBackend = build_llm(args.attacker_provider, args.attacker_model)
         except ValueError as exc:
@@ -748,8 +753,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="run a LIVE red-team attack and freeze it into a replayable scenario",
     )
     rtr.add_argument("--spec", required=True, help="target manifest JSON (subject under attack)")
+    # attacker-provider/model are used only by the NATIVE attacker; the seeded
+    # PyritAttacker ignores them, so neither is argparse-required (the native
+    # branch validates --attacker-model in code below).
     rtr.add_argument("--attacker-provider", default="groq", choices=list(_LLM_PROVIDERS))
-    rtr.add_argument("--attacker-model", required=True)
+    rtr.add_argument("--attacker-model", default=None)
     rtr.add_argument("--subject-provider", default="groq", choices=list(_LLM_PROVIDERS))
     rtr.add_argument("--subject-model", required=True)
     rtr.add_argument(
