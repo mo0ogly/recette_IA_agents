@@ -1,0 +1,21 @@
+[
+  {
+    "id": "gh-mock",
+    "system": "github",
+    "mode": "mock_local",
+    "port": 9101,
+    "pace_ms": 500
+  },
+  {
+    "id": "okta-mock",
+    "system": "okta",
+    "mode": "mock_local",
+    "port": 9102
+  },
+  {
+    "id": "finance-mock",
+    "system": "finance",
+    "mode": "mock_local",
+    "port": 9103
+  }
+]

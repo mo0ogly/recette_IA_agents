@@ -57,6 +57,8 @@ interface ServerFormValues {
   baseUrl: string;
   owner: string;
   authEnv: string;
+  /** Per-server cadence in ms; undefined = inherit default / instant. */
+  pace_ms?: number;
 }
 
 const EMPTY_FORM: ServerFormValues = {
@@ -124,6 +126,10 @@ function toServerEntry(values: ServerFormValues, id: string): ServerEntry {
   if (authEnv.length > 0) {
     entry.auth_env = authEnv;
   }
+  // Empty cadence means "inherit / instant": omit pace_ms, never send 0/NaN.
+  if (values.pace_ms !== undefined && !Number.isNaN(values.pace_ms)) {
+    entry.pace_ms = Math.max(0, values.pace_ms);
+  }
   return entry;
 }
 
@@ -137,6 +143,7 @@ function toFormValues(server: ServerEntry): ServerFormValues {
     baseUrl: server.base_url ?? "",
     owner: server.owner ?? "",
     authEnv: server.auth_env ?? "",
+    pace_ms: server.pace_ms,
   };
 }
 
@@ -425,7 +432,12 @@ export default function ServersPage(): JSX.Element {
                   <td>
                     <span className="servers-mode">{MODE_LABELS[server.mode]}</span>
                   </td>
-                  <td>{targetOf(server)}</td>
+                  <td>
+                    {targetOf(server)}
+                    {server.pace_ms !== undefined && (
+                      <span className="servers-pace"> pace {server.pace_ms}ms</span>
+                    )}
+                  </td>
                   <td>
                     <span className="servers-status">
                       <span
@@ -609,6 +621,29 @@ export default function ServersPage(): JSX.Element {
             type="text"
             value={form.authEnv}
             onChange={(e) => setField("authEnv", e.target.value)}
+          />
+        </div>
+
+        <div className="servers-form-row">
+          <label htmlFor="server-pace-ms">Cadence (ms)</label>
+          <input
+            id="server-pace-ms"
+            type="number"
+            min={0}
+            step={100}
+            value={form.pace_ms ?? ""}
+            placeholder="instant si vide"
+            onChange={(e) => {
+              // Empty input means "inherit / instant" -> undefined, never 0/NaN.
+              const raw = e.target.value.trim();
+              const parsed = raw === "" ? undefined : Number.parseInt(raw, 10);
+              setField(
+                "pace_ms",
+                parsed === undefined || Number.isNaN(parsed)
+                  ? undefined
+                  : Math.max(0, parsed),
+              );
+            }}
           />
         </div>
 

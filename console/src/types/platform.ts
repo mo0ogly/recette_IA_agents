@@ -486,6 +486,12 @@ export interface ServerEntry {
   owner?: string;
   /** Name of the env var holding the credential (never the secret itself, R8). */
   auth_env?: string;
+  /**
+   * Per-server pacing: delay in milliseconds (integer >= 0) inherited as the
+   * default by every agent acting against this server. Absent/undefined =
+   * instant; never sent as 0/NaN from an empty input.
+   */
+  pace_ms?: number;
 }
 
 /** Result of a start/stop lifecycle call; error explains a "down" outcome. */

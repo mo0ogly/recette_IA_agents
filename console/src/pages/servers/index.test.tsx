@@ -11,6 +11,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerEntry, ServerLogTail, ServerStatus } from "../../types/platform";
 import serversFixture from "./__fixtures__/servers.fixture.json";
+import serversWithPaceFixture from "./__fixtures__/servers-with-pace.fixture.json";
 import startUpFixture from "./__fixtures__/start-up.fixture.json";
 import startBusyPortFixture from "./__fixtures__/start-busy-port.fixture.json";
 import statusUpFixture from "./__fixtures__/status-up.fixture.json";
@@ -47,10 +48,12 @@ import {
   listServers,
   startServer,
   stopServer,
+  updateServer,
 } from "../../api/client";
 import ServersPage from "./index";
 
 const servers = serversFixture as ServerEntry[];
+const serversWithPace = serversWithPaceFixture as ServerEntry[];
 const logTail = logTailFixture as ServerLogTail;
 
 /** Statuses captured from the real backend, one per fixture server. */
@@ -397,5 +400,54 @@ describe("ServersPage", () => {
     expect(deleteServer).toHaveBeenCalledWith("gh-saas");
     // The post-delete refresh re-fetches the list (flushes pending updates).
     await waitFor(() => expect(listServers).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the configured pace in the row and loads/saves it as a number", async () => {
+    // The real pace fixture's first server (gh-mock) carries pace_ms: 500;
+    // the others inherit (no pace_ms).
+    vi.mocked(listServers).mockResolvedValue(serversWithPace);
+    vi.mocked(getServerStatus).mockResolvedValue({ status: "up" } as { status: ServerStatus });
+    vi.mocked(updateServer).mockResolvedValue(serversWithPace[0]);
+
+    render(<ServersPage />);
+
+    const paced = serversWithPace[0];
+    const row = await rowOf(paced.id);
+    // The table row surfaces the inherited-by-agents default cadence.
+    expect(within(row).getByText(/pace 500ms/)).toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
+    expect(cadence.value).toBe("500");
+
+    // Editing and saving carries the new pace as a NUMBER (not a string).
+    fireEvent.change(cadence, { target: { value: "750" } });
+    fireEvent.submit(cadence.closest("form")!);
+
+    await waitFor(() => expect(updateServer).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(updateServer).mock.calls[0];
+    expect(payload.pace_ms).toBe(750);
+  });
+
+  it("omits pace_ms (inherit) when the Cadence field is cleared", async () => {
+    vi.mocked(listServers).mockResolvedValue(serversWithPace);
+    vi.mocked(getServerStatus).mockResolvedValue({ status: "up" } as { status: ServerStatus });
+    vi.mocked(updateServer).mockResolvedValue(serversWithPace[0]);
+
+    render(<ServersPage />);
+
+    const paced = serversWithPace[0];
+    const row = await rowOf(paced.id);
+    fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
+    fireEvent.change(cadence, { target: { value: "" } });
+    fireEvent.submit(cadence.closest("form")!);
+
+    await waitFor(() => expect(updateServer).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(updateServer).mock.calls[0];
+    // Cleared = inherit / instant, never 0 or NaN.
+    expect(payload.pace_ms).toBeUndefined();
   });
 });
