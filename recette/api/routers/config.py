@@ -18,9 +18,10 @@ from fastapi import APIRouter, Body, HTTPException, Request, Response
 
 from ...llm import Message, build_llm
 from ...platform.events import PlatformActionEvent
+from ...platform.netname.resolver import ResolutionDenied, resolve_name
 from ...platform.proxy.lab_proxy import LabHttpProxy
 from ...platform.proxy.router import resolve_proxy
-from ..config_store import UnknownAgentError, UnknownServerError
+from ..config_store import ServerNetnameError, UnknownAgentError, UnknownServerError
 from ..server_manager import ServerManager
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -327,6 +328,59 @@ def delete_ai_backend_secret(request: Request, backend_id: str) -> Response:
     return Response(status_code=204)
 
 
+@router.get("/containment")
+def get_containment(request: Request) -> dict:
+    """Read the global private-DNS containment flag (default false)."""
+    return {"containment": _store(request).containment_enabled()}
+
+
+@router.put("/containment")
+def set_containment(request: Request, body: dict[str, Any]) -> dict:
+    """Persist the global containment flag. Body: {"enabled": bool}.
+
+    Missing/invalid "enabled" is a 422 (semantic validation), consistent with
+    FastAPI's body-validation contract elsewhere.
+    """
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=422, detail="'enabled' must be a boolean")
+    _store(request).set_containment(enabled)
+    return {"containment": enabled}
+
+
+@router.post("/resolve")
+def resolve_probe(request: Request, body: dict[str, Any]) -> dict:
+    """Probe how a name resolves against the server allowlist (diagnostic).
+
+    Body: ``{"name": str, "containment"?: bool}``. ``containment`` defaults to
+    the store's global flag when absent. A DENIED probe is a successful probe
+    RESULT, not an error: it returns HTTP 200 with ``resolved: false`` rather
+    than surfacing ResolutionDenied to the client. Pure, diagnostic path -- no
+    event is appended, the resolver stays I4-pure.
+    """
+    name = body.get("name")
+    if not isinstance(name, str) or not name:
+        raise HTTPException(status_code=422, detail="'name' must be a non-empty string")
+    store = _store(request)
+    raw_containment = body.get("containment")
+    containment = (
+        raw_containment if isinstance(raw_containment, bool) else store.containment_enabled()
+    )
+    servers = store.list_servers()
+    try:
+        entry = resolve_name(name, servers, containment=containment)
+    except ResolutionDenied:
+        return {"name": name, "resolved": False, "reason": "not_in_allowlist"}
+    if entry is None:
+        return {"name": name, "resolved": False, "reason": "unknown_legacy"}
+    return {
+        "name": name,
+        "resolved": True,
+        "server_id": entry["id"],
+        "fqdn": entry.get("fqdn"),
+    }
+
+
 @router.get("/servers")
 def list_servers(request: Request) -> list[dict]:
     return _store(request).list_servers()
@@ -336,6 +390,10 @@ def list_servers(request: Request) -> list[dict]:
 def create_server(request: Request, server: dict[str, Any]) -> dict:
     try:
         return _store(request).add_server(server)
+    except ServerNetnameError as exc:
+        # A malformed/colliding fqdn/alias is a semantic validation failure (422),
+        # distinct from a generic bad request like a duplicate id (400 below).
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -346,6 +404,8 @@ def update_server(request: Request, server_id: str, patch: dict[str, Any]) -> di
         return _store(request).update_server(server_id, patch)
     except UnknownServerError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ServerNetnameError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

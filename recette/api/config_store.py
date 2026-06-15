@@ -42,6 +42,16 @@ class UnknownServerError(LookupError):
     """Raised when a server id is not found (maps to HTTP 404, distinct from bad input)."""
 
 
+class ServerNetnameError(ValueError):
+    """Raised when a server fqdn/alias is malformed or collides with another server.
+
+    Subclasses ValueError so existing ``except ValueError`` handlers still catch
+    it; the config router catches it FIRST to map a netname problem to HTTP 422
+    (semantic validation failure), while a plain ValueError (e.g. duplicate id)
+    stays HTTP 400 (bad request).
+    """
+
+
 def _check_runtime(runtime: object) -> None:
     if runtime not in _RUNTIMES:
         raise ValueError(f"runtime must be one of {_RUNTIMES}")
@@ -83,9 +93,10 @@ def validate_server_netname(server: dict, *, others: list[dict]) -> None:
     """Validate a server's optional fqdn/aliases.
 
     Names must be syntactic hostnames and must not collide with any name
-    (fqdn or alias) declared by a DIFFERENT server. Fail-safe: raise ValueError
-    (the config router maps it to HTTP 422) before persistence. An entry
-    updating itself (same id) does not collide with its own previous names.
+    (fqdn or alias) declared by a DIFFERENT server. Fail-safe: raise
+    ServerNetnameError (a ValueError subclass the config router maps to HTTP
+    422) before persistence. An entry updating itself (same id) does not
+    collide with its own previous names.
     """
     names: list[str] = []
     fqdn = server.get("fqdn")
@@ -94,11 +105,11 @@ def validate_server_netname(server: dict, *, others: list[dict]) -> None:
     # Harden: aliases must be a list (reject malformed config with non-list aliases)
     aliases = server.get("aliases")
     if aliases is not None and not isinstance(aliases, list):
-        raise ValueError(f"aliases must be a list: {aliases!r}")
+        raise ServerNetnameError(f"aliases must be a list: {aliases!r}")
     names.extend(aliases or [])
     for name in names:
         if not isinstance(name, str) or not _HOSTNAME_RE.match(name):
-            raise ValueError(f"invalid hostname: {name!r}")
+            raise ServerNetnameError(f"invalid hostname: {name!r}")
     taken: set[str] = set()
     for other in others:
         if other.get("id") == server.get("id"):
@@ -111,7 +122,7 @@ def validate_server_netname(server: dict, *, others: list[dict]) -> None:
             taken.update(other_aliases)
     clash = taken.intersection(names)
     if clash:
-        raise ValueError(f"name already declared by another server: {sorted(clash)}")
+        raise ServerNetnameError(f"name already declared by another server: {sorted(clash)}")
 
 
 def _check_server(server: dict) -> None:
@@ -240,6 +251,19 @@ class ConfigStore:
           built, no proxy/HTTP call is made.
         """
         return bool(self.read().get("containment", False))
+
+    def set_containment(self, enabled: bool) -> None:
+        """Persist the top-level ``containment`` flag (atomic write).
+
+        The flag governs the private-DNS allowlist gate; see
+        ``containment_enabled`` for the BOTH-block-never-allow semantics. This
+        is operational config, not an audited event, so a plain overwrite of
+        the flag (no compensating event) is correct here -- the event store is
+        untouched (I1 N/A).
+        """
+        cfg = self.read()
+        cfg["containment"] = bool(enabled)
+        self._write(cfg)
 
     # --- servers ---
     def list_servers(self) -> list[dict]:
