@@ -620,6 +620,24 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             git du corpus, pas <code>corpus/maf_agents/</code>.
           </li>
         </ul>
+        <h3>Le meme moteur que les Agents et les Campagnes</h3>
+        <p>
+          Le red-team git n'est PAS un moteur a part : c'est{" "}
+          <strong>exactement le run d'un agent par une campagne</strong>, mais
+          deterministe. Le cockpit (onglet <strong>Agents</strong> /{" "}
+          <strong>Campagnes</strong>) et /sim appellent la{" "}
+          <strong>meme fonction</strong> <code>lane_b.run_agent</code> (meme boucle{" "}
+          <code>decide -&gt; act</code>, memes arguments derives de l'agent :
+          agent_id, principal, target_system, goal, capability_scope), et jugent
+          avec le <strong>meme juge</strong> d'identification. La seule difference :
+          le cockpit branche un <strong>LLM live</strong> + une{" "}
+          <strong>forge reelle</strong> (proxy / lab) ; /sim branche un{" "}
+          <strong>LLM rejoue</strong> (decisions figees, I4) + un{" "}
+          <strong>lab en memoire</strong>. Un sujet red-team est donc le{" "}
+          <strong>jumeau fige</strong> d'un run d'agent -- meme action-log, meme
+          verdict, mais reproductible. Promouvoir ne cree pas un agent lancable :
+          il fige ce jumeau dans le corpus pour la recette d'identification.
+        </p>
         <h3>Le CLI fait la meme chose (l'UI est le miroir)</h3>
         <ul>
           <li>

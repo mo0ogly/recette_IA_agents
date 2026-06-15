@@ -255,6 +255,54 @@ The screenshots above are regenerated on every `./recette.sh smoke` run
 (`scripts/smoke_console.py::_verify_sim_redteam`), so they never drift from the
 live UI (see `docs/screenshots/sim/README.md`).
 
+### Same Lane B engine as the Agents and Campaigns (verified)
+
+The git red-team is NOT a separate engine: it is **exactly a campaign run of one
+agent, made deterministic**. Both the cockpit and `/sim` call the SAME function
+`recette.lane_b.run_agent` and judge with the SAME identification judge:
+
+| | Agents / Campaigns (cockpit) | git red-team (/sim) |
+|--|--|--|
+| call site | `recette/api/runners.py::make_lane_b_runner` -> `run_lane_b_agent(...)` | `recette/redteam_git.py::_judge_once` -> `run_agent(...)` |
+| engine | `lane_b.run_agent` | `lane_b.run_agent` (same) |
+| args | `agent_id / principal / target_system / goal / capability_scope` from the config agent | the same five, derived from `target_manifest` (`_run_args`) |
+| LLM | live (or stub) backend | `ReplayLlm` over the frozen `subject_program` (I4) |
+| forge | real / proxy / lab (`forge_for_agent`) | in-memory `LabForge` (+ optional `tool_injection`) |
+| judge | identification `judge_subject` | `judge_subject` (same) |
+
+A red-team subject is therefore the **frozen twin** of an agent run: same
+action-log, same verdict, but reproducible. Verified functionally (R14): driving
+each committed git scenario through `run_git_scenario_view` (the `/sim` path) and
+through `lane_b.run_agent` directly (the cockpit path) yields the **identical
+action sequence and the identical verdict** for all five scenarios
+(`rt-prbot-overreach`, `-resisted`, `-policy-unapproved-merge`, `-behavior-spam`,
+`-identity-mismatch`). Promote does not create a launchable agent -- it freezes
+that twin into the corpus for the identification recette.
+
+```mermaid
+flowchart TD
+    subgraph cockpit["Agents / Campagnes (cockpit, live)"]
+        A1["config agent"] --> MR["make_lane_b_runner"]
+        MR --> RA
+        LLMlive["LLM live"] --> RA
+        FR["forge reelle / proxy / lab"] --> RA
+    end
+    subgraph sim["/sim git red-team (deterministe)"]
+        S1["git-sim-scenario<br/>(target_manifest)"] --> RG["redteam_git._run_args"]
+        RG --> RA
+        RP["ReplayLlm<br/>(subject_program fige)"] --> RA
+        LF["LabForge en memoire<br/>(+ tool_injection)"] --> RA
+    end
+    RA["lane_b.run_agent<br/>(decide puis act)"] --> AL["action-log (AgentAction)"]
+    AL --> JG["judge_subject<br/>(4 dimensions)"]
+    JG --> VD{"verdict"}
+    classDef same fill:#e8f0ff,stroke:#33bb66;
+    class RA,JG,VD same;
+```
+
+The blue nodes are the SHARED path: same engine, same judge, same verdict shape.
+Only the LLM source and the forge differ between the two subgraphs.
+
 ### Where the report lives (NOT in /sim)
 
 `/sim` proves the attack was caught and lets you freeze it. The **report** -- did
@@ -271,13 +319,19 @@ to the Recette page directly.
 
 ### The full loop
 
+```mermaid
+flowchart LR
+    SIM["/sim catches an anomaly<br/>(recette redteam)"] -->|"Promouvoir (recette redteam-promote)"| CORP
+    CORP["corpus/agents (git)<br/>corpus/maf_agents (MAF)<br/>incorrect/&lt;slug&gt;/ = ground truth"] --> REC
+    REC["page Recette<br/>recette run<br/>(scorecard identification)"] --> REP(["LE RAPPORT"])
+    CORP --> VER["page Verdicts<br/>(outil externe juge<br/>contre le ground-truth)"]
+    VER --> REP
+    classDef report fill:#dff5e1,stroke:#22aa77;
+    class REP report;
 ```
-/sim catches an anomaly (recette redteam)
-   -> Promouvoir freezes it          (recette redteam-promote <id>)
-   -> corpus/agents | corpus/maf_agents/incorrect/<slug>/   (ground truth)
-   -> Recette page scores it          (recette run)   <- the report
-   -> Verdicts page judges the external tool against it
-```
+
+The report is read on the **Recette** and **Verdicts** pages, never in `/sim`:
+`/sim` catches and freezes, the identification recette scores.
 
 ## Invariants
 
