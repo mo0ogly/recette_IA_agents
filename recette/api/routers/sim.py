@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from ...redteam_git import run_git_scenario, run_git_scenario_view
 from ...redteam_promote import UnknownScenarioError, promote_scenario
 from ...redteam_recette import run_scenario, run_scenario_view
 from ...sim_view import SimRecording, build_sim_view
@@ -32,6 +33,12 @@ def _discover_scenarios() -> list[Path]:
     if not _SIM_DIR.is_dir():
         return []
     return sorted(_SIM_DIR.glob("*.scenario.json"))
+
+
+def _discover_git_scenarios() -> list[Path]:
+    if not _SIM_DIR.is_dir():
+        return []
+    return sorted(_SIM_DIR.glob("*.git-scenario.json"))
 
 
 def list_runs() -> list[dict]:
@@ -87,6 +94,39 @@ def list_scenarios() -> list[dict]:
                 "violation_type": outcome.violation_type,
                 "anomaly_caught": outcome.anomaly_caught,
                 "tags": outcome.tags,
+                "family": "maf",
+            }
+        )
+    return scenarios
+
+
+def list_git_scenarios() -> list[dict]:
+    """Pure: summarize every committed git red-team scenario with its outcome.
+
+    Parallel to list_scenarios for the git family: for each *.git-scenario.json
+    file load the raw JSON (for the human ``name``), run it through
+    run_git_scenario, and merge the outcome with the name plus a ``family:
+    "git"`` marker so the console can split the two families. Files that fail to
+    load/validate/replay are skipped (mirrors list_scenarios), so one bad
+    scenario never blanks the list.
+    """
+    scenarios: list[dict] = []
+    for path in _discover_git_scenarios():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            outcome = run_git_scenario(data)
+        except (ValueError, OSError, KeyError, json.JSONDecodeError):
+            continue
+        scenarios.append(
+            {
+                "scenario_id": outcome.scenario_id,
+                "name": data.get("name", outcome.scenario_id),
+                "verdict": outcome.verdict,
+                "expected_verdict": outcome.expected_verdict,
+                "violation_type": outcome.violation_type,
+                "anomaly_caught": outcome.anomaly_caught,
+                "tags": outcome.tags,
+                "family": "git",
             }
         )
     return scenarios
@@ -108,6 +148,25 @@ def get_scenario(scenario_id: str) -> dict | None:
             continue
         if data.get("scenario_id") == scenario_id:
             return run_scenario_view(data)
+    return None
+
+
+def get_git_scenario(scenario_id: str) -> dict | None:
+    """Pure: the step-through view of one git scenario (outcome + transcript +
+    dimensions + action_log), or None for a genuinely-unknown ``scenario_id``.
+
+    Mirrors get_scenario for the git family. When the matching file IS present
+    but malformed (valid JSON failing schema/replay), ``run_git_scenario_view``
+    raises ``ValueError`` and we let it propagate so the route handler can
+    surface an explicit 422 -- a present-but-invalid scenario must be legible.
+    """
+    for path in _discover_git_scenarios():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("scenario_id") == scenario_id:
+            return run_git_scenario_view(data)
     return None
 
 
@@ -148,6 +207,30 @@ def scenario_view(scenario_id: str) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if view is None:
         raise HTTPException(status_code=404, detail=f"no scenario {scenario_id!r}")
+    return view
+
+
+@router.get("/git-scenarios")
+def git_scenarios() -> dict:
+    """List every git red-team scenario with its verdict and family marker."""
+    items = list_git_scenarios()
+    return {"count": len(items), "scenarios": items}
+
+
+@router.get("/git-scenarios/{scenario_id}")
+def git_scenario_view(scenario_id: str) -> dict:
+    """Step-through view of one git scenario: outcome + dimensions + action log.
+
+    Unknown ``scenario_id`` (no matching file) -> 404. A present-but-malformed
+    scenario file (valid JSON failing schema/replay) -> 422 with the validation
+    message, instead of leaking a bare 500 (legibility-first).
+    """
+    try:
+        view = get_git_scenario(scenario_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if view is None:
+        raise HTTPException(status_code=404, detail=f"no git scenario {scenario_id!r}")
     return view
 
 
