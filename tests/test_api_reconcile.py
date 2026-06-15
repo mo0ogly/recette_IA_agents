@@ -73,6 +73,28 @@ class ReconcileEndpointTest(unittest.TestCase):
         body = self.client.post("/proxy/reconcile/raise", params={"run_id": "run-1"}).json()
         self.assertEqual(body["raised"], 0)
 
+    def test_configured_llm_backend_host_is_not_a_bypass(self) -> None:
+        # Register a groq backend, then a wire flow to api.groq.com:443 must be
+        # treated as mediated (real-mode LLM traffic), not an unmediated path.
+        self.client.post(
+            "/config/ai-backends",
+            json={"id": "b-groq", "provider": "groq", "model": "llama"},
+        )
+        self.client.post(
+            "/proxy/wire",
+            json=_flow(host="api.groq.com", port=443, path="/openai/v1/chat/completions"),
+        )
+        body = self.client.get("/proxy/reconcile", params={"run_id": "run-1"}).json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["bypass_flows"], [])
+
+    def test_unconfigured_llm_host_still_flags(self) -> None:
+        # No backend registered for this host -> still an unmediated path.
+        self.client.post("/proxy/wire", json=_flow(host="api.evil.test", port=443, path="/x"))
+        body = self.client.get("/proxy/reconcile", params={"run_id": "run-1"}).json()
+        self.assertFalse(body["ok"])
+        self.assertEqual([f["host"] for f in body["bypass_flows"]], ["api.evil.test"])
+
     def test_strict_flags_ghost_via_allowlisted_target(self) -> None:
         # A governed-shaped write to the lab (:8082, mediated) with NO ProxyTrace
         # behind it: phase 2 sees a mediated target and says ok; phase 3 (strict)

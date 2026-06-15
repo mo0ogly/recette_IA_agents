@@ -149,6 +149,7 @@ def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = Fa
     target/run join. Pure given the recorder snapshots (I4); no side effect."""
     from urllib.parse import urlparse
 
+    from ...llm import provider_host
     from ...platform.proxy.lab_proxy import lab_url_from_env
     from ...platform.proxy.reconcile import (
         build_allowlist,
@@ -166,10 +167,18 @@ def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = Fa
     # Normalize through target_of so "localhost:8082" matches a flow recorded as
     # "127.0.0.1:8082" (and vice versa).
     lab_host = target_of({"host": lab.hostname or "127.0.0.1", "port": lab.port or 8082})
+    # A configured LLM backend is a mediated target: a real-mode run's traffic to
+    # its host must not be mistaken for an unmediated path (task C).
+    config_store = request.app.state.config_store
+    llm_hosts = {
+        host
+        for backend in config_store.read().get("ai_backends", [])
+        if (host := provider_host(backend.get("provider", ""), backend.get("base_url")))
+    }
     allow = build_allowlist(
-        servers=request.app.state.config_store.list_servers(),
+        servers=config_store.list_servers(),
         lab_host=lab_host,
-        llm_hosts=set(),
+        llm_hosts=llm_hosts,
     )
     join = reconcile_strict if strict else reconcile_run
     return join([f.to_dict() for f in flows], [t.to_dict() for t in traces], allow)

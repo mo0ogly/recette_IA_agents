@@ -810,6 +810,97 @@ _PROVIDERS = (
     "openai_compat",
 )
 
+# Provider id -> backend class, so the target HOST of a provider can be derived
+# from its class BASE_URL without instantiating it (used by the reconcile
+# allowlist so a real-mode LLM call is not mistaken for an unmediated path). The
+# drift guard test asserts this covers exactly _PROVIDERS.
+_PROVIDER_CLASSES: dict[str, type] = {
+    "anthropic": AnthropicLlm,
+    "openai": OpenAiLlm,
+    "gemini": GeminiLlm,
+    "groq": GroqLlm,
+    "mistral": MistralLlm,
+    "deepseek": DeepSeekLlm,
+    "xai": XaiLlm,
+    "openrouter": OpenRouterLlm,
+    "together": TogetherLlm,
+    "fireworks": FireworksLlm,
+    "moonshot": MoonshotLlm,
+    "zai": ZaiLlm,
+    "dashscope": DashscopeLlm,
+    "nvidia": NvidiaLlm,
+    "nous": NousLlm,
+    "ollama_cloud": OllamaCloudLlm,
+    "novita": NovitaLlm,
+    "stepfun": StepfunLlm,
+    "arcee": ArceeLlm,
+    "xiaomi": XiaomiLlm,
+    "gmi": GmiLlm,
+    "huggingface": HuggingFaceLlm,
+    "minimax": MinimaxLlm,
+    "minimax_cn": MinimaxCnLlm,
+    "opencode_zen": OpencodeZenLlm,
+    "kilocode": KilocodeLlm,
+    "alibaba_coding_plan": AlibabaCodingPlanLlm,
+    "qwen": QwenLlm,
+    "cerebras": CerebrasLlm,
+    "bedrock": BedrockLlm,
+    "openai_compat": OpenAiCompatLlm,
+}
+
+
+# Providers with NO canonical host: the target is whatever base_url the backend
+# was configured with (the class default must not leak into the allowlist).
+_BASE_URL_DRIVEN_PROVIDERS = frozenset({"openai_compat"})
+
+
+def provider_host(provider: str, base_url: str | None = None) -> str | None:
+    """The ``host:port`` an LLM call for ``provider`` targets, or None if unknown.
+
+    Uses ``base_url`` when given (openai_compat / a bedrock region override),
+    else the provider class ``BASE_URL``. openai_compat has no canonical host, so
+    without a base_url it is None. https implies port 443. Pure: no network, no
+    instantiation -- just URL parsing of a known constant."""
+    if provider in _BASE_URL_DRIVEN_PROVIDERS:
+        url = base_url
+    else:
+        cls = _PROVIDER_CLASSES.get(provider)
+        url = base_url or (getattr(cls, "BASE_URL", None) if cls is not None else None)
+    if not url:
+        return None
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.hostname:
+        return None
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    return f"{parsed.hostname}:{port}"
+
+
+# Provider id -> known model ids the console offers as a dropdown; first entry =
+# default selected when that provider is picked. INTENTIONALLY PARTIAL: only
+# providers whose model ids are grounded in this repo or an authoritative source
+# are listed. An absent provider falls back to a free-text model field in the
+# UI. Never invent a model id here (R13) -- a wrong suggestion is worse than
+# none; the dropdown always keeps a "custom" path, so an unlisted model stays
+# typeable. Add an entry only when a model id is verified, not guessed.
+_PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
+    "anthropic": (
+        "claude-opus-4-8",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5",
+        "claude-fable-5",
+    ),
+    "openai": ("gpt-4o", "gpt-4o-mini"),
+    "groq": ("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
+    "mistral": ("mistral-large-latest", "mistral-small-latest"),
+    "deepseek": ("deepseek-chat", "deepseek-reasoner"),
+}
+
+
+def provider_models(provider: str) -> tuple[str, ...]:
+    """Known model ids for ``provider`` (first = default), or empty if none are
+    declared. Pure lookup over the curated, intentionally partial map above."""
+    return _PROVIDER_MODELS.get(provider, ())
+
 
 def build_llm(
     provider: str,
