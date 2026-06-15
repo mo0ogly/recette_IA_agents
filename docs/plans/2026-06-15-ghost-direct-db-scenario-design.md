@@ -97,9 +97,11 @@ ExternalSystemProxy (NOT taken for the ghost write)                       |
   the live `WireFlowRecorder` and `ProxyTraceRecorder` by `run_id`.
 - **Alert append (I1)** `tests/test_bypass_event.py`: a detected bypass appends
   exactly one `bypass_detected` event; re-running does not mutate prior events.
-- **Live proof (R14)** `scripts/smoke_reconcile.py`: overlay up -> run
-  `ghost-shadow-writer` -> assert `/proxy/reconcile` reports the `:9113` bypass.
-  Self-skips without the Docker overlay (no secret needed).
+- **Live proof (R14)** `scripts/smoke_reconcile.py`: overlay up -> ghost probe
+  writes directly to `:9113` -> assert `/proxy/reconcile` reports the `:9113`
+  bypass. Self-skips without the Docker overlay (no secret needed). **Status:
+  PASSED live (2026-06-15)** -- "PASS -- bypass detected" with the `:9113` flow,
+  proving steps 1-4 end to end on a real mitmproxy overlay.
 
 ## Coverage-guard / corpus rules
 

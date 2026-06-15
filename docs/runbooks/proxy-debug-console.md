@@ -226,16 +226,24 @@ The two views make it visible:
 - the **mitmproxy wire** is what was actually *on the network*.
 
 So every flow seen on the wire should have a matching mediated event in the audit
-log. A wire flow with **no audit counterpart** (`wire_flows` not a subset of
-`audited_flows`) is an **unmediated path** -- the loophole -- and is the signal to
-raise to the Control Plane.
+log. A wire flow with **no audit counterpart** (a non-mediated target within its
+run) is an **unmediated path** -- the loophole -- and is the signal to raise to the
+Control Plane.
 
-Status (forward-looking): both views already exist and are captured; the automatic
-reconciliation assertion is **not yet coded**. This stays a recette LAB: it
-*observes* the unmediated path, it does not *enforce* a network block. Hard-blocking
-the direct outbound path (pod network isolation, plus the boot-time identity
-handshake of I3) is the platform's job, not the simulation's. The lab prepares and
-scores; enforcement is a separate layer.
+Status (implemented, allowlist + run-scoped join): `recette/platform/proxy/reconcile.py`
+joins the wire view (`WireFlow`) with the audit view (`ProxyTrace`) by `run_id`
+(`reconcile_run`); a flow to a non-mediated target (e.g. the `shadow-db-sink`
+honeypot on `:9113`) is flagged as a bypass. Surfaced at `GET /proxy/reconcile` and
+in the console (Proxy page, "reconciliation" tab). Proven end to end by the live
+smoke `scripts/smoke_reconcile.py` (mitmproxy overlay up -> ghost probe writes
+directly to `:9113` -> reconcile reports `ok:false` with the `:9113` bypass) and by
+the deterministic unit/contract suites (`tests/test_reconcile.py`,
+`test_api_reconcile.py`, `test_ghost_probe.py`, `ReconcilePanel.contract.test.tsx`).
+A per-flow `side_effect_hash` join (ghost via an *allowlisted* target) is phase 3.
+This stays a recette LAB: it *observes* the unmediated path, it does not *enforce* a
+network block. Hard-blocking the direct outbound path (pod network isolation, plus
+the boot-time identity handshake of I3) is the platform's job, not the simulation's.
+The lab prepares and scores; enforcement is a separate layer.
 | `tests/test_wire_routing.py` | proxy_url + ca_bundle seam; resolve_proxy threading; Slack wire env |
 | `tests/test_mitm_addon.py` | addon flow normalization + fail-safe guards (no mitmproxy runtime) |
 | `console/src/pages/proxy/WirePanel.contract.test.tsx` | R16 panel contract (real fixture, enabled/disabled) |
