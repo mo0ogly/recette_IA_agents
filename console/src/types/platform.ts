@@ -633,8 +633,13 @@ export interface WireFlowResponse {
 export interface ReconcileReport {
   run_id: string | null;
   ok: boolean;
-  bypass_flows: WireFlow[];
+  /** Each bypass carries a reason in strict (phase-3) mode: non_mediated_target
+   *  (target not mediated at all) or no_audit_event (governed flow to a mediated
+   *  target with no matching audit event). */
+  bypass_flows: (WireFlow & { bypass_reason?: string })[];
   audited_run_ids: string[];
+  /** Echoes whether the phase-3 per-flow side_effect_hash join was used. */
+  strict?: boolean;
 }
 
 /** Response of GET /proxy/wire/status: overlay state and buffered flow count. */

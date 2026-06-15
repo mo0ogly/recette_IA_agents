@@ -62,6 +62,31 @@ describe("ReconcilePanel (R16 contract)", () => {
     expect(screen.queryByTestId("reconcile-raise")).not.toBeInTheDocument();
   });
 
+  it("toggling strict re-queries with the phase-3 join", async () => {
+    render(<ReconcilePanel />);
+    await screen.findByTestId("reconcile-bypass");
+    const toggle = within(screen.getByTestId("reconcile-strict-toggle")).getByRole("checkbox");
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(vi.mocked(getReconcile)).toHaveBeenCalledWith(undefined, true),
+    );
+  });
+
+  it("renders the bypass_reason column from a strict report", async () => {
+    vi.mocked(getReconcile).mockResolvedValue({
+      run_id: null,
+      ok: false,
+      strict: true,
+      audited_run_ids: [],
+      bypass_flows: [
+        { ...fixture.bypass_flows[0], bypass_reason: "no_audit_event" },
+      ] as ReconcileReport["bypass_flows"],
+    });
+    render(<ReconcilePanel />);
+    const table = await screen.findByLabelText("bypass flows");
+    expect(table).toHaveTextContent("no_audit_event");
+  });
+
   it("shows the clean state when no flow is unmediated", async () => {
     vi.mocked(getReconcile).mockResolvedValue({
       run_id: null,

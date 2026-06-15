@@ -25,15 +25,18 @@ export default function ReconcilePanel(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [raising, setRaising] = useState(false);
   const [raiseMsg, setRaiseMsg] = useState<string | null>(null);
+  // Phase-3 toggle: per-flow side_effect_hash join (catches a ghost via an
+  // allowlisted target). Off = phase-2 target/run join.
+  const [strict, setStrict] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      setReport(await getReconcile());
+      setReport(await getReconcile(undefined, strict));
       setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [strict]);
 
   useEffect(() => {
     void refresh();
@@ -44,7 +47,7 @@ export default function ReconcilePanel(): JSX.Element {
   const onRaise = useCallback(async (): Promise<void> => {
     setRaising(true);
     try {
-      const res = await raiseReconcile();
+      const res = await raiseReconcile(undefined, strict);
       setRaiseMsg(
         res.raised > 0
           ? `${res.raised} evenement(s) consigne(s) au journal d'audit`
@@ -57,7 +60,7 @@ export default function ReconcilePanel(): JSX.Element {
     } finally {
       setRaising(false);
     }
-  }, [refresh]);
+  }, [refresh, strict]);
 
   const bypass = useMemo(() => report?.bypass_flows ?? [], [report]);
   const audited = useMemo(() => report?.audited_run_ids ?? [], [report]);
@@ -91,6 +94,14 @@ export default function ReconcilePanel(): JSX.Element {
             runs audites : {audited.join(", ")}
           </span>
         )}
+        <label className="proxy-summary" data-testid="reconcile-strict-toggle">
+          <input
+            type="checkbox"
+            checked={strict}
+            onChange={(e) => setStrict(e.target.checked)}
+          />{" "}
+          strict (hash par flux)
+        </label>
         {report !== null && !report.ok && (
           <button
             type="button"
@@ -131,6 +142,7 @@ export default function ReconcilePanel(): JSX.Element {
               <th>cible</th>
               <th>chemin</th>
               <th>run</th>
+              <th>raison</th>
             </tr>
           </thead>
           <tbody>
@@ -144,6 +156,7 @@ export default function ReconcilePanel(): JSX.Element {
                 </td>
                 <td>{f.path}</td>
                 <td>{f.run_id ?? "-"}</td>
+                <td>{f.bypass_reason ?? "non_mediated_target"}</td>
               </tr>
             ))}
           </tbody>

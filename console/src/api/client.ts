@@ -581,19 +581,26 @@ export function clearWireFlows(): Promise<{ cleared: boolean }> {
 }
 
 /** Wire<->audit reconciliation: ok=false when a wire flow reached a non-mediated
- *  target (no matching audit event). runId narrows the join to one run. */
-export function getReconcile(runId?: string): Promise<ReconcileReport> {
-  return request<ReconcileReport>(withQuery("/proxy/reconcile", { run_id: runId }), {
-    method: "GET",
-  });
+ *  target (no matching audit event). runId narrows the join to one run. strict
+ *  selects the phase-3 per-flow side_effect_hash join (catches a ghost hitting an
+ *  allowlisted target directly). */
+export function getReconcile(runId?: string, strict?: boolean): Promise<ReconcileReport> {
+  return request<ReconcileReport>(
+    withQuery("/proxy/reconcile", { run_id: runId, strict: strict ? "true" : undefined }),
+    { method: "GET" },
+  );
 }
 
 /** Record each detected bypass as a compensatory bypass_detected event in the
  *  append-only audit log (I1). Idempotent: a bypass already recorded is not
- *  appended twice. Returns how many NEW events were raised. */
-export function raiseReconcile(runId?: string): Promise<{ raised: number; event_ids: string[] }> {
+ *  appended twice. Returns how many NEW events were raised. strict raises the
+ *  phase-3 detections too. */
+export function raiseReconcile(
+  runId?: string,
+  strict?: boolean,
+): Promise<{ raised: number; event_ids: string[] }> {
   return request<{ raised: number; event_ids: string[] }>(
-    withQuery("/proxy/reconcile/raise", { run_id: runId }),
+    withQuery("/proxy/reconcile/raise", { run_id: runId, strict: strict ? "true" : undefined }),
     { method: "POST" },
   );
 }
