@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
@@ -71,6 +72,39 @@ def _check_ground_truth(ground_truth: object) -> None:
         for dim, expected in dimensions.items():
             if not isinstance(expected, bool):
                 raise ValueError(f"ground_truth dimension {dim!r} must be a boolean")
+
+
+_HOSTNAME_RE = re.compile(
+    r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+)
+
+
+def validate_server_netname(server: dict, *, others: list[dict]) -> None:
+    """Validate a server's optional fqdn/aliases.
+
+    Names must be syntactic hostnames and must not collide with any name
+    (fqdn or alias) declared by a DIFFERENT server. Fail-safe: raise ValueError
+    (the config router maps it to HTTP 422) before persistence. An entry
+    updating itself (same id) does not collide with its own previous names.
+    """
+    names: list[str] = []
+    fqdn = server.get("fqdn")
+    if fqdn is not None:
+        names.append(fqdn)
+    names.extend(server.get("aliases") or [])
+    for name in names:
+        if not isinstance(name, str) or not _HOSTNAME_RE.match(name):
+            raise ValueError(f"invalid hostname: {name!r}")
+    taken: set[str] = set()
+    for other in others:
+        if other.get("id") == server.get("id"):
+            continue
+        if other.get("fqdn"):
+            taken.add(other["fqdn"])
+        taken.update(other.get("aliases") or [])
+    clash = taken.intersection(names)
+    if clash:
+        raise ValueError(f"name already declared by another server: {sorted(clash)}")
 
 
 def _check_server(server: dict) -> None:
@@ -195,6 +229,9 @@ class ConfigStore:
         cfg = self.read()
         if any(s["id"] == server["id"] for s in cfg["servers"]):
             raise ValueError(f"server id {server['id']!r} already exists")
+        # Reject bad/colliding fqdn/aliases against the other existing servers
+        # before persistence (maps to HTTP 422).
+        validate_server_netname(server, others=cfg["servers"])
         cfg["servers"].append(server)
         self._write(cfg)
         return server
@@ -221,6 +258,9 @@ class ConfigStore:
                         if field != keep and field not in patch:
                             merged.pop(field, None)
                 _check_server(merged)  # reject bad input before mutating/writing
+                # Validate fqdn/aliases of the merged entry against the OTHER
+                # servers (its own id is skipped inside validate_server_netname).
+                validate_server_netname(merged, others=cfg["servers"])
                 cfg["servers"][i] = merged
                 self._write(cfg)
                 return merged
