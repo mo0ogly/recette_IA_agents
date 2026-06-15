@@ -38,6 +38,11 @@ class ExecutionResult:
     response: dict = field(default_factory=dict)
     side_effect_hash: str | None = None
     error: str | None = None
+    # The resolved server name (fqdn) the side effect was routed to, for trace
+    # realism (a trace reads ``api.github.com`` instead of ``127.0.0.1:9101``).
+    # None means no name was resolved -> the trace falls back to target_system,
+    # exactly the previous behaviour (back-compat).
+    target: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -46,6 +51,7 @@ class ExecutionResult:
             "response": self.response,
             "side_effect_hash": self.side_effect_hash,
             "error": self.error,
+            "target": self.target,
         }
 
 

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ..netname.resolver import resolve_name
 from .lab_proxy import LabHttpProxy
 from .protocol import ExternalSystemProxy
 
@@ -67,24 +68,38 @@ def resolve_proxy(
     or a malformed server entry (fail-safe: the run must fail, never
     execute through the wrong proxy).
     """
-    server_id = agent.get("server")
-    if not server_id:
+    server_ref = agent.get("server")
+    if not server_ref:
         return default
-    server = next((s for s in servers if s.get("id") == server_id), None)
+    # Realism resolution (Task 5): resolve the reference by name (fqdn/alias/id)
+    # with containment OFF -- an unknown name returns None and we keep the EXACT
+    # legacy id lookup below (which raises on a dangling reference). The deny path
+    # (containment ON) is Task 6 and is intentionally NOT wired here. resolve_name
+    # is pure (no I/O), so the router stays pure (I4).
+    server = resolve_name(server_ref, servers, containment=False)
     if server is None:
-        raise ValueError(f"agent {agent.get('id', '?')!r} references unknown server {server_id!r}")
+        server = next((s for s in servers if s.get("id") == server_ref), None)
+    if server is None:
+        raise ValueError(f"agent {agent.get('id', '?')!r} references unknown server {server_ref!r}")
+    server_id = server.get("id", server_ref)
+    # The resolved server name (fqdn, if any) becomes the trace target for the
+    # lab-mode proxies, so a trace reads the fqdn instead of the loopback IP.
+    fqdn = server.get("fqdn")
+    target_name = fqdn if isinstance(fqdn, str) and fqdn else None
     mode = server.get("mode")
     if mode == "mock_local":
         port = server.get("port")
         if not isinstance(port, int) or isinstance(port, bool):
             raise ValueError(f"server {server_id!r} (mock_local) requires an integer 'port'")
-        return LabHttpProxy(f"http://127.0.0.1:{port}", proxy_url=wire_proxy_url)
+        return LabHttpProxy(
+            f"http://127.0.0.1:{port}", proxy_url=wire_proxy_url, target_name=target_name
+        )
     if mode == "declared_url":
         base_url = server.get("base_url")
         if not isinstance(base_url, str) or not base_url:
             raise ValueError(f"server {server_id!r} (declared_url) requires a non-empty 'base_url'")
         # The declared server must implement the lab wire format (module docstring).
-        return LabHttpProxy(base_url, proxy_url=wire_proxy_url)
+        return LabHttpProxy(base_url, proxy_url=wire_proxy_url, target_name=target_name)
     if mode == "real_saas":
         if real_proxy_factory is None:
             raise ValueError("real_saas execution requires realmode wiring")

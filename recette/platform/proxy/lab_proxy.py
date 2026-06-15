@@ -60,13 +60,22 @@ def _error_from_envelope(resp: object) -> str:
 
 class LabHttpProxy:
     def __init__(
-        self, base_url: str | None = None, *, timeout: float = 10.0, proxy_url: str | None = None
+        self,
+        base_url: str | None = None,
+        *,
+        timeout: float = 10.0,
+        proxy_url: str | None = None,
+        target_name: str | None = None,
     ) -> None:
         # ``proxy_url`` (optional) routes the side effect through the mitmproxy
         # wire overlay; None (default) talks to the lab directly (I4 unchanged).
+        # ``target_name`` (optional) is the resolved server name (fqdn) recorded
+        # as the trace target for realism; None (default) means the trace falls
+        # back to event.target_system, exactly the previous behaviour.
         self._client = StdlibHttpClient(
             base_url or lab_url_from_env(), timeout=timeout, proxy_url=proxy_url
         )
+        self._target_name = target_name
 
     def execute(self, event: PlatformActionEvent) -> ExecutionResult:
         body = {
@@ -79,16 +88,25 @@ class LabHttpProxy:
             resp = self._client.post(f"/{event.target_system}/execute", json=body)
         except Exception as exc:  # urllib raises URLError on connect failure
             return ExecutionResult(
-                ok=False, status_code=0, error=_transport_error(self._client.base_url, exc)
+                ok=False,
+                status_code=0,
+                error=_transport_error(self._client.base_url, exc),
+                target=self._target_name,
             )
         if resp.status >= 400:
             return ExecutionResult(
-                ok=False, status_code=resp.status, error=_error_from_envelope(resp)
+                ok=False,
+                status_code=resp.status,
+                error=_error_from_envelope(resp),
+                target=self._target_name,
             )
         envelope = resp.json()
         if not isinstance(envelope, dict) or not envelope.get("success"):
             return ExecutionResult(
-                ok=False, status_code=resp.status, error="lab envelope missing success=true"
+                ok=False,
+                status_code=resp.status,
+                error="lab envelope missing success=true",
+                target=self._target_name,
             )
         data = envelope.get("data")
         response = data if isinstance(data, dict) else {"data": data}
@@ -99,4 +117,5 @@ class LabHttpProxy:
             side_effect_hash=side_effect_hash(
                 event.target_system, event.action_type, event.resource, response
             ),
+            target=self._target_name,
         )

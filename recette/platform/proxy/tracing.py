@@ -50,6 +50,10 @@ class ProxyTrace:
     timestamp: str
     agent_id: str
     target_system: str
+    # The resolved server name (fqdn) the side effect was routed to, for trace
+    # realism (reads ``api.github.com`` instead of ``127.0.0.1:9101``). Falls
+    # back to ``target_system`` when no name was resolved (back-compat).
+    target: str
     action_type: str
     resource: str
     request_payload: dict
@@ -73,6 +77,7 @@ class ProxyTrace:
             "timestamp": self.timestamp,
             "agent_id": self.agent_id,
             "target_system": self.target_system,
+            "target": self.target,
             "action_type": self.action_type,
             "resource": self.resource,
             "request_payload": self.request_payload,
@@ -122,6 +127,7 @@ class RingTraceRecorder:
                 timestamp=event.timestamp,
                 agent_id=event.agent_id,
                 target_system=event.target_system,
+                target=result.target or event.target_system,
                 action_type=event.action_type,
                 resource=event.resource,
                 request_payload=dict(event.payload),
