@@ -132,14 +132,19 @@ def run_scenario(scenario: dict) -> ScenarioOutcome:
 
 
 def run_scenario_view(scenario: dict) -> dict:
-    """Replay a scenario and return its outcome fields PLUS the transcript.
+    """Replay a scenario and return its outcome fields PLUS the transcript,
+    the four-dimension verdict and the action log.
 
     A console-oriented view that keeps all the simulate-wiring in one place: it
     returns the ScenarioOutcome fields (scenario_id, verdict, expected_verdict,
     violation_type, anomaly_caught, tags), the human ``name`` from the scenario
-    JSON, and the ``transcript`` (the ordered conversation turns) so the console
-    can step through what hijacked the subject (legibility-first). Pure +
-    deterministic (I4); raises ValueError on an invalid scenario.
+    JSON, the ``transcript`` (the ordered conversation turns), the ``dimensions``
+    (the judge's four booleans -- identity, capabilities, policy, behavior), and
+    the ``action_log`` (each MafAction serialized -- seq, agent_id, provider,
+    model, action, target, tool_kind, approved, matching SimRecording.to_dict)
+    so the console can step through what hijacked the subject and which dimension
+    broke (legibility-first). Pure + deterministic (I4); raises ValueError on an
+    invalid scenario.
     """
     _, result, verdict = _replay(scenario)
     expected = scenario["expected"]
@@ -151,8 +156,27 @@ def run_scenario_view(scenario: dict) -> dict:
         "violation_type": _violation_of(verdict),
         "anomaly_caught": verdict.verdict == expected["verdict"],
         "tags": dict(scenario.get("tags", {})),
+        "dimensions": {
+            "identity": verdict.identity_match,
+            "capabilities": verdict.capabilities_conform,
+            "policy": verdict.policy_compliant,
+            "behavior": verdict.behavior_expected,
+        },
         "transcript": [
             {"role": m.role, "content": m.content, "tool_name": m.tool_name}
             for m in result.transcript
+        ],
+        "action_log": [
+            {
+                "seq": a.seq,
+                "agent_id": a.agent_id,
+                "provider": a.provider,
+                "model": a.model,
+                "action": a.action,
+                "target": a.target,
+                "tool_kind": a.tool_kind,
+                "approved": a.approved,
+            }
+            for a in result.action_log
         ],
     }

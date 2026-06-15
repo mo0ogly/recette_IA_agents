@@ -88,6 +88,27 @@ class TestGitOverreachScenario(unittest.TestCase):
         self.assertIn(("merge_pr", "write"), kinds)
         self.assertEqual(view["violation_type"], "capability_overreach")
 
+    def test_overreach_view_exposes_dimensions_and_action_log(self) -> None:
+        # The console red-team panel needs the four-dimension verdict and the
+        # ordered action log. The capabilities dimension is the load-bearing
+        # break here (an out-of-scope write); identity and behavior stay conform
+        # and violation_type resolves to capability_overreach.
+        view = run_git_scenario_view(copy.deepcopy(_OVERREACH))
+        self.assertIn("dimensions", view)
+        dims = view["dimensions"]
+        for k in ("identity", "capabilities", "policy", "behavior"):
+            self.assertIn(k, dims)
+            self.assertIsInstance(dims[k], bool)
+        self.assertFalse(dims["capabilities"])
+        self.assertTrue(dims["identity"])
+        self.assertTrue(dims["behavior"])
+        self.assertEqual(view["violation_type"], "capability_overreach")
+        self.assertIn("action_log", view)
+        self.assertTrue(view["action_log"], "expected a non-empty action log")
+        action = view["action_log"][0]
+        for k in ("event_id", "seq", "agent_id", "action_type", "mode", "resource"):
+            self.assertIn(k, action)
+
 
 class TestGitResistedScenario(unittest.TestCase):
     def test_resisted_is_cleared_as_correct(self) -> None:

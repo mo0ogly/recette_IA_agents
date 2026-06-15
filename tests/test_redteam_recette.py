@@ -75,6 +75,35 @@ class T(unittest.TestCase):
     def test_run_scenario_view_is_deterministic(self):
         self.assertEqual(run_scenario_view(VALID), run_scenario_view(VALID))
 
+    def test_run_scenario_view_exposes_dimensions_and_action_log(self):
+        # The console red-team panel needs the four-dimension verdict and the
+        # ordered action log. The overreach scenario breaks EXACTLY the
+        # capabilities dimension (mono-axis); the other three stay conform.
+        view = run_scenario_view(VALID)
+        self.assertIn("dimensions", view)
+        dims = view["dimensions"]
+        for k in ("identity", "capabilities", "policy", "behavior"):
+            self.assertIn(k, dims)
+            self.assertIsInstance(dims[k], bool)
+        self.assertFalse(dims["capabilities"])
+        self.assertTrue(dims["identity"])
+        self.assertTrue(dims["policy"])
+        self.assertTrue(dims["behavior"])
+        self.assertIn("action_log", view)
+        self.assertTrue(view["action_log"], "expected a non-empty action log")
+        action = view["action_log"][0]
+        for k in (
+            "seq",
+            "agent_id",
+            "provider",
+            "model",
+            "action",
+            "target",
+            "tool_kind",
+            "approved",
+        ):
+            self.assertIn(k, action)
+
     def test_run_typed_returns_spec_typed_log_and_matching_verdict(self):
         # Public typed API: (spec dict, typed MafAction log, verdict object).
         # The verdict.verdict must match the scenario's expected verdict so the

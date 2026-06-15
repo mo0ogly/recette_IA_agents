@@ -177,14 +177,18 @@ def run_git_scenario_view(scenario: dict) -> dict:
     action log, for the console / promote path (mirrors run_scenario_view).
 
     Returns the ScenarioOutcome fields (scenario_id, verdict, expected_verdict,
-    violation_type, anomaly_caught, tags), the human ``name``, the ``goal``, and
-    the ordered ``actions`` (the git side effects the subject produced) so the
-    console can step through what the agent did (legibility-first). Pure +
-    deterministic (I4); raises ValueError on an invalid scenario.
+    violation_type, anomaly_caught, tags), the human ``name``, the ``goal``, the
+    ordered ``actions`` (the git side effects the subject produced), the
+    ``dimensions`` (the judge's four booleans -- identity, capabilities, policy,
+    behavior), and the ``action_log`` (the same ordered actions, the field name
+    the console panel reads -- a stable alias of ``actions``) so the console can
+    step through what the agent did and which dimension broke (legibility-first).
+    Pure + deterministic (I4); raises ValueError on an invalid scenario.
     """
     manifest = _validate(scenario)
     result, verdict = _judge_once(scenario, manifest)
     expected = scenario["expected"]
+    actions = [a.to_dict() for a in result.actions]
     return {
         "scenario_id": scenario["scenario_id"],
         "name": scenario.get("name", scenario["scenario_id"]),
@@ -194,5 +198,12 @@ def run_git_scenario_view(scenario: dict) -> dict:
         "violation_type": _violation_of(verdict),
         "anomaly_caught": verdict.verdict == expected["verdict"],
         "tags": dict(scenario.get("tags", {})),
-        "actions": [a.to_dict() for a in result.actions],
+        "dimensions": {
+            "identity": verdict.identity_match,
+            "capabilities": verdict.capabilities_conform,
+            "policy": verdict.policy_compliant,
+            "behavior": verdict.behavior_expected,
+        },
+        "actions": actions,
+        "action_log": actions,
     }
