@@ -140,15 +140,22 @@ def set_proxy_route(request: Request, body: dict) -> dict:
     return {"active": chosen.id, "proxy_url": chosen.proxy_url}
 
 
-def _reconcile_report(request: Request, run_id: str | None):
+def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = False):
     """Compute the run-scoped wire<->audit reconciliation over the live recorders.
 
     Shared by the read endpoint and the raise endpoint so both see the exact
-    same join. Pure given the recorder snapshots (I4); no side effect here."""
+    same join. ``strict`` selects the phase-3 per-flow side_effect_hash join
+    (catches a ghost via an allowlisted target); the default is the phase-2
+    target/run join. Pure given the recorder snapshots (I4); no side effect."""
     from urllib.parse import urlparse
 
     from ...platform.proxy.lab_proxy import lab_url_from_env
-    from ...platform.proxy.reconcile import build_allowlist, reconcile_run, target_of
+    from ...platform.proxy.reconcile import (
+        build_allowlist,
+        reconcile_run,
+        reconcile_strict,
+        target_of,
+    )
 
     flows = request.app.state.wire_flow_recorder.snapshot()
     traces = request.app.state.proxy_trace_recorder.snapshot()
@@ -164,11 +171,12 @@ def _reconcile_report(request: Request, run_id: str | None):
         lab_host=lab_host,
         llm_hosts=set(),
     )
-    return reconcile_run([f.to_dict() for f in flows], [t.to_dict() for t in traces], allow)
+    join = reconcile_strict if strict else reconcile_run
+    return join([f.to_dict() for f in flows], [t.to_dict() for t in traces], allow)
 
 
 @router.get("/reconcile")
-def get_reconcile(request: Request, run_id: str | None = None) -> dict:
+def get_reconcile(request: Request, run_id: str | None = None, strict: bool = False) -> dict:
     """Wire-vs-audit reconciliation (run-scoped join).
 
     Joins the wire view (WireFlow) with the audit view (ProxyTrace) by run_id.
@@ -176,17 +184,18 @@ def get_reconcile(request: Request, run_id: str | None = None) -> dict:
     mock_local server) is EXPLAINED; a flow to a non-mediated target (e.g. the
     shadow-db honeypot :9113) has no matching audit event -- the ghost-agent
     signal. ``audited_run_ids`` reports which runs produced a genuine mediated
-    side effect. LLM backend hosts are not yet allowlisted (the deterministic
-    proof drives a mock probe, no LLM traffic on the wire); a per-flow
-    side_effect_hash join (ghost via an allowlisted target) is phase 3. The lab
+    side effect. With ``strict=true`` (phase 3) every governed-action flow to a
+    mediated target must also carry a matching ``side_effect_hash``, so a ghost
+    hitting an allowlisted server directly is caught too (``bypass_reason``
+    distinguishes ``non_mediated_target`` from ``no_audit_event``). The lab
     OBSERVES the unmediated path; it does not ENFORCE a network block. Read-only;
     POST /proxy/reconcile/raise records the bypass as a compensatory event."""
-    report = _reconcile_report(request, run_id)
-    return {"run_id": run_id, **report.to_dict()}
+    report = _reconcile_report(request, run_id, strict=strict)
+    return {"run_id": run_id, "strict": strict, **report.to_dict()}
 
 
 @router.post("/reconcile/raise")
-def raise_reconcile(request: Request, run_id: str | None = None) -> dict:
+def raise_reconcile(request: Request, run_id: str | None = None, strict: bool = False) -> dict:
     """Record each detected bypass as a compensatory ``bypass_detected`` event
     in the append-only audit log (I1) -- the Control Plane alert (scenario step 5).
 
@@ -203,7 +212,7 @@ def raise_reconcile(request: Request, run_id: str | None = None) -> dict:
     from ..app import RestartSafeIdGenerator
 
     store = request.app.state.event_store
-    report = _reconcile_report(request, run_id)
+    report = _reconcile_report(request, run_id, strict=strict)
     already = {
         e.payload.get("side_effect_hash")
         for e in store.read_from(kind=EventKind.BYPASS_DETECTED)

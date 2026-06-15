@@ -7,14 +7,18 @@ is a pure function of (flows, allowlist): no clock, no network, byte-stable.
 
 from __future__ import annotations
 
+import json
 import unittest
 
+from recette.platform.proxy.protocol import side_effect_hash
 from recette.platform.proxy.reconcile import (
     ReconcileReport,
     build_allowlist,
     reconcile,
     reconcile_run,
+    reconcile_strict,
     target_of,
+    wire_flow_side_effect_hash,
 )
 
 
@@ -120,6 +124,71 @@ class TestReconcileRun(unittest.TestCase):
         b = reconcile_run(flows, traces, {"127.0.0.1:8082"})
         self.assertEqual(a.to_dict(), b.to_dict())
         self.assertEqual([f["seq"] for f in a.bypass_flows], [2])
+
+
+def _exec_flow(seq: int, port: int, *, action: str = "open_pr", resource: str = "acme/x") -> dict:
+    """A governed-action wire flow (/{ts}/execute), shaped like LabHttpProxy's call."""
+    return {
+        "seq": seq,
+        "host": "127.0.0.1",
+        "port": port,
+        "path": "/github/execute",
+        "request_body": json.dumps({"action_type": action, "resource": resource, "payload": {}}),
+        "response_body": json.dumps({"success": True, "data": {"number": 42}}),
+        "run_id": "R",
+    }
+
+
+def _trace_for(action: str = "open_pr", resource: str = "acme/x") -> dict:
+    """A ProxyTrace whose side_effect_hash matches _exec_flow's recomputed hash."""
+    response = {"number": 42}
+    return {
+        "run_id": "R",
+        "side_effect_hash": side_effect_hash("github", action, resource, response),
+    }
+
+
+class TestReconcileStrict(unittest.TestCase):
+    """Phase 3: per-flow side_effect_hash join catches a ghost hitting an
+    ALLOWLISTED target directly (no matching ProxyTrace)."""
+
+    def test_recomputes_the_proxy_hash_from_a_wire_flow(self) -> None:
+        self.assertEqual(
+            wire_flow_side_effect_hash(_exec_flow(1, 9101)),
+            side_effect_hash("github", "open_pr", "acme/x", {"number": 42}),
+        )
+
+    def test_non_execute_flow_has_no_recomputable_hash(self) -> None:
+        health = {"seq": 1, "host": "127.0.0.1", "port": 9101, "path": "/health"}
+        self.assertIsNone(wire_flow_side_effect_hash(health))
+
+    def test_mediated_action_with_matching_audit_event_is_ok(self) -> None:
+        report = reconcile_strict([_exec_flow(1, 9101)], [_trace_for()], {"127.0.0.1:9101"})
+        self.assertTrue(report.ok)
+        self.assertEqual(report.bypass_flows, [])
+
+    def test_ghost_via_allowlisted_target_is_flagged_no_audit_event(self) -> None:
+        # A governed-shaped write to an allowlisted server with NO matching trace:
+        # phase 2 (target allowlist) would MISS this; phase 3 catches it.
+        report = reconcile_strict([_exec_flow(1, 9101)], [], {"127.0.0.1:9101"})
+        self.assertFalse(report.ok)
+        self.assertEqual([f["bypass_reason"] for f in report.bypass_flows], ["no_audit_event"])
+
+    def test_non_mediated_target_still_flagged(self) -> None:
+        ghost = {"seq": 1, "host": "127.0.0.1", "port": 9113, "path": "/shadow_db/write"}
+        report = reconcile_strict([ghost], [], {"127.0.0.1:9101"})
+        self.assertEqual([f["bypass_reason"] for f in report.bypass_flows], ["non_mediated_target"])
+
+    def test_benign_health_traffic_to_mediated_target_not_flagged(self) -> None:
+        health = {"seq": 1, "host": "127.0.0.1", "port": 9101, "path": "/health"}
+        report = reconcile_strict([health], [], {"127.0.0.1:9101"})
+        self.assertTrue(report.ok)
+
+    def test_is_deterministic(self) -> None:
+        flows = [_exec_flow(2, 9101), _exec_flow(1, 9101, action="merge_pr")]
+        a = reconcile_strict(flows, [], {"127.0.0.1:9101"})
+        b = reconcile_strict(flows, [], {"127.0.0.1:9101"})
+        self.assertEqual(a.to_dict(), b.to_dict())
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ the honeypot as a bypass. The deterministic recette never runs a real overlay.
 
 from __future__ import annotations
 
+import json
 import unittest
 
 try:
@@ -71,6 +72,29 @@ class ReconcileEndpointTest(unittest.TestCase):
         self.client.post("/proxy/wire", json=_flow(port=8082))  # only the lab
         body = self.client.post("/proxy/reconcile/raise", params={"run_id": "run-1"}).json()
         self.assertEqual(body["raised"], 0)
+
+    def test_strict_flags_ghost_via_allowlisted_target(self) -> None:
+        # A governed-shaped write to the lab (:8082, mediated) with NO ProxyTrace
+        # behind it: phase 2 sees a mediated target and says ok; phase 3 (strict)
+        # recomputes the side_effect_hash, finds no audit event, and flags it.
+        ghost = _flow(
+            port=8082,
+            path="/github/execute",
+            request_body=json.dumps(
+                {"action_type": "open_pr", "resource": "acme/x", "payload": {}}
+            ),
+            response_body=json.dumps({"success": True, "data": {"number": 42}}),
+        )
+        self.client.post("/proxy/wire", json=ghost)
+        lenient = self.client.get("/proxy/reconcile", params={"run_id": "run-1"}).json()
+        self.assertTrue(lenient["ok"])  # phase 2 misses it
+        strict = self.client.get(
+            "/proxy/reconcile", params={"run_id": "run-1", "strict": "true"}
+        ).json()
+        self.assertFalse(strict["ok"])  # phase 3 catches it
+        self.assertEqual(
+            [f["bypass_reason"] for f in strict["bypass_flows"]], ["no_audit_event"]
+        )
 
 
 if __name__ == "__main__":

@@ -17,7 +17,10 @@ which carries host and port separately); ``localhost`` and ``::1`` are folded to
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+
+from .protocol import side_effect_hash
 
 # Host strings (not a bind): the local-loopback aliases a proxy may record for
 # the same local target. "0.0.0.0" is here as a host ALIAS to fold onto
@@ -93,6 +96,73 @@ def reconcile_run(
     base = reconcile(wire_flows, allowlist)
     audited = tuple(sorted({str(t["run_id"]) for t in proxy_traces if t.get("run_id") is not None}))
     return ReconcileReport(ok=base.ok, bypass_flows=base.bypass_flows, audited_run_ids=audited)
+
+
+def wire_flow_side_effect_hash(flow: dict) -> str | None:
+    """Recompute the ``side_effect_hash`` of a governed action from its wire flow.
+
+    Mirrors exactly what ``LabHttpProxy.execute`` hashes: target_system from the
+    ``/{target_system}/execute`` path, ``action_type``/``resource`` from the
+    request body, and the unwrapped ``data`` of the lab envelope as the response.
+    Returns ``None`` when the flow is not a governed-action call (a different
+    path, a non-JSON body) -- such traffic (health checks, etc.) is benign and is
+    not correlated. Pure/deterministic (I4)."""
+    parts = [p for p in str(flow.get("path", "")).split("/") if p]
+    if len(parts) != 2 or parts[1] != "execute":
+        return None
+    target_system = parts[0]
+    try:
+        request = json.loads(flow.get("request_body") or "{}")
+        envelope = json.loads(flow.get("response_body") or "{}")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(request, dict) or not isinstance(envelope, dict):
+        return None
+    data = envelope.get("data")
+    response = data if isinstance(data, dict) else {"data": data}
+    return side_effect_hash(
+        target_system,
+        str(request.get("action_type", "")),
+        str(request.get("resource", "")),
+        response,
+    )
+
+
+def reconcile_strict(
+    wire_flows: list[dict],
+    proxy_traces: list[dict],
+    allowlist: set[str],
+) -> ReconcileReport:
+    """Phase-3 reconciliation: per-flow ``side_effect_hash`` join (I4).
+
+    Stronger than ``reconcile_run``: it also catches a ghost that hits an
+    ALLOWLISTED target directly (e.g. a raw write to a mock_local server,
+    bypassing the gateway). Every governed-action flow (``/{ts}/execute``) to a
+    mediated target MUST have a matching ``ProxyTrace`` (same recomputed hash);
+    one that does not is an unaudited side effect -- a ghost via an allowlisted
+    target. Each bypass carries a ``bypass_reason``:
+
+    - ``non_mediated_target`` -- the target is not mediated at all (phase 1/2);
+    - ``no_audit_event`` -- a governed-action flow to a mediated target with no
+      matching audit event.
+
+    Non-``/execute`` traffic to a mediated target (health probes, etc.) is benign
+    and never flagged. Pure: same inputs -> same report, byte for byte."""
+    audited_hashes = {t["side_effect_hash"] for t in proxy_traces if t.get("side_effect_hash")}
+    bypass: list[dict] = []
+    for flow in sorted(wire_flows, key=lambda f: f.get("seq", 0)):
+        if target_of(flow) not in allowlist:
+            bypass.append({**flow, "bypass_reason": "non_mediated_target"})
+            continue
+        digest = wire_flow_side_effect_hash(flow)
+        if digest is None:
+            continue  # not a governed-action call to a mediated target -> benign
+        if digest not in audited_hashes:
+            bypass.append({**flow, "bypass_reason": "no_audit_event"})
+    audited_runs = tuple(
+        sorted({str(t["run_id"]) for t in proxy_traces if t.get("run_id") is not None})
+    )
+    return ReconcileReport(ok=(bypass == []), bypass_flows=bypass, audited_run_ids=audited_runs)
 
 
 def build_allowlist(
