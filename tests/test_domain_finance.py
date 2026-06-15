@@ -231,9 +231,7 @@ class TestFinanceEntityModel(unittest.TestCase):
             self.assertIn("subtotal", line)
 
     def test_modify_iban_shows_old_and_new(self) -> None:
-        resp = finance_lab.handle(
-            "modify_iban", "acct-7", {"iban": "DE89370400440532013000"}
-        )
+        resp = finance_lab.handle("modify_iban", "acct-7", {"iban": "DE89370400440532013000"})
         assert resp is not None
         self.assertIn("old_iban", resp)
         self.assertNotEqual(resp["old_iban"], resp["iban"])
@@ -246,12 +244,8 @@ class TestFinanceEntityModel(unittest.TestCase):
         self.assertEqual(ctx.exception.detail["field"], "amount")
 
     def test_entity_derivation_is_deterministic(self) -> None:
-        self.assertEqual(
-            _entities.derive_invoice("inv/x"), _entities.derive_invoice("inv/x")
-        )
-        self.assertEqual(
-            _entities.derive_account("acct/y"), _entities.derive_account("acct/y")
-        )
+        self.assertEqual(_entities.derive_invoice("inv/x"), _entities.derive_invoice("inv/x"))
+        self.assertEqual(_entities.derive_account("acct/y"), _entities.derive_account("acct/y"))
 
 
 class TestFinanceInLoadedCatalog(unittest.TestCase):

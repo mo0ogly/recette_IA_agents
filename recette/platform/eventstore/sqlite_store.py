@@ -117,7 +117,8 @@ class SqliteEventStore:
         if tail is not None:
             # Last n of the filtered set, returned ascending: pick them via a
             # DESC LIMIT subquery, then restore the replay order (I4).
-            query = f"SELECT * FROM ({query} ORDER BY seq DESC LIMIT ?) ORDER BY seq ASC"
+            # query is internally built from fixed clauses; all values are ? params
+            query = f"SELECT * FROM ({query} ORDER BY seq DESC LIMIT ?) ORDER BY seq ASC"  # noqa: S608  # nosec B608
             params.append(max(tail, 0))
         else:
             query += " ORDER BY seq ASC"

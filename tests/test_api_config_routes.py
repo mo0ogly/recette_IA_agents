@@ -558,9 +558,7 @@ class TestServerLifecycleRoutes(unittest.TestCase):
     def test_start_honeypot_is_startable(self) -> None:
         # A honeypot sink reuses the mock_server process; the router must let it
         # start (it is excluded from the allowlist, not from the lifecycle).
-        self._add_server(
-            {"id": "sink", "system": "shadow_db", "mode": "honeypot", "port": 9113}
-        )
+        self._add_server({"id": "sink", "system": "shadow_db", "mode": "honeypot", "port": 9113})
         r = self.client.post("/config/servers/sink/start")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(self.manager.calls, [("start", "sink")])

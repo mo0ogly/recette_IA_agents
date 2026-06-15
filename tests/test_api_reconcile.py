@@ -92,9 +92,7 @@ class ReconcileEndpointTest(unittest.TestCase):
             "/proxy/reconcile", params={"run_id": "run-1", "strict": "true"}
         ).json()
         self.assertFalse(strict["ok"])  # phase 3 catches it
-        self.assertEqual(
-            [f["bypass_reason"] for f in strict["bypass_flows"]], ["no_audit_event"]
-        )
+        self.assertEqual([f["bypass_reason"] for f in strict["bypass_flows"]], ["no_audit_event"])
 
 
 if __name__ == "__main__":

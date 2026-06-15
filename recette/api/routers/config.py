@@ -150,7 +150,8 @@ def _probe_base_url(base_url: str) -> str:
     if not base_url.startswith(("http://", "https://")):
         return "down"
     try:
-        with urllib.request.urlopen(base_url, timeout=_PROBE_TIMEOUT_S):
+        # operator-configured declared_url reachability probe, not attacker input
+        with urllib.request.urlopen(base_url, timeout=_PROBE_TIMEOUT_S):  # noqa: S310  # nosec B310
             return "up"
     except urllib.error.HTTPError:
         return "up"  # the server answered, just not with 2xx/3xx

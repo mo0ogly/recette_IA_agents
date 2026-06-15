@@ -103,7 +103,8 @@ class ServerManager:
                     "error": f"mock server exited with code {proc.returncode}",
                 }
             try:
-                with urllib.request.urlopen(
+                # fixed localhost health probe to a server we spawned
+                with urllib.request.urlopen(  # noqa: S310  # nosec B310
                     f"http://127.0.0.1:{port}/health", timeout=1
                 ) as response:
                     if response.status == 200:

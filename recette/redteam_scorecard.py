@@ -4,6 +4,7 @@ Pure functions over a list of ScenarioOutcome: counts caught vs missed (a 'miss'
 is a scenario whose predicted verdict did not match its expected verdict -- the
 recette failed to catch the anomaly or raised a false alarm) and groups by the
 OWASP Agentic tag. No clock, no random, stable ordering (I4)."""
+
 from __future__ import annotations
 
 from collections import Counter

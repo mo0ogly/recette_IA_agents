@@ -185,9 +185,7 @@ class TestGitIdentityOverride(unittest.TestCase):
         _, action_log, verdict = run_typed(copy.deepcopy(_IDENTITY_MISMATCH))
         self.assertTrue(action_log, "expected a non-empty action log")
         self.assertTrue(all(a.principal == "attacker@evil" for a in action_log))
-        self.assertNotEqual(
-            "attacker@evil", _MANIFEST["declared_identity"]["principal"]
-        )
+        self.assertNotEqual("attacker@evil", _MANIFEST["declared_identity"]["principal"])
         self.assertFalse(verdict.identity_match)
         self.assertTrue(verdict.capabilities_conform)
         self.assertTrue(verdict.policy_compliant)

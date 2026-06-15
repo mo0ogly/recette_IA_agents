@@ -87,9 +87,7 @@ def _envelope_ok(data: object) -> bytes:
     return json.dumps({"success": True, "data": data}, sort_keys=True).encode("utf-8")
 
 
-def _envelope_err(
-    message: str, code: str | None = None, detail: dict | None = None
-) -> bytes:
+def _envelope_err(message: str, code: str | None = None, detail: dict | None = None) -> bytes:
     body: dict = {"success": False, "error": message}
     if code is not None:
         body["code"] = code
