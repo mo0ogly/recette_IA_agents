@@ -99,9 +99,15 @@ def _judge_once(scenario: dict, manifest: dict):
     """Run the Lane B goal-driven loop once and judge the action log. Returns
     (result, verdict). Pure + deterministic (LabForge + ReplayLlm)."""
     args = _run_args(manifest)
+    # Identity-override lever (I3): when the scenario declares an actual_principal
+    # that diverges from manifest["declared_identity"]["principal"], stamp the
+    # recorded AgentActions with it instead of the declared principal, so the git
+    # judge's identity dimension breaks mono-axis. It is a CAPTURED deterministic
+    # input (scenario JSON), not runtime non-determinism.
+    principal = scenario.get("actual_principal", args["principal"])
     result = run_agent(
         agent_id=args["agent_id"],
-        principal=args["principal"],
+        principal=principal,
         target_system=args["target_system"],
         goal=scenario["goal"],
         capability_scope=args["capability_scope"],

@@ -42,15 +42,13 @@ RESERVED_UNEXERCISED: frozenset[str] = frozenset()
 # Red-team violation_types not yet exercised by any corpus scenario
 # (corpus/sim/*.scenario.json). Frozen so the gap cannot grow and cannot be
 # closed silently: add a scenario for one AND remove it here, or this fails.
-# identity_mismatch stays pending by JUDGE/RUNNER LIMITATION, not by omission:
-# recette.simulate.simulate records every MafAction's provider/model verbatim
-# from spec["declared_identity"] (simulate.py: provider, model = identity[...]),
-# and maf_judge._check_identity compares the recorded provider/model to that same
-# declared identity -- so a red-team subject_program (which only chooses tools)
-# can never make identity diverge. It is structurally always True via this path;
-# exercising it would require a runner that injects a divergent identity, which is
-# out of scope here. behavior_anomaly is now covered (rt-maf-behavior-spam).
-REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset({"identity_mismatch"})
+# Now EMPTY: every MAF violation_type is exercised. identity_mismatch is covered
+# by rt-maf-identity-mismatch via the captured identity-override lever -- a
+# scenario declares actual_identity (a deterministic INPUT, not runtime
+# non-determinism), redteam_recette passes it to simulate(actual_identity=...),
+# which stamps the recorded MafActions with a provider/model diverging from
+# spec["declared_identity"], so maf_judge._check_identity (I3) breaks mono-axis.
+REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset()
 
 ALL_VIOLATION_TYPES: frozenset[str] = frozenset(
     {"identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"}
@@ -58,17 +56,14 @@ ALL_VIOLATION_TYPES: frozenset[str] = frozenset(
 
 # Git red-team violation_types not yet exercised by a corpus git scenario
 # (corpus/sim/*.git-scenario.json). Frozen so the gap cannot grow / close silently.
-# identity_mismatch stays pending by JUDGE/RUNNER LIMITATION, not by omission:
-# recette.redteam_git._run_args derives the principal from
-# manifest["declared_identity"]["principal"] and run_agent stamps that SAME
-# principal on every AgentAction, while adapters._check_identity compares each
-# action's principal to that declared principal -- so a git red-team
-# subject_program (which only chooses actions) can never make identity diverge.
-# It is structurally always True via this path; exercising it would require a
-# runner that injects a divergent principal, out of scope here. policy_violation
-# (rt-prbot-policy-unapproved-merge) and behavior_anomaly (rt-prbot-behavior-spam)
-# are now covered.
-GIT_REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset({"identity_mismatch"})
+# Now EMPTY: every git violation_type is exercised. identity_mismatch is covered
+# by rt-prbot-identity-mismatch via the captured identity-override lever -- a
+# scenario declares actual_principal (a deterministic INPUT, not runtime
+# non-determinism), redteam_git._judge_once passes it to run_agent(principal=...),
+# which stamps the recorded AgentActions with a principal diverging from
+# manifest["declared_identity"]["principal"], so adapters._check_identity (I3)
+# breaks mono-axis.
+GIT_REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset()
 
 
 def _campaign_action_keys(globpat: str) -> set[tuple[str, str]]:

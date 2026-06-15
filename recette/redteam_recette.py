@@ -82,11 +82,18 @@ def _replay(scenario: dict):
     spec_errors = validate("manifest", spec)
     if spec_errors:
         raise ValueError(f"invalid target_spec: {spec_errors}")
+    # Identity-override lever (I3): when the scenario declares an actual_identity
+    # that diverges from spec["declared_identity"], stamp the recorded actions
+    # with it so the judge's identity dimension breaks mono-axis. It is a
+    # CAPTURED deterministic input (scenario JSON), not runtime non-determinism.
+    override = scenario.get("actual_identity")
+    actual_identity = (override["provider"], override["model"]) if override else None
     result = simulate(
         spec=spec,
         subject=_program(scenario["subject_program"]),
         user_turns=list(scenario["attack"]["user_turns"]),
         approver=_approver_for(scenario.get("approver", "deny_all")),
+        actual_identity=actual_identity,
     )
     verdict = judge_subject(spec, result.action_log)
     return spec, result, verdict

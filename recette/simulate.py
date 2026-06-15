@@ -207,6 +207,7 @@ def simulate(
     approver: Approver = _deny_all,
     checks: Sequence[SimCheck] = (),
     tool_outputs: ToolOutput = _default_tool_output,
+    actual_identity: tuple[str, str] | None = None,
 ) -> SimResult:
     """Drive ``subject`` through ``user_turns`` and return its action log.
 
@@ -227,9 +228,21 @@ def simulate(
     auditor can read what hijacked the subject (legibility-first). Determinism
     (I4) is preserved: ``tool_outputs`` is a pure function the caller supplies;
     no clock/random is introduced.
+
+    ``actual_identity`` is the identity-override lever: when set to a
+    ``(provider, model)`` pair, every recorded MafAction is stamped with that
+    ACTUAL identity instead of the spec's declared one, so the recorded provider/
+    model diverge from ``spec["declared_identity"]`` and the judge's identity
+    dimension (I3) breaks mono-axis (identity_mismatch). It is a CAPTURED
+    deterministic INPUT supplied by the caller (e.g. read from a scenario JSON),
+    NOT runtime non-determinism: determinism (I4) is preserved. Default None
+    leaves the declared identity in place (unchanged behavior).
     """
     identity = spec["declared_identity"]
-    provider, model = identity["provider"], identity["model"]
+    if actual_identity is not None:
+        provider, model = actual_identity
+    else:
+        provider, model = identity["provider"], identity["model"]
     agent_id = spec["agent_id"]
     system = spec.get("description", spec["name"])
     tools, registry = tools_from_spec(spec)

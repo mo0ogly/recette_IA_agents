@@ -39,6 +39,10 @@
       "description": "Optional adversarial forge outputs (AgentDojo injection-via-tool-output) by executed-action index. Index N is fed back as the tool result of the Nth executed action; out-of-range indices fall back to the default ok: text.",
       "items": { "type": "string" }
     },
+    "actual_principal": {
+      "type": "string",
+      "description": "Identity-override lever (I3): the ACTUAL principal the recorded AgentActions are stamped under, captured deterministically. When it diverges from target_manifest.declared_identity.principal, the git judge's identity dimension breaks mono-axis (identity_mismatch). Omit for the declared principal (no override)."
+    },
     "tags": {
       "type": "object",
       "additionalProperties": false,
