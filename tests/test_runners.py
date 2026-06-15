@@ -393,6 +393,31 @@ class TestCampaignRunner(unittest.TestCase):
         runner({}, lambda kind, data: frames.append((kind, data)), lambda: True)
         self.assertEqual(frames, [])
 
+    def test_campaign_runner_paces_when_pace_set(self) -> None:
+        # Pacing wires through the campaign (gateway) runner exactly like the
+        # dashboard runner: the agent carries a pace_ms, so the wrapped on_step
+        # sleeps AFTER each step. Deterministic (StubLlm, no server, no HTTP).
+        # We assert time.sleep was called at least once (proves on_step was
+        # paced); with no pace it must NOT sleep (transparent pass-through).
+        sleeps: list[float] = []
+        original_sleep = runners_mod.time.sleep
+        runners_mod.time.sleep = lambda seconds: sleeps.append(seconds)
+        try:
+            store = FakeConfigStore({"a1": _mock_agent("a1", pace_ms=200)})
+            campaign = {"id": "camp", "steps": [{"agent_id": "a1"}]}
+            runner = make_campaign_runner(campaign, store, FakeRecordingStore())
+            runner({}, lambda kind, data: None, lambda: False)
+            self.assertTrue(sleeps, "expected time.sleep to be called (pace not wired)")
+
+            # No pace set -> no sleep (transparent pass-through).
+            sleeps.clear()
+            store = FakeConfigStore({"a1": _mock_agent("a1")})
+            unpaced = make_campaign_runner(campaign, store, FakeRecordingStore())
+            unpaced({}, lambda kind, data: None, lambda: False)
+            self.assertEqual(sleeps, [], "expected no sleep when pace is unset")
+        finally:
+            runners_mod.time.sleep = original_sleep
+
 
 class TestLaneBRunner(unittest.TestCase):
     def test_result_frame_carries_actions_and_recording(self) -> None:

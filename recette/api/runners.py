@@ -567,7 +567,13 @@ def make_campaign_runner(
                 provider=provider,
                 model=model,
                 stop_on_repeat=True,
-                on_step=_lane_b_step_emit(emit, agent_id),
+                # Pacing is operational metadata (I4 / R20): resolved in the ops
+                # layer and applied by wrapping on_step, never inside lane_b.
+                on_step=_paced_on_step(
+                    _lane_b_step_emit(emit, agent_id),
+                    resolve_pace(agent_cfg, servers),
+                    should_stop,
+                ),
                 should_stop=should_stop,
             )
             rec_id = f"{campaign['id']}.{idx:02d}.{agent_id}"
