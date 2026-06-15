@@ -46,8 +46,11 @@ nats = [
 # Optional PyRIT-backed adversarial attacker for the red-team recorder
 # (recette redteam-record --attacker pyrit). The native RedTeamSimulator and the
 # deterministic gate need none of this; pyrit is import-guarded (lazy import).
+# HEAVY (~939 MB: azure-*, openai, transformers, datasets) -> kept OUT of the base
+# Docker image by design (R20/R22). Pinned to 0.14: the code targets the 0.14
+# TextJailBreak API (verified 2026-06-15); an older 0.x would install and break.
 redteam = [
-    "pyrit>=0.5",
+    "pyrit>=0.14",
 ]
 # Local dev tooling (tests run on stdlib unittest without these).
 dev = [

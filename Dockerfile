@@ -33,6 +33,10 @@ COPY corpus ./corpus
 # Runtime dep + editable install (keeps corpus a sibling of recette as required).
 # [bundle] brings cryptography so `recette bundle-verify` works and its tests run for real.
 # [api] brings fastapi/uvicorn so the Track U API (recette/api) tests run in the lab too.
+# NOT installed here by design (R22): heavy/opt-in extras [redteam] (pyrit ~939MB),
+# [real], [temporal], [maf], [postgres], [nats]. The red-team CORE (native attacker,
+# deterministic gate, recorder, promote, /sim API) needs none of them; add [redteam]
+# only to run `recette redteam-record --attacker pyrit` (see docs/runbooks/redteam-recette.md).
 RUN pip install "jsonschema>=4.0" && \
     pip install -e ".[bundle,api]" && \
     chown -R recette:recette /app

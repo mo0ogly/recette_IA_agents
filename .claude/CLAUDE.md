@@ -293,6 +293,16 @@ poussee. "Disparu" => `git reflog` / `git stash list` / `git fsck --lost-found` 
 n'est perdu). Fix durable : un `git worktree` par session, branche distincte. Detail :
 `.claude/rules/no-work-loss-multisession-merge.md`.
 
+**R22 Docker Dependency Adequation:** L'app tourne en Docker. La declaration des deps
+DOIT etre coherente entre `pyproject.toml` (deps + extras), le `Dockerfile`
+(`pip install -e ".[...]"`), les `requirements*.txt`, et l'env de verification. Base
+deps minimale (`jsonschema`) ; tout le reste = extra OPTIONNEL explicite. Un extra lourd
+(ex `[redteam]` = pyrit ~939MB) reste opt-in, HORS image de base (R20), documente ; ne
+JAMAIS bloater l'image parce qu'on l'a installe en local. Pin a la version dont l'API est
+verifiee (`pyrit>=0.14`, pas `>=0.5`). Verifier une feature dans un env qui matche le
+conteneur ; un venv jetable prouve l'extra mais la declaration (extra + pin + Dockerfile/
+runbook) doit rendre la preuve reproductible. Detail : `.claude/rules/docker-dependency-adequation.md`.
+
 ---
 
 ## REFERENCES RULES
@@ -316,6 +326,7 @@ n'est perdu). Fix durable : un `git worktree` par session, branche distincte. De
 | `.claude/rules/recette-sh-single-entrypoint.md` | R19 -- recette.sh seul lanceur, ne pas hand-launch ni changer de port |
 | `.claude/rules/no-work-loss-multisession-merge.md` | R21 -- merge multi-session sans perte : status avant switch, snapshot, commit+push, reflog/stash recovery, worktree par session |
 | `.claude/rules/recette-and-test-constraints.md` | R20 -- contraintes recettes+tests : unittest stdlib, determinisme, coverage guard, R16, smoke versionne (pas /tmp) |
+| `.claude/rules/docker-dependency-adequation.md` | R22 -- coherence deps Docker : pyproject/Dockerfile/requirements/env de verif alignes ; extras lourds opt-in hors image, pin a l'API verifiee |
 | `.claude/rules/frontend-contract-gate.md` | R16 |
 | `.claude/rules/vuln-fix-latest-version.md` | R17 |
 | `.claude/rules/no-backslash-line-continuation-copypaste.md` | Commandes copy-paste sures |
