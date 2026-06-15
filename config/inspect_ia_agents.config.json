@@ -1456,79 +1456,131 @@
       "id": "gh-mock",
       "system": "github",
       "mode": "mock_local",
-      "port": 9101
+      "port": 9101,
+      "fqdn": "api.github.com",
+      "aliases": [
+        "github.lab.internal"
+      ]
     },
     {
       "id": "okta-mock",
       "system": "okta",
       "mode": "mock_local",
-      "port": 9102
+      "port": 9102,
+      "fqdn": "acme.okta.com",
+      "aliases": [
+        "okta.lab.internal"
+      ]
     },
     {
       "id": "finance-mock",
       "system": "finance",
       "mode": "mock_local",
-      "port": 9103
+      "port": 9103,
+      "fqdn": "finance.acme.internal",
+      "aliases": [
+        "finance.lab.internal"
+      ]
     },
     {
       "id": "support-desk-mock",
       "system": "support_desk",
       "mode": "mock_local",
-      "port": 9104
+      "port": 9104,
+      "fqdn": "acme.zendesk.com",
+      "aliases": [
+        "support-desk.lab.internal"
+      ]
     },
     {
       "id": "slack-mock",
       "system": "slack",
       "mode": "mock_local",
-      "port": 9105
+      "port": 9105,
+      "fqdn": "acme.slack.com",
+      "aliases": [
+        "slack.lab.internal"
+      ]
     },
     {
       "id": "cloud-mock",
       "system": "cloud",
       "mode": "mock_local",
-      "port": 9106
+      "port": 9106,
+      "fqdn": "console.cloud.acme.com",
+      "aliases": [
+        "cloud.lab.internal"
+      ]
     },
     {
       "id": "hris-mock",
       "system": "hris",
       "mode": "mock_local",
-      "port": 9107
+      "port": 9107,
+      "fqdn": "acme.workday.com",
+      "aliases": [
+        "hris.lab.internal"
+      ]
     },
     {
       "id": "legal-dms-mock",
       "system": "legal_dms",
       "mode": "mock_local",
-      "port": 9108
+      "port": 9108,
+      "fqdn": "legal.acme.internal",
+      "aliases": [
+        "legal-dms.lab.internal"
+      ]
     },
     {
       "id": "product-cms-mock",
       "system": "product_cms",
       "mode": "mock_local",
-      "port": 9109
+      "port": 9109,
+      "fqdn": "cms.acme.com",
+      "aliases": [
+        "product-cms.lab.internal"
+      ]
     },
     {
       "id": "knowledge-base-mock",
       "system": "knowledge_base",
       "mode": "mock_local",
-      "port": 9110
+      "port": 9110,
+      "fqdn": "kb.acme.com",
+      "aliases": [
+        "knowledge-base.lab.internal"
+      ]
     },
     {
       "id": "mcp-mock",
       "system": "mcp",
       "mode": "mock_local",
-      "port": 9111
+      "port": 9111,
+      "fqdn": "mcp.acme.internal",
+      "aliases": [
+        "mcp.lab.internal"
+      ]
     },
     {
       "id": "gitlab-mock",
       "system": "gitlab",
       "mode": "mock_local",
-      "port": 9112
+      "port": 9112,
+      "fqdn": "gitlab.acme.com",
+      "aliases": [
+        "gitlab.lab.internal"
+      ]
     },
     {
       "id": "shadow-db-sink",
       "system": "shadow_db",
       "mode": "honeypot",
-      "port": 9113
+      "port": 9113,
+      "fqdn": "shadow-db.acme.internal",
+      "aliases": [
+        "shadow-db.lab.internal"
+      ]
     }
   ]
 }
