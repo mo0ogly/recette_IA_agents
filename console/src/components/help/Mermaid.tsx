@@ -64,6 +64,9 @@ export default function Mermaid({ chart, title }: { chart: string; title?: strin
         <div
           className="help-mermaid-svg"
           data-testid="help-mermaid-svg"
+          // Safe: `svg` is produced by mermaid.render (securityLevel "strict")
+          // from a STATIC literal chart defined in code -- never user input. No
+          // untrusted HTML can reach this sink.
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: svg }}
         />
