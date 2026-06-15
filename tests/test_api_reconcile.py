@@ -8,12 +8,15 @@ the honeypot as a bypass. The deterministic recette never runs a real overlay.
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 try:
     from fastapi.testclient import TestClient
 
     from recette.api.app import create_app
+    from recette.api.config_store import ConfigStore
     from recette.platform.eventstore.memory_store import InMemoryEventStore
 
     _HAS_FASTAPI = True
@@ -42,7 +45,17 @@ class ReconcileEndpointTest(unittest.TestCase):
     def setUp(self) -> None:
         # Inject a fresh in-memory store so the raise endpoint's idempotency is
         # tested against a clean log, not a persistent file shared across runs.
-        self.client = TestClient(create_app(event_store=InMemoryEventStore()))
+        # Also point the ConfigStore at a throwaway file so POST /config/* writes
+        # never pollute the real config/inspect_ia_agents.config.json.
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        cfg_path = Path(self._tmpdir.name) / "config.json"
+        self.client = TestClient(
+            create_app(
+                event_store=InMemoryEventStore(),
+                config_store=ConfigStore(cfg_path),
+            )
+        )
 
     def test_clean_run_reconciles_ok(self) -> None:
         # A single flow to the lab (:8082) -> mediated -> ok.

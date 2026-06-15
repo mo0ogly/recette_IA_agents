@@ -47,4 +47,14 @@ describe("PageHelp", () => {
     fireEvent.click(screen.getByTestId("help-modal-backdrop"));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("documents private-DNS containment in the servers topic with its diagram", () => {
+    render(<PageHelp topic="servers" />);
+    fireEvent.click(screen.getByRole("button", { name: /aide/i }));
+    expect(screen.getByText(HELP_TOPICS.servers.title)).toBeTruthy();
+    // The new FQDN/alias/containment section and its mermaid diagram are present.
+    expect(screen.getByText(/Noms prives : FQDN, alias et containment/)).toBeTruthy();
+    expect(screen.getAllByText(/resolution_denied/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("help-mermaid").length).toBeGreaterThanOrEqual(1);
+  });
 });

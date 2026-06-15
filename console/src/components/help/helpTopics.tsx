@@ -26,6 +26,18 @@ const REDTEAM_ENGINE_CHART = `flowchart TD
   RA["lane_b.run_agent<br/>(decide puis act)"] --> JG["judge_subject<br/>(4 dimensions)"]
   JG --> VD{"verdict"}`;
 
+/**
+ * Private-DNS containment: a server name resolves fqdn -> alias -> id; an
+ * unknown name is denied (fail-safe) only when the global flag is ON.
+ */
+const CONTAINMENT_CHART = `flowchart TD
+  N["agent reference un nom<br/>(server / fqdn / alias)"] --> R
+  R["resolve_name<br/>fqdn puis alias puis id"] --> H{"nom dans<br/>l'allowlist ?"}
+  H -->|"oui"| OK["proxy resolu<br/>side-effect mediatise (I5)"]
+  H -->|"non"| C{"containment<br/>actif ?"}
+  C -->|"ON"| DENY["ResolutionDenied<br/>event resolution_denied audite<br/>run echoue (fail-safe I2/I5)"]
+  C -->|"OFF"| LEGACY["nom inconnu = reference pendante<br/>(comportement historique)"]`;
+
 export type HelpTopicKey =
   | "dashboard"
   | "cockpit"
@@ -1380,6 +1392,35 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             invalide est un diagnostic attendu, pas un bug.
           </li>
         </ul>
+        <h3>Noms prives : FQDN, alias et containment</h3>
+        <ul>
+          <li>
+            <strong>FQDN</strong> (optionnel) : le nom pleinement qualifie auquel
+            le serveur repond (resolveur DNS prive), ex.{" "}
+            <code>api.github.com</code>. Tous les serveurs n'en declarent pas.
+          </li>
+          <li>
+            <strong>Alias</strong> (liste separee par des virgules) : les autres
+            noms qui resolvent vers ce serveur (allowlist DNS prive), ex.{" "}
+            <code>github.lab.internal, gh.internal</code>.
+          </li>
+          <li>
+            <strong>Containment (private-DNS)</strong> : un commutateur{" "}
+            <strong>global</strong> en tete de l'onglet de configuration. La
+            resolution d'un nom suit l'ordre <code>fqdn</code> puis{" "}
+            <code>alias</code> puis <code>id</code>. Containment{" "}
+            <strong>ON</strong> : un nom hors allowlist est <strong>refuse</strong>{" "}
+            (<code>ResolutionDenied</code>), un evenement{" "}
+            <code>resolution_denied</code> est audite et le run echoue safe
+            (I2/I5) — aucun proxy n'est construit. Containment{" "}
+            <strong>OFF</strong> (defaut) : un nom inconnu reste une reference
+            pendante (comportement historique, realisme seul).
+          </li>
+        </ul>
+        <Mermaid
+          title="Resolution d'un nom prive et deny fail-safe (containment)"
+          chart={CONTAINMENT_CHART}
+        />
         <p>
           Regle fail-safe : un agent qui reference un serveur supprime ou un
           mode non supporte voit son run <strong>echouer</strong>. Executer des
