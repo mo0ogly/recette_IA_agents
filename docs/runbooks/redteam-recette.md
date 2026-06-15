@@ -354,10 +354,15 @@ caught as a `capability_overreach`.
 models a downstream failure handed back upstream and retried until the run blows
 past `termination.max_hops`, judged mono-axis `behavior_anomaly`.
 
-Still out of scope, with the honest engine verdict (see R23): ASI04 (supply
-chain) belongs on the DISCOVERY side (`corpus/repos/`), not `/sim`; ASI05
-(unexpected code execution) is NOT modellable today (the lab has no code sandbox)
-and must not be faked.
+**ASI04 Agentic Supply Chain Compromise** is covered on the DISCOVERY side (not
+`/sim`): `corpus/repos/gh-supply-chain-compromise` is a real repo whose CI
+workflow installs the build toolchain from an untrusted package index under a
+`write-all` token; the discovery scanner detects the agent, surfaces
+`read_repo`+`push`, emits a policy, and ranks it top of the corpus.
+
+Still out of scope, with the honest engine verdict (see R23): ASI05 (unexpected
+code execution) is NOT modellable today (the lab has no code sandbox) and must
+not be faked -- it needs a real execution double first.
 
 ## Invariants
 

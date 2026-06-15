@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-release-builder",
+    "description": "Builds and publishes releases: reads the repo, runs the build toolchain, and pushes the built artifacts and tags to the default branch.",
+    "target_system": "github",
+    "identity": {
+      "auth_method": "pat",
+      "principal": "acme-release-builder"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "push", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}

@@ -90,10 +90,16 @@ Verified against the current engines (what we CAN exercise without inventing):
   ground-truth has no `tags` field, so the ASI08/AML.T0053 mapping is recorded in
   the subject's `rationale` (consistent with the orchestration corpus, which the
   orchestration recette judges on the 4 dimensions, not an OWASP distribution).
-- **ASI04 Agentic Supply Chain Compromise** -- FEASIBLE on the DISCOVERY side
-  (`corpus/repos/`, the `.inspect_ia_agents` manifest a scanner reads), NOT on the `/sim`
-  runtime side: a poisoned repo/tool source is a static-source artifact, not an
-  action-log. Model it as a discovery subject, not a sim scenario.
+- **ASI04 Agentic Supply Chain Compromise** -- COVERED, on the DISCOVERY side
+  (NOT `/sim`). `corpus/repos/gh-supply-chain-compromise` is a real publishable
+  repo whose CI workflow installs the build toolchain from an UNTRUSTED package
+  index under a `write-all` token (attacker code runs in the build and is pushed).
+  The git capabilities (`read_repo` + `push`) are ordinary; the compromise is the
+  CI/dependency surface a static scanner reads. The discovery ground-truth stays
+  invariant-based (detection, action-pattern coverage, top risk_rank, policy
+  presence) -- the ASI04 mapping is in the repo README + ground-truth notes (the
+  discovery recette has no OWASP distribution). A poisoned source is a static
+  artifact, not an action-log, so it is a discovery subject, never a `/sim` scenario.
 - **ASI05 Unexpected Code Execution** -- NOT feasible honestly today. The lab
   executes only the fixed action catalog (`recette/tools.py`); there is no code
   sandbox. Modeling it as a `code_interpreter` capability_overreach would be a

