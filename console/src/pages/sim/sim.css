@@ -1,0 +1,389 @@
+/* Red-team panel styles. House tokens only -- no new colours, no new deps.
+ * Polished to the verdicts-page level: scenario cards in a responsive grid, a
+ * four-dimension matrix, an adversarial attack timeline and the action log. */
+
+.sim-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sim-intro {
+  color: var(--color-text-muted);
+  max-width: 72ch;
+  margin: 0;
+}
+
+/* --- A family section (MAF subjects / Git agents) ------------------------ */
+
+.sim-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+}
+
+.sim-section-head h2 {
+  margin: 0;
+  color: var(--color-accent);
+}
+
+.sim-section-sub {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.sim-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.sim-loading,
+.sim-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* --- Scenario card grid ------------------------------------------------- */
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sim-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.06s ease;
+}
+
+.sim-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.sim-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.sim-card[data-selected="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.sim-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sim-card-title {
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.sim-verdict-line {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.sim-verdict-line strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.sim-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sim-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.sim-promoted {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.sim-promoted li {
+  padding: 0.1rem 0;
+}
+
+.sim-promote-error {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--badge-red-fg);
+  font-weight: 500;
+}
+
+/* --- Chips: family, strategy, standards, caught/missed ------------------ */
+
+.sim-chip {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.sim-chip-neutral {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.sim-chip-accent {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.sim-caught {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.sim-missed {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+/* --- Detail panel ------------------------------------------------------- */
+
+.sim-detail {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.sim-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sim-detail-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.sim-detail-goal {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.sim-detail-block h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+/* Four-dimension matrix (reuses the verdict scorecard look). */
+
+.sim-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.sim-dim {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.sim-dim[data-state="conform"] {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.sim-dim[data-state="broken"] {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-color: var(--badge-red-fg);
+}
+
+.sim-dim-mark {
+  font-weight: 800;
+}
+
+/* Attack timeline (the Crescendo escalation). */
+
+.sim-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sim-turn {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-2);
+  font-size: 0.86rem;
+}
+
+.sim-turn-role {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 0.1rem;
+}
+
+/* The adversary turn is the escalation -- make it the loud one. */
+.sim-turn[data-role="user"] {
+  border-left: 3px solid var(--badge-red-fg);
+  background-color: var(--badge-red-bg);
+}
+
+.sim-turn[data-role="user"] .sim-turn-role {
+  color: var(--badge-red-fg);
+}
+
+.sim-turn[data-role="assistant"] .sim-turn-role {
+  color: var(--color-accent);
+}
+
+.sim-turn[data-role="tool"] {
+  background-color: var(--color-bg);
+  font-family: var(--font-mono);
+}
+
+.sim-turn[data-role="tool"] .sim-turn-role {
+  color: var(--color-text-muted);
+}
+
+.sim-turn-body {
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.sim-turn-tool {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sim-turn-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Action log. */
+
+.sim-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sim-action {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-family: var(--font-mono);
+  background-color: var(--color-surface-2);
+}
+
+.sim-action[data-flagged="true"] {
+  border-color: var(--badge-red-fg);
+  background-color: var(--badge-red-bg);
+}
+
+.sim-action-seq {
+  color: var(--color-text-muted);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.sim-action-name {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sim-action-target {
+  color: var(--color-accent);
+}
+
+.sim-action-meta {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.sim-action-flag {
+  margin-left: auto;
+}
+
+/* --- Frozen recordings stepper (secondary) ------------------------------ */
+
+.sim-recordings {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.25rem;
+}

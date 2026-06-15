@@ -1,38 +1,41 @@
 /**
- * Red-team scenario list tests (R16 contract gate).
+ * Red-team scenario card + detail tests (R16 contract gate).
  *
- * The fixture in __fixtures__/scenarios.fixture.json was captured from the live
- * API (GET /sim/scenarios) after the two committed scenarios were replayed -- it
- * carries the { count, scenarios: [...] } envelope with one "incorrect" and one
- * "correct" verdict, both anomaly_caught, each with an owasp_asi tag. ScenarioList
- * is now stateful -- its Promote action calls promoteSimScenario -- so the test
- * mocks the API client and renders the component against the real captured
- * payloads (scenarios + promote fixtures).
+ * Fixtures captured from the live API:
+ * - scenarios.fixture.json      GET /sim/scenarios     (MAF list, +family)
+ * - gitScenarios.fixture.json   GET /sim/git-scenarios (git list, +family)
+ * - scenarioDetail.fixture.json GET /sim/scenarios/{id}     (MAF: dims+transcript+action_log)
+ * - gitScenarioDetail.fixture.json GET /sim/git-scenarios/{id} (git: dims+goal+action_log)
+ * - promote.fixture.json        POST /sim/scenarios/{id}/promote
+ *
+ * ScenarioList is presentational except for its promote action (it calls
+ * promoteSimScenario), so the client is mocked. ScenarioDetail is pure.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { promoteSimScenario } from "../../api/client";
-import type { SimPromoteResult, SimScenario } from "../../api/client";
+import type { SimPromoteResult, SimScenario, SimScenarioView } from "../../api/client";
+import gitScenarioDetailFixture from "./__fixtures__/gitScenarioDetail.fixture.json";
+import gitScenariosFixture from "./__fixtures__/gitScenarios.fixture.json";
 import promoteFixture from "./__fixtures__/promote.fixture.json";
+import scenarioDetailFixture from "./__fixtures__/scenarioDetail.fixture.json";
 import scenariosFixture from "./__fixtures__/scenarios.fixture.json";
-import { ScenarioList } from "./index";
+import { ScenarioDetail, ScenarioList } from "./index";
 
-// ScenarioList is presentational EXCEPT for the promote action, which calls the
-// API. The mock factory lists EVERY sim client function imported by the sim page
-// module so no export is silently undefined (matching index.test.tsx); the unit
-// test only drives promoteSimScenario, whose resolved value is the REAL captured
-// promote payload (__fixtures__/promote.fixture.json).
 vi.mock("../../api/client", () => ({
   getSimRuns: vi.fn(),
   getSimView: vi.fn(),
   getSimScenarios: vi.fn(),
+  getSimGitScenarios: vi.fn(),
   getSimScenario: vi.fn(),
+  getSimGitScenario: vi.fn(),
   promoteSimScenario: vi.fn(),
 }));
 
-const scenarios = (scenariosFixture as unknown as { scenarios: SimScenario[] }).scenarios;
+const maf = (scenariosFixture as unknown as { scenarios: SimScenario[] }).scenarios;
+const git = (gitScenariosFixture as unknown as { scenarios: SimScenario[] }).scenarios;
 
 beforeEach(() => {
   vi.mocked(promoteSimScenario).mockResolvedValue(promoteFixture as SimPromoteResult);
@@ -42,26 +45,27 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("ScenarioList", () => {
-  it("renders without crashing and shows a row per scenario", () => {
-    render(<ScenarioList scenarios={scenarios} />);
-    for (const s of scenarios) {
+describe("ScenarioList (cards)", () => {
+  it("renders a card per scenario for both families", () => {
+    render(<ScenarioList scenarios={[...maf, ...git]} />);
+    for (const s of [...maf, ...git]) {
       expect(screen.getByText(s.name)).toBeInTheDocument();
+      expect(screen.getByTestId(`sim-scn-card-${s.scenario_id}`)).toBeInTheDocument();
     }
   });
 
-  it("shows a caught badge (pill-ok) for each anomaly-caught scenario", () => {
-    render(<ScenarioList scenarios={scenarios} />);
-    const caught = scenarios.filter((s) => s.anomaly_caught);
+  it("shows a green caught badge for an anomaly-caught scenario", () => {
+    render(<ScenarioList scenarios={maf} />);
+    const caught = maf.filter((s) => s.anomaly_caught);
     expect(caught.length).toBeGreaterThan(0);
     for (const s of caught) {
       const badge = screen.getByTestId(`sim-scn-caught-${s.scenario_id}`);
-      expect(badge).toHaveClass("pill", "pill-ok");
+      expect(badge).toHaveClass("sim-caught");
       expect(badge).toHaveTextContent("caught");
     }
   });
 
-  it("reflects anomaly_caught=false with pill-bad and a 'missed' label", () => {
+  it("shows a red missed badge when anomaly_caught is false", () => {
     const missed: SimScenario = {
       scenario_id: "rt-synthetic-missed",
       name: "Synthetic missed scenario",
@@ -70,79 +74,108 @@ describe("ScenarioList", () => {
       violation_type: null,
       anomaly_caught: false,
       tags: {},
+      family: "maf",
     };
     render(<ScenarioList scenarios={[missed]} />);
     const badge = screen.getByTestId("sim-scn-caught-rt-synthetic-missed");
-    expect(badge).toHaveClass("pill", "pill-bad");
+    expect(badge).toHaveClass("sim-missed");
     expect(badge).toHaveTextContent("missed");
   });
 
-  it("renders the OWASP ASI tag when present", () => {
-    render(<ScenarioList scenarios={scenarios} />);
-    const tagged = scenarios.filter((s) => s.tags.owasp_asi);
-    expect(tagged.length).toBeGreaterThan(0);
-    // At least one ASI0x tag is surfaced in the DOM.
+  it("renders the OWASP ASI standards chip when present", () => {
+    render(<ScenarioList scenarios={maf} />);
     expect(screen.getAllByText(/ASI0\d/).length).toBeGreaterThan(0);
   });
 
-  it("covers both verdict variants present in the fixture (correct + incorrect)", () => {
-    const correct = scenarios.find((s) => s.verdict === "correct");
-    const incorrect = scenarios.find((s) => s.verdict === "incorrect");
-    expect(correct).toBeDefined();
-    expect(incorrect).toBeDefined();
-    render(<ScenarioList scenarios={scenarios} />);
-    // Both rows expose their predicted-vs-expected verdict.
-    if (correct) {
-      const okBadge = screen.getByTestId(`sim-scn-caught-${correct.scenario_id}`);
-      expect(okBadge).toHaveClass(correct.anomaly_caught ? "pill-ok" : "pill-bad");
-    }
-    if (incorrect) {
-      const koBadge = screen.getByTestId(`sim-scn-caught-${incorrect.scenario_id}`);
-      expect(koBadge).toHaveClass(incorrect.anomaly_caught ? "pill-ok" : "pill-bad");
-    }
+  it("covers both verdict variants present in the fixture", () => {
+    expect(maf.find((s) => s.verdict === "correct")).toBeDefined();
+    expect(maf.find((s) => s.verdict === "incorrect")).toBeDefined();
   });
 
-  it("offers an enabled Promote button for a caught anomaly (verdict=incorrect)", () => {
-    const incorrect = scenarios.find((s) => s.verdict === "incorrect");
-    expect(incorrect).toBeDefined();
-    render(<ScenarioList scenarios={scenarios} />);
-    const btn = screen.getByTestId(`sim-scn-promote-${incorrect!.scenario_id}`);
-    expect(btn).toBeInTheDocument();
+  it("enables Promote for a caught anomaly (verdict=incorrect)", () => {
+    const incorrect = maf.find((s) => s.verdict === "incorrect")!;
+    render(<ScenarioList scenarios={maf} />);
+    const btn = screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`);
     expect(btn).not.toBeDisabled();
     expect(btn).toHaveTextContent("Promote to corpus");
   });
 
-  it("disables Promote for a true negative (verdict=correct: nothing to promote)", () => {
-    const correct = scenarios.find((s) => s.verdict === "correct");
-    expect(correct).toBeDefined();
-    render(<ScenarioList scenarios={scenarios} />);
-    const btn = screen.getByTestId(`sim-scn-promote-${correct!.scenario_id}`);
+  it("disables Promote for a true negative (verdict=correct)", () => {
+    const correct = maf.find((s) => s.verdict === "correct")!;
+    render(<ScenarioList scenarios={maf} />);
+    const btn = screen.getByTestId(`sim-scn-promote-${correct.scenario_id}`);
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute("title", "nothing to promote");
   });
 
   it("promotes a caught anomaly and renders the created corpus paths", async () => {
-    const incorrect = scenarios.find((s) => s.verdict === "incorrect");
-    expect(incorrect).toBeDefined();
-    render(<ScenarioList scenarios={scenarios} />);
-    fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect!.scenario_id}`));
-    expect(promoteSimScenario).toHaveBeenCalledWith(incorrect!.scenario_id);
-    const list = await screen.findByTestId(`sim-scn-promoted-${incorrect!.scenario_id}`);
+    const incorrect = maf.find((s) => s.verdict === "incorrect")!;
+    render(<ScenarioList scenarios={maf} />);
+    fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`));
+    expect(promoteSimScenario).toHaveBeenCalledWith(incorrect.scenario_id);
+    const list = await screen.findByTestId(`sim-scn-promoted-${incorrect.scenario_id}`);
     for (const path of (promoteFixture as SimPromoteResult).created) {
       expect(list).toHaveTextContent(path);
     }
   });
 
   it("surfaces the API error message when promote fails", async () => {
-    const incorrect = scenarios.find((s) => s.verdict === "incorrect");
-    expect(incorrect).toBeDefined();
+    const incorrect = maf.find((s) => s.verdict === "incorrect")!;
     vi.mocked(promoteSimScenario).mockRejectedValueOnce(new Error("already promoted"));
-    render(<ScenarioList scenarios={scenarios} />);
-    fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect!.scenario_id}`));
+    render(<ScenarioList scenarios={maf} />);
+    fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`));
     await waitFor(() =>
       expect(
-        screen.getByTestId(`sim-scn-promote-error-${incorrect!.scenario_id}`),
+        screen.getByTestId(`sim-scn-promote-error-${incorrect.scenario_id}`),
       ).toHaveTextContent("already promoted"),
     );
+  });
+
+  it("calls onSelect with the scenario id when a card is clicked", () => {
+    const onSelect = vi.fn();
+    render(<ScenarioList scenarios={maf} onSelect={onSelect} />);
+    fireEvent.click(screen.getByTestId(`sim-scn-card-${maf[0].scenario_id}`));
+    expect(onSelect).toHaveBeenCalledWith(maf[0].scenario_id);
+  });
+});
+
+describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
+  it("shows the broken axis red and the others green (MAF fixture)", () => {
+    const view = scenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    for (const dim of ["identity", "capabilities", "policy", "behavior"] as const) {
+      const chip = screen.getByTestId(`sim-scn-dim-${view.scenario_id}-${dim}`);
+      expect(chip).toHaveAttribute("data-state", view.dimensions[dim] ? "conform" : "broken");
+    }
+    // capabilities is the single broken axis in this red-team fixture.
+    expect(screen.getByTestId(`sim-scn-dim-${view.scenario_id}-capabilities`)).toHaveAttribute(
+      "data-state",
+      "broken",
+    );
+  });
+
+  it("renders the Crescendo escalation transcript turns (MAF fixture)", () => {
+    const view = scenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    const timeline = screen.getByTestId(`sim-scn-transcript-${view.scenario_id}`);
+    const turns = within(timeline).getAllByRole("listitem");
+    expect(turns.length).toBe(view.transcript?.length);
+    // The adversary turn carries the data-role marker used to style the escalation.
+    expect(timeline.querySelector('[data-role="user"]')).not.toBeNull();
+  });
+
+  it("flags the unapproved action in the action log (MAF fixture)", () => {
+    const view = scenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    const log = screen.getByTestId(`sim-scn-actions-${view.scenario_id}`);
+    expect(within(log).getAllByText("unapproved").length).toBeGreaterThan(0);
+  });
+
+  it("renders the git goal and action log without a transcript (git fixture)", () => {
+    const view = gitScenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    expect(screen.getByText(/Goal:/)).toBeInTheDocument();
+    expect(screen.getByTestId(`sim-scn-actions-${view.scenario_id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`sim-scn-transcript-${view.scenario_id}`)).toBeNull();
   });
 });

@@ -903,6 +903,15 @@ export function getSimView(agentId: string): Promise<SimView> {
   return request<SimView>(`/sim/runs/${encodeURIComponent(agentId)}`);
 }
 
+/** The four recette dimensions of a judged subject: true = conform, false =
+ *  the broken axis (the anomaly). Mirrors the AgentActionEvent judging. */
+export interface SimDimensions {
+  identity: boolean;
+  capabilities: boolean;
+  policy: boolean;
+  behavior: boolean;
+}
+
 export interface SimScenario {
   scenario_id: string;
   name: string;
@@ -914,21 +923,52 @@ export interface SimScenario {
   anomaly_caught: boolean;
   /** Standards mapping, e.g. { owasp_asi, mitre_atlas, nist }. May be partial. */
   tags: Record<string, string>;
+  /** Agent family: "maf" (tool/handoff subjects) or "git" (Lane B agents). */
+  family?: string;
 }
 
+/**
+ * One scenario's full red-team detail. MAF scenarios carry a `transcript` (the
+ * Crescendo escalation between the adversary `user`, the `assistant` and `tool`
+ * turns); git scenarios carry a `goal` instead. Both carry the four-dimension
+ * matrix and the ordered `action_log` the subject actually took (the unapproved
+ * / out-of-scope action is the anomaly). Fields are typed optional because the
+ * shape differs by family.
+ */
 export interface SimScenarioView extends SimScenario {
-  transcript: { role: string; content: string; tool_name: string | null }[];
+  /** The judged four-dimension matrix; the broken axis is the anomaly. */
+  dimensions: SimDimensions;
+  /** MAF only: the replayed adversarial conversation, in order. */
+  transcript?: { role: string; content: string; tool_name: string | null }[];
+  /** Git only: the natural-language objective the agent was driven toward. */
+  goal?: string;
+  /** The ordered actions the subject took (MAF: invoke_tool rows; git: gateway
+   *  actions). Free-form per family; the out-of-scope/unapproved one is flagged. */
+  action_log?: Record<string, unknown>[];
 }
 
-/** GET /sim/scenarios: every red-team scenario with its verdict and whether the
- *  recette caught the anomaly. */
+/** GET /sim/scenarios: every MAF red-team scenario with its verdict and whether
+ *  the recette caught the anomaly. */
 export function getSimScenarios(): Promise<{ count: number; scenarios: SimScenario[] }> {
   return request<{ count: number; scenarios: SimScenario[] }>("/sim/scenarios");
 }
 
-/** GET /sim/scenarios/{id}: one scenario's outcome plus its replayed transcript. */
+/** GET /sim/scenarios/{id}: one MAF scenario's outcome plus its replayed
+ *  transcript, four-dimension matrix and action log. */
 export function getSimScenario(id: string): Promise<SimScenarioView> {
   return request<SimScenarioView>(`/sim/scenarios/${encodeURIComponent(id)}`);
+}
+
+/** GET /sim/git-scenarios: every git (Lane B) red-team scenario. Mirrors the
+ *  MAF list; each entry carries family:"git". */
+export function getSimGitScenarios(): Promise<{ count: number; scenarios: SimScenario[] }> {
+  return request<{ count: number; scenarios: SimScenario[] }>("/sim/git-scenarios");
+}
+
+/** GET /sim/git-scenarios/{id}: one git scenario's outcome plus its goal,
+ *  four-dimension matrix and action log (the gateway actions it took). */
+export function getSimGitScenario(id: string): Promise<SimScenarioView> {
+  return request<SimScenarioView>(`/sim/git-scenarios/${encodeURIComponent(id)}`);
 }
 
 /** The corpus subject created by promoting a caught anomaly. */
