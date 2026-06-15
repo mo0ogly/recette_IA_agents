@@ -1,0 +1,21 @@
+{
+  "run_id": "ghost-run-1",
+  "ok": false,
+  "bypass_flows": [
+    {
+      "seq": 2,
+      "method": "POST",
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 9113,
+      "path": "/shadow_db/write",
+      "status_code": 200,
+      "ok": true,
+      "content_type": "",
+      "request_body": "{}",
+      "response_body": "{\"written\":true}",
+      "run_id": "ghost-run-1"
+    }
+  ],
+  "audited_run_ids": []
+}

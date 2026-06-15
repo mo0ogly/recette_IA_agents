@@ -622,6 +622,21 @@ export interface WireFlowResponse {
   flows: WireFlow[];
 }
 
+/**
+ * Response of GET /proxy/reconcile: the wire<->audit reconciliation.
+ *
+ * ``ok`` is false when at least one wire flow reached a non-mediated target (no
+ * matching audit event -- the ghost-agent signal). ``bypass_flows`` are those
+ * unmediated flows; ``audited_run_ids`` are the runs that produced a genuine
+ * mediated side effect (the audit-view context).
+ */
+export interface ReconcileReport {
+  run_id: string | null;
+  ok: boolean;
+  bypass_flows: WireFlow[];
+  audited_run_ids: string[];
+}
+
 /** Response of GET /proxy/wire/status: overlay state and buffered flow count. */
 export interface WireStatus {
   enabled: boolean;

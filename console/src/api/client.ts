@@ -42,6 +42,7 @@ import type {
   RagScorecard,
   VerdictScorecard,
   ProxyRouteState,
+  ReconcileReport,
   VerdictSubmission,
   VerdictSubmissionRequest,
   WireFlowResponse,
@@ -577,6 +578,14 @@ export function getWireStatus(): Promise<WireStatus> {
 /** Discard the wire flow buffer (the append-only audit log is untouched, I1). */
 export function clearWireFlows(): Promise<{ cleared: boolean }> {
   return request<{ cleared: boolean }>("/proxy/wire", { method: "DELETE" });
+}
+
+/** Wire<->audit reconciliation: ok=false when a wire flow reached a non-mediated
+ *  target (no matching audit event). runId narrows the join to one run. */
+export function getReconcile(runId?: string): Promise<ReconcileReport> {
+  return request<ReconcileReport>(withQuery("/proxy/reconcile", { run_id: runId }), {
+    method: "GET",
+  });
 }
 
 /** The selectable transport targets (direct vs wire overlay) + the active one. */

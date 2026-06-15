@@ -31,13 +31,15 @@ import "./proxy.css";
 
 const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
 const WirePanel = lazy(() => import("./WirePanel"));
+const ReconcilePanel = lazy(() => import("./ReconcilePanel"));
 
 const POLL_INTERVAL_MS = 2000;
 
 type ViewerMode = "trace" | "stream";
 /** Which side-effect altitude the page shows: the application-level ProxyTrace
- *  list ("app"), or the network-level mitmproxy flows ("wire"). */
-type Source = "app" | "wire";
+ *  list ("app"), the network-level mitmproxy flows ("wire"), or the
+ *  wire<->audit reconciliation that flags unmediated paths ("reconcile"). */
+type Source = "app" | "wire" | "reconcile";
 
 interface BoundaryState {
   error: Error | null;
@@ -159,6 +161,14 @@ export default function ProxyPage(): JSX.Element {
           >
             wire (mitmproxy)
           </button>
+          <button
+            type="button"
+            className="proxy-mode-btn"
+            data-active={source === "reconcile"}
+            onClick={() => setSource("reconcile")}
+          >
+            reconciliation
+          </button>
         </span>
         {source === "app" && (
           <>
@@ -196,6 +206,12 @@ export default function ProxyPage(): JSX.Element {
       {source === "wire" && (
         <Suspense fallback={<div className="proxy-viewer-msg">loading wire panel...</div>}>
           <WirePanel />
+        </Suspense>
+      )}
+
+      {source === "reconcile" && (
+        <Suspense fallback={<div className="proxy-viewer-msg">loading reconcile panel...</div>}>
+          <ReconcilePanel />
         </Suspense>
       )}
 
