@@ -36,6 +36,34 @@ Emit = Callable[[str, dict], None]
 ShouldStop = Callable[[], bool]
 
 
+# Pacing is operational metadata, never a decision input (I4 / R20): the delay
+# lives here in the ops layer, never inside lane_b's pure execution loop.
+MAX_PACE_MS = 30000
+PACE_SLICE_MS = 100
+
+
+def resolve_pace(agent_cfg: dict, servers: list[dict]) -> int:
+    """Resolve the inter-action delay for an agent: agent ?? server ?? 0.
+
+    Clamped to [0, MAX_PACE_MS]. Any malformed value falls back to 0 (fail-safe
+    to instant -- a bad pace never crashes or freezes a run).
+    """
+
+    def _coerce(value: object) -> int | None:
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        return value
+
+    pace = _coerce(agent_cfg.get("pace_ms"))
+    if pace is None:
+        server_id = agent_cfg.get("server")
+        server = next((s for s in servers if s.get("id") == server_id), None)
+        pace = _coerce(server.get("pace_ms")) if server is not None else None
+    if pace is None:
+        return 0
+    return max(0, min(pace, MAX_PACE_MS))
+
+
 class ProxyForge:
     """GitForge adapter that executes every action through an ExternalSystemProxy (I5).
 
