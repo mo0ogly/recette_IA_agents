@@ -194,6 +194,75 @@ The loop is closed: a promoted subject re-enters the standard corpus under
 scorecard) -- the dynamic red-team finding becomes a permanent deterministic
 identification case.
 
+## The /sim console panel and how it ties into the platform
+
+The `/sim` page is the console face of the CLI above: it does NOT introduce a
+parallel tool, every button mirrors a `recette ...` command. Read this section if
+the relation between `/sim`, the agents, the campaigns and the reports is unclear.
+
+### What `/sim` is (and what it is NOT)
+
+`/sim` is the **identification** side of the recette, working on **frozen
+subjects**, not live agents. Promoting a scenario writes a **test subject**
+(ground truth) into the corpus; it does **NOT**:
+
+- create a runtime agent (the **Agents** tab) -- those are live agents you launch;
+- create or run a campaign (the **Campaigns** tabs) -- those orchestrate live runs.
+
+`/sim` and the live cockpit feed the SAME identification target, but by different
+means: `/sim` by freezing recorded attacks into corpus subjects, the cockpit by
+launching an agent and producing an action-log. Recall the three forms of an
+agent (`.claude/rules/recette-corpus.md`): runtime agent -> identification subject
+(action-log) -> discovery subject (repo). `/sim` lives entirely in the second
+form.
+
+### The four tabs (each mirrors a CLI command)
+
+| Tab | Shows | CLI mirror |
+|-----|-------|------------|
+| Scorecard | total / caught / missed + OWASP breakdown | `recette redteam` |
+| Sujets MAF | MAF tool/handoff scenario cards + detail | `recette redteam` |
+| Agents Git (Lane B) | git scenario cards + detail | `recette redteam` |
+| Enregistrements figes | step a frozen recording | `recette agent replay <id>` |
+
+![Scorecard tab](../screenshots/sim/sim_scorecard.png)
+
+A subject card detail shows the four-dimension verdict (the broken axis is the
+anomaly), the **declared capabilities**, the **attack timeline** (the Crescendo
+escalation), and the **action log** with each action tagged by the judge
+(`conforme` / `hors perimetre` / `en attente (I6)`).
+
+![Sujets MAF tab](../screenshots/sim/sim_maf.png)
+![Agents Git tab](../screenshots/sim/sim_git.png)
+
+The screenshots above are regenerated on every `./recette.sh smoke` run
+(`scripts/smoke_console.py::_verify_sim_redteam`), so they never drift from the
+live UI (see `docs/screenshots/sim/README.md`).
+
+### Where the report lives (NOT in /sim)
+
+`/sim` proves the attack was caught and lets you freeze it. The **report** -- did
+the external identification tool catch the frozen anomaly? -- is produced by the
+identification recette downstream:
+
+- **Recette** page (`recette run`): replays the whole corpus (including promoted
+  subjects) and gives the 4-dimension identification scorecard.
+- **Verdicts** page (`POST /verdicts`): the external tool's submitted verdicts,
+  judged against that same ground truth.
+
+The `/sim` MAF/git tabs link to both pages, and a freshly promoted subject links
+to the Recette page directly.
+
+### The full loop
+
+```
+/sim catches an anomaly (recette redteam)
+   -> Promouvoir freezes it          (recette redteam-promote <id>)
+   -> corpus/agents | corpus/maf_agents/incorrect/<slug>/   (ground truth)
+   -> Recette page scores it          (recette run)   <- the report
+   -> Verdicts page judges the external tool against it
+```
+
 ## Invariants
 
 - I1: a frozen scenario is immutable -- `write_scenario` refuses to clobber.

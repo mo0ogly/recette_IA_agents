@@ -610,10 +610,27 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             externe, juges contre ce meme ground-truth.
           </li>
         </ul>
+        <h3>Le lien avec les Agents et les Campagnes (la confusion frequente)</h3>
+        <p>
+          /sim travaille sur des <strong>sujets figes</strong> (cote
+          identification), pas sur des agents vivants. Promouvoir{" "}
+          <strong>n'ajoute NI agent runtime</strong> (onglet{" "}
+          <strong>Agents</strong>, les agents que tu LANCES){" "}
+          <strong>NI campagne</strong> (onglets <strong>Campagnes</strong>, qui
+          orchestrent des runs live). Un meme agent porte{" "}
+          <strong>trois formes</strong> : l'agent runtime (qu'on lance), le sujet
+          d'identification (un action-log fige, ce que juge /sim et la page
+          Recette), et le sujet de discovery (un vrai repo). /sim vit dans la
+          deuxieme forme uniquement. Le cockpit (Agents/Campagnes) et /sim
+          alimentent la <strong>meme</strong> cible d'identification, mais l'un en
+          lancant un agent, l'autre en figeant une attaque enregistree.
+        </p>
         <p>
           La boucle : <strong>/sim attrape</strong> -&gt;{" "}
-          <strong>Promouvoir fige</strong> -&gt; <strong>Recette/Verdicts
-          notent</strong>. C'est la que se lit le rapport, pas dans /sim.
+          <strong>Promouvoir fige</strong> dans{" "}
+          <code>corpus/agents</code> (git) ou <code>corpus/maf_agents</code>{" "}
+          (MAF) -&gt; <strong>Recette/Verdicts notent</strong>. C'est la que se lit
+          le rapport, pas dans /sim.
         </p>
       </>
     ),
