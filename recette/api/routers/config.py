@@ -21,6 +21,7 @@ from ...platform.events import PlatformActionEvent
 from ...platform.proxy.lab_proxy import LabHttpProxy
 from ...platform.proxy.router import resolve_proxy
 from ..config_store import UnknownAgentError, UnknownServerError
+from ..server_manager import ServerManager
 
 router = APIRouter(prefix="/config", tags=["config"])
 
@@ -124,6 +125,12 @@ def _secrets(request: Request):
 
 def _manager(request: Request):
     return request.app.state.server_manager
+
+
+# Modes the ServerManager can spawn (port-bound, same mock_server process):
+# mock_local (mediated lab double) and honeypot (a sink excluded from the
+# reconcile allowlist). Sourced from the manager to avoid drift.
+_STARTABLE_SERVER_MODES = ServerManager._STARTABLE_MODES
 
 
 def _get_server_or_404(request: Request, server_id: str) -> dict:
@@ -349,17 +356,20 @@ def delete_server(request: Request, server_id: str) -> Response:
 
 @router.post("/servers/{server_id}/start")
 def start_server(request: Request, server_id: str) -> dict:
-    """Start one mock_local server via the manager.
+    """Start one port-bound server (mock_local or honeypot) via the manager.
 
     Both manager outcomes are HTTP 200: {"status": "up"} and
     {"status": "down", "error": ...} (e.g. busy port) are domain results
     the console renders, not transport errors.
     """
     server = _get_server_or_404(request, server_id)
-    if server.get("mode") != "mock_local":
+    if server.get("mode") not in _STARTABLE_SERVER_MODES:
         raise HTTPException(
             status_code=400,
-            detail=f"only mode 'mock_local' servers can be started, got {server.get('mode')!r}",
+            detail=(
+                f"only modes {sorted(_STARTABLE_SERVER_MODES)} can be started, "
+                f"got {server.get('mode')!r}"
+            ),
         )
     try:
         return _manager(request).start(server)

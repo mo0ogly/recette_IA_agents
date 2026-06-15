@@ -555,6 +555,16 @@ class TestServerLifecycleRoutes(unittest.TestCase):
         self.assertEqual(r.json(), {"status": "up"})
         self.assertEqual(self.manager.calls, [("start", "srv")])
 
+    def test_start_honeypot_is_startable(self) -> None:
+        # A honeypot sink reuses the mock_server process; the router must let it
+        # start (it is excluded from the allowlist, not from the lifecycle).
+        self._add_server(
+            {"id": "sink", "system": "shadow_db", "mode": "honeypot", "port": 9113}
+        )
+        r = self.client.post("/config/servers/sink/start")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.manager.calls, [("start", "sink")])
+
     def test_start_busy_port_is_200_with_down_and_error(self) -> None:
         # A busy port is a domain result the console renders, not a transport
         # error: HTTP 200 with the manager dict as-is.
