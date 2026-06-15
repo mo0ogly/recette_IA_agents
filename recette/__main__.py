@@ -24,6 +24,7 @@ from .harness import DEFAULT_CORPUS, discover_agent_dirs, run_recette
 # http client, so this import is cheap.
 from .llm import _PROVIDERS as _LLM_PROVIDERS
 from .manifest import load_ground_truth, load_manifest, load_scenario
+from .redteam_git import run_git_scenario
 from .redteam_recette import run_scenario
 from .redteam_scorecard import render as render_redteam
 from .redteam_scorecard import scorecard as redteam_scorecard
@@ -518,16 +519,22 @@ def _cmd_import_maf(spec_path: str, out: str | None) -> int:
 def _cmd_redteam() -> int:
     """Replay every committed red-team scenario, print the scorecard.
 
-    Globs corpus/sim/*.scenario.json in sorted order (deterministic, I4), runs
-    each through run_scenario, aggregates with redteam_scorecard, and returns a
-    non-zero exit code when any anomaly was missed (predicted verdict diverged
-    from the expected verdict)."""
+    Covers BOTH families in sorted order (deterministic, I4): MAF subjects
+    (corpus/sim/*.scenario.json via run_scenario) and git agents
+    (corpus/sim/*.git-scenario.json via run_git_scenario). Aggregates with
+    redteam_scorecard and returns a non-zero exit code when any anomaly was
+    missed (predicted verdict diverged from the expected verdict). This is the
+    same set the console /sim Scorecard tab mirrors."""
     sim_dir = _REPO_ROOT / "corpus" / "sim"
     outcomes = []
+    # *.scenario.json (MAF) and *.git-scenario.json (git) are disjoint globs: the
+    # git suffix is "-scenario.json", so the MAF glob never matches a git file.
     for path in sorted(sim_dir.glob("*.scenario.json")):
         with path.open(encoding="utf-8") as fh:
-            scenario = json.load(fh)
-        outcomes.append(run_scenario(scenario))
+            outcomes.append(run_scenario(json.load(fh)))
+    for path in sorted(sim_dir.glob("*.git-scenario.json")):
+        with path.open(encoding="utf-8") as fh:
+            outcomes.append(run_git_scenario(json.load(fh)))
     card = redteam_scorecard(outcomes)
     print(render_redteam(card))
     return 1 if card["missed"] else 0
