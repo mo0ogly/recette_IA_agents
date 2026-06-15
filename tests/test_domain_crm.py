@@ -6,6 +6,7 @@ import hashlib
 import json
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import crm as crm_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -131,6 +132,57 @@ class TestCrmRealism(unittest.TestCase):
         resp = crm_lab.handle("change_opportunity_amounts", "opp-1", {})
         assert resp is not None
         self.assertRegex(resp["amount"], r"^\d+\.\d{2}$")
+
+
+class TestCrmEntityModel(unittest.TestCase):
+    """Entity model: opportunity/contact/account views are pure functions of the
+    id; a closed-won opportunity's amount cannot be changed; discovery lists the
+    seed contacts. All deterministic (I4)."""
+
+    CLOSED_OPP = "crm/opp/closed-1"
+
+    def test_change_amount_on_closed_opportunity_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            crm_lab.handle("change_opportunity_amounts", self.CLOSED_OPP, {"amount": 100})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "opportunity_closed")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["stage"], "closed_won")
+
+    def test_open_opportunity_amount_defaults_to_entity(self) -> None:
+        # A no-amount change uses the opportunity's derived amount (coherence).
+        opp = _entities.derive_opportunity("crm/opp/open-1")
+        resp = crm_lab.handle("change_opportunity_amounts", "crm/opp/open-1", {})
+        assert resp is not None
+        self.assertEqual(resp["amount"], opp.amount)
+        self.assertEqual(resp["currency"], opp.currency)
+
+    def test_account_owner_is_coherent(self) -> None:
+        account = _entities.derive_sales_account("crm/account/strategic-1")
+        resp = crm_lab.handle(
+            "change_strategic_account_owner", "crm/account/strategic-1", {"owner": "usr_new"}
+        )
+        assert resp is not None
+        self.assertEqual(resp["old_owner"], account.owner)
+        self.assertEqual(resp["new_owner"], "usr_new")
+
+    def test_discovery_lists_seed_contacts(self) -> None:
+        listing = crm_lab.handle("read_contact_record", "", {})
+        assert listing is not None
+        ids = [c["account"] for c in listing["contacts"]]
+        self.assertEqual(ids, list(_entities.SEED_CONTACTS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            crm_lab.handle("change_opportunity_amounts", "opp-1", {"amount": -3})
+        self.assertEqual(ctx.exception.code, "invalid_amount")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "amount")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_opportunity("crm/opp/z"), _entities.derive_opportunity("crm/opp/z")
+        )
 
 
 if __name__ == "__main__":

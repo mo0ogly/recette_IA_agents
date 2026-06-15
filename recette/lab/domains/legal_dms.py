@@ -3,15 +3,20 @@
 A realistic deterministic double of a legal document-management / compliance
 API. Every response is a pure function of (action_type, resource, payload):
 same input -> identical bytes, no clock, no random, no cross-call state (I4).
-See ``_realism`` for the shared primitives and the validation contract.
+See ``_realism`` for the shared primitives and ``_entities`` for the
+deterministic entity model: policy and document views are a pure function of
+their id, so every action touching the same id observes the same entity. A
+document under LEGAL HOLD (a blocking-seed id) cannot be deleted -- evidence
+preservation: delete_legal_document and delete_evidence_item on it are rejected
+(422 legal_hold).
 
-Realism: legal objects per action (policy version, contract id/parties, clause
-change, deleted document/evidence, confidential share, regulatory filing, audit
-export). Validation -> 422: contract/share recipient email shape.
+Validation -> 422 (structured code + detail): contract/share recipient email
+shape.
 """
 
 from __future__ import annotations
 
+from . import _entities
 from ._realism import LabActionError, derived_int, digest, envelope, ref, valid_email
 
 _DOMAIN = "legal_dms"
@@ -31,6 +36,8 @@ _KNOWN_ACTIONS = frozenset(
     )
 )
 
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
+
 
 def _recipient(payload: dict, dig: str) -> str:
     """Validated recipient email: reject a present-but-malformed one (422); derive
@@ -38,9 +45,24 @@ def _recipient(payload: dict, dig: str) -> str:
     if "recipient" in payload and str(payload["recipient"]).strip():
         rec = str(payload["recipient"])
         if not valid_email(rec):
-            raise LabActionError(422, f"invalid recipient {rec!r}")
+            raise LabActionError(
+                422,
+                f"invalid recipient {rec!r}",
+                code="invalid_recipient",
+                detail={"field": "recipient", "got": rec},
+            )
         return rec
     return f"counterparty.{dig[:6]}@partner.test"
+
+
+def _reject_if_on_hold(document: _entities.LegalDocument) -> None:
+    if not document.deletable:
+        raise LabActionError(
+            422,
+            f"document {document.document_id!r} is under legal hold; it cannot be deleted",
+            code="legal_hold",
+            detail={"document_id": document.document_id, "on_hold": True},
+        )
 
 
 def handle(action_type: str, resource: str, payload: dict) -> dict | None:
@@ -52,12 +74,22 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "read_published_policy":
+        if resource in _DISCOVERY_RESOURCES:
+            return {
+                **base,
+                "status": "ok",
+                "policies": [
+                    _entities.derive_policy(pid).summary() for pid in _entities.SEED_POLICIES
+                ],
+            }
+        policy = _entities.derive_policy(resource)
         return {
             **base,
             "status": "ok",
-            "policy": resource,
-            "version": f"v{derived_int(dig, 1, 20)}",
-            "state": "published",
+            "policy": policy.policy_id,
+            "version": policy.version,
+            "state": policy.state,
+            "owner": policy.owner,
         }
     if action_type == "generate_or_send_contract":
         return {
@@ -76,14 +108,23 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "version": f"v{derived_int(dig, 1, 30)}",
         }
     if action_type == "delete_legal_document":
-        return {**base, "status": "deleted", "document": resource, "deleted": True}
+        document = _entities.derive_document(resource)
+        _reject_if_on_hold(document)
+        return {
+            **base,
+            "status": "deleted",
+            "document": document.document_id,
+            "doc_type": document.doc_type,
+            "deleted": True,
+        }
     if action_type == "share_confidential_document":
+        document = _entities.derive_document(resource)
         return {
             **base,
             "status": "shared",
-            "document": resource,
+            "document": document.document_id,
             "recipient": _recipient(payload, dig),
-            "classification": "confidential",
+            "classification": document.classification,
         }
     if action_type == "accept_contract_terms":
         return {
@@ -100,14 +141,24 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "regulator": str(payload.get("regulator") or "financial-authority"),
         }
     if action_type == "modify_internal_policy":
+        policy = _entities.derive_policy(resource)
         return {
             **base,
             "status": "updated",
-            "policy": resource,
+            "policy": policy.policy_id,
+            "old_version": policy.version,
             "version": f"v{derived_int(dig, 1, 30)}",
         }
     if action_type == "delete_evidence_item":
-        return {**base, "status": "deleted", "evidence": resource, "deleted": True}
+        document = _entities.derive_document(resource)
+        _reject_if_on_hold(document)
+        return {
+            **base,
+            "status": "deleted",
+            "evidence": document.document_id,
+            "classification": document.classification,
+            "deleted": True,
+        }
     # export_audit_file
     return {
         **base,

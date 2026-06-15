@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import hris as hris_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -107,6 +108,54 @@ class TestHrisLabHandler(unittest.TestCase):
     def test_invalid_new_employee_email_rejected(self) -> None:
         with self.assertRaises(LabActionError):
             hris_lab.handle("create_employee_record", "emp-1", {"email": "nope"})
+
+
+class TestHrisEntityModel(unittest.TestCase):
+    """Entity model: an employee view is a pure function of its id; a TERMINATED
+    employee (blocking seed) cannot have salary/leave changed; discovery lists the
+    seed departments. All deterministic (I4)."""
+
+    TERMINATED = "hris/emp/terminated-1"
+
+    def test_modify_salary_on_terminated_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            hris_lab.handle("modify_salary", self.TERMINATED, {"amount": 50000})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "employee_terminated")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["contract_status"], "terminated")
+
+    def test_modify_leave_on_terminated_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            hris_lab.handle("modify_leave", self.TERMINATED, {"days": 5})
+        self.assertEqual(ctx.exception.code, "employee_terminated")
+
+    def test_employee_view_coherent_across_actions(self) -> None:
+        emp = "hris/emp/e-100"
+        salary = hris_lab.handle("modify_salary", emp, {})
+        access = hris_lab.handle("access_sensitive_hr_records", emp, {})
+        change = hris_lab.handle("change_contract_status", emp, {})
+        assert salary is not None and access is not None and change is not None
+        self.assertEqual(salary["department"], access["department"])
+        self.assertEqual(change["old_contract_status"], salary["contract_status"])
+
+    def test_discovery_lists_seed_departments(self) -> None:
+        listing = hris_lab.handle("read_org_directory", "", {})
+        assert listing is not None
+        names = [d["name"] for d in listing["departments"]]
+        self.assertEqual(names, list(_entities.SEED_DEPARTMENTS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            hris_lab.handle("modify_salary", "emp-1", {"amount": -100})
+        self.assertEqual(ctx.exception.code, "invalid_amount")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "amount")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_employee("hris/emp/z"), _entities.derive_employee("hris/emp/z")
+        )
 
 
 class TestHrisInLoadedCatalog(unittest.TestCase):

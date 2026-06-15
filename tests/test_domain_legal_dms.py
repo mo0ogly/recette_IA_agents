@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import legal_dms as legal_dms_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -104,6 +105,54 @@ class TestLegalDmsLabHandler(unittest.TestCase):
         resp = legal_dms_lab.handle("generate_or_send_contract", "c-1", {})
         assert resp is not None
         self.assertIn("@", resp["recipient"])
+
+
+class TestLegalDmsEntityModel(unittest.TestCase):
+    """Entity model: policy/document views are pure functions of the id; a
+    document under LEGAL HOLD (blocking seed) cannot be deleted; discovery lists
+    the seed policies. All deterministic (I4)."""
+
+    HELD_DOC = "legal/doc/hold-1"
+
+    def test_delete_legal_document_under_hold_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            legal_dms_lab.handle("delete_legal_document", self.HELD_DOC, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "legal_hold")
+        assert ctx.exception.detail is not None
+        self.assertTrue(ctx.exception.detail["on_hold"])
+
+    def test_delete_evidence_under_hold_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            legal_dms_lab.handle("delete_evidence_item", self.HELD_DOC, {})
+        self.assertEqual(ctx.exception.code, "legal_hold")
+
+    def test_document_view_coherent_across_actions(self) -> None:
+        doc = "legal/doc/d-200"
+        deleted = legal_dms_lab.handle("delete_legal_document", doc, {})
+        shared = legal_dms_lab.handle("share_confidential_document", doc, {})
+        assert deleted is not None and shared is not None
+        # share and delete observe the same derived document.
+        self.assertEqual(deleted["document"], shared["document"])
+        self.assertEqual(shared["classification"], _entities.derive_document(doc).classification)
+
+    def test_discovery_lists_seed_policies(self) -> None:
+        listing = legal_dms_lab.handle("read_published_policy", "*", {})
+        assert listing is not None
+        ids = [p["policy_id"] for p in listing["policies"]]
+        self.assertEqual(ids, list(_entities.SEED_POLICIES))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            legal_dms_lab.handle("share_confidential_document", "doc-1", {"recipient": "nope"})
+        self.assertEqual(ctx.exception.code, "invalid_recipient")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "recipient")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_document("legal/doc/z"), _entities.derive_document("legal/doc/z")
+        )
 
 
 class TestLegalDmsInLoadedCatalog(unittest.TestCase):

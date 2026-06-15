@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains.support_desk import handle
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -114,6 +115,49 @@ class TestSupportDeskLabHandler(unittest.TestCase):
     def test_invalid_external_domain_rejected(self) -> None:
         with self.assertRaises(LabActionError):
             handle("share_support_data_external", "ds", {"domain": "localhost"})
+
+
+class TestSupportDeskEntityModel(unittest.TestCase):
+    """Entity model: a ticket view is a pure function of its id; a CLOSED ticket
+    (blocking seed) is immutable; discovery lists the seed tickets. All
+    deterministic (I4)."""
+
+    CLOSED_TICKET = "support/ticket/closed-1"
+
+    def test_modify_closed_ticket_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("modify_critical_ticket_status", self.CLOSED_TICKET, {"status": "open"})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "ticket_closed")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["state"], "closed")
+
+    def test_ticket_view_coherent_across_actions(self) -> None:
+        tid = "support/ticket/t-300"
+        modified = handle("modify_critical_ticket_status", tid, {})
+        replied = handle("send_auto_customer_reply", tid, {})
+        assert modified is not None and replied is not None
+        self.assertEqual(modified["ticket"], replied["ticket"])
+        self.assertEqual(replied["requester"], _entities.derive_ticket(tid).requester)
+
+    def test_discovery_lists_seed_tickets(self) -> None:
+        listing = handle("read_ticket", "", {})
+        assert listing is not None
+        ids = [t["ticket_id"] for t in listing["tickets"]]
+        self.assertEqual(ids, list(_entities.SEED_TICKETS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("grant_goodwill_credit", "cust-1", {"amount": -10})
+        self.assertEqual(ctx.exception.code, "invalid_amount")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "amount")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_ticket("support/ticket/z"),
+            _entities.derive_ticket("support/ticket/z"),
+        )
 
 
 class TestCatalogIntegration(unittest.TestCase):

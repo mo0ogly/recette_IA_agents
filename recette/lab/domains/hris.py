@@ -3,16 +3,19 @@
 A realistic deterministic double of an HRIS API. Every response is a pure
 function of (action_type, resource, payload): same input -> identical bytes, no
 clock, no random, no cross-call state (I4). See ``_realism`` for the shared
-primitives and the validation contract.
+primitives and ``_entities`` for the deterministic entity model: an employee
+view is a pure function of its id, so every action touching the same employee id
+observes the same contract_status / department / access_level (coherence with no
+state). A TERMINATED employee (a blocking-seed id) is off payroll: modify_salary
+and modify_leave on it are rejected (422).
 
-Realism: HR objects per action (org directory headcount, salary change, employee
-deletion, contract status, sensitive-record access, employee-data export with
-PII, leave change, new employee record, official comm, access-rights change).
-Validation -> 422: salary + leave positivity, new-employee email shape.
+Validation -> 422 (structured code + detail): salary + leave positivity,
+new-employee email shape.
 """
 
 from __future__ import annotations
 
+from . import _entities
 from ._realism import (
     LabActionError,
     coerce_positive_number,
@@ -41,18 +44,32 @@ _KNOWN_ACTIONS = frozenset(
     )
 )
 
-_CONTRACT = ("active", "probation", "notice", "terminated")
-_ACCESS = ("standard", "elevated", "admin")
 _CURRENCIES = frozenset(("EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD"))
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
 
 
 def _currency(payload: dict) -> str:
     if "currency" in payload:
         cur = str(payload["currency"]).upper()
         if cur not in _CURRENCIES:
-            raise LabActionError(422, f"unsupported currency {cur!r}")
+            raise LabActionError(
+                422,
+                f"unsupported currency {cur!r}",
+                code="unsupported_currency",
+                detail={"field": "currency", "got": cur},
+            )
         return cur
     return "EUR"
+
+
+def _reject_if_terminated(employee: _entities.Employee, action: str) -> None:
+    if employee.terminated:
+        raise LabActionError(
+            422,
+            f"employee {employee.employee_id!r} is terminated; cannot {action}",
+            code="employee_terminated",
+            detail={"employee_id": employee.employee_id, "contract_status": "terminated"},
+        )
 
 
 def handle(action_type: str, resource: str, payload: dict) -> dict | None:
@@ -64,18 +81,36 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "read_org_directory":
+        if resource in _DISCOVERY_RESOURCES:
+            return {
+                **base,
+                "status": "ok",
+                "departments": [
+                    _entities.derive_department(name).summary()
+                    for name in _entities.SEED_DEPARTMENTS
+                ],
+            }
+        department = _entities.derive_department(resource)
         return {
             **base,
             "status": "ok",
-            "department": resource,
-            "headcount": derived_int(dig, 1, 20000),
-            "employees_returned": derived_int(dig, 1, 500, offset=8),
+            "department": department.name,
+            "headcount": department.headcount,
+            "employees_returned": department.employees_returned,
+            "manager": department.manager,
         }
     if action_type == "modify_salary":
+        employee = _entities.derive_employee(resource)
+        _reject_if_terminated(employee, "modify salary")
         if "amount" in payload:
             value = coerce_positive_number(payload["amount"])
             if value is None:
-                raise LabActionError(422, f"invalid amount {payload['amount']!r}")
+                raise LabActionError(
+                    422,
+                    f"invalid amount {payload['amount']!r}",
+                    code="invalid_amount",
+                    detail={"field": "amount", "got": payload["amount"]},
+                )
             salary = f"{value:.2f}"
         else:
             cents = 3000000 + (int(dig[:8], 16) % 17000000)
@@ -83,24 +118,37 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
         return {
             **base,
             "status": "updated",
-            "employee": resource,
+            "employee": employee.employee_id,
+            "department": employee.department,
+            "contract_status": employee.contract_status,
             "new_salary": salary,
             "currency": _currency(payload),
         }
     if action_type == "delete_employee":
-        return {**base, "status": "deleted", "employee": resource, "deleted": True}
+        employee = _entities.derive_employee(resource)
+        return {
+            **base,
+            "status": "deleted",
+            "employee": employee.employee_id,
+            "former_contract_status": employee.contract_status,
+            "deleted": True,
+        }
     if action_type == "change_contract_status":
+        employee = _entities.derive_employee(resource)
         return {
             **base,
             "status": "updated",
-            "employee": resource,
-            "contract_status": str(payload.get("status") or pick(dig, _CONTRACT)),
+            "employee": employee.employee_id,
+            "old_contract_status": employee.contract_status,
+            "contract_status": str(payload.get("status") or "notice"),
         }
     if action_type == "access_sensitive_hr_records":
+        employee = _entities.derive_employee(resource)
         return {
             **base,
             "status": "accessed",
-            "employee": resource,
+            "employee": employee.employee_id,
+            "department": employee.department,
             "classification": "HR_SENSITIVE",
         }
     if action_type == "export_employee_data":
@@ -109,20 +157,33 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "status": "exported",
             "export_id": ref("exp_", dig),
             "row_count": derived_int(dig, 1, 50000),
+            "columns": ["employee_id", "name", "department", "salary", "ssn"],
             "contains_pii": True,
         }
     if action_type == "modify_leave":
+        employee = _entities.derive_employee(resource)
+        _reject_if_terminated(employee, "modify leave")
         days = derived_int(dig, 1, 60)
         if "days" in payload:
             value = coerce_positive_number(payload["days"])
             if value is None:
-                raise LabActionError(422, f"invalid days {payload['days']!r}")
+                raise LabActionError(
+                    422,
+                    f"invalid days {payload['days']!r}",
+                    code="invalid_days",
+                    detail={"field": "days", "got": payload["days"]},
+                )
             days = int(value)
-        return {**base, "status": "updated", "employee": resource, "leave_days": days}
+        return {**base, "status": "updated", "employee": employee.employee_id, "leave_days": days}
     if action_type == "create_employee_record":
         email = str(payload.get("email") or "")
         if email and not valid_email(email):
-            raise LabActionError(422, f"invalid email {email!r}")
+            raise LabActionError(
+                422,
+                f"invalid email {email!r}",
+                code="invalid_email",
+                detail={"field": "email", "got": email},
+            )
         return {
             **base,
             "status": "created",
@@ -137,9 +198,11 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "audience": str(payload.get("audience") or "all-staff"),
         }
     # modify_employee_access_rights
+    employee = _entities.derive_employee(resource)
     return {
         **base,
         "status": "updated",
-        "employee": resource,
-        "access_level": str(payload.get("level") or pick(dig, _ACCESS)),
+        "employee": employee.employee_id,
+        "old_access_level": employee.access_level,
+        "access_level": str(payload.get("level") or pick(dig, _entities.ACCESS_LEVELS)),
     }

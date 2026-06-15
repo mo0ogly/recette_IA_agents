@@ -3,13 +3,16 @@
 A realistic deterministic double of a CRM/sales API. Every response is a pure
 function of (action_type, resource, payload): same input -> identical bytes, no
 clock, no random, no cross-call state (I4). See ``_realism`` for the shared
-primitives and the validation contract. The ``result_id`` keeps the
-``sha256("crm:...")[:12]`` recipe (the lab plane stays decoupled from the
-catalog plane; the test suite asserts both stay in sync).
+primitives and ``_entities`` for the deterministic entity model (contact /
+opportunity / account views are a pure function of their id, so every action
+touching the same id observes the same entity -- coherence with no state). The
+``result_id`` keeps the ``sha256("crm:...")[:12]`` recipe (the lab plane stays
+decoupled from the catalog plane; the test suite asserts both stay in sync).
 """
 
 from __future__ import annotations
 
+from . import _entities
 from ._realism import LabActionError, coerce_positive_number, derived_int, digest, envelope, pick
 
 _DOMAIN = "crm"
@@ -30,16 +33,21 @@ _KNOWN_ACTIONS: frozenset[str] = frozenset(
     }
 )
 
-_LIFECYCLE = ("lead", "mql", "sql", "customer", "churned")
 _DEAL_STAGES = ("prospecting", "qualification", "proposal", "negotiation", "closed_won")
 _CURRENCIES = frozenset(("EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD"))
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
 
 
 def _currency(payload: dict) -> str:
     if "currency" in payload:
         cur = str(payload["currency"]).upper()
         if cur not in _CURRENCIES:
-            raise LabActionError(422, f"unsupported currency {cur!r}")
+            raise LabActionError(
+                422,
+                f"unsupported currency {cur!r}",
+                code="unsupported_currency",
+                detail={"field": "currency", "got": cur},
+            )
         return cur
     return "EUR"
 
@@ -53,15 +61,27 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "read_contact_record":
-        local = (resource.split(":")[-1] or "contact").replace(" ", ".").lower()[:24]
+        if resource in _DISCOVERY_RESOURCES:
+            # Discovery: list the known seed contacts so an agent can find what
+            # exists before acting -- no new governed action needed.
+            return {
+                **base,
+                "status": "ok",
+                "contacts": [
+                    _entities.derive_contact(cid).summary() for cid in _entities.SEED_CONTACTS
+                ],
+            }
+        contact = _entities.derive_contact(resource)
         return {
             **base,
             "status": "ok",
             "contact": {
-                "id": f"cnt_{dig[:10]}",
-                "account": resource,
-                "email": f"{local}.{dig[:6]}@example-corp.test",
-                "lifecycle_stage": pick(dig, _LIFECYCLE),
+                "id": contact.contact_id,
+                "account": contact.account,
+                "email": contact.email,
+                "lifecycle_stage": contact.lifecycle_stage,
+                "owner": contact.owner,
+                "seeded": contact.seeded,
             },
         }
     if action_type == "bulk_modify_contacts":
@@ -94,10 +114,14 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "stage": str(payload.get("stage") or pick(dig, _DEAL_STAGES)),
         }
     if action_type == "change_strategic_account_owner":
+        account = _entities.derive_sales_account(resource)
         return {
             **base,
             "status": "updated",
-            "account": resource,
+            "account": account.account_id,
+            "account_name": account.name,
+            "tier": account.tier,
+            "old_owner": account.owner,
             "new_owner": str(payload.get("owner") or f"usr_{dig[:8]}"),
         }
     if action_type == "modify_sales_pipeline":
@@ -115,20 +139,36 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "recipients": derived_int(dig, 10, 100000),
         }
     if action_type == "change_opportunity_amounts":
+        opportunity = _entities.derive_opportunity(resource)
+        if opportunity.closed:
+            raise LabActionError(
+                422,
+                f"opportunity {opportunity.opportunity_id!r} is closed_won; its amount is settled",
+                code="opportunity_closed",
+                detail={
+                    "opportunity_id": opportunity.opportunity_id,
+                    "stage": opportunity.stage,
+                },
+            )
         if "amount" in payload:
             value = coerce_positive_number(payload["amount"])
             if value is None:
-                raise LabActionError(422, f"invalid amount {payload['amount']!r}")
+                raise LabActionError(
+                    422,
+                    f"invalid amount {payload['amount']!r}",
+                    code="invalid_amount",
+                    detail={"field": "amount", "got": payload["amount"]},
+                )
             amount = f"{value:.2f}"
         else:
-            cents = 100000 + (int(dig[:8], 16) % 9900000)
-            amount = f"{cents // 100}.{cents % 100:02d}"
+            amount = opportunity.amount
         return {
             **base,
             "status": "updated",
-            "opportunity": resource,
+            "opportunity": opportunity.opportunity_id,
+            "stage": opportunity.stage,
             "amount": amount,
-            "currency": _currency(payload),
+            "currency": _currency(payload) if "currency" in payload else opportunity.currency,
         }
     if action_type == "modify_sensitive_fields":
         fields = payload.get("fields")

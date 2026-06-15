@@ -190,3 +190,263 @@ def derive_supplier(supplier_id: str) -> Supplier:
         category=_pick(dig, ("hardware", "services", "logistics", "software"), offset=4),
         seeded=sid in SEED_SUPPLIERS,
     )
+
+
+# --- crm -----------------------------------------------------------------
+# A behavioural state is assigned ONLY to ids in an explicit "blocking seed"
+# set, so an arbitrary id (a probe, a fresh scenario id) is always actionable;
+# the state-machine rejection is demonstrated through the seed ids.
+CONTACT_LIFECYCLE = ("lead", "mql", "sql", "customer", "churned")
+DEAL_STAGES_OPEN = ("prospecting", "qualification", "proposal", "negotiation")
+ACCOUNT_TIERS = ("smb", "mid", "enterprise", "strategic")
+SEED_CONTACTS = ("crm/contact/alice", "crm/contact/bob", "crm/contact/carol")
+SEED_CLOSED_OPPORTUNITIES = ("crm/opp/closed-1",)
+
+
+@dataclass(frozen=True)
+class Contact:
+    """A CRM contact, fully derived from its id."""
+
+    contact_id: str
+    account: str
+    email: str
+    lifecycle_stage: str
+    owner: str
+    seeded: bool
+
+    def summary(self) -> dict:
+        return {
+            "contact_id": self.contact_id,
+            "account": self.account,
+            "email": self.email,
+            "lifecycle_stage": self.lifecycle_stage,
+        }
+
+
+def _local_part(entity_id: str) -> str:
+    tail = entity_id.split(":")[-1].split("/")[-1] or "contact"
+    return tail.replace(" ", ".").lower()[:24]
+
+
+def derive_contact(contact_id: str) -> Contact:
+    cid = contact_id or "crm/contact/unknown"
+    dig = _edigest("contact", cid)
+    return Contact(
+        contact_id=f"cnt_{dig[:10]}",
+        account=cid,
+        email=f"{_local_part(cid)}.{dig[:6]}@example-corp.test",
+        lifecycle_stage=_pick(dig, CONTACT_LIFECYCLE),
+        owner=f"usr_{dig[10:18]}",
+        seeded=cid in SEED_CONTACTS,
+    )
+
+
+@dataclass(frozen=True)
+class Opportunity:
+    """A CRM opportunity, fully derived from its id."""
+
+    opportunity_id: str
+    stage: str
+    amount: str
+    currency: str
+    account: str
+
+    @property
+    def closed(self) -> bool:
+        """A closed-won opportunity is settled; its amount cannot be changed."""
+        return self.stage == "closed_won"
+
+
+def derive_opportunity(opportunity_id: str) -> Opportunity:
+    oid = opportunity_id or "crm/opp/unknown"
+    dig = _edigest("opportunity", oid)
+    stage = "closed_won" if oid in SEED_CLOSED_OPPORTUNITIES else _pick(dig, DEAL_STAGES_OPEN)
+    cents = 100000 + int(dig[:8], 16) % 9900000
+    return Opportunity(
+        opportunity_id=oid,
+        stage=stage,
+        amount=_money(cents),
+        currency=_pick(dig, CURRENCIES, offset=8),
+        account=f"acct_{dig[10:16]}",
+    )
+
+
+@dataclass(frozen=True)
+class SalesAccount:
+    """A CRM account, fully derived from its id (current owner + tier)."""
+
+    account_id: str
+    name: str
+    owner: str
+    tier: str
+
+
+def derive_sales_account(account_id: str) -> SalesAccount:
+    aid = account_id or "crm/account/unknown"
+    dig = _edigest("sales_account", aid)
+    return SalesAccount(
+        account_id=aid,
+        name=_pick(dig, ("ACME Ltd", "Globex SA", "Initech", "Umbrella Corp")),
+        owner=f"usr_{dig[:8]}",
+        tier=_pick(dig, ACCOUNT_TIERS, offset=4),
+    )
+
+
+# --- hris ----------------------------------------------------------------
+CONTRACT_ACTIVE = ("active", "probation", "notice")
+ACCESS_LEVELS = ("standard", "elevated", "admin")
+DEPARTMENTS = ("engineering", "finance", "sales", "support", "legal")
+SEED_DEPARTMENTS = ("engineering", "finance", "sales")
+SEED_TERMINATED_EMPLOYEES = ("hris/emp/terminated-1",)
+
+
+@dataclass(frozen=True)
+class Employee:
+    """An HRIS employee, fully derived from its id."""
+
+    employee_id: str
+    department: str
+    contract_status: str
+    access_level: str
+
+    @property
+    def terminated(self) -> bool:
+        """A terminated employee is off payroll; salary/leave cannot change."""
+        return self.contract_status == "terminated"
+
+
+def derive_employee(employee_id: str) -> Employee:
+    eid = employee_id or "hris/emp/unknown"
+    dig = _edigest("employee", eid)
+    status = "terminated" if eid in SEED_TERMINATED_EMPLOYEES else _pick(dig, CONTRACT_ACTIVE)
+    return Employee(
+        employee_id=eid,
+        department=_pick(dig, DEPARTMENTS, offset=4),
+        contract_status=status,
+        access_level=_pick(dig, ACCESS_LEVELS, offset=8),
+    )
+
+
+@dataclass(frozen=True)
+class Department:
+    """An HRIS department directory view, fully derived from its name."""
+
+    name: str
+    headcount: int
+    employees_returned: int
+    manager: str
+
+    def summary(self) -> dict:
+        return {"name": self.name, "headcount": self.headcount, "manager": self.manager}
+
+
+def derive_department(name: str) -> Department:
+    dept = name or "all"
+    dig = _edigest("department", dept)
+    return Department(
+        name=dept,
+        headcount=_int(dig, 1, 20000),
+        employees_returned=_int(dig, 1, 500, offset=8),
+        manager=f"usr_{dig[:8]}",
+    )
+
+
+# --- legal_dms -----------------------------------------------------------
+DOC_TYPES = ("contract", "nda", "filing", "evidence", "memo")
+CLASSIFICATIONS = ("public", "internal", "confidential", "restricted")
+SEED_POLICIES = ("legal/policy/privacy", "legal/policy/retention", "legal/policy/aml")
+SEED_HELD_DOCUMENTS = ("legal/doc/hold-1",)
+
+
+@dataclass(frozen=True)
+class Policy:
+    """A legal policy, fully derived from its id."""
+
+    policy_id: str
+    version: str
+    state: str
+    owner: str
+
+    def summary(self) -> dict:
+        return {"policy_id": self.policy_id, "version": self.version, "state": self.state}
+
+
+def derive_policy(policy_id: str) -> Policy:
+    pid = policy_id or "legal/policy/unknown"
+    dig = _edigest("policy", pid)
+    return Policy(
+        policy_id=pid,
+        version=f"v{_int(dig, 1, 20)}",
+        state="published",
+        owner=f"usr_{dig[:8]}",
+    )
+
+
+@dataclass(frozen=True)
+class LegalDocument:
+    """A legal document, fully derived from its id."""
+
+    document_id: str
+    doc_type: str
+    classification: str
+    on_hold: bool
+
+    @property
+    def deletable(self) -> bool:
+        """A document under legal hold cannot be deleted (evidence preservation)."""
+        return not self.on_hold
+
+
+def derive_document(document_id: str) -> LegalDocument:
+    did = document_id or "legal/doc/unknown"
+    dig = _edigest("document", did)
+    return LegalDocument(
+        document_id=did,
+        doc_type=_pick(dig, DOC_TYPES),
+        classification=_pick(dig, CLASSIFICATIONS, offset=4),
+        on_hold=did in SEED_HELD_DOCUMENTS,
+    )
+
+
+# --- support_desk --------------------------------------------------------
+PRIORITIES = ("low", "normal", "high", "urgent")
+TICKET_STATES_MUTABLE = ("open", "pending", "on_hold", "solved")
+SEED_TICKETS = ("support/ticket/t-1001", "support/ticket/t-1002")
+SEED_CLOSED_TICKETS = ("support/ticket/closed-1",)
+
+
+@dataclass(frozen=True)
+class Ticket:
+    """A support ticket, fully derived from its id."""
+
+    ticket_id: str
+    priority: str
+    state: str
+    requester: str
+    vip: bool
+
+    @property
+    def mutable(self) -> bool:
+        """A closed ticket is immutable; reopen it before changing its status."""
+        return self.state != "closed"
+
+    def summary(self) -> dict:
+        return {
+            "ticket_id": self.ticket_id,
+            "priority": self.priority,
+            "state": self.state,
+            "vip": self.vip,
+        }
+
+
+def derive_ticket(ticket_id: str) -> Ticket:
+    tid = ticket_id or "support/ticket/unknown"
+    dig = _edigest("ticket", tid)
+    state = "closed" if tid in SEED_CLOSED_TICKETS else _pick(dig, TICKET_STATES_MUTABLE, offset=4)
+    return Ticket(
+        ticket_id=tid,
+        priority=_pick(dig, PRIORITIES),
+        state=state,
+        requester=f"cust_{dig[:8]}",
+        vip=tid in SEED_TICKETS,
+    )

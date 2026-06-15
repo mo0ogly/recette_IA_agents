@@ -34,23 +34,32 @@ touches `inv/9`, this run and every replay. Cross-call coherence therefore needs
 NO mutable state (I4): two actions on the same id observe the same entity because
 both recompute it from the id alone.
 
-Finance is the first adopter. Consequences:
+Five domains adopt it: **finance, crm, hris, legal_dms, support_desk**. Each
+gets richer responses, cross-call coherence, a seed-discovery listing on its read
+action (empty/`"all"`/`"*"` resource), structured errors (`code` + `detail`), and
+ONE state-machine rejection. The blocking state is assigned ONLY to ids in an
+explicit "blocking seed" set, so an arbitrary id (a probe, a fresh scenario id)
+is always actionable -- the rejection is demonstrated through the seed id.
 
-- `read_invoice_status("inv/9")` and `trigger_refund`/`validate_invoice`/
-  `create_credit_note` on `inv/9` agree on status, amount, currency, payee, line
-  items. A no-amount refund is a FULL refund (same amount as the invoice).
-- A PAID invoice is closed: `trigger_refund` on it -> 422 `invoice_paid`
-  (`detail.hint`: use `create_credit_note`). Refundable states are
-  pending/overdue/disputed.
-- Seed discovery: `read_invoice_status` with an empty/`"all"` resource lists the
-  `SEED_INVOICES` so an agent can find what exists before acting -- no new
-  governed action needed. An arbitrary id still derives a valid entity (any id
-  works); seed ids derive a richer one.
-- Time is a relative ordinal (`due_in_days`), never a wall-clock date, so the
-  model stays byte-stable under replay.
+| Domain | Read entity | Coherent across | Blocking-seed rejection (422) |
+|---|---|---|---|
+| finance | invoice | read/refund/validate/credit_note | `invoice_paid` -- refund a PAID invoice (use credit_note) |
+| crm | contact | change_opportunity_amounts / change_account_owner | `opportunity_closed` -- change a closed_won opportunity's amount |
+| hris | department / employee | salary/leave/contract/access on one employee | `employee_terminated` -- modify_salary/modify_leave on a terminated employee |
+| legal_dms | policy / document | delete/share on one document | `legal_hold` -- delete a document under legal hold |
+| support_desk | ticket | modify/reply/delete on one ticket | `ticket_closed` -- modify_critical_ticket_status on a closed ticket |
 
-The pattern is generic -- `derive_account`/`derive_supplier` are there too, and
-other domains adopt the same derive-by-id approach in later iterations.
+Notes:
+- `result_id` keeps its per-action `sha256("<domain>:<action>:<resource>:<payload>")[:12]`
+  recipe; the entity model uses a SEPARATE id-keyed digest, so coherence does not
+  perturb `result_id` (the test suite asserts the recipe).
+- Time is a relative ordinal (e.g. `due_in_days`), never a wall-clock date, so
+  the model stays byte-stable under replay.
+- An arbitrary id still derives a valid entity (any id works); seed ids derive a
+  richer / blocking one. Discovery never adds a NEW governed action (a new action
+  would need a catalog entry -> gateway-denied).
+- The coverage guard's D2 treats a raised `LabActionError` as HANDLED (the
+  three-outcome contract: dict / None / raise).
 
 ## The toolkit (do not reinvent per domain)
 
