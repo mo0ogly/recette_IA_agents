@@ -36,11 +36,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ..netname.resolver import resolve_name
+from ..netname.resolver import ResolutionDenied, resolve_name
 from .lab_proxy import LabHttpProxy
 from .protocol import ExternalSystemProxy
 
 RealProxyFactory = Callable[[dict], ExternalSystemProxy]
+
+# Re-exported: ResolutionDenied is part of resolve_proxy's contract under
+# containment (the call-site catches it to audit + fail-safe deny).
+__all__ = ["RealProxyFactory", "ResolutionDenied", "resolve_proxy"]
 
 
 def resolve_proxy(
@@ -50,6 +54,7 @@ def resolve_proxy(
     *,
     real_proxy_factory: RealProxyFactory | None = None,
     wire_proxy_url: str | None = None,
+    containment: bool = False,
 ) -> ExternalSystemProxy:
     """Resolve the proxy for one agent run from the server registry.
 
@@ -64,6 +69,16 @@ def resolve_proxy(
     proxy is built by the factory; real targets are HTTPS and would need the
     overlay CA, out of the phase-1 lab scope).
 
+    ``containment`` (Task 6) is the private-DNS CONTAINMENT gate. When True, an
+    agent referencing a name NOT in the server allowlist is DENIED fail-safe:
+    ``resolve_name`` raises ``ResolutionDenied`` and this function lets it
+    PROPAGATE -- NO proxy is built, NO call is made. The impure call-site
+    catches it and emits the audited ``resolution_denied`` event; this router
+    only RAISES and stays pure (I4). When False (the default), an unknown name
+    returns None and is treated as a dangling reference (ValueError), exactly
+    the legacy realism-only behaviour.
+
+    Raises ResolutionDenied when containment is on and the name is undeclared.
     Raises ValueError on a dangling server reference, an unsupported mode,
     or a malformed server entry (fail-safe: the run must fail, never
     execute through the wrong proxy).
@@ -71,13 +86,13 @@ def resolve_proxy(
     server_ref = agent.get("server")
     if not server_ref:
         return default
-    # Realism resolution (Task 5): resolve the reference by name (fqdn/alias/id)
-    # with containment OFF -- resolve_name's third pass already matches by id, so
-    # an unknown name returns None and the reference is dangling (no separate id
-    # lookup needed). A dangling reference fails the run (fail-safe). The deny path
-    # (containment ON) is Task 6 and is intentionally NOT wired here. resolve_name
-    # is pure (no I/O), so the router stays pure (I4).
-    server = resolve_name(server_ref, servers, containment=False)
+    # Resolve the reference by name (fqdn/alias/id). With containment ON an
+    # undeclared name raises ResolutionDenied, which propagates out of this pure
+    # router (no proxy built); the impure call-site audits it (fail-safe deny,
+    # I2/I5). With containment OFF an unknown name returns None and the reference
+    # is dangling (ValueError below), the legacy realism-only behaviour. The
+    # router never emits the event -- it only raises (I4: pure, no I/O).
+    server = resolve_name(server_ref, servers, containment=containment)
     if server is None:
         raise ValueError(f"agent {agent.get('id', '?')!r} references unknown server {server_ref!r}")
     server_id = server.get("id", server_ref)

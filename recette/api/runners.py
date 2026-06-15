@@ -26,6 +26,7 @@ from ..llm import LlmBackend, LlmDecision, StubLlm
 from ..platform.catalog.model import RISK_SCORE, RiskLevel
 from ..platform.events import PlatformActionEvent
 from ..platform.gateway import ActionRequest, Gateway
+from ..platform.netname.resolver import ResolutionDenied
 from ..platform.proxy.lab_proxy import LabHttpProxy, lab_url_from_env
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
@@ -261,6 +262,7 @@ def forge_for_agent(
     run_id: str | None = None,
     gateway: Gateway | None = None,
     wire_proxy_url: str | None = None,
+    containment: bool = False,
 ) -> GitForge:
     """Forge for one run. An agent without a ``server`` binding takes the
     lab-mode path; an agent bound to a server executes through the proxy
@@ -278,8 +280,16 @@ def forge_for_agent(
     trace with the originating run so the console can filter by run (F3). The
     in-memory LabForge path produces no external side effect, so it is not traced.
 
-    Raises ValueError on a dangling or unsupported server reference
-    (fail-safe: the run must fail, never execute against the wrong target).
+    ``containment`` (Task 6) enforces the private-DNS allowlist: when True an
+    agent referencing an undeclared server name raises ``ResolutionDenied`` out
+    of ``resolve_proxy`` (no proxy built); the runner call-site catches it,
+    audits a ``resolution_denied`` event, and fails the run safe (I2/I5). When
+    False (the default) an unknown name is a dangling reference (ValueError),
+    the legacy behaviour.
+
+    Raises ResolutionDenied (containment on + undeclared name) or ValueError on
+    a dangling/unsupported server reference (fail-safe: the run must fail, never
+    execute against the wrong target).
     """
     server_id = agent_cfg.get("server")
     if not server_id:
@@ -295,6 +305,7 @@ def forge_for_agent(
         servers,
         default_proxy or LabHttpProxy(),
         wire_proxy_url=wire_proxy_url,
+        containment=containment,
     )
     # A mock_local server on the canonical lab port is the SAME target the
     # gateway already mediates (the lab, routed by target_system). When a gateway
@@ -345,15 +356,41 @@ def make_lane_b_runner(
         # error frame via RunManager), never as an API crash and never as
         # a silent fallback to the wrong execution target (I5 fail-safe).
         servers = config_store.list_servers() if config_store is not None else []  # type: ignore[attr-defined]
-        forge = forge_for_agent(
-            agent_cfg,
-            servers,
-            recorder=recorder,
-            debug_enabled=debug_enabled,
-            run_id=run_id,
-            gateway=gateway,
-            wire_proxy_url=wire_proxy_url,
+        # CONTAINMENT gate (Task 6): when enforced, an agent referencing an
+        # undeclared server name is DENIED fail-safe. resolve_proxy raises
+        # ResolutionDenied (no proxy built, no HTTP call). The event is emitted
+        # HERE, the impure call-site -- resolve_proxy stays pure (I4) -- through
+        # the gateway, which owns the audit sink + the event-id generator (the
+        # same path every other platform event uses, I1/I2). Then the run fails
+        # safe via the existing exception channel (RunManager -> status=failed),
+        # so NO execution happens.
+        containment = (
+            bool(config_store.containment_enabled())  # type: ignore[attr-defined]
+            if config_store is not None and hasattr(config_store, "containment_enabled")
+            else False
         )
+        try:
+            forge = forge_for_agent(
+                agent_cfg,
+                servers,
+                recorder=recorder,
+                debug_enabled=debug_enabled,
+                run_id=run_id,
+                gateway=gateway,
+                wire_proxy_url=wire_proxy_url,
+                containment=containment,
+            )
+        except ResolutionDenied as exc:
+            if gateway is not None:
+                gateway.record_resolution_denied(
+                    agent_id=str(agent_cfg.get("id", "")),
+                    name=exc.name,
+                    reason="not_in_allowlist",
+                )
+            # Fail safe: surface the deny through the existing run-failure channel
+            # (RunManager maps a raised exception to status=failed + error frame).
+            # No proxy was built and no external call was made.
+            raise
         # Pacing is operational metadata (I4 / R20): resolved here in the ops
         # layer and applied by wrapping on_step, never inside lane_b's pure loop.
         pace_ms = resolve_pace(agent_cfg, servers)
@@ -420,6 +457,14 @@ def make_campaign_runner(
     from ..llm import build_llm
 
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
+        # CONTAINMENT gate (Task 6): same fail-safe deny as the single-agent
+        # runner. A step referencing an undeclared server name is denied, audited
+        # via the gateway (the audit sink owner), and fails THIS step only.
+        containment = (
+            bool(config_store.containment_enabled())  # type: ignore[attr-defined]
+            if hasattr(config_store, "containment_enabled")
+            else False
+        )
         steps = campaign.get("steps", [])
         for idx, step in enumerate(steps):
             if should_stop():
@@ -473,18 +518,29 @@ def make_campaign_runner(
                     else None
                 )
                 llm = build_llm(provider, model, base_url=backend.get("base_url"), api_key=api_key)
+            servers = config_store.list_servers()  # type: ignore[attr-defined]
             try:
                 # Per-agent proxy routing (I5): a dangling server reference
                 # fails this step explicitly, never falls back to the default.
                 forge = forge_for_agent(
                     agent_cfg,
-                    config_store.list_servers(),  # type: ignore[attr-defined]
+                    servers,
                     recorder=recorder,
                     debug_enabled=debug_enabled,
                     run_id=run_id,
                     gateway=gateway,
                     wire_proxy_url=wire_proxy_url,
+                    containment=containment,
                 )
+            except ResolutionDenied as exc:
+                # Fail safe: no proxy built, no HTTP call. Audit at the impure
+                # call-site (gateway owns the sink + id), then fail this step.
+                if gateway is not None:
+                    gateway.record_resolution_denied(
+                        agent_id=agent_id, name=exc.name, reason="not_in_allowlist"
+                    )
+                emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})
+                continue
             except ValueError as exc:
                 emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})
                 continue

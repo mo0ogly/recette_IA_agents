@@ -32,6 +32,7 @@ from .events import (
     PlatformActionEvent,
     PolicyDecision,
     PolicyVerdict,
+    build_resolution_denied,
 )
 from .eventstore.protocol import EventStore, StoredEvent
 from .ids import EventIdGenerator
@@ -238,6 +239,42 @@ class Gateway:
         approved = self._with_approval(event, ApprovalState.APPROVED)
         return self._execute_and_record(
             approved, approval_state=ApprovalState.APPROVED, original_event_id=pending_event_id
+        )
+
+    def record_resolution_denied(
+        self, *, agent_id: str, name: str, reason: str, timestamp: str | None = None
+    ) -> ActionOutcome:
+        """Audit a CONTAINMENT deny and return a controlled deny outcome (I2/I5).
+
+        Called by the impure run call-site when ``resolve_proxy(..., containment=
+        True)`` raised ``ResolutionDenied`` for an undeclared server name: NO proxy
+        was built and NO external call was made. This method only APPENDS the
+        immutable ``resolution_denied`` event (I1) via the same audit sink and the
+        same id generator every other event uses, then returns a deny outcome so
+        the run fails safe (no execution). The ``event_id`` is sequence-derived
+        (``self._ids``); ``timestamp`` is a captured input, never the host clock
+        (I4). The builder is pure -- emission lives here, at the impure boundary.
+        """
+        event_id = self._ids.next_id()
+        event = build_resolution_denied(
+            event_id=event_id,
+            agent_id=agent_id,
+            name=name,
+            reason=reason,
+            timestamp=timestamp,
+        )
+        self._append(EventKind.RESOLUTION_DENIED, event.to_dict(), event_id=event_id)
+        return ActionOutcome(
+            event_id=event_id,
+            verdict=PolicyVerdict.DENY,
+            approval_state=ApprovalState.NONE,
+            risk_level=str(RiskLevel.HIGH),
+            policy_version=None,
+            rule_id=None,
+            executed=False,
+            result=None,
+            side_effect_hash=None,
+            error=f"resolution denied: {name} ({reason})",
         )
 
     def sweep_timeouts(self, *, now_iso: str) -> list[str]:

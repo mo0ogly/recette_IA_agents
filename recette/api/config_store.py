@@ -224,6 +224,18 @@ class ConfigStore:
         cfg["ai_backends"] = [b for b in cfg["ai_backends"] if b["id"] != backend_id]
         self._write(cfg)
 
+    # --- containment (private-DNS allowlist gate, Task 6) ---
+    def containment_enabled(self) -> bool:
+        """Whether the private-DNS CONTAINMENT gate is enforced (fail-safe).
+
+        Sourced from the top-level ``containment`` flag of the config document.
+        Default False: an undeclared server name stays a dangling reference
+        (legacy realism-only behaviour), never a silent allow. When True, an
+        agent referencing a name NOT in the server allowlist is DENIED and
+        audited at the run call-site (I2/I5), and no proxy/HTTP call is made.
+        """
+        return bool(self.read().get("containment", False))
+
     # --- servers ---
     def list_servers(self) -> list[dict]:
         return self.read()["servers"]
