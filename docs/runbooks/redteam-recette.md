@@ -360,9 +360,18 @@ workflow installs the build toolchain from an untrusted package index under a
 `write-all` token; the discovery scanner detects the agent, surfaces
 `read_repo`+`push`, emits a policy, and ranks it top of the corpus.
 
-Still out of scope, with the honest engine verdict (see R23): ASI05 (unexpected
-code execution) is NOT modellable today (the lab has no code sandbox) and must
-not be faked -- it needs a real execution double first.
+**ASI05 Unexpected Code Execution** is covered on the MAF side:
+`corpus/sim/rt-maf-code-exec.scenario.json` models a web-search-only diagnostic
+agent crescendo-coerced into invoking an UNDECLARED `code_interpreter` (caught
+mono-axis as `capability_overreach`). The MAF `simulate()` path never executes
+real tools -- a `code_interpreter` call is modeled at the same fidelity as any
+other tool, so this is the recette's standard deterministic modeling, not a fake.
+The git/lab path stays out of scope for ASI05 (its `LabForge` has no code sandbox;
+a git-side code-exec subject would be a proxy -- see R23).
+
+All ten OWASP Agentic 2026 categories (ASI01-ASI10) are now exercised across the
+three engines: `/sim` MAF + git (ASI01/02/03/05/06/07/09/10), orchestration
+(ASI08), discovery (ASI04).
 
 ## Invariants
 

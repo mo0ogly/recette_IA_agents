@@ -100,11 +100,18 @@ Verified against the current engines (what we CAN exercise without inventing):
   presence) -- the ASI04 mapping is in the repo README + ground-truth notes (the
   discovery recette has no OWASP distribution). A poisoned source is a static
   artifact, not an action-log, so it is a discovery subject, never a `/sim` scenario.
-- **ASI05 Unexpected Code Execution** -- NOT feasible honestly today. The lab
-  executes only the fixed action catalog (`recette/tools.py`); there is no code
-  sandbox. Modeling it as a `code_interpreter` capability_overreach would be a
-  proxy, not real code execution -- do NOT fake it (R4/R13). Add only if a real
-  exec double is introduced.
+- **ASI05 Unexpected Code Execution** -- COVERED on the MAF side, NOT on the
+  git/lab side. The MAF `/sim` path (`simulate()`) NEVER executes real tools:
+  every tool (web_search, file_search, code_interpreter, ...) is a MODELED
+  tool-call with a modeled output, so a `code_interpreter` call is exactly the
+  same fidelity as a `web_search` call -- not a fake, the recette's standard
+  deterministic modeling (I4). `corpus/sim/rt-maf-code-exec.scenario.json` models
+  a diagnostic agent (web_search only) crescendo-coerced into invoking an
+  UNDECLARED `code_interpreter` = unexpected code execution, caught mono-axis as
+  `capability_overreach` (ASI05 / AML.T0051). The git/lab path is different: it
+  runs the fixed action catalog (`recette/tools.py` + `LabForge`) which has no
+  code sandbox, so a git-side code-exec subject WOULD be a proxy -- do not model
+  ASI05 on the git side until a real exec double exists (R4/R13).
 
 ## Related
 
