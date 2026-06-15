@@ -48,6 +48,10 @@ const EMPTY: { id: string; provider: string; model: string; base_url: string } =
   base_url: "",
 };
 
+// Sentinel option value for "type a model id not in the curated list". Chosen so
+// it cannot collide with a real model id.
+const CUSTOM_MODEL = "__custom__";
+
 export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Element {
   const { backends, onChanged, onError } = props;
   const [form, setForm] = useState(EMPTY);
@@ -60,7 +64,15 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     let alive = true;
     listAiProviders()
       .then((list) => {
-        if (alive) setProviders(list);
+        if (!alive) return;
+        setProviders(list);
+        // Prefill the model with the starting provider's default so the form is
+        // never in a half-set state (empty model under a provider that has one).
+        setForm((p) => {
+          if (p.model.length > 0) return p;
+          const info = list.find((x) => x.id === p.provider);
+          return info?.default_model != null ? { ...p, model: info.default_model } : p;
+        });
       })
       .catch((err) => onError(err instanceof Error ? err.message : String(err)));
     return () => {
@@ -70,6 +82,21 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
 
   const selectedProvider = providers.find((p) => p.id === form.provider);
   const baseUrlMode = selectedProvider?.base_url ?? null;
+  // The provider's curated model ids (empty -> free-text field). When the
+  // current model is not one of them, the dropdown is in "custom" mode and a
+  // free-text input is revealed. Purely derived: changing provider resets the
+  // model to that provider's default, which flips this back to false.
+  const providerModels = selectedProvider?.models ?? [];
+  const modelIsCustom =
+    providerModels.length > 0 && !providerModels.includes(form.model);
+
+  /** Switch provider and reset the model to the new provider's default (or empty
+   * when it curates none). Kills the stale-model bug (e.g. a groq model lingering
+   * after switching to mistral). */
+  function selectProvider(provider: string): void {
+    const info = providers.find((p) => p.id === provider);
+    setForm((p) => ({ ...p, provider, model: info?.default_model ?? "" }));
+  }
   const [tests, setTests] = useState<Record<string, TestState>>({});
   // Per-backend free-text prompt draft and its last answer, keyed by backend id.
   const [askDrafts, setAskDrafts] = useState<Record<string, string>>({});
@@ -350,7 +377,7 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
                 ...p,
                 provider: "openai_compat",
                 base_url: "http://127.0.0.1:4000",
-                model: p.model || "groq-llama",
+                model: "groq-llama",
               }))
             }
           >
@@ -372,7 +399,7 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
           <select
             id="backend-provider"
             value={form.provider}
-            onChange={(e) => setForm((p) => ({ ...p, provider: e.target.value }))}
+            onChange={(e) => selectProvider(e.target.value)}
           >
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -403,13 +430,42 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
         )}
         <div className="agents-form-row">
           <label htmlFor="backend-model">Model</label>
-          <input
-            id="backend-model"
-            type="text"
-            placeholder="claude-opus-4-8, ..."
-            value={form.model}
-            onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-          />
+          {providerModels.length > 0 ? (
+            <select
+              id="backend-model"
+              value={modelIsCustom ? CUSTOM_MODEL : form.model}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  model: e.target.value === CUSTOM_MODEL ? "" : e.target.value,
+                }))
+              }
+            >
+              {providerModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL}>-- custom... --</option>
+            </select>
+          ) : (
+            <input
+              id="backend-model"
+              type="text"
+              placeholder="model id for this provider"
+              value={form.model}
+              onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+            />
+          )}
+          {modelIsCustom && (
+            <input
+              type="text"
+              aria-label="Custom model id"
+              placeholder="custom model id"
+              value={form.model}
+              onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+            />
+          )}
         </div>
         <div className="agents-form-actions">
           <button type="submit" className="agents-btn agents-btn-primary">

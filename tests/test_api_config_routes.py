@@ -50,6 +50,23 @@ class TestConfigRoutes(unittest.TestCase):
         self.assertEqual(by_id["bedrock"]["base_url"], "optional")
         self.assertEqual(by_id["moonshot"]["env_key"], "KIMI_API_KEY")
         self.assertTrue(by_id["moonshot"]["key_required"])
+        # Each entry carries the curated model dropdown (first = default_model).
+        # A provider with curated models exposes them; one without falls back to
+        # an empty list + null default (the console then shows a free-text field).
+        from recette.llm import provider_models
+
+        for entry in catalog:
+            expected = list(provider_models(entry["id"]))
+            self.assertEqual(entry["models"], expected)
+            self.assertEqual(entry["default_model"], expected[0] if expected else None)
+        # mistral is curated: its default is the first listed model, not a model
+        # of another provider (regression: the form used to keep a groq model
+        # selected after switching to mistral).
+        self.assertEqual(by_id["mistral"]["default_model"], "mistral-large-latest")
+        self.assertIn("mistral-large-latest", by_id["mistral"]["models"])
+        # openai_compat curates none -> empty list + null default (free text).
+        self.assertEqual(by_id["openai_compat"]["models"], [])
+        self.assertIsNone(by_id["openai_compat"]["default_model"])
 
     def test_ai_backend_crud(self) -> None:
         self.assertEqual(self.client.get("/config/ai-backends").json(), [])

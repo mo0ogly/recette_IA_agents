@@ -91,13 +91,29 @@ const ALL_PROVIDERS = [
 
 /** The catalog the mocked /config/ai-providers returns -- mirrors what the real
  * backend serves from recette.llm._PROVIDERS, so the dropdown lists every id. */
-const PROVIDER_CATALOG: AiProviderInfo[] = ALL_PROVIDERS.map((id): AiProviderInfo => ({
-  id,
-  env_key: id === "openai_compat" ? null : `${id.toUpperCase()}_API_KEY`,
-  key_required: id !== "openai_compat",
-  base_url:
-    id === "openai_compat" ? "required" : id === "bedrock" ? "optional" : null,
-}));
+// Curated model dropdowns mirror recette.llm._PROVIDER_MODELS (intentionally
+// partial: only providers with grounded model ids). Everything else falls back
+// to a free-text model field (models: [], default_model: null).
+const PROVIDER_MODELS: Record<string, string[]> = {
+  anthropic: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-fable-5"],
+  openai: ["gpt-4o", "gpt-4o-mini"],
+  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  mistral: ["mistral-large-latest", "mistral-small-latest"],
+  deepseek: ["deepseek-chat", "deepseek-reasoner"],
+};
+
+const PROVIDER_CATALOG: AiProviderInfo[] = ALL_PROVIDERS.map((id): AiProviderInfo => {
+  const models = PROVIDER_MODELS[id] ?? [];
+  return {
+    id,
+    env_key: id === "openai_compat" ? null : `${id.toUpperCase()}_API_KEY`,
+    key_required: id !== "openai_compat",
+    base_url:
+      id === "openai_compat" ? "required" : id === "bedrock" ? "optional" : null,
+    models,
+    default_model: models.length > 0 ? models[0] : null,
+  };
+});
 
 function renderPanel(
   rows: AiBackend[] = backends,
@@ -472,5 +488,58 @@ describe("AiBackendsPanel", () => {
     expect(baseUrl.value).toBe("http://127.0.0.1:4000");
     const model = screen.getByLabelText("Model") as HTMLInputElement;
     expect(model.value).toBe("groq-llama");
+  });
+
+  it("switching provider resets the model to the new provider's default", async () => {
+    renderPanel();
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    // anthropic is the starting provider and is curated, so the model field is a
+    // dropdown preset to anthropic's default.
+    const model = (await screen.findByLabelText("Model")) as HTMLSelectElement;
+    expect(model.tagName).toBe("SELECT");
+    expect(model.value).toBe("claude-opus-4-8");
+
+    // Switching to mistral must NOT keep an anthropic/other model selected: the
+    // model resets to mistral's default (regression: a groq model used to linger
+    // after switching provider).
+    fireEvent.change(screen.getByLabelText("Provider"), {
+      target: { value: "mistral" },
+    });
+    const mistralModel = screen.getByLabelText("Model") as HTMLSelectElement;
+    expect(mistralModel.value).toBe("mistral-large-latest");
+    const options = within(mistralModel)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(options).toContain("mistral-small-latest");
+    expect(options).not.toContain("claude-opus-4-8");
+  });
+
+  it("curated dropdown offers a custom path that reveals a free-text input", async () => {
+    renderPanel();
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    const model = (await screen.findByLabelText("Model")) as HTMLSelectElement;
+    // No custom input until the custom sentinel is chosen.
+    expect(screen.queryByLabelText("Custom model id")).not.toBeInTheDocument();
+
+    fireEvent.change(model, { target: { value: "__custom__" } });
+    const custom = screen.getByLabelText("Custom model id") as HTMLInputElement;
+    expect(custom).toBeInTheDocument();
+    fireEvent.change(custom, { target: { value: "mistral-tiny" } });
+    expect(custom.value).toBe("mistral-tiny");
+  });
+
+  it("provider without curated models keeps a free-text model field", async () => {
+    renderPanel();
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    // xai curates no model -> the field stays a plain text input.
+    fireEvent.change(screen.getByLabelText("Provider"), {
+      target: { value: "xai" },
+    });
+    const model = screen.getByLabelText("Model") as HTMLInputElement;
+    expect(model.tagName).toBe("INPUT");
+    expect(model.value).toBe("");
   });
 });

@@ -88,16 +88,21 @@ def _provider_catalog() -> list[dict]:
     env-var hint (write-only key, R8), whether a key is required, and whether a
     base_url field applies.
     """
-    from ...llm import _PROVIDERS
+    from ...llm import _PROVIDERS, provider_models
 
     catalog: list[dict] = []
     for provider in _PROVIDERS:
+        models = list(provider_models(provider))
         catalog.append(
             {
                 "id": provider,
                 "env_key": _PROVIDER_ENV_KEY.get(provider),
                 "key_required": provider != "openai_compat",
                 "base_url": _PROVIDER_BASE_URL.get(provider),
+                # Known model ids for the console dropdown (first = default),
+                # empty when none are curated -> the UI offers a free-text field.
+                "models": models,
+                "default_model": models[0] if models else None,
             }
         )
     return catalog

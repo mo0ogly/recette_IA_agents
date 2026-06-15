@@ -428,6 +428,13 @@ export interface AiProviderInfo {
   env_key: string | null;
   key_required: boolean;
   base_url: "required" | "optional" | null;
+  /** Known model ids offered as a dropdown (first = default). Empty when the
+   * backend curates none for this provider -> the console shows a free-text
+   * model field. A "custom" path is always kept so an unlisted id stays typeable. */
+  models: string[];
+  /** The model preselected when this provider is picked (first of `models`), or
+   * null when no models are curated. */
+  default_model: string | null;
 }
 
 /** A configured AI backend an agent can be bound to. */
