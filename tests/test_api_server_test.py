@@ -75,7 +75,7 @@ class ServerTestEndpointTest(unittest.TestCase):
         body = res.json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["status_code"], 200)
-        self.assertEqual(body["response"]["user_status"], "SUSPENDED")
+        self.assertEqual(body["response"]["status"], "SUSPENDED")
         self.assertEqual(body["response"]["action"], "suspend_user")
         self.assertTrue(body["side_effect_hash"])
         self.assertIsNone(body["error"])
@@ -100,7 +100,7 @@ class ServerTestEndpointTest(unittest.TestCase):
         body = res.json()
         self.assertFalse(body["ok"])
         self.assertEqual(body["status_code"], 0)
-        self.assertIn("transport error", body["error"])
+        self.assertIn("unreachable", body["error"])
 
     def test_missing_action_type_is_400(self) -> None:
         res = self.client.post("/config/servers/okta-up/test", json={"resource": "x"})
@@ -124,7 +124,7 @@ class ServerTestEndpointTest(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertTrue(body["ok"])
-        self.assertEqual(body["response"]["user_status"], "SUSPENDED")
+        self.assertEqual(body["response"]["status"], "SUSPENDED")
 
     def test_resource_and_payload_are_forwarded_to_the_server(self) -> None:
         # The resource is echoed back, proving it reached the handler; two
