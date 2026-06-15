@@ -4,8 +4,9 @@ Cette doc installe le projet et lance, **uniquement via `./recette.sh`**
 (R19 -- point d'entree unique), les deux familles de serveurs :
 
 - le **serveur applicatif** : l'API gouvernee (`:8090`) + la console UX (`:5173`) ;
-- les **serveurs appeles par les agents** : le lab mock (`:8082`) qui simule les
-  11 systemes externes (okta, github, finance, slack, ...). C'est ce que touche
+- les **serveurs appeles par les agents** : le lab mock (`:8082`) plus les 12
+  serveurs par-domaine (`:9101`-`:9112`) qui simulent les 16 systemes gouvernes
+  (okta, github, gitlab, finance, slack, comms, compliance, ...). C'est ce que touche
   un agent quand il execute une action -- jamais un vrai SaaS par defaut (lab
   forge, zero effet de bord, I5).
 
@@ -69,7 +70,8 @@ premier demarrage.
 ./recette.sh console start
 ```
 
-- `platform up` demarre le **lab mock `:8082`** (les 11 systemes appeles par les
+- `platform up` demarre le **lab mock `:8082`** + les 12 serveurs par-domaine
+  (`:9101`-`:9112`, les 16 systemes appeles par les
   agents) puis l'**API gouvernee `:8090`** (ou 1er port libre 8090-8099, persiste
   dans `.run/api.port`).
 - `console start` lance la **console `:5173`**, cablee automatiquement sur le

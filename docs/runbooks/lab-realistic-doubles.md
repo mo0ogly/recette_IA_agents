@@ -1,7 +1,7 @@
 # Lab realistic doubles -- runbook
 
 The lab (`recette/lab/`, served on `:8082` and as `mock_local` servers on
-`9101+`) is the simulated side of the 14 external systems an agent acts against.
+`9101`-`9112`) is the simulated side of the 16 governed systems an agent acts against.
 Each system is a domain double in `recette/lab/domains/<system>.py` with a single
 `handle(action_type, resource, payload) -> dict | None` entry point, dispatched
 by `recette/lab/mock_server.py` on `POST /{target_system}/execute`.

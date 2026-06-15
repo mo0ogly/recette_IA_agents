@@ -66,7 +66,7 @@ Un agent ne touche jamais un systeme externe sans :
             GET /audit/events, GET /audit/verify
 ```
 
-### Le catalogue : 118 actions sensibles / 11 systemes
+### Le catalogue : 146 actions sensibles / 16 systemes (criticite Annex C C1-C4)
 
 Source de verite : `docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md`.
 Code : `recette/platform/catalog/domains/<systeme>.py` (1 module par systeme).
@@ -103,7 +103,7 @@ Six onglets, branches directement sur l'API. Detail : [console/README.md](../../
 | **Recette** | lancer discovery + identification sur le corpus -> scorecard detecte/distingue vs ground-truth (par surface / par agent) |
 | **Campagnes** | jeux d'agents persistes lances a la demande ; flux live ; enregistrements rejouables avec verdict IDENTIQUE/DIVERGENT (replay deterministe, I4) |
 | **Agents** | definir chaque agent (principal, target_system, goal, capability_scope = actions canoniques, ai_backend) + CRUD des ai-backends (provider+model, zero secret R8) |
-| **Catalog** (gouvernance mock) | les 118 actions + editeur de policy |
+| **Catalog** (gouvernance mock) | les 146 actions (criticite C1-C4) + editeur de policy |
 | **Approvals** (gouvernance mock) | inbox des approbations (I6) |
 | **Audit** (gouvernance mock) | journal immuable + chaine de hash |
 
@@ -180,7 +180,7 @@ variante docker (`cicd/checks.sh`).
 
 **Plateforme gouvernee (18-22)** -- le coeur vague 1 (`cicd/platform.sh`) :
 
-- **18 Plateforme up** : demarre le lab mock (:8082, 11 systemes simules) PUIS
+- **18 Plateforme up** : demarre le lab mock (:8082 + 12 serveurs :9101-:9112, 16 systemes simules) PUIS
   l'API avec tout le cablage (URL lab, event store SQLite, dossier policies).
   Choisit automatiquement un port libre (8090-8099) si 8090 est occupe par un
   autre service local, et le persiste dans `.run/api.port`.
@@ -315,4 +315,4 @@ viendraient de l'environnement, detenus par les proxies.
 - Installation (prerequis + premier demarrage) : [installation.md](installation.md)
 - Plateforme (docker lab + e2e) : [platform.md](platform.md)
 - API Track U : [api.md](api.md)
-- Catalogue 118 actions : [../tracking/PLAN_high-risk-action-catalog_2026-06-12.md](../tracking/PLAN_high-risk-action-catalog_2026-06-12.md)
+- Catalogue (plan initial 118 actions, etendu a 146) : [../tracking/PLAN_high-risk-action-catalog_2026-06-12.md](../tracking/PLAN_high-risk-action-catalog_2026-06-12.md)
