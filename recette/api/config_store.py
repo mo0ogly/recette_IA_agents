@@ -91,7 +91,11 @@ def validate_server_netname(server: dict, *, others: list[dict]) -> None:
     fqdn = server.get("fqdn")
     if fqdn is not None:
         names.append(fqdn)
-    names.extend(server.get("aliases") or [])
+    # Harden: aliases must be a list (reject malformed config with non-list aliases)
+    aliases = server.get("aliases")
+    if aliases is not None and not isinstance(aliases, list):
+        raise ValueError(f"aliases must be a list: {aliases!r}")
+    names.extend(aliases or [])
     for name in names:
         if not isinstance(name, str) or not _HOSTNAME_RE.match(name):
             raise ValueError(f"invalid hostname: {name!r}")
@@ -101,7 +105,10 @@ def validate_server_netname(server: dict, *, others: list[dict]) -> None:
             continue
         if other.get("fqdn"):
             taken.add(other["fqdn"])
-        taken.update(other.get("aliases") or [])
+        # Guard: silently skip malformed other-server aliases (do not poison collision set)
+        other_aliases = other.get("aliases")
+        if isinstance(other_aliases, list):
+            taken.update(other_aliases)
     clash = taken.intersection(names)
     if clash:
         raise ValueError(f"name already declared by another server: {sorted(clash)}")

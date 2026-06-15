@@ -54,6 +54,21 @@ class TestServerNetnameValidation(unittest.TestCase):
             others=existing,
         )
 
+    def test_rejects_non_list_aliases(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_server_netname(
+                {"id": "a", "mode": "mock_local", "port": 9101, "aliases": "gh.lab.internal"},
+                others=[],
+            )
+
+    def test_other_server_with_malformed_aliases_is_ignored(self) -> None:
+        # a different server with a non-list aliases must not poison collision detection
+        existing = [{"id": "a", "aliases": "api.github.com"}]
+        validate_server_netname(
+            {"id": "b", "mode": "mock_local", "port": 9102, "fqdn": "api.github.com"},
+            others=existing,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
