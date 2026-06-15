@@ -167,6 +167,12 @@ export interface AgentConfig {
   ground_truth?: GroundTruth;
   /** Optional link to a corpus subject (corpus/agents/<id>) for its ground-truth. */
   corpus_subject_id?: string;
+  /**
+   * Per-agent pacing: delay in milliseconds (integer >= 0) between successive
+   * Lane B actions. Absent/undefined = inherit from the server (or instant);
+   * never sent as 0/NaN from an empty input.
+   */
+  pace_ms?: number;
 }
 
 /** The four correctness dimensions judged by the identification recette. */

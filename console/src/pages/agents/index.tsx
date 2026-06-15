@@ -82,6 +82,8 @@ interface AgentFormValues {
   actions: string[];
   aiBackendId: string;
   corpusSubjectId: string;
+  /** Per-agent cadence in ms; undefined = inherit from server / instant. */
+  pace_ms?: number;
   // Full properties (previously invisible in the form).
   role: string;
   model: string;
@@ -178,6 +180,7 @@ function toAgentConfig(values: AgentFormValues, id: string): AgentConfig {
     target_system: values.targetSystem.trim() || undefined,
     goal: values.goal.trim() || undefined,
     capability_scope: values.actions,
+    pace_ms: values.pace_ms,
     scenario,
     ai_backend_id: values.aiBackendId || undefined,
     corpus_subject_id: values.corpusSubjectId || undefined,
@@ -200,6 +203,7 @@ function toFormValues(agent: AgentConfig): AgentFormValues {
     targetSystem: agent.target_system ?? "",
     goal: agent.goal ?? "",
     actions: agent.capability_scope ?? [],
+    pace_ms: agent.pace_ms,
     aiBackendId: agent.ai_backend_id ?? "",
     corpusSubjectId: agent.corpus_subject_id ?? "",
     role: agent.role ?? "",
@@ -507,6 +511,7 @@ export default function AgentsPage(): JSX.Element {
             <th>Goal</th>
             <th>AI backend</th>
             <th>Capability scope</th>
+            <th>Cadence</th>
             <th>Statut</th>
             <th>Actions</th>
           </tr>
@@ -514,7 +519,7 @@ export default function AgentsPage(): JSX.Element {
         <tbody>
           {loaded && agents.length === 0 ? (
             <tr>
-              <td colSpan={8} className="agents-empty">
+              <td colSpan={9} className="agents-empty">
                 No agents configured.
               </td>
             </tr>
@@ -529,6 +534,13 @@ export default function AgentsPage(): JSX.Element {
                 <td>{agent.goal ?? ""}</td>
                 <td>{agent.ai_backend_id ?? ""}</td>
                 <td>{(agent.capability_scope ?? []).join(", ")}</td>
+                <td>
+                  {agent.pace_ms !== undefined ? (
+                    <span className="agents-pace">pace {agent.pace_ms}ms</span>
+                  ) : (
+                    ""
+                  )}
+                </td>
                 <td>
                   {(() => {
                     const v = voyantFor(latestRun(agent.id)?.status ?? "");
@@ -687,6 +699,29 @@ export default function AgentsPage(): JSX.Element {
             type="text"
             value={form.goal}
             onChange={(e) => setField("goal", e.target.value)}
+          />
+        </div>
+
+        <div className="agents-form-row">
+          <label htmlFor="agent-pace-ms">Cadence (ms)</label>
+          <input
+            id="agent-pace-ms"
+            type="number"
+            min={0}
+            step={100}
+            value={form.pace_ms ?? ""}
+            placeholder="herite du serveur / instant"
+            onChange={(e) => {
+              // Empty input means "inherit" -> undefined, never 0 or NaN.
+              const raw = e.target.value.trim();
+              const parsed = raw === "" ? undefined : Number.parseInt(raw, 10);
+              setField(
+                "pace_ms",
+                parsed === undefined || Number.isNaN(parsed)
+                  ? undefined
+                  : Math.max(0, parsed),
+              );
+            }}
           />
         </div>
 

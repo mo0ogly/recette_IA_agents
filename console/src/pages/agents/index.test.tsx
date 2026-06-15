@@ -11,6 +11,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentConfig, AiBackend } from "../../types/platform";
 import agentsFixture from "./__fixtures__/agents.fixture.json";
+import agentsWithPaceFixture from "./__fixtures__/agents-with-pace.fixture.json";
 import backendsFixture from "./__fixtures__/ai-backends.fixture.json";
 
 vi.mock("../../api/client", async (importOriginal) => {
@@ -72,6 +73,7 @@ const AGENT_ACTIONS = [
 ];
 
 const agents = agentsFixture as unknown as AgentConfig[];
+const agentsWithPace = agentsWithPaceFixture as unknown as AgentConfig[];
 const backends = backendsFixture as unknown as AiBackend[];
 
 describe("AgentsPage", () => {
@@ -221,6 +223,57 @@ describe("AgentsPage", () => {
     expect(payload.model).toBe("llama-3.3-70b-versatile");
     expect(payload.ground_truth?.expected_verdict).toBe("correct");
     expect(payload.ground_truth?.dimensions?.identity).toBe(true);
+  });
+
+  it("loads pace_ms into the Cadence (ms) field and saves an edited value as a number", async () => {
+    // The real fixture's first agent (camp-rogue-bot) carries pace_ms: 800;
+    // the others inherit (no pace_ms).
+    vi.mocked(listAgents).mockResolvedValue(agentsWithPace);
+    vi.mocked(listAiBackends).mockResolvedValue(backends);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(updateAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+
+    const paced = agentsWithPace[0];
+    const row = (await screen.findByText(paced.id)).closest("tr") as HTMLElement;
+    // Table cell shows the configured pace for the paced agent.
+    expect(within(row).getByText(/pace 800ms/)).toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
+    expect(cadence.value).toBe("800");
+
+    // Editing and saving carries the new pace as a NUMBER (not a string).
+    fireEvent.change(cadence, { target: { value: "1500" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(updateAgent).mock.calls[0];
+    expect(payload.pace_ms).toBe(1500);
+  });
+
+  it("omits pace_ms (inherit) when the Cadence field is cleared", async () => {
+    vi.mocked(listAgents).mockResolvedValue(agentsWithPace);
+    vi.mocked(listAiBackends).mockResolvedValue(backends);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(updateAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+
+    const paced = agentsWithPace[0];
+    const row = (await screen.findByText(paced.id)).closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
+    fireEvent.change(cadence, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(updateAgent).mock.calls[0];
+    // Cleared = inherit from server / instant, never 0 or NaN.
+    expect(payload.pace_ms).toBeUndefined();
   });
 
   it("exposes a Corpus tab with the answer-key note distinct from the Cockpit exam", async () => {
