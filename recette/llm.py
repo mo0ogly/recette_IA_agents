@@ -893,6 +893,16 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "groq": ("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
     "mistral": ("mistral-large-latest", "mistral-small-latest"),
     "deepseek": ("deepseek-chat", "deepseek-reasoner"),
+    # Nous Research inference models, frozen once from models.dev (no runtime
+    # fetch -> I4). Bare model names as the vendor publishes them; the panel's
+    # free-text field remains the fallback if the direct endpoint expects a
+    # prefixed variant. First = default (smaller/faster than 405B).
+    "nous": (
+        "Hermes-4-70B",
+        "Hermes-4-405B",
+        "Hermes-3-Llama-3.1-70B",
+        "Hermes-3-Llama-3.1-405B",
+    ),
 }
 
 

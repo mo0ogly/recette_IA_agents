@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import unittest
 
-from recette.llm import _PROVIDER_CLASSES, _PROVIDERS, provider_host
+from recette.llm import _PROVIDER_CLASSES, _PROVIDERS, provider_host, provider_models
 
 
 class ProviderHostTest(unittest.TestCase):
@@ -43,6 +43,17 @@ class ProviderHostTest(unittest.TestCase):
             else:
                 self.assertIsNotNone(host, f"{provider}: no host derived")
                 self.assertIn(":", host or "")
+
+
+class ProviderModelsTest(unittest.TestCase):
+    def test_nous_models_frozen_from_models_dev(self) -> None:
+        # Frozen static list (no runtime fetch, I4); the panel gets a dropdown
+        # instead of an empty model field. Default = first = the 70B.
+        models = provider_models("nous")
+        self.assertTrue(models, "nous models must not be empty")
+        self.assertEqual(models[0], "Hermes-4-70B")
+        # Bare vendor names only -- the provider stays "nous", never "hermes".
+        self.assertNotIn("hermes", _PROVIDERS)
 
 
 if __name__ == "__main__":
