@@ -43,7 +43,7 @@ RESERVED_UNEXERCISED: frozenset[str] = frozenset()
 # (corpus/sim/*.scenario.json). Frozen so the gap cannot grow and cannot be
 # closed silently: add a scenario for one AND remove it here, or this fails.
 REDTEAM_PENDING_VIOLATIONS: frozenset[str] = frozenset(
-    {"identity_mismatch", "policy_violation", "behavior_anomaly"}
+    {"identity_mismatch", "behavior_anomaly"}
 )
 
 ALL_VIOLATION_TYPES: frozenset[str] = frozenset(
