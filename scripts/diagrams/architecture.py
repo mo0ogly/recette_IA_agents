@@ -68,7 +68,7 @@ flowchart TB
   end
 
   subgraph LAB["Lab simule (recette/lab/, :8082)"]
-    MOCK["Serveur mock unique<br/>14 domaines deterministes<br/>doubles realistes (champs metier, 422 si invalide)"]
+    MOCK["Serveur mock unique<br/>16 domaines deterministes<br/>doubles realistes (champs metier, 422 si invalide)"]
   end
 
   CONSOLE -->|"HTTP + WebSocket"| API
@@ -110,7 +110,7 @@ flowchart LR
   subgraph SRV["Serveurs en face"]
     direction TB
     LF["LabForge<br/>in-memory, in-process"]
-    LAB["Mock servers mock_local (config-driven, 1 par systeme, 9101+)<br/>14 domaines: github gitlab okta finance support_desk slack cloud<br/>hris legal_dms product_cms data_platform crm knowledge_base mcp<br/>doubles realistes (champs metier, 422 si invalide), deterministes<br/>POST /system/execute, access log JSONL + /health"]
+    LAB["Mock servers mock_local (config-driven, 12 serveurs :9101-9112)<br/>16 domaines: github gitlab okta finance support_desk slack cloud<br/>hris legal_dms product_cms data_platform crm knowledge_base mcp comms compliance<br/>doubles realistes (champs metier, 422 si invalide), deterministes<br/>POST /system/execute, access log JSONL + /health"]
     DECL["Serveur declare (declared_url)<br/>meme contrat wire que le lab"]
     REAL["SaaS reels (real_saas)<br/>pas de proxy encore : run FAIL<br/>jamais de fallback (I5)"]
   end
@@ -309,7 +309,7 @@ flowchart TB
   end
   subgraph DATA["Data Plane"]
     PROXY["ExternalSystemProxy (proxy/)<br/>seul contact externe<br/>produit side_effect_hash"]
-    LAB2["Lab mock :8082<br/>14 domaines, handlers purs (doubles realistes)"]
+    LAB2["Lab mock :8082<br/>16 domaines, handlers purs (doubles realistes)"]
     PROXY --> LAB2
   end
   subgraph AUDIT["Audit Plane"]

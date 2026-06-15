@@ -46,11 +46,18 @@ stays byte-deterministic so replay (I4) holds.
 | Known action, bad input | `raise LabActionError(422, msg)` | `422` + `{"success": false, "error": msg}` |
 | Unknown action | `None` | `404` |
 
-## The 14 domains
+## The 16 domains
 
 `recette/lab/domains/__init__.py::HANDLER_MODULES` is the registry:
-`cloud, crm, data_platform, finance, github, gitlab, hris, knowledge_base,
-legal_dms, mcp, okta, product_cms, slack, support_desk`.
+`cloud, comms, compliance, crm, data_platform, finance, github, gitlab, hris,
+knowledge_base, legal_dms, mcp, okta, product_cms, slack, support_desk`.
+
+These 16 match the 16 governed systems in the catalog. Twelve carry a dedicated
+`mock_local` server (`:9101`-`:9112`): cloud, finance, github, gitlab, hris,
+knowledge_base, legal_dms, mcp, okta, product_cms, slack, support_desk. The
+other four (comms, compliance, crm, data_platform) are lab doubles served only
+by the in-process `LabForge` / the shared lab `:8082`, without a standalone
+mock_local server.
 
 `github`/`gitlab` keep the canonical git read handlers (`read_repo`,
 `list_repos`, ...) and enrich the risky write actions. `knowledge_base`
