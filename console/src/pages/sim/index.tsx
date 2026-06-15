@@ -72,6 +72,17 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * True when a failed promote is the "subject already exists" conflict. The
+ * client's ApiError message embeds the HTTP status and the backend detail, so a
+ * 409 carries both "409" and the "already exists" wording -- either signals the
+ * subject is already in the corpus and can be replaced with overwrite.
+ */
+function isAlreadyPromotedConflict(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("409") || lower.includes("already exists");
+}
+
 /** A small string field read defensively from a free-form action-log row. */
 function actionField(row: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -204,18 +215,32 @@ export function ScenarioList({
 }): JSX.Element {
   const [promoted, setPromoted] = useState<Record<string, SimPromoteResult>>({});
   const [promoteError, setPromoteError] = useState<Record<string, string>>({});
+  const [conflict, setConflict] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
-  const onPromote = (id: string): void => {
+  const onPromote = (id: string, overwrite = false): void => {
     setPending((p) => ({ ...p, [id]: true }));
     setPromoteError((e) => {
       const next = { ...e };
       delete next[id];
       return next;
     });
-    promoteSimScenario(id)
+    setConflict((c) => {
+      const next = { ...c };
+      delete next[id];
+      return next;
+    });
+    promoteSimScenario(id, overwrite ? { overwrite: true } : undefined)
       .then((res) => setPromoted((p) => ({ ...p, [id]: res })))
-      .catch((err) => setPromoteError((e) => ({ ...e, [id]: errorMessage(err) })))
+      .catch((err) => {
+        const message = errorMessage(err);
+        // A 409 "already exists" is not a dead end: offer the overwrite replace.
+        if (!overwrite && isAlreadyPromotedConflict(message)) {
+          setConflict((c) => ({ ...c, [id]: true }));
+        } else {
+          setPromoteError((e) => ({ ...e, [id]: message }));
+        }
+      })
       .finally(() => setPending((p) => ({ ...p, [id]: false })));
   };
 
@@ -232,6 +257,7 @@ export function ScenarioList({
         const caughtAnomaly = s.verdict === "incorrect";
         const result = promoted[s.scenario_id];
         const error = promoteError[s.scenario_id];
+        const inConflict = conflict[s.scenario_id] === true && result === undefined;
         return (
           <li key={s.scenario_id} data-testid={`sim-scn-${s.scenario_id}`}>
             <button
@@ -297,6 +323,23 @@ export function ScenarioList({
                   </li>
                 ))}
               </ul>
+            )}
+            {inConflict && (
+              <div
+                className="sim-promote-conflict"
+                data-testid={`sim-scn-conflict-${s.scenario_id}`}
+              >
+                <span className="sim-section-sub">Deja dans le corpus.</span>
+                <button
+                  type="button"
+                  className="pill"
+                  data-testid={`sim-scn-overwrite-${s.scenario_id}`}
+                  disabled={pending[s.scenario_id]}
+                  onClick={() => onPromote(s.scenario_id, true)}
+                >
+                  Remplacer
+                </button>
+              </div>
             )}
             {error && (
               <span

@@ -170,6 +170,14 @@
   font-weight: 500;
 }
 
+.sim-promote-conflict {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+}
+
 /* --- Chips: family, strategy, standards, caught/missed ------------------ */
 
 .sim-chip {

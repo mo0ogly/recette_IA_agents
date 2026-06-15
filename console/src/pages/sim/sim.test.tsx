@@ -112,23 +112,60 @@ describe("ScenarioList (cards)", () => {
     const incorrect = maf.find((s) => s.verdict === "incorrect")!;
     render(<ScenarioList scenarios={maf} />);
     fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`));
-    expect(promoteSimScenario).toHaveBeenCalledWith(incorrect.scenario_id);
+    // The plain promote passes no overwrite option (back-compat call shape).
+    expect(promoteSimScenario).toHaveBeenCalledWith(incorrect.scenario_id, undefined);
     const list = await screen.findByTestId(`sim-scn-promoted-${incorrect.scenario_id}`);
     for (const path of (promoteFixture as SimPromoteResult).created) {
       expect(list).toHaveTextContent(path);
     }
   });
 
-  it("surfaces the API error message when promote fails", async () => {
+  it("surfaces the API error message when promote fails (non-conflict)", async () => {
     const incorrect = maf.find((s) => s.verdict === "incorrect")!;
-    vi.mocked(promoteSimScenario).mockRejectedValueOnce(new Error("already promoted"));
+    vi.mocked(promoteSimScenario).mockRejectedValueOnce(
+      new Error("API request failed (422) on ...: multi-axis"),
+    );
     render(<ScenarioList scenarios={maf} />);
     fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`));
     await waitFor(() =>
       expect(
         screen.getByTestId(`sim-scn-promote-error-${incorrect.scenario_id}`),
-      ).toHaveTextContent("already promoted"),
+      ).toHaveTextContent("multi-axis"),
     );
+  });
+
+  it("offers Remplacer on a 409 conflict, then re-promotes with overwrite", async () => {
+    const incorrect = maf.find((s) => s.verdict === "incorrect")!;
+    // First (plain) promote rejects with the 409 already-exists conflict; the
+    // overwrite re-promote (default mock) then succeeds.
+    vi.mocked(promoteSimScenario).mockRejectedValueOnce(
+      new Error(
+        "API request failed (409) on /sim/scenarios/x/promote: subject already exists ... use overwrite to replace",
+      ),
+    );
+    render(<ScenarioList scenarios={maf} />);
+    fireEvent.click(screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`));
+
+    // The conflict affordance appears (FR line + Remplacer), no raw error dump.
+    const overwriteBtn = await screen.findByTestId(
+      `sim-scn-overwrite-${incorrect.scenario_id}`,
+    );
+    expect(
+      screen.getByTestId(`sim-scn-conflict-${incorrect.scenario_id}`),
+    ).toHaveTextContent("Deja dans le corpus.");
+    expect(
+      screen.queryByTestId(`sim-scn-promote-error-${incorrect.scenario_id}`),
+    ).toBeNull();
+
+    // Click Remplacer -> re-promote with overwrite, created paths render.
+    fireEvent.click(overwriteBtn);
+    expect(promoteSimScenario).toHaveBeenLastCalledWith(incorrect.scenario_id, {
+      overwrite: true,
+    });
+    const list = await screen.findByTestId(`sim-scn-promoted-${incorrect.scenario_id}`);
+    for (const path of (promoteFixture as SimPromoteResult).created) {
+      expect(list).toHaveTextContent(path);
+    }
   });
 
   it("calls onSelect with the scenario id when a card is clicked", () => {

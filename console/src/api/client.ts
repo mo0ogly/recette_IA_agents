@@ -984,9 +984,19 @@ export interface SimPromoteResult {
  * single-axis) into a negative corpus subject, closing the recette loop.
  * Resolves with the created corpus paths. Rejects (ApiError) on 404 (unknown
  * scenario), 422 (true-negative / multi-axis), or 409 (already promoted).
+ *
+ * Pass { overwrite: true } to re-promote an already-existing subject (the
+ * backend's ?overwrite=true replace path), turning the 409 conflict into a
+ * deliberate replace.
  */
-export function promoteSimScenario(id: string): Promise<SimPromoteResult> {
-  return request<SimPromoteResult>(`/sim/scenarios/${encodeURIComponent(id)}/promote`, {
+export function promoteSimScenario(
+  id: string,
+  opts?: { overwrite?: boolean },
+): Promise<SimPromoteResult> {
+  const path = opts?.overwrite
+    ? withQuery(`/sim/scenarios/${encodeURIComponent(id)}/promote`, { overwrite: "true" })
+    : `/sim/scenarios/${encodeURIComponent(id)}/promote`;
+  return request<SimPromoteResult>(path, {
     method: "POST",
     body: JSON.stringify({}),
   });
