@@ -144,7 +144,7 @@ _lab_servers_start() {
     local base="http://${API_HOST}:${API_PORT}"
     local ids
     ids="$(curl -sf --max-time 5 "${base}/config/servers" 2>/dev/null \
-        | "$(py)" -c 'import sys,json; print(" ".join(s["id"] for s in json.load(sys.stdin) if s.get("mode")=="mock_local"))' 2>/dev/null || true)"
+        | "$(py)" -c 'import sys,json; print(" ".join(s["id"] for s in json.load(sys.stdin) if s.get("mode") in ("mock_local","honeypot")))' 2>/dev/null || true)"
     if [ -z "${ids}" ]; then
         info "aucun serveur mock_local declare dans la config"
         return 0
@@ -264,9 +264,9 @@ platform_status() {
     meta="$(curl -sf --max-time 3 "${base}/config/servers" 2>/dev/null \
         | "$(py)" -c 'import sys,json
 for s in json.load(sys.stdin):
-    if s.get("mode")=="mock_local": print(s["id"], s.get("system","?"), s.get("port","?"))' 2>/dev/null || true)"
+    if s.get("mode") in ("mock_local","honeypot"): print(s["id"], s.get("system","?"), s.get("port","?"))' 2>/dev/null || true)"
     if [ -n "${meta}" ]; then
-        info "serveurs lab mock_local :"
+        info "serveurs lab (mock_local + honeypot) :"
         local sid ssys sport sstatus
         while read -r sid ssys sport; do
             [ -n "${sid}" ] || continue

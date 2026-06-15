@@ -221,6 +221,15 @@ class ServerManagerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.manager.start({"id": "x", "mode": "declared_url", "base_url": "http://h"})
 
+    def test_start_accepts_honeypot_sink(self) -> None:
+        # A honeypot reuses the same mock_server process (port-bound sink); only
+        # its mode (and thus its exclusion from build_allowlist) differs.
+        port = _free_port()
+        result = self.manager.start({"id": "sink", "mode": "honeypot", "port": port})
+        self.assertEqual(result, {"status": "up"})
+        self.assertEqual(self._health_status(port), 200)
+        self.assertEqual(self.manager.status("sink"), "up")
+
     def test_access_log_path_under_data_lab(self) -> None:
         path = self.manager.access_log_path("s1")
         self.assertTrue(path.as_posix().endswith("data/lab/s1.access.jsonl"))

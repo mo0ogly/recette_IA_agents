@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-_LOCAL_ALIASES = frozenset(("localhost", "::1", "127.0.0.1", "0.0.0.0"))
+# Host strings (not a bind): the local-loopback aliases a proxy may record for
+# the same local target. "0.0.0.0" is here as a host ALIAS to fold onto
+# 127.0.0.1, never a bind address. nosec B104 - no socket binds here.
+_LOCAL_ALIASES = frozenset(("localhost", "::1", "127.0.0.1", "0.0.0.0"))  # nosec B104
 
 
 def _normalize_host(host: str) -> str:

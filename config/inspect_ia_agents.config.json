@@ -1523,6 +1523,12 @@
       "system": "gitlab",
       "mode": "mock_local",
       "port": 9112
+    },
+    {
+      "id": "shadow-db-sink",
+      "system": "shadow_db",
+      "mode": "honeypot",
+      "port": 9113
     }
   ]
 }

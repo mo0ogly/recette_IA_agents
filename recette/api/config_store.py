@@ -14,8 +14,17 @@ from pathlib import Path
 SCHEMA_VERSION = "1.0"
 _FORBIDDEN_SECRET_FIELDS = {"api_key", "key", "token", "secret", "password", "passwd"}
 _RUNTIMES = {"lab", "real"}
-_SERVER_MODES = {"mock_local", "declared_url", "real_saas"}
-_SERVER_MODE_REQUIRED = {"mock_local": "port", "declared_url": "base_url", "real_saas": "owner"}
+# "honeypot" reuses the port-bound mock_server shape but is a SINK an agent must
+# never reach through the mediated path; build_allowlist excludes it, so any wire
+# flow to it is a bypass signal (ghost-agent / shadow-AI), not a mediated target.
+_SERVER_MODES = {"mock_local", "honeypot", "declared_url", "real_saas"}
+_PORT_BOUND_MODES = {"mock_local", "honeypot"}
+_SERVER_MODE_REQUIRED = {
+    "mock_local": "port",
+    "honeypot": "port",
+    "declared_url": "base_url",
+    "real_saas": "owner",
+}
 # Field names align with corpus/schemas/ground-truth.schema.json: "detectable"
 # (expected_discovery.detectable), "expected_verdict" (correct|incorrect) and the
 # 4 correctness dimensions of expected_identification.
@@ -78,10 +87,10 @@ def _check_server(server: dict) -> None:
     required = _SERVER_MODE_REQUIRED[mode]
     if required not in server:
         raise ValueError(f"server mode {mode!r} requires field {required!r}")
-    if mode == "mock_local" and not (
+    if mode in _PORT_BOUND_MODES and not (
         isinstance(server["port"], int) and not isinstance(server["port"], bool)
     ):
-        raise ValueError("server 'port' must be an integer for mode 'mock_local'")
+        raise ValueError(f"server 'port' must be an integer for mode {mode!r}")
 
 
 def _default() -> dict:

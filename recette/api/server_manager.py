@@ -42,23 +42,31 @@ class ServerManager:
         """JSONL access log of one server, under the manager base dir."""
         return self._base_dir / f"{server_id}.access.jsonl"
 
-    def start(self, server: dict) -> dict:
-        """Start one mock_local server; return {"status": "up"} or a down+error.
+    # Port-bound modes share the same mock_server process; only build_allowlist
+    # tells them apart (honeypot is excluded -> a sink that flags any traffic).
+    _STARTABLE_MODES = frozenset(("mock_local", "honeypot"))
 
+    def start(self, server: dict) -> dict:
+        """Start one port-bound lab server; return {"status": "up"} or a down+error.
+
+        Handles ``mock_local`` (a mediated lab double) and ``honeypot`` (a sink
+        an agent must never reach directly) -- both run the same mock_server.
         Fail-fast preflight: bind the port once before spawning, so a busy
         port yields an explicit error and zero child process. The server
         stays "down"; nothing is retried and no traffic is rerouted.
         """
         mode = server.get("mode")
-        if mode != "mock_local":
-            raise ValueError(f"ServerManager only starts mode=mock_local servers, got {mode!r}")
+        if mode not in self._STARTABLE_MODES:
+            raise ValueError(
+                f"ServerManager only starts modes {sorted(self._STARTABLE_MODES)}, got {mode!r}"
+            )
         server_id = server.get("id")
         if not server_id:
             raise ValueError("server entry requires a non-empty 'id'")
         port = server.get("port")
         # bool is an int subclass: reject it explicitly (same rule as config_store).
         if not isinstance(port, int) or isinstance(port, bool):
-            raise ValueError(f"mock_local server {server_id!r} requires an integer 'port'")
+            raise ValueError(f"port-bound server {server_id!r} requires an integer 'port'")
 
         probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # SO_REUSEADDR matches the mock server's own bind semantics

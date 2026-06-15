@@ -247,6 +247,24 @@ class ServerSectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.add_server({"id": "s3", "system": "github", "mode": "real_saas"})
 
+    def test_honeypot_mode_accepted_with_int_port(self) -> None:
+        # A honeypot is a sink server (a target an agent must NEVER reach
+        # directly). It reuses the mock_local server shape (port-bound) but a
+        # distinct mode so build_allowlist excludes it -> traffic to it is a
+        # bypass signal, not a mediated path.
+        self.store.add_server(
+            {"id": "shadow-db-sink", "system": "shadow_db", "mode": "honeypot", "port": 9113}
+        )
+        self.assertEqual(self.store.get_server("shadow-db-sink")["mode"], "honeypot")
+
+    def test_honeypot_mode_requires_int_port(self) -> None:
+        with self.assertRaises(ValueError):
+            self.store.add_server({"id": "hp", "system": "shadow_db", "mode": "honeypot"})
+        with self.assertRaises(ValueError):
+            self.store.add_server(
+                {"id": "hp", "system": "shadow_db", "mode": "honeypot", "port": "9113"}
+            )
+
     def test_secret_fields_rejected(self) -> None:
         with self.assertRaises(ValueError):
             self.store.add_server(
