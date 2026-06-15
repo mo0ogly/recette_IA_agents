@@ -48,8 +48,10 @@ import type {
   WireStatus,
 } from "../types/platform";
 
+// Dev-only fallback when VITE_INSPECT_IA_AGENTS_API_URL is unset; recette.sh always
+// sets it to the live API. 8090 is the canonical governed-API port (cicd/lib/common.sh, R19).
 const API_BASE_URL: string =
-  import.meta.env.VITE_INSPECT_IA_AGENTS_API_URL ?? "http://localhost:8080";
+  import.meta.env.VITE_INSPECT_IA_AGENTS_API_URL ?? "http://localhost:8090";
 
 /** WebSocket base derived from the API base (http -> ws, https -> wss). */
 function wsBaseUrl(): string {

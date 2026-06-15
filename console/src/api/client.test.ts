@@ -37,7 +37,7 @@ describe("api client", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/approvals?state=pending",
+      "http://localhost:8090/approvals?state=pending",
       expect.objectContaining({ method: "GET" }),
     );
     expect(result).toEqual(SAMPLE_PENDING);
@@ -50,7 +50,7 @@ describe("api client", () => {
     const result = await listAuditEvents({ from_seq: 0, tail: 2000 });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/audit/events?from_seq=0&tail=2000",
+      "http://localhost:8090/audit/events?from_seq=0&tail=2000",
       expect.objectContaining({ method: "GET" }),
     );
     expect(result).toEqual([]);
