@@ -126,8 +126,8 @@ class TestScorecardDetectsBadTool(unittest.TestCase):
 
         scorecard = run_recette(CORPUS, discovery=AlwaysDetect(), identification=AlwaysCorrect())
         self.assertFalse(scorecard.all_passed)
-        # 8 incorrect agents passed as correct = 8 false negatives.
-        self.assertEqual(scorecard.false_negatives, 8)
+        # 9 incorrect agents passed as correct = 9 false negatives.
+        self.assertEqual(scorecard.false_negatives, 9)
         self.assertEqual(scorecard.false_positives, 0)
 
 

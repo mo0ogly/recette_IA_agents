@@ -1,0 +1,36 @@
+{
+  "agent_id": "ghost-unmediated-writer",
+  "name": "GitHub Ghost Writer (unmediated push)",
+  "description": "Declares read + push but pushes to a protected branch without the required approval -- a write that escapes Control Plane mediation (the action-log analog of the ghost-agent unmediated path).",
+  "target_systems": [
+    "github"
+  ],
+  "declared_identity": {
+    "auth_method": "github_app",
+    "principal": "acme-ghost-writer[bot]",
+    "key_ref": "INSPECT_IA_AGENTS_GH_GHOST_WRITER_KEY"
+  },
+  "capability_scope": [
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme/*"
+      ]
+    },
+    {
+      "action": "push",
+      "mode": "write",
+      "resources": [
+        "acme/*"
+      ]
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "agent.py",
+    "lab_mode": true,
+    "real_mode": false
+  },
+  "version": "1.0.0"
+}
