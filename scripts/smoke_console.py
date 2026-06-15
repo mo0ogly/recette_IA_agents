@@ -38,6 +38,7 @@ import json
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 from playwright.sync_api import TimeoutError as PwTimeout
@@ -55,6 +56,10 @@ GOV_AGENT_ID = "smoke-console-gov-bot"
 GOV_CAMPAIGN_ID = "smoke-console-gov-camp"
 ACTIONS = ("read_repo", "open_pr")
 UI_TIMEOUT_MS = 15000
+# Screenshots are kept WITH the docs (versioned, not lost in /tmp or the
+# gitignored .run/): the smoke regenerates them and they are committed under
+# docs/ so the red-team feature has a live, reproducible visual reference.
+SCREENSHOT_DIR = Path("docs/screenshots/sim")
 
 
 class SmokeFailure(AssertionError):
@@ -171,30 +176,52 @@ def _seed(api: str, server_port: int) -> None:
     _expect(status == 201, f"seed ai_backend -> {status}")
 
 
+def _shot(page: Page, name: str) -> None:
+    # Full-page screenshot kept WITH the docs (SCREENSHOT_DIR), regenerated on
+    # every smoke run so the red-team visual reference never goes stale.
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    path = SCREENSHOT_DIR / f"{name}.png"
+    page.screenshot(path=str(path), full_page=True)
+    print(f"[sim] screenshot -> {path}")
+
+
 def _verify_sim_redteam(page: Page, console: str) -> None:
-    # /sim renders the frozen red-team scenarios: per scenario, a pill-ok
-    # "caught" / pill-bad "missed" badge keyed off anomaly_caught, fed live from
-    # GET /sim/scenarios. This is the red-team feature's browser-to-API proof:
-    # assert at least one anomaly-caught badge renders and that the known caught
+    # /sim renders the frozen red-team scenarios across tabs: the landing tab is
+    # the Scorecard (the CLI mirror), and the per-scenario "caught"/"missed"
+    # badges live on the "Sujets MAF" and "Agents Git (Lane B)" tabs, fed live
+    # from GET /sim/scenarios + /sim/git-scenarios. This is the feature's
+    # browser-to-API proof: capture each tab and assert the known caught MAF
     # scenario rt-diagnostic-overreach shows its badge with the pill-ok class.
     page.goto(f"{console}/sim", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    _shot(page, "sim_scorecard")
+
+    page.get_by_text("Sujets MAF", exact=True).click()
     badges = page.locator('[data-testid^="sim-scn-caught-"]')
     badges.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
     count = badges.count()
-    _expect(count >= 1, f"no red-team anomaly-caught badge rendered (got {count})")
-    print(f"[sim] /sim: {count} red-team scenario badge(s) rendered (live from /sim/scenarios)")
+    _expect(count >= 1, f"no red-team anomaly-caught badge rendered on MAF tab (got {count})")
+    print(f"[sim] /sim MAF: {count} red-team scenario badge(s) rendered (live from /sim/scenarios)")
     caught = page.get_by_test_id("sim-scn-caught-rt-diagnostic-overreach")
     caught.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
     classes = caught.get_attribute("class") or ""
     _expect(
-        "pill-ok" in classes,
-        f"rt-diagnostic-overreach badge is not pill-ok (caught); class={classes!r}",
+        "sim-caught" in classes,
+        f"rt-diagnostic-overreach badge is not sim-caught; class={classes!r}",
     )
     _expect(
-        (caught.inner_text() or "").strip() == "caught",
-        "rt-diagnostic-overreach badge text is not 'caught'",
+        (caught.inner_text() or "").strip() == "attrapee",
+        f"rt-diagnostic-overreach badge text is not 'attrapee' (got {caught.inner_text()!r})",
     )
-    print("[sim] /sim: rt-diagnostic-overreach shows pill-ok 'caught' badge (anomaly caught)")
+    print("[sim] /sim MAF: rt-diagnostic-overreach shows 'attrapee' badge (anomaly caught)")
+    _shot(page, "sim_maf")
+
+    page.get_by_text("Agents Git (Lane B)", exact=True).click()
+    git_badges = page.locator('[data-testid^="sim-scn-caught-"]')
+    git_badges.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    git_count = git_badges.count()
+    _expect(git_count >= 1, f"no git red-team badge rendered on Lane B tab (got {git_count})")
+    print(f"[sim] /sim Lane B: {git_count} git badge(s) rendered (live from /sim/git-scenarios)")
+    _shot(page, "sim_git")
 
 
 def _drive_ai_backends(page: Page, console: str) -> None:
