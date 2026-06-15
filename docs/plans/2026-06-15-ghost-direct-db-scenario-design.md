@@ -64,8 +64,8 @@ not silently missing). YAGNI for the first end-to-end proof.
 | 2 Direct attempt | a real second egress: `StdlibHttpClient` POSTing `http://127.0.0.1:9113/shadow_db/write`, NOT via `ExternalSystemProxy` (that is the whole point: it escapes I5) | I2, I5 |
 | 3 Wire trace | the mitmproxy overlay records one `WireFlow` to `:9113` (live, in the smoke) | -- |
 | 4 No audit event | `reconcile_run(wire_flows, proxy_traces, mediated)` -- pure: a flow not explained by a mediated target within its run is a bypass | I4 |
-| 5 Alert | emit `bypass_detected` and APPEND it to the audit log (never mutate, I1); surface in `GET /proxy/reconcile` and the console | I1 |
-| 6 Replay | a frozen `(wire_flows, proxy_traces)` fixture replays byte-stable to the same `ReconcileReport` | I4 |
+| 5 Alert | DONE: `bypass_detected` is a compensatory `PlatformActionEvent` (deny, `EventKind.BYPASS_DETECTED`) appended via `POST /proxy/reconcile/raise` (idempotent by `side_effect_hash`); surfaced in `GET /proxy/reconcile` + the console. Proven live: `raised:1` then `raised:0`, event in `/audit/events`, chain `/audit/verify` ok | I1 |
+| 6 Replay | DONE: the bypass events rebuild byte-stable from `(flows, ids, timestamp)` inputs (`tests/test_bypass_event.py::test_replay_is_deterministic`); being canonical events, replaying the stream reproduces them | I4 |
 
 ## Data flow
 
