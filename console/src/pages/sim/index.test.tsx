@@ -84,6 +84,23 @@ describe("SimPage", () => {
     }
   });
 
+  it("shows the exact CLI command for each tab (UI mirrors the CLI)", async () => {
+    render(<SimPage />);
+    expect(await screen.findByTestId("sim-tab-cli")).toHaveTextContent("recette redteam");
+    fireEvent.click(screen.getByTestId("sim-tab-recordings"));
+    expect(screen.getByTestId("sim-tab-cli")).toHaveTextContent("recette agent replay");
+  });
+
+  it("explains the promote loop and links to the identification recette on a subject tab", async () => {
+    render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-maf"));
+    const loop = await screen.findByTestId("sim-loop-explainer");
+    expect(loop).toHaveTextContent("recette redteam-promote");
+    expect(loop).toHaveTextContent("recette run");
+    expect(screen.getByTestId("sim-loop-recette-link")).toHaveAttribute("href", "/recette");
+    expect(screen.getByTestId("sim-loop-verdicts-link")).toHaveAttribute("href", "/verdicts");
+  });
+
   it("opens a MAF detail panel with the broken dimension red and the transcript", async () => {
     render(<SimPage />);
     fireEvent.click(screen.getByTestId("sim-tab-maf"));

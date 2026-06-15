@@ -591,6 +591,30 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             sujet negatif du corpus.
           </li>
         </ul>
+        <h3>Et apres ? (le lien avec la plateforme)</h3>
+        <p>
+          Promouvoir <strong>n'ajoute ni agent runtime ni campagne</strong> : il
+          ecrit un <strong>sujet de test fige</strong> (la verite de reference)
+          dans le corpus d'identification (<code>corpus/agents/</code> pour git,{" "}
+          <code>corpus/maf_agents/</code> pour MAF). Ce sujet est ensuite{" "}
+          <strong>note</strong> par la recette d'identification :
+        </p>
+        <ul>
+          <li>
+            <strong>page Recette</strong> (<code>recette run</code>) : rejoue le
+            corpus et donne la <strong>scorecard d'identification</strong> --
+            l'outil externe attrape-t-il l'anomalie figee ?
+          </li>
+          <li>
+            <strong>page Verdicts</strong> : les verdicts soumis par l'outil
+            externe, juges contre ce meme ground-truth.
+          </li>
+        </ul>
+        <p>
+          La boucle : <strong>/sim attrape</strong> -&gt;{" "}
+          <strong>Promouvoir fige</strong> -&gt; <strong>Recette/Verdicts
+          notent</strong>. C'est la que se lit le rapport, pas dans /sim.
+        </p>
       </>
     ),
   },

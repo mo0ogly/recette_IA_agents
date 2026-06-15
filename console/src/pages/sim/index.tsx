@@ -68,6 +68,19 @@ const TAB_NOTES: Record<SimTab, string> = {
     "Conversations figees : on rejoue pas a pas un echange enregistre, deterministe (aucune IA live).",
 };
 
+/**
+ * The exact CLI command each tab mirrors, shown verbatim so the UI stays in sync
+ * with the operator's CLI (no parallel tool). Scorecard == `recette redteam`;
+ * the MAF/git tabs run that same set then expose `recette redteam-promote`;
+ * recordings replay a frozen Lane B agent recording.
+ */
+const TAB_CLI: Record<SimTab, string> = {
+  scorecard: "recette redteam",
+  maf: "recette redteam",
+  git: "recette redteam",
+  recordings: "recette agent replay <id>",
+};
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -316,12 +329,25 @@ export function ScenarioList({
             </div>
             {result && (
               <ul className="sim-promoted" data-testid={`sim-scn-promoted-${s.scenario_id}`}>
-                <li className="sim-promoted-intro">Sujet negatif cree :</li>
+                <li className="sim-promoted-intro">
+                  Sujet negatif cree (equiv. <code>recette redteam-promote {s.scenario_id}</code>)
+                  :
+                </li>
                 {result.created.map((path) => (
                   <li key={path}>
                     <code>{path}</code>
                   </li>
                 ))}
+                <li className="sim-promoted-next">
+                  Note maintenant par la recette d'identification :{" "}
+                  <a
+                    className="sim-loop-link"
+                    href="/recette"
+                    data-testid={`sim-scn-promoted-recette-${s.scenario_id}`}
+                  >
+                    page Recette (<code>recette run</code>)
+                  </a>
+                </li>
               </ul>
             )}
             {inConflict && (
@@ -704,6 +730,42 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
 // One family section: grid + on-demand detail
 // ---------------------------------------------------------------------------
 
+/**
+ * The promote loop made legible (legibility-first): states EXACTLY what
+ * "Promouvoir" does and how it ties back to the platform, in CLI terms so the
+ * UI mirrors the operator's CLI. A caught single-axis anomaly is frozen into a
+ * negative corpus subject (equiv. `recette redteam-promote <id>`); that subject
+ * then becomes ground truth scored by the IDENTIFICATION recette (`recette run`,
+ * surfaced on the Recette page). Promote does NOT create a runtime agent or a
+ * campaign -- it only adds a frozen test subject.
+ */
+function PromoteLoopExplainer(): JSX.Element {
+  return (
+    <aside className="sim-loop" data-testid="sim-loop-explainer">
+      <p className="sim-loop-chain">
+        Anomalie <strong>attrapee</strong> mono-axe
+        <span className="sim-loop-arrow"> -&gt; </span>
+        <strong>Promouvoir</strong> (<code>recette redteam-promote &lt;id&gt;</code>) fige un
+        sujet negatif dans le corpus
+        <span className="sim-loop-arrow"> -&gt; </span>
+        note par la recette d'<strong>identification</strong> (<code>recette run</code>).
+      </p>
+      <p className="sim-loop-note">
+        Promouvoir ne cree NI agent runtime NI campagne : il ajoute un sujet de test fige
+        (ground-truth). Le rapport se lit sur la{" "}
+        <a className="sim-loop-link" href="/recette" data-testid="sim-loop-recette-link">
+          page Recette
+        </a>{" "}
+        (scorecard d'identification) et la{" "}
+        <a className="sim-loop-link" href="/verdicts" data-testid="sim-loop-verdicts-link">
+          page Verdicts
+        </a>{" "}
+        (jugement de l'outil externe).
+      </p>
+    </aside>
+  );
+}
+
 function FamilySection({
   scenarios,
   fetchDetail,
@@ -735,6 +797,7 @@ function FamilySection({
 
   return (
     <section>
+      <PromoteLoopExplainer />
       <ScenarioList scenarios={scenarios} selected={open} onSelect={onSelect} />
       {detailError && (
         <div className="sim-error" role="alert">
@@ -941,6 +1004,9 @@ export default function SimPage(): JSX.Element {
 
       <p className="agents-tab-note" data-testid="sim-tab-note">
         {TAB_NOTES[activeTab]}
+        <span className="sim-tab-cli">
+          CLI : <code data-testid="sim-tab-cli">{TAB_CLI[activeTab]}</code>
+        </span>
       </p>
 
       {activeTab === "scorecard" && (

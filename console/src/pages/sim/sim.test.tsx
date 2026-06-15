@@ -119,6 +119,11 @@ describe("ScenarioList (cards)", () => {
     for (const path of (promoteFixture as SimPromoteResult).created) {
       expect(list).toHaveTextContent(path);
     }
+    // Downstream is legible: the promoted subject links to the identification
+    // recette (the page that actually scores it), and names the CLI equivalent.
+    const next = screen.getByTestId(`sim-scn-promoted-recette-${incorrect.scenario_id}`);
+    expect(next).toHaveAttribute("href", "/recette");
+    expect(list).toHaveTextContent(`recette redteam-promote ${incorrect.scenario_id}`);
   });
 
   it("surfaces the API error message when promote fails (non-conflict)", async () => {
