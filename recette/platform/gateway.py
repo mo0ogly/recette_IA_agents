@@ -254,6 +254,10 @@ class Gateway:
         the run fails safe (no execution). The ``event_id`` is sequence-derived
         (``self._ids``); ``timestamp`` is a captured input, never the host clock
         (I4). The builder is pure -- emission lives here, at the impure boundary.
+
+        The returned ``ActionOutcome`` is provided for symmetry with the other
+        submission paths; run call-sites may discard it (the deny is already
+        enforced by the raised ``ResolutionDenied`` and the appended event).
         """
         event_id = self._ids.next_id()
         event = build_resolution_denied(

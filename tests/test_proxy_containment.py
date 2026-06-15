@@ -16,6 +16,11 @@ Router-level tests (pure):
 Call-site test:
 - on ResolutionDenied the gateway records a ``resolution_denied`` event and NO
   proxy is built / NO HTTP call is made.
+
+Helper test (Fix 3):
+- ``_audit_resolution_denied`` with gateway=None never crashes, logs a warning
+  so the blocked attempt is visible, and the denial stays enforced by the
+  caller (the helper builds no proxy and makes no HTTP call).
 """
 
 from __future__ import annotations
@@ -135,6 +140,104 @@ class ContainmentCallSiteTests(unittest.TestCase):
         # The outcome is a controlled deny (no execution, no result).
         self.assertFalse(outcome.executed)
         self.assertEqual(outcome.verdict, "deny")
+
+
+class AuditResolutionDeniedHelperTests(unittest.TestCase):
+    """Fix 3: no silent unaudited denial when gateway is None (fail-safe holds)."""
+
+    def _gateway(self):
+        import tempfile
+        from pathlib import Path
+
+        from recette.platform.catalog import Catalog
+        from recette.platform.eventstore.memory_store import InMemoryEventStore
+        from recette.platform.gateway import AgentResolver, Gateway
+        from recette.platform.ids import SequenceIdGenerator
+        from recette.platform.policy.store import PolicyStore
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        store = InMemoryEventStore()
+        proxy = _RecordingProxy()
+        gw = Gateway(
+            catalog=Catalog(()),
+            policy_store=PolicyStore(Path(tmp.name) / "policies"),
+            event_store=store,
+            proxy=proxy,  # type: ignore[arg-type]
+            id_generator=SequenceIdGenerator(),
+            agent_resolver=AgentResolver(lambda _id: None),
+        )
+        return gw, store, proxy
+
+    def test_helper_with_gateway_none_logs_warning_no_crash(self) -> None:
+        from recette.api.runners import _audit_resolution_denied
+
+        exc = ResolutionDenied("evil.example.com")
+        with self.assertLogs("recette.api.runners", level="WARNING") as cm:
+            # Must not raise and must not need a proxy/HTTP call.
+            _audit_resolution_denied(None, "agent-x", exc)
+        self.assertTrue(
+            any(
+                "resolution_denied" in r.getMessage()
+                and "agent-x" in r.getMessage()
+                and "evil.example.com" in r.getMessage()
+                for r in cm.records
+            ),
+            cm.output,
+        )
+
+    def test_helper_with_gateway_records_event(self) -> None:
+        from recette.api.runners import _audit_resolution_denied
+
+        gw, store, proxy = self._gateway()
+        exc = ResolutionDenied("evil.example.com")
+        _audit_resolution_denied(gw, "agent-x", exc)
+        self.assertEqual(proxy.calls, 0)
+        denied = [e for e in store.read_from(0) if e.kind == EventKind.RESOLUTION_DENIED]
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(denied[0].payload["name"], "evil.example.com")
+        self.assertEqual(denied[0].payload["reason"], "not_in_allowlist")
+
+
+class ContainmentRunnerTests(unittest.TestCase):
+    """Through the full runner: ResolutionDenied with gateway=None still BLOCKS
+    execution (the run raises, no agent runs) and logs a warning (Fix 3)."""
+
+    def test_lane_b_runner_gateway_none_blocks_and_logs(self) -> None:
+        from recette.api.runners import make_lane_b_runner
+        from recette.llm import StubLlm
+
+        class _ContainmentOnStore:
+            def list_servers(self) -> list[dict]:
+                return list(SERVERS)
+
+            def containment_enabled(self) -> bool:
+                return True
+
+        agent_cfg = {
+            "id": "a1",
+            "principal": "p",
+            "target_system": "github",
+            "goal": "g",
+            "capability_scope": ["read_repo"],
+            "server": "evil.example.com",
+        }
+        runner = make_lane_b_runner(
+            agent_cfg,
+            StubLlm([]),
+            config_store=_ContainmentOnStore(),  # type: ignore[arg-type]
+            gateway=None,
+        )
+        emitted: list[tuple[str, dict]] = []
+
+        def emit(kind: str, data: dict) -> None:
+            emitted.append((kind, data))
+
+        with self.assertLogs("recette.api.runners", level="WARNING"):
+            with self.assertRaises(ResolutionDenied):
+                runner({}, emit, lambda: False)
+        # Fail-safe: the agent never ran -> no step/result frame emitted.
+        self.assertEqual([k for k, _ in emitted], [])
 
 
 if __name__ == "__main__":

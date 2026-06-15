@@ -7,6 +7,7 @@ Runners never touch HTTP or asyncio — they are pure orchestration over recette
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 
@@ -33,9 +34,31 @@ from ..platform.proxy.router import resolve_proxy
 from ..platform.proxy.tracing import TraceRecorder, TracingProxy
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
+from .config_store import ConfigStore
+
+logger = logging.getLogger(__name__)
 
 Emit = Callable[[str, dict], None]
 ShouldStop = Callable[[], bool]
+
+
+def _audit_resolution_denied(gateway: Gateway | None, agent_id: str, exc: ResolutionDenied) -> None:
+    """Emit the audited resolution_denied event (fail-safe containment signal).
+
+    The caller has ALREADY been denied a proxy (resolve_proxy raised); the
+    denial is enforced by the call-site's own control flow (re-raise or
+    step_error + continue) regardless of this function. When a gateway is
+    available the deny is appended to the audit sink (I1/I2). When no gateway is
+    available the denial is still enforced by the caller; log it so a blocked
+    attempt is never invisible (Fix 3 -- no silent unaudited denial)."""
+    if gateway is not None:
+        gateway.record_resolution_denied(
+            agent_id=agent_id, name=exc.name, reason="not_in_allowlist"
+        )
+    else:
+        logger.warning(
+            "resolution_denied (unaudited: no gateway): agent=%s name=%s", agent_id, exc.name
+        )
 
 
 # Pacing is operational metadata, never a decision input (I4 / R20): the delay
@@ -343,7 +366,7 @@ def make_lane_b_runner(
     agent_cfg: dict,
     llm: LlmBackend,
     *,
-    config_store: object | None = None,
+    config_store: ConfigStore | None = None,
     recorder: TraceRecorder | None = None,
     debug_enabled: bool = False,
     run_id: str | None = None,
@@ -355,7 +378,7 @@ def make_lane_b_runner(
         # reference surfaces as an explicit run failure (status=failed +
         # error frame via RunManager), never as an API crash and never as
         # a silent fallback to the wrong execution target (I5 fail-safe).
-        servers = config_store.list_servers() if config_store is not None else []  # type: ignore[attr-defined]
+        servers = config_store.list_servers() if config_store is not None else []
         # CONTAINMENT gate (Task 6): when enforced, an agent referencing an
         # undeclared server name is DENIED fail-safe. resolve_proxy raises
         # ResolutionDenied (no proxy built, no HTTP call). The event is emitted
@@ -365,9 +388,7 @@ def make_lane_b_runner(
         # safe via the existing exception channel (RunManager -> status=failed),
         # so NO execution happens.
         containment = (
-            bool(config_store.containment_enabled())  # type: ignore[attr-defined]
-            if config_store is not None and hasattr(config_store, "containment_enabled")
-            else False
+            bool(config_store.containment_enabled()) if config_store is not None else False
         )
         try:
             forge = forge_for_agent(
@@ -381,12 +402,7 @@ def make_lane_b_runner(
                 containment=containment,
             )
         except ResolutionDenied as exc:
-            if gateway is not None:
-                gateway.record_resolution_denied(
-                    agent_id=str(agent_cfg.get("id", "")),
-                    name=exc.name,
-                    reason="not_in_allowlist",
-                )
+            _audit_resolution_denied(gateway, str(agent_cfg.get("id", "")), exc)
             # Fail safe: surface the deny through the existing run-failure channel
             # (RunManager maps a raised exception to status=failed + error frame).
             # No proxy was built and no external call was made.
@@ -440,7 +456,7 @@ def _lane_b_step_emit(emit: Emit, agent_id: str) -> Callable[[int, object], None
 
 def make_campaign_runner(
     campaign: dict,
-    config_store: object,
+    config_store: ConfigStore,
     recording_store: object,
     secret_store: object | None = None,
     *,
@@ -461,9 +477,7 @@ def make_campaign_runner(
         # runner. A step referencing an undeclared server name is denied, audited
         # via the gateway (the audit sink owner), and fails THIS step only.
         containment = (
-            bool(config_store.containment_enabled())  # type: ignore[attr-defined]
-            if hasattr(config_store, "containment_enabled")
-            else False
+            bool(config_store.containment_enabled()) if config_store is not None else False
         )
         steps = campaign.get("steps", [])
         for idx, step in enumerate(steps):
@@ -535,10 +549,7 @@ def make_campaign_runner(
             except ResolutionDenied as exc:
                 # Fail safe: no proxy built, no HTTP call. Audit at the impure
                 # call-site (gateway owns the sink + id), then fail this step.
-                if gateway is not None:
-                    gateway.record_resolution_denied(
-                        agent_id=agent_id, name=exc.name, reason="not_in_allowlist"
-                    )
+                _audit_resolution_denied(gateway, agent_id, exc)
                 emit("step_error", {"index": idx, "agent_id": agent_id, "message": str(exc)})
                 continue
             except ValueError as exc:

@@ -267,6 +267,11 @@ class FakeConfigStore:
     def list_servers(self) -> list[dict]:
         return list(self.servers)
 
+    def containment_enabled(self) -> bool:
+        # Mirror the real ConfigStore public interface; these runner tests
+        # exercise the realism-only path (containment off).
+        return False
+
 
 class FakeRecordingStore:
     def __init__(self) -> None:

@@ -229,10 +229,15 @@ class ConfigStore:
         """Whether the private-DNS CONTAINMENT gate is enforced (fail-safe).
 
         Sourced from the top-level ``containment`` flag of the config document.
-        Default False: an undeclared server name stays a dangling reference
-        (legacy realism-only behaviour), never a silent allow. When True, an
-        agent referencing a name NOT in the server allowlist is DENIED and
-        audited at the run call-site (I2/I5), and no proxy/HTTP call is made.
+        BOTH settings BLOCK execution on an undeclared server name; they differ
+        only in the signal + audit, never allow-vs-deny:
+        - False (default, realism-only): an unknown name is a dangling reference
+          and ``resolve_proxy`` raises ``ValueError`` -- the run fails, no audit
+          event. Never a silent allow.
+        - True (gate enforced): ``resolve_proxy`` raises ``ResolutionDenied`` for
+          a name NOT in the server allowlist; the run call-site audits a
+          ``resolution_denied`` event (I2/I5) and fails the run. No proxy is
+          built, no proxy/HTTP call is made.
         """
         return bool(self.read().get("containment", False))
 
