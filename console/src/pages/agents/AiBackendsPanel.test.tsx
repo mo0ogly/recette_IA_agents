@@ -292,6 +292,29 @@ describe("AiBackendsPanel", () => {
     });
   });
 
+  it("after a successful create the form resets to the default provider's default model", async () => {
+    vi.mocked(createAiBackend).mockResolvedValue({} as never);
+    renderPanel();
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    // Switch to mistral (so the reset must actually move back to anthropic).
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "m1" } });
+    fireEvent.change(screen.getByLabelText("Provider"), {
+      target: { value: "mistral" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create backend" }));
+    await waitFor(() => expect(createAiBackend).toHaveBeenCalled());
+
+    // The form must reset to anthropic WITH its default model selected, not an
+    // empty "custom" state (regression: setForm(EMPTY) left model empty).
+    const provider = screen.getByLabelText("Provider") as HTMLSelectElement;
+    expect(provider.value).toBe("anthropic");
+    const model = screen.getByLabelText("Model") as HTMLSelectElement;
+    expect(model.tagName).toBe("SELECT");
+    expect(model.value).toBe("claude-opus-4-8");
+    expect(screen.queryByLabelText("Custom model id")).not.toBeInTheDocument();
+  });
+
   it("key_configured false renders a 'no key' chip and the Save-key input", () => {
     renderPanel(backendsNoKey);
 

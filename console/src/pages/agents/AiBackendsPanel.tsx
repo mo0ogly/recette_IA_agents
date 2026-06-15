@@ -90,12 +90,18 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
   const modelIsCustom =
     providerModels.length > 0 && !providerModels.includes(form.model);
 
+  /** The default model for a provider from the loaded catalog, or "" when none
+   * is curated. Single source for the prefill, the provider switch, and the
+   * post-create reset, so the form is never left in a half-set state. */
+  function defaultModelFor(provider: string): string {
+    return providers.find((p) => p.id === provider)?.default_model ?? "";
+  }
+
   /** Switch provider and reset the model to the new provider's default (or empty
    * when it curates none). Kills the stale-model bug (e.g. a groq model lingering
    * after switching to mistral). */
   function selectProvider(provider: string): void {
-    const info = providers.find((p) => p.id === provider);
-    setForm((p) => ({ ...p, provider, model: info?.default_model ?? "" }));
+    setForm((p) => ({ ...p, provider, model: defaultModelFor(provider) }));
   }
   const [tests, setTests] = useState<Record<string, TestState>>({});
   // Per-backend free-text prompt draft and its last answer, keyed by backend id.
@@ -138,7 +144,9 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     }
     try {
       await createAiBackend(backend);
-      setForm(EMPTY);
+      // Reset to the default provider WITH its default model, so the dropdown
+      // does not drop into an empty "custom" state after a create.
+      setForm({ ...EMPTY, model: defaultModelFor(EMPTY.provider) });
       await onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));
