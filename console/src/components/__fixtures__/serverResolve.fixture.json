@@ -1,0 +1,13 @@
+{
+  "resolved": {
+    "name": "api.github.com",
+    "resolved": true,
+    "server_id": "gh-mock",
+    "fqdn": "api.github.com"
+  },
+  "denied": {
+    "name": "evil.example.com",
+    "resolved": false,
+    "reason": "not_in_allowlist"
+  }
+}

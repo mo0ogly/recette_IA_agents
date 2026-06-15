@@ -13,8 +13,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { getCatalog, testServer } from "../api/client";
-import type { ActionSpec, ServerEntry, ServerTestResult } from "../types/platform";
+import { getCatalog, resolveName, testServer } from "../api/client";
+import type {
+  ActionSpec,
+  ResolveResult,
+  ServerEntry,
+  ServerTestResult,
+} from "../types/platform";
 
 interface ServerTestPanelProps {
   server: ServerEntry;
@@ -68,6 +73,11 @@ export default function ServerTestPanel({ server }: ServerTestPanelProps): JSX.E
   const [result, setResult] = useState<ServerTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  // Name-resolution probe (POST /config/resolve): diagnostic, side-effect free.
+  const [resolveQuery, setResolveQuery] = useState("");
+  const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +135,26 @@ export default function ServerTestPanel({ server }: ServerTestPanelProps): JSX.E
       setRunning(false);
     }
   }, [actionType, payload, resource, server.id]);
+
+  const runResolve = useCallback(async (): Promise<void> => {
+    setResolveError(null);
+    setResolveResult(null);
+    const name = resolveQuery.trim();
+    if (name.length === 0) {
+      setResolveError("Enter a name to resolve.");
+      return;
+    }
+    setResolving(true);
+    try {
+      // Honor the global containment flag (omit the override): a denied probe
+      // returns resolved=false, not a thrown error.
+      setResolveResult(await resolveName(name));
+    } catch (err) {
+      setResolveError(errorText(err));
+    } finally {
+      setResolving(false);
+    }
+  }, [resolveQuery]);
 
   return (
     <div className="servers-test-panel" data-testid={`server-test-${server.id}`}>
@@ -203,6 +233,49 @@ export default function ServerTestPanel({ server }: ServerTestPanelProps): JSX.E
             <div className="servers-test-error" role="alert">
               {result.error ?? "unknown error"}
             </div>
+          )}
+        </div>
+      )}
+
+      <div className="servers-resolve-form" data-testid={`server-resolve-${server.id}`}>
+        <label htmlFor={`resolve-name-${server.id}`}>Resolve name (private DNS)</label>
+        <input
+          id={`resolve-name-${server.id}`}
+          type="text"
+          value={resolveQuery}
+          placeholder="api.github.com"
+          onChange={(e) => setResolveQuery(e.target.value)}
+        />
+        <button
+          type="button"
+          className="servers-btn"
+          disabled={resolving}
+          onClick={() => void runResolve()}
+        >
+          {resolving ? "Resolving..." : "Resolve"}
+        </button>
+      </div>
+
+      {resolveError !== null && (
+        <div className="servers-test-error" role="alert">
+          {resolveError}
+        </div>
+      )}
+
+      {resolveResult !== null && (
+        <div
+          className="servers-resolve-result"
+          data-testid={`server-resolve-result-${server.id}`}
+        >
+          {resolveResult.resolved ? (
+            <span className="servers-resolve-ok">
+              {resolveResult.name} -&gt; {resolveResult.server_id}
+              {resolveResult.fqdn != null && ` (${resolveResult.fqdn})`}
+            </span>
+          ) : (
+            <span className="servers-resolve-denied" role="status">
+              denied: {resolveResult.name} ({resolveResult.reason})
+            </span>
           )}
         </div>
       )}

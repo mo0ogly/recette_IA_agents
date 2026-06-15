@@ -507,6 +507,20 @@ export interface ContainmentState {
   containment: boolean;
 }
 
+/** Result of POST /config/resolve: how a name maps to a server through the
+ *  private-DNS allowlist. Raw dict, no { success, data } envelope. A DENIED
+ *  probe is a successful diagnostic (resolved=false + reason), never an error. */
+export interface ResolveResult {
+  name: string;
+  resolved: boolean;
+  /** Why a name did not resolve: outside the allowlist, or unknown legacy id. */
+  reason?: "not_in_allowlist" | "unknown_legacy";
+  /** Server id the name resolved to (resolved=true). */
+  server_id?: string;
+  /** Canonical fqdn of the resolved server, when it declares one. */
+  fqdn?: string | null;
+}
+
 /** Result of a start/stop lifecycle call; error explains a "down" outcome. */
 export interface ServerLifecycleResult {
   status: ServerStatus;

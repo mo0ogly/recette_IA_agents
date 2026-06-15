@@ -12,7 +12,13 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import testFixture from "./__fixtures__/serverTest.fixture.json";
-import type { ActionSpec, ServerEntry, ServerTestResult } from "../types/platform";
+import resolveFixture from "./__fixtures__/serverResolve.fixture.json";
+import type {
+  ActionSpec,
+  ResolveResult,
+  ServerEntry,
+  ServerTestResult,
+} from "../types/platform";
 
 vi.mock("../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/client")>();
@@ -20,10 +26,11 @@ vi.mock("../api/client", async (importOriginal) => {
     ...actual,
     getCatalog: vi.fn(),
     testServer: vi.fn(),
+    resolveName: vi.fn(),
   };
 });
 
-import { getCatalog, testServer } from "../api/client";
+import { getCatalog, resolveName, testServer } from "../api/client";
 import ServerTestPanel from "./ServerTestPanel";
 
 const SERVER: ServerEntry = {
@@ -130,5 +137,44 @@ describe("ServerTestPanel", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(/Invalid payload/);
     expect(vi.mocked(testServer)).not.toHaveBeenCalled();
+  });
+
+  it("resolves a name and renders the resolved endpoint", async () => {
+    vi.mocked(resolveName).mockResolvedValue(
+      resolveFixture.resolved as ResolveResult,
+    );
+    render(<ServerTestPanel server={SERVER} />);
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("suspend_user"));
+
+    fireEvent.change(screen.getByLabelText(/Resolve name/), {
+      target: { value: "api.github.com" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    });
+
+    expect(vi.mocked(resolveName)).toHaveBeenCalledWith("api.github.com");
+    const out = screen.getByTestId("server-resolve-result-okta-mock");
+    expect(out).toHaveTextContent("gh-mock");
+    expect(out).toHaveTextContent("api.github.com");
+  });
+
+  it("renders a denied badge for a name outside the allowlist", async () => {
+    vi.mocked(resolveName).mockResolvedValue(
+      resolveFixture.denied as ResolveResult,
+    );
+    render(<ServerTestPanel server={SERVER} />);
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("suspend_user"));
+
+    fireEvent.change(screen.getByLabelText(/Resolve name/), {
+      target: { value: "evil.example.com" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    });
+
+    const badge = screen.getByRole("status");
+    expect(badge).toHaveTextContent("denied");
+    expect(badge).toHaveTextContent("not_in_allowlist");
   });
 });

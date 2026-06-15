@@ -26,6 +26,7 @@ import type {
   ProxyTraceResponse,
   RealtimeStatus,
   RecordingMeta,
+  ResolveResult,
   RunEvent,
   RunHandle,
   RunInfo,
@@ -298,6 +299,24 @@ export function setContainment(enabled: boolean): Promise<ContainmentState> {
   return request<ContainmentState>("/config/containment", {
     method: "PUT",
     body: JSON.stringify({ enabled }),
+  });
+}
+
+/** Probe how a name resolves against the server allowlist (diagnostic, no
+ *  side effect). A denied probe returns HTTP 200 with resolved=false, never a
+ *  thrown error. When containment is omitted the backend uses its global flag.
+ *  Raw dict, no envelope to unwrap. */
+export function resolveName(
+  name: string,
+  containment?: boolean,
+): Promise<ResolveResult> {
+  const body: { name: string; containment?: boolean } = { name };
+  if (containment !== undefined) {
+    body.containment = containment;
+  }
+  return request<ResolveResult>("/config/resolve", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
