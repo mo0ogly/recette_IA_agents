@@ -588,6 +588,16 @@ export function getReconcile(runId?: string): Promise<ReconcileReport> {
   });
 }
 
+/** Record each detected bypass as a compensatory bypass_detected event in the
+ *  append-only audit log (I1). Idempotent: a bypass already recorded is not
+ *  appended twice. Returns how many NEW events were raised. */
+export function raiseReconcile(runId?: string): Promise<{ raised: number; event_ids: string[] }> {
+  return request<{ raised: number; event_ids: string[] }>(
+    withQuery("/proxy/reconcile/raise", { run_id: runId }),
+    { method: "POST" },
+  );
+}
+
 /** The selectable transport targets (direct vs wire overlay) + the active one. */
 export function getProxyRoute(): Promise<ProxyRouteState> {
   return request<ProxyRouteState>("/proxy/route", { method: "GET" });

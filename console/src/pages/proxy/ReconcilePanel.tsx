@@ -7,13 +7,15 @@
  * (ok / bypass detected) and the offending flows (target host:port + path), so
  * an operator sees an unmediated egress without reading raw buffers.
  *
- * Read-only (I1): a reconciliation is a computed view over effects that already
- * happened; the lab OBSERVES the unmediated path, it never blocks it.
+ * Polling the verdict is read-only. The ONE mutating action is "raise": it
+ * records each detected bypass as a compensatory event in the append-only audit
+ * log (I1, never a mutation) -- the Control Plane alert. The lab OBSERVES the
+ * unmediated path and now JOURNALS it; it still never blocks it.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getReconcile } from "../../api/client";
+import { getReconcile, raiseReconcile } from "../../api/client";
 import type { ReconcileReport } from "../../types/platform";
 
 const POLL_INTERVAL_MS = 2000;
@@ -21,6 +23,8 @@ const POLL_INTERVAL_MS = 2000;
 export default function ReconcilePanel(): JSX.Element {
   const [report, setReport] = useState<ReconcileReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [raising, setRaising] = useState(false);
+  const [raiseMsg, setRaiseMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -35,6 +39,24 @@ export default function ReconcilePanel(): JSX.Element {
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
+  }, [refresh]);
+
+  const onRaise = useCallback(async (): Promise<void> => {
+    setRaising(true);
+    try {
+      const res = await raiseReconcile();
+      setRaiseMsg(
+        res.raised > 0
+          ? `${res.raised} evenement(s) consigne(s) au journal d'audit`
+          : "deja consigne (aucun nouvel evenement)",
+      );
+      setError(null);
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRaising(false);
+    }
   }, [refresh]);
 
   const bypass = useMemo(() => report?.bypass_flows ?? [], [report]);
@@ -69,8 +91,24 @@ export default function ReconcilePanel(): JSX.Element {
             runs audites : {audited.join(", ")}
           </span>
         )}
+        {report !== null && !report.ok && (
+          <button
+            type="button"
+            className="proxy-clear"
+            data-testid="reconcile-raise"
+            disabled={raising}
+            onClick={() => void onRaise()}
+          >
+            {raising ? "consignation..." : "Consigner au journal d'audit"}
+          </button>
+        )}
       </header>
 
+      {raiseMsg !== null && (
+        <p className="proxy-banner" role="status" data-testid="reconcile-raise-msg">
+          {raiseMsg}
+        </p>
+      )}
       {error !== null && <p className="proxy-error">{error}</p>}
 
       <p className="proxy-banner" role="note">

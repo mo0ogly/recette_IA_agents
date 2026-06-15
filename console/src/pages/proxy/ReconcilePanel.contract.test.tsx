@@ -9,7 +9,7 @@
  * (ok=true, no bypass).
  */
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReconcileReport } from "../../types/platform";
@@ -17,10 +17,10 @@ import reconcileFixture from "./__fixtures__/reconcile.fixture.json";
 
 vi.mock("../../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/client")>();
-  return { ...actual, getReconcile: vi.fn() };
+  return { ...actual, getReconcile: vi.fn(), raiseReconcile: vi.fn() };
 });
 
-import { getReconcile } from "../../api/client";
+import { getReconcile, raiseReconcile } from "../../api/client";
 import ReconcilePanel from "./ReconcilePanel";
 
 const fixture = reconcileFixture as ReconcileReport;
@@ -29,6 +29,7 @@ describe("ReconcilePanel (R16 contract)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getReconcile).mockResolvedValue(fixture);
+    vi.mocked(raiseReconcile).mockResolvedValue({ raised: 1, event_ids: ["EV-1"] });
   });
 
   it("renders the captured bypass report without crashing", async () => {
@@ -40,6 +41,25 @@ describe("ReconcilePanel (R16 contract)", () => {
     expect(rows).toHaveLength(fixture.bypass_flows.length);
     expect(table).toHaveTextContent("127.0.0.1:9113");
     expect(table).toHaveTextContent("/shadow_db/write");
+  });
+
+  it("raises the bypass to the audit log on demand", async () => {
+    render(<ReconcilePanel />);
+    fireEvent.click(await screen.findByTestId("reconcile-raise"));
+    await waitFor(() => expect(raiseReconcile).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("reconcile-raise-msg")).toHaveTextContent("1 evenement");
+  });
+
+  it("does not offer the raise button on a clean run", async () => {
+    vi.mocked(getReconcile).mockResolvedValue({
+      run_id: null,
+      ok: true,
+      bypass_flows: [],
+      audited_run_ids: [],
+    });
+    render(<ReconcilePanel />);
+    await screen.findByTestId("reconcile-ok");
+    expect(screen.queryByTestId("reconcile-raise")).not.toBeInTheDocument();
   });
 
   it("shows the clean state when no flow is unmediated", async () => {
