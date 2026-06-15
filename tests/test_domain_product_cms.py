@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import product_cms as product_cms_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -105,6 +106,47 @@ class TestProductCmsLabHandler(unittest.TestCase):
     def test_unknown_currency_rejected(self) -> None:
         with self.assertRaises(LabActionError):
             product_cms_lab.handle("modify_pricing", "plan-pro", {"price": 10, "currency": "XXX"})
+
+
+class TestProductCmsEntityModel(unittest.TestCase):
+    """Entity model: content is a pure function of its id; ARCHIVED content
+    (blocking seed) is read-only; discovery lists the seed content. Deterministic
+    (I4)."""
+
+    ARCHIVED = "cms/content/archived-1"
+
+    def test_publish_archived_content_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            product_cms_lab.handle("publish_production", self.ARCHIVED, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "content_archived")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["state"], "archived")
+
+    def test_content_view_coherent_across_actions(self) -> None:
+        cid = "cms/content/c-1"
+        read = product_cms_lab.handle("read_content_draft", cid, {})
+        deleted = product_cms_lab.handle("delete_content", cid, {})
+        assert read is not None and deleted is not None
+        self.assertEqual(read["content_id"], deleted["content"])
+
+    def test_discovery_lists_seed_content(self) -> None:
+        listing = product_cms_lab.handle("read_content_draft", "all", {})
+        assert listing is not None
+        ids = [c["content_id"] for c in listing["contents"]]
+        self.assertEqual(ids, list(_entities.SEED_CONTENT))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            product_cms_lab.handle("modify_pricing", "plan-pro", {"price": -5})
+        self.assertEqual(ctx.exception.code, "invalid_price")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "price")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_content("cms/content/z"), _entities.derive_content("cms/content/z")
+        )
 
 
 class TestProductCmsInLoadedCatalog(unittest.TestCase):

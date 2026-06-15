@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains.github_devops import handle
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -188,6 +189,48 @@ class TestGithubDevopsCanonicalActions(unittest.TestCase):
         self.assertTrue(merged["merged"])
         self.assertTrue(pushed["pushed"])
         self.assertIsInstance(pushed["commit"], str)
+
+
+class TestGithubEntityModel(unittest.TestCase):
+    """Entity model: a repo is a pure function of its name; an ARCHIVED repo
+    (blocking seed) cannot be deployed/merged/deleted; discovery lists the seed
+    repos. Deterministic (I4)."""
+
+    ARCHIVED = "github/repo/archived-1"
+
+    def test_deploy_on_archived_repo_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("deploy_production", self.ARCHIVED, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "repo_archived")
+        assert ctx.exception.detail is not None
+        self.assertTrue(ctx.exception.detail["archived"])
+
+    def test_read_metadata_keeps_private_visibility(self) -> None:
+        meta = handle("read_repo_metadata", "org/repo", {})
+        assert meta is not None
+        self.assertEqual(meta["repository"]["visibility"], "private")
+        self.assertEqual(meta["repository"]["default_branch"], "main")
+        self.assertFalse(meta["repository"]["archived"])
+
+    def test_discovery_lists_seed_repos(self) -> None:
+        listing = handle("read_repo_metadata", "", {})
+        assert listing is not None
+        names = [r["full_name"] for r in listing["repositories"]]
+        self.assertEqual(names, list(_entities.SEED_REPOS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("add_external_collaborator", "org/repo", {"permission": "superuser"})
+        self.assertEqual(ctx.exception.code, "invalid_permission")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "permission")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_repository("github/repo/z"),
+            _entities.derive_repository("github/repo/z"),
+        )
 
 
 if __name__ == "__main__":

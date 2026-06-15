@@ -450,3 +450,227 @@ def derive_ticket(ticket_id: str) -> Ticket:
         requester=f"cust_{dig[:8]}",
         vip=tid in SEED_TICKETS,
     )
+
+
+# --- cloud ---------------------------------------------------------------
+CLOUD_STATES = ("running", "stopped")
+CLOUD_KINDS = ("ec2", "rds", "s3", "eks", "lambda")
+CLOUD_REGIONS = ("eu-west-1", "us-east-1", "ap-south-1")
+SEED_CLOUD_RESOURCES = ("cloud/res/db-prod", "cloud/res/bucket-logs", "cloud/res/eks-main")
+SEED_TERMINATED_RESOURCES = ("cloud/res/terminated-1",)
+
+
+@dataclass(frozen=True)
+class CloudResource:
+    """A cloud resource, fully derived from its id."""
+
+    resource_id: str
+    kind: str
+    state: str
+    region: str
+
+    @property
+    def terminated(self) -> bool:
+        """A terminated resource is gone; it cannot be modified or deleted."""
+        return self.state == "terminated"
+
+    def summary(self) -> dict:
+        return {"resource_id": self.resource_id, "kind": self.kind, "state": self.state}
+
+
+def derive_cloud_resource(resource_id: str) -> CloudResource:
+    rid = resource_id or "cloud/res/unknown"
+    dig = _edigest("cloud_resource", rid)
+    state = "terminated" if rid in SEED_TERMINATED_RESOURCES else _pick(dig, CLOUD_STATES)
+    return CloudResource(
+        resource_id=rid,
+        kind=_pick(dig, CLOUD_KINDS, offset=4),
+        state=state,
+        region=_pick(dig, CLOUD_REGIONS, offset=8),
+    )
+
+
+# --- slack ---------------------------------------------------------------
+SEED_CHANNELS = ("slack/channel/general", "slack/channel/random", "slack/channel/eng")
+SEED_ARCHIVED_CHANNELS = ("slack/channel/archived-1",)
+
+
+@dataclass(frozen=True)
+class SlackChannel:
+    """A Slack channel, fully derived from its id/name."""
+
+    channel_id: str
+    name: str
+    is_private: bool
+    num_members: int
+    archived: bool
+
+    def summary(self) -> dict:
+        return {"channel_id": self.channel_id, "name": self.name, "archived": self.archived}
+
+
+def derive_channel(name: str) -> SlackChannel:
+    ch = name or "slack/channel/unknown"
+    dig = _edigest("slack_channel", ch)
+    return SlackChannel(
+        channel_id=f"C{dig[:9].upper()}",
+        name=ch,
+        is_private=False,
+        num_members=_int(dig, 1, 5000),
+        archived=ch in SEED_ARCHIVED_CHANNELS,
+    )
+
+
+# --- product_cms ---------------------------------------------------------
+CONTENT_STATES = ("draft", "in_review", "published")
+SEED_CONTENT = ("cms/content/home", "cms/content/pricing", "cms/content/blog")
+SEED_ARCHIVED_CONTENT = ("cms/content/archived-1",)
+
+
+@dataclass(frozen=True)
+class Content:
+    """A CMS content item, fully derived from its id."""
+
+    content_id: str
+    state: str
+    version: str
+    word_count: int
+
+    @property
+    def archived(self) -> bool:
+        """Archived content is read-only; edit/publish/delete is rejected."""
+        return self.state == "archived"
+
+    def summary(self) -> dict:
+        return {"content_id": self.content_id, "state": self.state, "version": self.version}
+
+
+def derive_content(content_id: str) -> Content:
+    cid = content_id or "cms/content/unknown"
+    dig = _edigest("content", cid)
+    state = "archived" if cid in SEED_ARCHIVED_CONTENT else _pick(dig, CONTENT_STATES)
+    return Content(
+        content_id=cid,
+        state=state,
+        version=f"v{_int(dig, 1, 50)}",
+        word_count=_int(dig, 10, 5000, offset=8),
+    )
+
+
+# --- data_platform -------------------------------------------------------
+DATA_CLASS = ("public", "internal", "confidential", "restricted")
+SEED_DATASETS = ("data/dataset/curated-sales", "data/dataset/curated-ops")
+SEED_FROZEN_DATASETS = ("data/dataset/frozen-1",)
+
+
+@dataclass(frozen=True)
+class Dataset:
+    """A data-platform dataset, fully derived from its id."""
+
+    dataset_id: str
+    classification: str
+    row_estimate: int
+    frozen: bool
+
+    @property
+    def available(self) -> bool:
+        """A frozen/quarantined dataset cannot be queried or exported."""
+        return not self.frozen
+
+    def summary(self) -> dict:
+        return {
+            "dataset_id": self.dataset_id,
+            "classification": self.classification,
+            "frozen": self.frozen,
+        }
+
+
+def derive_dataset(dataset_id: str) -> Dataset:
+    did = dataset_id or "data/dataset/unknown"
+    dig = _edigest("dataset", did)
+    return Dataset(
+        dataset_id=did,
+        classification=_pick(dig, DATA_CLASS),
+        row_estimate=_int(dig, 0, 1000000, offset=8),
+        frozen=did in SEED_FROZEN_DATASETS,
+    )
+
+
+# --- github / gitlab -----------------------------------------------------
+# Visibility/default_branch stay literal ("private"/"main") because the read
+# handlers assert them; ``archived`` is the entity's behavioural state.
+SEED_REPOS = ("github/repo/app", "github/repo/infra")
+SEED_ARCHIVED_REPOS = ("github/repo/archived-1",)
+SEED_PROJECTS = ("gitlab/project/app", "gitlab/project/infra")
+SEED_ARCHIVED_PROJECTS = ("gitlab/project/archived-1",)
+
+
+@dataclass(frozen=True)
+class Repository:
+    """A GitHub repository, fully derived from its full name."""
+
+    full_name: str
+    visibility: str
+    default_branch: str
+    archived: bool
+
+    def summary(self) -> dict:
+        return {"full_name": self.full_name, "archived": self.archived}
+
+
+def derive_repository(full_name: str) -> Repository:
+    name = full_name or "github/repo/unknown"
+    return Repository(
+        full_name=name,
+        visibility="private",
+        default_branch="main",
+        archived=name in SEED_ARCHIVED_REPOS,
+    )
+
+
+@dataclass(frozen=True)
+class GitlabProject:
+    """A GitLab project, fully derived from its path."""
+
+    path_with_namespace: str
+    visibility: str
+    default_branch: str
+    archived: bool
+
+    def summary(self) -> dict:
+        return {"path_with_namespace": self.path_with_namespace, "archived": self.archived}
+
+
+def derive_project(path: str) -> GitlabProject:
+    p = path or "gitlab/project/unknown"
+    return GitlabProject(
+        path_with_namespace=p,
+        visibility="private",
+        default_branch="main",
+        archived=p in SEED_ARCHIVED_PROJECTS,
+    )
+
+
+# --- mcp -----------------------------------------------------------------
+SEED_TOOLS = ("web_search", "code_interpreter", "file_search")
+SEED_DISABLED_TOOLS = ("mcp/tool/disabled-1", "disabled_tool")
+
+
+@dataclass(frozen=True)
+class McpTool:
+    """An MCP tool, fully derived from its name."""
+
+    tool: str
+    registered: bool
+    enabled: bool
+
+    @property
+    def usable(self) -> bool:
+        """A disabled/unregistered tool cannot be invoked."""
+        return self.registered and self.enabled
+
+
+def derive_tool(tool: str) -> McpTool:
+    name = tool or "mcp/tool/unknown"
+    disabled = name in SEED_DISABLED_TOOLS
+    return McpTool(tool=name, registered=not disabled, enabled=not disabled)

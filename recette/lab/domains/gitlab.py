@@ -11,9 +11,22 @@ clock, no random, no cross-call state (I4). See ``_realism`` for the primitives.
 
 from __future__ import annotations
 
-from ._realism import derived_int, digest, envelope, ref
+from . import _entities
+from ._realism import LabActionError, derived_int, digest, envelope, ref
 
 _DOMAIN = "gitlab"
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
+
+
+def _reject_if_archived(project: _entities.GitlabProject, action: str) -> None:
+    if project.archived:
+        raise LabActionError(
+            422,
+            f"project {project.path_with_namespace!r} is archived; cannot {action}",
+            code="project_archived",
+            detail={"project": project.path_with_namespace, "archived": True},
+        )
+
 
 _KNOWN_ACTIONS = frozenset(
     (
@@ -38,13 +51,23 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "read_repo":
+        if resource in _DISCOVERY_RESOURCES:
+            return {
+                **base,
+                "status": "ok",
+                "projects_list": [
+                    _entities.derive_project(p).summary() for p in _entities.SEED_PROJECTS
+                ],
+            }
+        project = _entities.derive_project(resource)
         return {
             **base,
             "status": "ok",
             "project": {
-                "path_with_namespace": resource,
-                "default_branch": "main",
-                "visibility": "private",
+                "path_with_namespace": project.path_with_namespace,
+                "default_branch": project.default_branch,
+                "visibility": project.visibility,
+                "archived": project.archived,
             },
         }
     if action_type == "list_repos":
@@ -68,12 +91,14 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "merge_request": {"iid": derived_int(dig, 1, 10000), "state": "opened"},
         }
     if action_type == "merge_pr":
+        _reject_if_archived(_entities.derive_project(resource), "merge into it")
         return {
             **base,
             "status": "merged",
             "merge_request": {"iid": derived_int(dig, 1, 10000), "merged": True},
         }
     if action_type == "push":
+        _reject_if_archived(_entities.derive_project(resource), "push to it")
         return {
             **base,
             "status": "pushed",

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import mcp as mcp_lab
+from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
 from recette.platform.catalog.domains.mcp import ACTIONS, TARGET_SYSTEM
 
@@ -59,6 +61,28 @@ class TestMcpLabHandler(unittest.TestCase):
     def test_unknown_action_returns_none(self) -> None:
         self.assertIsNone(mcp_lab.handle("execute_shell", "x", {}))
         self.assertIsNone(mcp_lab.handle("", "x", {}))
+
+
+class TestMcpEntityModel(unittest.TestCase):
+    """Entity model: a tool is a pure function of its name; a DISABLED tool
+    (blocking seed) cannot be invoked. Deterministic (I4)."""
+
+    def test_invoke_disabled_tool_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            mcp_lab.handle("invoke_tool", "x", {"tool": "disabled_tool"})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "tool_disabled")
+        assert ctx.exception.detail is not None
+        self.assertFalse(ctx.exception.detail["enabled"])
+
+    def test_registered_tool_invokes(self) -> None:
+        resp = mcp_lab.handle("invoke_tool", "web_search", {"tool": "web_search"})
+        assert resp is not None
+        self.assertEqual(resp["status"], "invoked")
+        self.assertEqual(resp["tool"], "web_search")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(_entities.derive_tool("web_search"), _entities.derive_tool("web_search"))
 
 
 if __name__ == "__main__":

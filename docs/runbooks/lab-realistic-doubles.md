@@ -34,10 +34,11 @@ touches `inv/9`, this run and every replay. Cross-call coherence therefore needs
 NO mutable state (I4): two actions on the same id observe the same entity because
 both recompute it from the id alone.
 
-Five domains adopt it: **finance, crm, hris, legal_dms, support_desk**. Each
-gets richer responses, cross-call coherence, a seed-discovery listing on its read
-action (empty/`"all"`/`"*"` resource), structured errors (`code` + `detail`), and
-ONE state-machine rejection. The blocking state is assigned ONLY to ids in an
+Twelve domains adopt it: **finance, crm, hris, legal_dms, support_desk, cloud,
+slack, product_cms, data_platform, github, gitlab, mcp**. Each gets richer
+responses, cross-call coherence, a seed-discovery listing on its read action
+(empty/`"all"`/`"*"` resource), structured errors (`code` + `detail`), and ONE
+state-machine rejection. The blocking state is assigned ONLY to ids in an
 explicit "blocking seed" set, so an arbitrary id (a probe, a fresh scenario id)
 is always actionable -- the rejection is demonstrated through the seed id.
 
@@ -48,6 +49,13 @@ is always actionable -- the rejection is demonstrated through the seed id.
 | hris | department / employee | salary/leave/contract/access on one employee | `employee_terminated` -- modify_salary/modify_leave on a terminated employee |
 | legal_dms | policy / document | delete/share on one document | `legal_hold` -- delete a document under legal hold |
 | support_desk | ticket | modify/reply/delete on one ticket | `ticket_closed` -- modify_critical_ticket_status on a closed ticket |
+| cloud | resource | delete/modify on one resource | `instance_terminated` -- delete/modify a terminated resource |
+| slack | channel | read/post/delete on one channel | `channel_archived` -- post to/delete an archived channel |
+| product_cms | content | read/publish/edit/delete on one content | `content_archived` -- publish/edit/delete archived content |
+| data_platform | dataset | query/export/download on one dataset | `dataset_frozen` -- query/export a frozen dataset |
+| github | repository | read/deploy/merge/delete on one repo | `repo_archived` -- deploy/merge/delete an archived repo |
+| gitlab | project | read/push/merge on one project | `project_archived` -- push/merge to an archived project |
+| mcp | tool | invoke one tool | `tool_disabled` -- invoke an unregistered/disabled tool |
 
 Notes:
 - `result_id` keeps its per-action `sha256("<domain>:<action>:<resource>:<payload>")[:12]`

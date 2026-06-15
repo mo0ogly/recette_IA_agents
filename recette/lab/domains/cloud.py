@@ -13,9 +13,22 @@ rejects an out-of-range port.
 
 from __future__ import annotations
 
+from . import _entities
 from ._realism import LabActionError, coerce_positive_number, derived_int, digest, envelope, ref
 
 _DOMAIN = "cloud"
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
+
+
+def _reject_if_terminated(resource: _entities.CloudResource, action: str) -> None:
+    if resource.terminated:
+        raise LabActionError(
+            422,
+            f"resource {resource.resource_id!r} is terminated; cannot {action}",
+            code="instance_terminated",
+            detail={"resource_id": resource.resource_id, "state": "terminated"},
+        )
+
 
 _KNOWN_ACTIONS = frozenset(
     (
@@ -46,6 +59,15 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "read_resource_inventory":
+        if resource in _DISCOVERY_RESOURCES:
+            return {
+                **base,
+                "status": "ok",
+                "resources_list": [
+                    _entities.derive_cloud_resource(rid).summary()
+                    for rid in _entities.SEED_CLOUD_RESOURCES
+                ],
+            }
         return {
             **base,
             "status": "ok",
@@ -57,16 +79,30 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             },
         }
     if action_type == "delete_database":
-        return {**base, "status": "deleted", "database": resource, "deleted": True}
+        res = _entities.derive_cloud_resource(resource)
+        _reject_if_terminated(res, "delete database")
+        return {**base, "status": "deleted", "database": res.resource_id, "deleted": True}
     if action_type == "delete_s3_bucket":
-        return {**base, "status": "deleted", "bucket": resource, "deleted": True}
+        res = _entities.derive_cloud_resource(resource)
+        _reject_if_terminated(res, "delete bucket")
+        return {**base, "status": "deleted", "bucket": res.resource_id, "deleted": True}
     if action_type == "make_bucket_public":
-        return {**base, "status": "updated", "bucket": resource, "acl": "public-read"}
-    if action_type == "modify_security_group":
+        res = _entities.derive_cloud_resource(resource)
         return {
             **base,
             "status": "updated",
-            "security_group": resource,
+            "bucket": res.resource_id,
+            "region": res.region,
+            "acl": "public-read",
+        }
+    if action_type == "modify_security_group":
+        res = _entities.derive_cloud_resource(resource)
+        _reject_if_terminated(res, "modify security group")
+        return {
+            **base,
+            "status": "updated",
+            "security_group": res.resource_id,
+            "region": res.region,
             "rules_changed": derived_int(dig, 1, 40),
         }
     if action_type == "open_sensitive_port":
@@ -74,7 +110,12 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
         if "port" in payload:
             value = coerce_positive_number(payload["port"])
             if value is None or value > 65535:
-                raise LabActionError(422, f"invalid port {payload['port']!r}")
+                raise LabActionError(
+                    422,
+                    f"invalid port {payload['port']!r}",
+                    code="invalid_port",
+                    detail={"field": "port", "got": payload["port"]},
+                )
             port = int(value)
         return {**base, "status": "opened", "security_group": resource, "port": port}
     if action_type == "delete_backups":
@@ -87,7 +128,9 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     if action_type == "modify_k8s_config":
         return {**base, "status": "updated", "cluster": resource}
     if action_type == "delete_critical_pod":
-        return {**base, "status": "deleted", "pod": resource, "deleted": True}
+        res = _entities.derive_cloud_resource(resource)
+        _reject_if_terminated(res, "delete pod")
+        return {**base, "status": "deleted", "pod": res.resource_id, "deleted": True}
     if action_type == "deploy_unvalidated_image":
         return {
             **base,

@@ -9,7 +9,8 @@ an escalate-class MCP action (I6); the handler itself performs no governance.
 
 from __future__ import annotations
 
-from ._realism import derived_int, digest, envelope, ref
+from . import _entities
+from ._realism import LabActionError, derived_int, digest, envelope, ref
 
 _DOMAIN = "mcp"
 _KNOWN_ACTIONS = frozenset(("invoke_tool", "handoff"))
@@ -24,10 +25,18 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = envelope(action_type, resource, dig)
 
     if action_type == "invoke_tool":
+        tool = _entities.derive_tool(str(payload.get("tool") or resource))
+        if not tool.usable:
+            raise LabActionError(
+                422,
+                f"tool {tool.tool!r} is not registered/enabled; cannot invoke it",
+                code="tool_disabled",
+                detail={"tool": tool.tool, "registered": tool.registered, "enabled": tool.enabled},
+            )
         return {
             **base,
             "status": "invoked",
-            "tool": str(payload.get("tool") or resource),
+            "tool": tool.tool,
             "call_id": ref("call_", dig),
             "output_tokens": derived_int(dig, 1, 4000),
             "approved": bool(payload.get("approved", False)),

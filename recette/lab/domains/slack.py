@@ -11,9 +11,22 @@ per action. Validation -> 422: invite_external_user rejects a malformed email.
 
 from __future__ import annotations
 
+from . import _entities
 from ._realism import LabActionError, derived_int, digest, envelope, ref, valid_email
 
 _DOMAIN = "slack"
+_DISCOVERY_RESOURCES = frozenset(("", "all", "*"))
+
+
+def _reject_if_archived(channel: _entities.SlackChannel, action: str) -> None:
+    if channel.archived:
+        raise LabActionError(
+            422,
+            f"channel {channel.name!r} is archived; cannot {action}",
+            code="channel_archived",
+            detail={"channel": channel.name, "archived": True},
+        )
+
 
 _KNOWN_ACTIONS: frozenset[str] = frozenset(
     {
@@ -45,28 +58,45 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     base = {**envelope(action_type, resource, dig), "target_system": "slack"}
 
     if action_type == "read_public_channel":
+        if resource in _DISCOVERY_RESOURCES:
+            return {
+                **base,
+                "status": "ok",
+                "channels": [
+                    _entities.derive_channel(name).summary() for name in _entities.SEED_CHANNELS
+                ],
+            }
+        channel = _entities.derive_channel(resource)
         return {
             **base,
             "status": "ok",
             "channel": {
-                "id": _channel_id(dig),
-                "name": resource,
-                "is_private": False,
-                "num_members": derived_int(dig, 1, 5000),
+                "id": channel.channel_id,
+                "name": channel.name,
+                "is_private": channel.is_private,
+                "num_members": channel.num_members,
+                "archived": channel.archived,
             },
         }
     if action_type == "send_message_external_channel":
+        channel = _entities.derive_channel(resource)
+        _reject_if_archived(channel, "post a message")
         return {
             **base,
             "status": "sent",
-            "channel": resource,
+            "channel": channel.name,
             "message_id": ref("msg_", dig),
             "external": True,
         }
     if action_type == "invite_external_user":
         email = str(payload.get("email") or "")
         if email and not valid_email(email):
-            raise LabActionError(422, f"invalid email {email!r}")
+            raise LabActionError(
+                422,
+                f"invalid email {email!r}",
+                code="invalid_email",
+                detail={"field": "email", "got": email},
+            )
         return {
             **base,
             "status": "invited",
@@ -93,7 +123,9 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
     if action_type == "modify_workspace_permissions":
         return {**base, "status": "updated", "workspace": resource, "scope": "workspace"}
     if action_type == "delete_channel":
-        return {**base, "status": "deleted", "channel": resource, "deleted": True}
+        channel = _entities.derive_channel(resource)
+        _reject_if_archived(channel, "delete it (already archived)")
+        return {**base, "status": "deleted", "channel": channel.name, "deleted": True}
     if action_type == "publish_company_announcement":
         return {
             **base,

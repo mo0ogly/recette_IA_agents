@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains.cloud import handle
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -114,6 +115,48 @@ class TestCloudLabHandler(unittest.TestCase):
         resp = handle("open_sensitive_port", "sg-1", {"port": 22})
         assert resp is not None
         self.assertEqual(resp["port"], 22)
+
+
+class TestCloudEntityModel(unittest.TestCase):
+    """Entity model: a cloud resource is a pure function of its id; a TERMINATED
+    resource (blocking seed) cannot be deleted/modified; discovery lists the seed
+    resources. Deterministic (I4)."""
+
+    TERMINATED = "cloud/res/terminated-1"
+
+    def test_delete_terminated_resource_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("delete_database", self.TERMINATED, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "instance_terminated")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["state"], "terminated")
+
+    def test_resource_view_coherent_across_actions(self) -> None:
+        rid = "cloud/res/r-1"
+        a = handle("delete_database", rid, {})
+        b = handle("modify_security_group", rid, {})
+        assert a is not None and b is not None
+        self.assertEqual(a["database"], b["security_group"])
+
+    def test_discovery_lists_seed_resources(self) -> None:
+        listing = handle("read_resource_inventory", "", {})
+        assert listing is not None
+        ids = [r["resource_id"] for r in listing["resources_list"]]
+        self.assertEqual(ids, list(_entities.SEED_CLOUD_RESOURCES))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("open_sensitive_port", "sg-1", {"port": 70000})
+        self.assertEqual(ctx.exception.code, "invalid_port")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "port")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_cloud_resource("cloud/res/z"),
+            _entities.derive_cloud_resource("cloud/res/z"),
+        )
 
 
 class TestCatalogIntegration(unittest.TestCase):

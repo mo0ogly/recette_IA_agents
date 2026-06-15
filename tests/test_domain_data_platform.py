@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains.data_platform import handle
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -127,6 +128,47 @@ class TestDataPlatformRealism(unittest.TestCase):
         self.assertIsNotNone(handle("share_pii_file", "f-1", {}))
         self.assertIsNotNone(handle("send_data_to_external_domain", "ds", {}))
         self.assertIsNotNone(handle("modify_retention_policy", "p", {}))
+
+
+class TestDataPlatformEntityModel(unittest.TestCase):
+    """Entity model: a dataset is a pure function of its id; a FROZEN dataset
+    (blocking seed) cannot be queried/exported; discovery lists the seed datasets.
+    Deterministic (I4)."""
+
+    FROZEN = "data/dataset/frozen-1"
+
+    def test_query_frozen_dataset_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("query_curated_dataset", self.FROZEN, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "dataset_frozen")
+        assert ctx.exception.detail is not None
+        self.assertTrue(ctx.exception.detail["frozen"])
+
+    def test_dataset_view_coherent_across_actions(self) -> None:
+        did = "data/dataset/d-1"
+        q = handle("query_curated_dataset", did, {})
+        x = handle("export_customer_data", did, {})
+        assert q is not None and x is not None
+        self.assertEqual(q["classification"], x["classification"])
+
+    def test_discovery_lists_seed_datasets(self) -> None:
+        listing = handle("query_curated_dataset", "*", {})
+        assert listing is not None
+        ids = [d["dataset_id"] for d in listing["datasets"]]
+        self.assertEqual(ids, list(_entities.SEED_DATASETS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            handle("modify_retention_policy", "p", {"retention_days": -5})
+        self.assertEqual(ctx.exception.code, "invalid_retention")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "retention_days")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_dataset("data/dataset/z"), _entities.derive_dataset("data/dataset/z")
+        )
 
 
 if __name__ == "__main__":

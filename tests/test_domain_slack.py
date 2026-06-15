@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import slack as slack_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -122,6 +123,47 @@ class TestSlackLabHandler(unittest.TestCase):
         resp = slack_lab.handle("invite_external_user", "general", {})
         assert resp is not None
         self.assertIn("@", resp["email"])
+
+
+class TestSlackEntityModel(unittest.TestCase):
+    """Entity model: a channel is a pure function of its id; an ARCHIVED channel
+    (blocking seed) cannot be posted to/deleted; discovery lists the seed
+    channels. Deterministic (I4)."""
+
+    ARCHIVED = "slack/channel/archived-1"
+
+    def test_post_to_archived_channel_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            slack_lab.handle("send_message_external_channel", self.ARCHIVED, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "channel_archived")
+        assert ctx.exception.detail is not None
+        self.assertTrue(ctx.exception.detail["archived"])
+
+    def test_channel_view_coherent_across_actions(self) -> None:
+        name = "slack/channel/c-1"
+        read = slack_lab.handle("read_public_channel", name, {})
+        sent = slack_lab.handle("send_message_external_channel", name, {})
+        assert read is not None and sent is not None
+        self.assertEqual(read["channel"]["name"], sent["channel"])
+
+    def test_discovery_lists_seed_channels(self) -> None:
+        listing = slack_lab.handle("read_public_channel", "", {})
+        assert listing is not None
+        names = [c["name"] for c in listing["channels"]]
+        self.assertEqual(names, list(_entities.SEED_CHANNELS))
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            slack_lab.handle("invite_external_user", "general", {"email": "nope"})
+        self.assertEqual(ctx.exception.code, "invalid_email")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "email")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_channel("slack/channel/z"), _entities.derive_channel("slack/channel/z")
+        )
 
 
 class TestCatalogIntegration(unittest.TestCase):
