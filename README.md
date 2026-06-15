@@ -7,6 +7,12 @@ Recette et corpus ground-truth pour inspect_ia_agents : valide la gouvernance ru
 des actions d'agents IA (policy allow/deny/escalate, approbation humaine
 bloquante, audit immuable) sur les outils discovery et identification.
 
+> C'est un **lab** : il **simule** les decisions gouvernees et produit une
+> verite-terrain, il ne **bloque pas** de trafic reel. Son role est de preparer
+> la plateforme sur laquelle les outils externes (discovery, identification)
+> s'exercent et sont scores. L'enforcement reel (isolation reseau, blocage du
+> chemin direct) est le travail de la plateforme cible, pas de la simulation.
+
 ## En chiffres
 
 | Element | Nombre |

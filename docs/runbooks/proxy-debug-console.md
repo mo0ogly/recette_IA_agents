@@ -211,6 +211,31 @@ overlay up, drives a request through it to the lab, and asserts the flow reaches
 |------|--------|
 | `tests/test_wire_proxy.py` | WireFlow normalize/clamp, bounded ring, monotone seq, immutability |
 | `tests/test_api_wire.py` | `/proxy/wire*` endpoints; ingest/list/clear/status; tail; run_id; 422 |
+
+### Wire-vs-audit reconciliation -- detecting an unmediated (ghost-agent) path
+
+Holding the two altitudes side by side turns the overlay into a detector for the
+"ghost agent" / shadow-AI threat: an unregistered agent that talks straight to an
+external system via native code, bypassing the `ExternalSystemProxy` (and thus the
+Control Plane). Such a call produces a **network side effect with no audit event**.
+
+The two views make it visible:
+
+- the **audit chain** (append-only log, fed by the mediated `ProxyTrace`, I1/I5)
+  is what went *through* the gateway;
+- the **mitmproxy wire** is what was actually *on the network*.
+
+So every flow seen on the wire should have a matching mediated event in the audit
+log. A wire flow with **no audit counterpart** (`wire_flows` not a subset of
+`audited_flows`) is an **unmediated path** -- the loophole -- and is the signal to
+raise to the Control Plane.
+
+Status (forward-looking): both views already exist and are captured; the automatic
+reconciliation assertion is **not yet coded**. This stays a recette LAB: it
+*observes* the unmediated path, it does not *enforce* a network block. Hard-blocking
+the direct outbound path (pod network isolation, plus the boot-time identity
+handshake of I3) is the platform's job, not the simulation's. The lab prepares and
+scores; enforcement is a separate layer.
 | `tests/test_wire_routing.py` | proxy_url + ca_bundle seam; resolve_proxy threading; Slack wire env |
 | `tests/test_mitm_addon.py` | addon flow normalization + fail-safe guards (no mitmproxy runtime) |
 | `console/src/pages/proxy/WirePanel.contract.test.tsx` | R16 panel contract (real fixture, enabled/disabled) |
