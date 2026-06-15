@@ -350,4 +350,23 @@ describe("Scorecard (CLI mirror)", () => {
       );
     }
   });
+
+  it("shows cross-engine OWASP coverage: ASI04/ASI08 marked covered elsewhere", () => {
+    const all = [...maf, ...git];
+    render(<Scorecard scenarios={all} />);
+    // The cross-engine categories are not /sim scenarios but ARE covered.
+    const asi04 = screen.getByTestId("sim-scorecard-cov-ASI04");
+    const asi08 = screen.getByTestId("sim-scorecard-cov-ASI08");
+    expect(asi04).toHaveAttribute("data-cov", "cross");
+    expect(asi04).toHaveTextContent("discovery");
+    expect(asi08).toHaveAttribute("data-cov", "cross");
+    expect(asi08).toHaveTextContent("orchestration");
+    // The coverage count includes the two cross-engine categories (X/10 format).
+    expect(screen.getByTestId("sim-scorecard-coverage-count")).toHaveTextContent("/10");
+    // A category present in the fixtures is marked "here" (MAF/git).
+    const here = new Set(computeScorecard(all).byOwasp.map(([t]) => t));
+    for (const tag of here) {
+      expect(screen.getByTestId(`sim-scorecard-cov-${tag}`)).toHaveAttribute("data-cov", "here");
+    }
+  });
 });

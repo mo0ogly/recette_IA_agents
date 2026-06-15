@@ -204,6 +204,23 @@
   color: var(--color-text-muted);
 }
 
+/* OWASP 2026 cross-engine coverage chips: here (MAF/git) / cross (other recette) / absent. */
+.sim-cov[data-cov="here"] {
+  background: var(--badge-green-bg, var(--color-accent-soft));
+  color: var(--badge-green-fg, var(--color-text));
+  border: 1px solid var(--color-accent);
+}
+.sim-cov[data-cov="cross"] {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px dashed var(--color-accent);
+}
+.sim-cov[data-cov="absent"] {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
 .sim-promote-error {
   display: block;
   margin-top: 0.4rem;

@@ -55,6 +55,32 @@ const DIM_LABELS: Record<DimName, string> = {
 /** Standards keys surfaced as chips, in display order. */
 const TAG_KEYS = ["owasp_asi", "mitre_atlas", "nist"] as const;
 
+/** The full OWASP Top 10 for Agentic Applications 2026 (ASI01..ASI10). */
+const OWASP_2026 = [
+  "ASI01",
+  "ASI02",
+  "ASI03",
+  "ASI04",
+  "ASI05",
+  "ASI06",
+  "ASI07",
+  "ASI08",
+  "ASI09",
+  "ASI10",
+] as const;
+
+/**
+ * ASI categories exercised by ANOTHER recette engine, not the /sim MAF+git
+ * families: the /sim scorecard counts only what it judges, so these two are
+ * marked here so the panel can show the full cross-engine 10/10 coverage without
+ * inflating the /sim counts. Ground truth: corpus/repos (discovery) and
+ * corpus/maf_orchestration (orchestration).
+ */
+const CROSS_ENGINE_ASI: Record<string, string> = {
+  ASI04: "discovery",
+  ASI08: "orchestration",
+};
+
 /** The four tabs of the red-team panel. */
 type SimTab = "scorecard" | "maf" | "git" | "recordings";
 
@@ -164,6 +190,11 @@ export function computeScorecard(scenarios: SimScenario[]): RedTeamScorecard {
  */
 export function Scorecard({ scenarios }: { scenarios: SimScenario[] }): JSX.Element {
   const card = computeScorecard(scenarios);
+  // Full OWASP Agentic 2026 coverage across the THREE engines: the ASI tags
+  // judged here (MAF+git) plus the cross-engine ones (discovery, orchestration).
+  const here = new Set(card.byOwasp.map(([tag]) => tag));
+  const covered = new Set([...here, ...Object.keys(CROSS_ENGINE_ASI)]);
+  const coveredCount = OWASP_2026.filter((a) => covered.has(a)).length;
   return (
     <div className="verdict-scorecard" data-testid="sim-scorecard">
       <div className="verdict-scorecard-group">
@@ -197,6 +228,36 @@ export function Scorecard({ scenarios }: { scenarios: SimScenario[] }): JSX.Elem
             </span>
           ))
         )}
+      </div>
+      <div className="verdict-scorecard-group" data-testid="sim-scorecard-coverage">
+        <span className="verdict-stat-label sim-owasp-label">
+          Couverture OWASP Agentic 2026
+        </span>
+        <span className="verdict-stat sim-stat-caught" data-testid="sim-scorecard-coverage-count">
+          {coveredCount}/10
+        </span>
+        {OWASP_2026.map((asi) => {
+          const inSim = here.has(asi);
+          const cross = CROSS_ENGINE_ASI[asi];
+          const state = inSim ? "here" : cross ? "cross" : "absent";
+          const title = inSim
+            ? "couvert ici (MAF / git)"
+            : cross
+              ? `couvert par la recette ${cross}`
+              : "non couvert";
+          return (
+            <span
+              key={asi}
+              className="sim-chip sim-cov"
+              data-cov={state}
+              title={title}
+              data-testid={`sim-scorecard-cov-${asi}`}
+            >
+              {asi}
+              {cross ? ` (${cross})` : ""}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
