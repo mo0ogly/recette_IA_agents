@@ -13,6 +13,7 @@ from recette.platform.proxy.reconcile import (
     ReconcileReport,
     build_allowlist,
     reconcile,
+    reconcile_run,
     target_of,
 )
 
@@ -75,6 +76,50 @@ class TestAllowlistFromConfig(unittest.TestCase):
         self.assertIn("127.0.0.1:9101", allow)  # a mock_local server
         self.assertIn("api.groq.com:443", allow)  # an LLM backend
         self.assertNotIn("127.0.0.1:9113", allow)  # the honeypot is NEVER allowlisted
+
+
+class TestReconcileRun(unittest.TestCase):
+    """The wire<->audit join (step 4): a wire flow to a non-mediated target has
+    no matching ProxyTrace -> bypass; the run's audited side-effects are the
+    audit-view half of the reconciliation."""
+
+    @staticmethod
+    def _run_flow(seq: int, host: str, port: int, run_id: str) -> dict:
+        return {"seq": seq, "host": host, "port": port, "run_id": run_id}
+
+    @staticmethod
+    def _trace(run_id: str, target_system: str = "github") -> dict:
+        return {"run_id": run_id, "target_system": target_system, "side_effect_hash": "h"}
+
+    def test_direct_write_to_non_mediated_target_is_unaudited_bypass(self) -> None:
+        flows = [
+            self._run_flow(1, "127.0.0.1", 8082, "R"),  # mediated lab egress
+            self._run_flow(2, "127.0.0.1", 9113, "R"),  # ghost: direct shadow-db write
+        ]
+        traces = [self._trace("R")]  # only the lab action produced an audit event
+        report = reconcile_run(flows, traces, {"127.0.0.1:8082"})
+        self.assertFalse(report.ok)
+        self.assertEqual([f["port"] for f in report.bypass_flows], [9113])
+        # The run WAS otherwise audited: a legit ProxyTrace exists for it, which
+        # sharpens the signal (audited run + an unaudited egress).
+        self.assertIn("R", report.audited_run_ids)
+
+    def test_all_mediated_flows_reconcile_ok(self) -> None:
+        flows = [self._run_flow(1, "127.0.0.1", 8082, "R")]
+        report = reconcile_run(flows, [self._trace("R")], {"127.0.0.1:8082"})
+        self.assertTrue(report.ok)
+        self.assertEqual(report.bypass_flows, [])
+
+    def test_join_is_deterministic(self) -> None:
+        flows = [
+            self._run_flow(2, "127.0.0.1", 9113, "R"),
+            self._run_flow(1, "127.0.0.1", 8082, "R"),
+        ]
+        traces = [self._trace("R")]
+        a = reconcile_run(flows, traces, {"127.0.0.1:8082"})
+        b = reconcile_run(flows, traces, {"127.0.0.1:8082"})
+        self.assertEqual(a.to_dict(), b.to_dict())
+        self.assertEqual([f["seq"] for f in a.bypass_flows], [2])
 
 
 if __name__ == "__main__":

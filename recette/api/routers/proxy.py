@@ -142,22 +142,27 @@ def set_proxy_route(request: Request, body: dict) -> dict:
 
 @router.get("/reconcile")
 def get_reconcile(request: Request, run_id: str | None = None) -> dict:
-    """Wire-vs-audit reconciliation (allowlist slice).
+    """Wire-vs-audit reconciliation (run-scoped join).
 
-    A wire flow whose target (host:port) is outside the allowlist of mediated
-    systems (the lab, the mock_local servers) is an UNMEDIATED path -- the
-    ghost-agent signal. Slice 1 does not allowlist LLM backend hosts (the
-    deterministic proof drives a mock probe, no LLM traffic on the wire); a
-    real-run LLM allowlist + an audit-event join are phase 2. The lab OBSERVES
-    the unmediated path; it does not ENFORCE a network block."""
+    Joins the wire view (WireFlow) with the audit view (ProxyTrace) by run_id.
+    A wire flow whose target (host:port) is a mediated endpoint (the lab, a
+    mock_local server) is EXPLAINED; a flow to a non-mediated target (e.g. the
+    shadow-db honeypot :9113) has no matching audit event -- the ghost-agent
+    signal. ``audited_run_ids`` reports which runs produced a genuine mediated
+    side effect. LLM backend hosts are not yet allowlisted (the deterministic
+    proof drives a mock probe, no LLM traffic on the wire); a per-flow
+    side_effect_hash join (ghost via an allowlisted target) is phase 3. The lab
+    OBSERVES the unmediated path; it does not ENFORCE a network block."""
     from urllib.parse import urlparse
 
     from ...platform.proxy.lab_proxy import lab_url_from_env
-    from ...platform.proxy.reconcile import build_allowlist, reconcile, target_of
+    from ...platform.proxy.reconcile import build_allowlist, reconcile_run, target_of
 
     flows = request.app.state.wire_flow_recorder.snapshot()
+    traces = request.app.state.proxy_trace_recorder.snapshot()
     if run_id is not None:
         flows = [f for f in flows if f.run_id == run_id]
+        traces = [t for t in traces if t.run_id == run_id]
     lab = urlparse(lab_url_from_env())
     # Normalize through target_of so "localhost:8082" matches a flow recorded as
     # "127.0.0.1:8082" (and vice versa).
@@ -167,5 +172,9 @@ def get_reconcile(request: Request, run_id: str | None = None) -> dict:
         lab_host=lab_host,
         llm_hosts=set(),
     )
-    report = reconcile([f.to_dict() for f in flows], allow)
+    report = reconcile_run(
+        [f.to_dict() for f in flows],
+        [t.to_dict() for t in traces],
+        allow,
+    )
     return {"run_id": run_id, **report.to_dict()}

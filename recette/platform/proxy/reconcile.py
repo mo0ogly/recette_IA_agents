@@ -44,13 +44,19 @@ def target_of(flow: dict) -> str:
 class ReconcileReport:
     """Outcome of one wire-vs-audit reconciliation. ``ok`` is True iff no flow
     fell outside the allowlist; ``bypass_flows`` lists the offending flows in
-    seq order."""
+    seq order. ``audited_run_ids`` is the audit-view context (the runs that
+    produced a ProxyTrace) -- empty for the target-only ``reconcile``."""
 
     ok: bool
     bypass_flows: list[dict]
+    audited_run_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
-        return {"ok": self.ok, "bypass_flows": self.bypass_flows}
+        return {
+            "ok": self.ok,
+            "bypass_flows": self.bypass_flows,
+            "audited_run_ids": list(self.audited_run_ids),
+        }
 
 
 def reconcile(wire_flows: list[dict], allowlist: set[str]) -> ReconcileReport:
@@ -63,6 +69,30 @@ def reconcile(wire_flows: list[dict], allowlist: set[str]) -> ReconcileReport:
         if target_of(f) not in allowlist
     ]
     return ReconcileReport(ok=(bypass == []), bypass_flows=bypass)
+
+
+def reconcile_run(
+    wire_flows: list[dict],
+    proxy_traces: list[dict],
+    allowlist: set[str],
+) -> ReconcileReport:
+    """Wire<->audit join (run-scoped): step 4 of the ghost-direct-db scenario.
+
+    A wire flow whose target is a mediated endpoint is EXPLAINED -- the proxy
+    records a ``ProxyTrace`` for those side effects. A flow to a non-mediated
+    target has no matching audit event (the proxy never traces a target it does
+    not mediate), so it is a bypass. ``proxy_traces`` is the audit-view half:
+    ``audited_run_ids`` reports which runs produced a genuine, mediated side
+    effect, sharpening the signal (an audited run that ALSO made an unaudited
+    egress is a stronger ghost indicator than a flow with no run at all).
+
+    Pure and deterministic (I4): same inputs -> same report, byte for byte.
+    The discriminator is target-based by decision (the wire carries raw bytes,
+    not the canonical ``side_effect_hash``); a per-flow hash join is phase 3.
+    """
+    base = reconcile(wire_flows, allowlist)
+    audited = tuple(sorted({str(t["run_id"]) for t in proxy_traces if t.get("run_id") is not None}))
+    return ReconcileReport(ok=base.ok, bypass_flows=base.bypass_flows, audited_run_ids=audited)
 
 
 def build_allowlist(
