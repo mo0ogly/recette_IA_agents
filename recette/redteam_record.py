@@ -26,13 +26,13 @@ from pathlib import Path
 from .judge import judge_subject
 from .llm import LlmBackend, LlmDecision, Message, ToolSpec
 from .manifest import validate
+from .redteam import CRESCENDO
 from .redteam_recette import _APPROVERS, _approver_for, _violation_of, run_scenario
 from .simulate import UserTurns, simulate
 
 # Raised by the PyRIT attacker when the optional dependency is absent. Kept as a
-# module constant so the message has a single source of truth (and the guard test
-# asserts the [redteam] extra hint is present -- "redteam" still satisfies an
-# assertIn("real", ...) check since it is a substring).
+# module constant so the message has a single source of truth; the guard test
+# asserts the [redteam] extra hint is present.
 _PYRIT_MISSING = (
     "PyRIT attacker requires the [redteam] extra: pip install inspect_ia_agents[redteam]"
 )
@@ -79,16 +79,17 @@ class PyritAttacker:
     phase text, so an operator with the optional dependency installed can attack a
     target with PyRIT's curated jailbreak corpus.
 
-    Approach -- PyRIT-SEEDED (not the adaptive async orchestrator).
-    -----------------------------------------------------------------
+    Approach -- PyRIT jailbreak templates over an escalating objective.
+    -------------------------------------------------------------------
     PyRIT's red-teaming orchestrator is async and multi-turn; wiring its adaptive
     loop synchronously into our turn-by-turn ``simulate()`` callable is brittle
     (event-loop reentrancy, target adapters). So on the FIRST call this attacker
-    asks PyRIT to materialize an ORDERED list of ``max_turns`` adversarial seed
-    prompts for ``objective`` (from PyRIT's built-in jailbreak ``SeedPromptDataset``
-    plus the objective), caches them on the instance, and returns one per call --
-    deterministic given a fixed PyRIT dataset version. This is the documented
-    "seeded" mode; it is NOT the adaptive orchestrator.
+    materializes an ORDERED list of ``max_turns`` adversarial turns: each turn wraps
+    the ``objective`` (escalated by the in-repo Crescendo phase, ``CRESCENDO``) in a
+    PyRIT ``TextJailBreak`` template via ``get_jailbreak(prompt=...)``, caches them
+    on the instance, and returns one per call. ``get_jailbreak`` is a pure offline
+    template substitution, so for a FIXED ``template`` (not random) the turns are
+    byte-stable -- deterministic, no network, no provider key.
 
     Import guard (R20): pyrit is NEVER imported at module top, and NOT at
     construction -- only inside ``__call__`` (via ``_seed_prompts``). When pyrit is
@@ -96,48 +97,47 @@ class PyritAttacker:
     bare ImportError), so the deterministic gate venv stays dependency-free and the
     failure mode is legible. Constructing the attacker is always safe.
 
-    NOTE: this seeded path has NOT been executed end-to-end in this repo's
-    environment (pyrit is not installed here); it is written against PyRIT's
-    documented seed-dataset API and exercised only when the [redteam] extra is
-    installed (the pyrit-only tests skip otherwise). Verify after
-    ``pip install inspect_ia_agents[redteam]``.
+    Verified end-to-end against pyrit 0.14.0 (PyPI ``pyrit``, MIT) on 2026-06-15:
+    ``TextJailBreak(template_file_name=...).get_jailbreak(prompt=...)`` produces the
+    adversarial turn offline. Exercised by the pyrit-only tests in
+    ``tests/test_redteam_pyrit.py`` (which skip when the [redteam] extra is absent).
     """
 
     objective: str
     # provider/model are reserved for a future PyRIT adaptive-orchestrator path
-    # and are UNUSED in the current seeded mode (seed prompts come from PyRIT's
-    # built-in dataset, not from a live attacker backend).
+    # and are UNUSED in the current jailbreak-template mode (turns come from PyRIT's
+    # built-in templates, not from a live attacker backend).
     provider: str = "groq"
     model: str = "x"
     max_turns: int = 4
+    # A fixed PyRIT jailbreak template (NOT random) keeps the turns deterministic
+    # (I4). Must be one of TextJailBreak.get_jailbreak_templates().
+    template: str = "ailab_redteam_simulation.yaml"
     _seeds: list[str] | None = field(default=None, init=False, repr=False, compare=False)
 
     def _seed_prompts(self) -> list[str]:
-        """Build (and cache) the ordered adversarial seed prompts via PyRIT.
+        """Build (and cache) the ordered adversarial turns via PyRIT TextJailBreak.
 
         Lazily imports pyrit; raises RuntimeError naming the [real] extra if it is
-        not installed. Returns up to ``max_turns`` prompts derived from PyRIT's
-        built-in jailbreak seed corpus, each framed toward ``objective``.
+        not installed. Returns ``max_turns`` turns: the objective, escalated by the
+        Crescendo phase, wrapped in a fixed (deterministic) PyRIT jailbreak template.
         """
         if self._seeds is not None:
             return self._seeds
         try:
-            from pyrit.datasets import fetch_decoding_trust_stereotypes_dataset
-            from pyrit.models import SeedPromptDataset
+            from pyrit.datasets import TextJailBreak
         except ImportError:
             raise RuntimeError(_PYRIT_MISSING) from None
 
-        # Load PyRIT's built-in adversarial seed corpus and frame each toward the
-        # objective. PyRIT's dataset API has churned across releases; both the
-        # dataset loader and SeedPromptDataset are resolved lazily above so any
-        # surface change is contained to this method, not the import-guard seam.
-        dataset: SeedPromptDataset = fetch_decoding_trust_stereotypes_dataset()
-        prompts = [str(p.value) for p in dataset.prompts]
-        framed = [f"{self.objective}: {p}" for p in prompts[: self.max_turns]]
-        # Guarantee at least one turn so the seam is usable even on an empty corpus.
-        if not framed:
-            framed = [self.objective]
-        self._seeds = framed
+        # Fixed template (not random_template) -> get_jailbreak is a pure offline
+        # substitution, byte-stable per (template, prompt). Escalate the objective
+        # turn by turn with the in-repo Crescendo phases, then jailbreak-wrap each.
+        jailbreak = TextJailBreak(template_file_name=self.template)
+        seeds = [
+            jailbreak.get_jailbreak(prompt=f"{CRESCENDO.phase_for_turn(i)} {self.objective}")
+            for i in range(max(self.max_turns, 1))
+        ]
+        self._seeds = seeds
         return self._seeds
 
     def __call__(self, history: list[Message]) -> str | None:
