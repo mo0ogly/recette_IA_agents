@@ -19,6 +19,7 @@ import type {
   Campaign,
   CampaignTemplate,
   ChainReport,
+  ContainmentState,
   PendingApproval,
   PolicyDocument,
   ProxyDebugStatus,
@@ -286,6 +287,18 @@ export function testServer(
     `/config/servers/${encodeURIComponent(id)}/test`,
     { method: "POST", body: JSON.stringify(body) },
   );
+}
+
+/** Global private-DNS containment flag. Raw dict, no envelope to unwrap. */
+export function getContainment(): Promise<ContainmentState> {
+  return request<ContainmentState>("/config/containment", { method: "GET" });
+}
+
+export function setContainment(enabled: boolean): Promise<ContainmentState> {
+  return request<ContainmentState>("/config/containment", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
 }
 
 // ---------------------------------------------------------------------------

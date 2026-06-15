@@ -487,11 +487,24 @@ export interface ServerEntry {
   /** Name of the env var holding the credential (never the secret itself, R8). */
   auth_env?: string;
   /**
+   * Fully-qualified domain name the server answers to (private DNS resolver).
+   * Optional: not every server declares one.
+   */
+  fqdn?: string;
+  /** Additional names that resolve to this server (private DNS allowlist). */
+  aliases?: string[];
+  /**
    * Per-server pacing: delay in milliseconds (integer >= 0) inherited as the
    * default by every agent acting against this server. Absent/undefined =
    * instant; never sent as 0/NaN from an empty input.
    */
   pace_ms?: number;
+}
+
+/** Global private-DNS containment flag (GET/PUT /config/containment).
+ *  Raw shape: no { success, data } envelope. */
+export interface ContainmentState {
+  containment: boolean;
 }
 
 /** Result of a start/stop lifecycle call; error explains a "down" outcome. */

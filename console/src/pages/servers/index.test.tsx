@@ -35,6 +35,8 @@ vi.mock("../../api/client", async (importOriginal) => {
     getServerLog: vi.fn(),
     getCatalog: vi.fn(),
     testServer: vi.fn(),
+    getContainment: vi.fn(),
+    setContainment: vi.fn(),
   };
 });
 
@@ -43,14 +45,18 @@ import {
   createServer,
   deleteServer,
   getCatalog,
+  getContainment,
   getServerLog,
   getServerStatus,
   listServers,
+  setContainment,
   startServer,
   stopServer,
   updateServer,
 } from "../../api/client";
 import ServersPage from "./index";
+import containmentOffFixture from "./__fixtures__/containment-off.fixture.json";
+import containmentOnFixture from "./__fixtures__/containment-on.fixture.json";
 
 const servers = serversFixture as ServerEntry[];
 const serversWithPace = serversWithPaceFixture as ServerEntry[];
@@ -88,6 +94,10 @@ async function rowOf(id: string): Promise<HTMLElement> {
 describe("ServersPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The page reads the global containment flag on mount in every test.
+    vi.mocked(getContainment).mockResolvedValue(
+      containmentOffFixture as { containment: boolean },
+    );
   });
 
   afterEach(() => {
@@ -449,5 +459,92 @@ describe("ServersPage", () => {
     const [, payload] = vi.mocked(updateServer).mock.calls[0];
     // Cleared = inherit / instant, never 0 or NaN.
     expect(payload.pace_ms).toBeUndefined();
+  });
+
+  it("Edit pre-fills the fqdn and the comma-joined aliases", async () => {
+    mockHappyList();
+
+    render(<ServersPage />);
+    const row = await rowOf("gh-mock");
+    fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
+
+    // gh-mock in the fixture declares fqdn + one alias.
+    expect(
+      (screen.getByLabelText(/FQDN/) as HTMLInputElement).value,
+    ).toBe("api.github.com");
+    expect(
+      (screen.getByLabelText(/Aliases/) as HTMLInputElement).value,
+    ).toBe("github.lab.internal");
+  });
+
+  it("creates a server carrying fqdn and the parsed alias list", async () => {
+    vi.mocked(listServers).mockResolvedValue([]);
+    vi.mocked(createServer).mockResolvedValue(servers[0]);
+
+    render(<ServersPage />);
+    await screen.findByText("No servers configured.");
+    openConfigTab();
+
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "gh-mock" } });
+    fireEvent.change(screen.getByLabelText("System"), { target: { value: "github" } });
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "9101" } });
+    fireEvent.change(screen.getByLabelText(/FQDN/), {
+      target: { value: "api.github.com" },
+    });
+    // Spaces and an empty trailing entry are trimmed/dropped on submit.
+    fireEvent.change(screen.getByLabelText(/Aliases/), {
+      target: { value: "github.lab.internal, gh.internal , " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(createServer).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createServer).mock.calls[0][0]).toEqual({
+      id: "gh-mock",
+      system: "github",
+      mode: "mock_local",
+      port: 9101,
+      fqdn: "api.github.com",
+      aliases: ["github.lab.internal", "gh.internal"],
+    });
+  });
+
+  it("omits fqdn and aliases when both fields are left empty", async () => {
+    vi.mocked(listServers).mockResolvedValue([]);
+    vi.mocked(createServer).mockResolvedValue(servers[0]);
+
+    render(<ServersPage />);
+    await screen.findByText("No servers configured.");
+    openConfigTab();
+
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "gh-mock" } });
+    fireEvent.change(screen.getByLabelText("System"), { target: { value: "github" } });
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "9101" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const payload = vi.mocked(createServer).mock.calls[0][0];
+    expect(payload).not.toHaveProperty("fqdn");
+    expect(payload).not.toHaveProperty("aliases");
+  });
+
+  it("reads the containment flag on mount and persists a toggle", async () => {
+    mockHappyList();
+    vi.mocked(getContainment).mockResolvedValue(
+      containmentOffFixture as { containment: boolean },
+    );
+    vi.mocked(setContainment).mockResolvedValue(
+      containmentOnFixture as { containment: boolean },
+    );
+
+    render(<ServersPage />);
+    await screen.findByText("gh-mock");
+    openConfigTab();
+
+    const toggle = screen.getByLabelText(/Private-DNS containment/) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+
+    fireEvent.click(toggle);
+
+    expect(setContainment).toHaveBeenCalledWith(true);
+    await waitFor(() => expect(toggle.checked).toBe(true));
   });
 });

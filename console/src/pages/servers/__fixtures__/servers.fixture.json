@@ -3,7 +3,9 @@
         "id": "gh-mock",
         "system": "github",
         "mode": "mock_local",
-        "port": 9101
+        "port": 9101,
+        "fqdn": "api.github.com",
+        "aliases": ["github.lab.internal"]
     },
     {
         "id": "gl-staging",

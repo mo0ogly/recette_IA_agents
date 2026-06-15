@@ -13,9 +13,11 @@ import {
   ApiError,
   createServer,
   deleteServer,
+  getContainment,
   getServerLog,
   getServerStatus,
   listServers,
+  setContainment,
   startServer,
   stopServer,
   updateServer,
@@ -57,6 +59,10 @@ interface ServerFormValues {
   baseUrl: string;
   owner: string;
   authEnv: string;
+  /** FQDN the server answers to (private DNS resolver); empty = none. */
+  fqdn: string;
+  /** Aliases as a raw comma-separated string; mapped to string[] on submit. */
+  aliases: string;
   /** Per-server cadence in ms; undefined = inherit default / instant. */
   pace_ms?: number;
 }
@@ -69,7 +75,17 @@ const EMPTY_FORM: ServerFormValues = {
   baseUrl: "",
   owner: "",
   authEnv: "",
+  fqdn: "",
+  aliases: "",
 };
+
+/** Parse a comma-separated aliases input into a trimmed, non-empty list. */
+function parseAliases(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
 /** The mode-dependent target shown in the table (port / base_url / owner). */
 function targetOf(server: ServerEntry): string {
@@ -126,6 +142,15 @@ function toServerEntry(values: ServerFormValues, id: string): ServerEntry {
   if (authEnv.length > 0) {
     entry.auth_env = authEnv;
   }
+  // Private-DNS names: omit empty fqdn and an empty alias list (never send "").
+  const fqdn = values.fqdn.trim();
+  if (fqdn.length > 0) {
+    entry.fqdn = fqdn;
+  }
+  const aliases = parseAliases(values.aliases);
+  if (aliases.length > 0) {
+    entry.aliases = aliases;
+  }
   // Empty cadence means "inherit / instant": omit pace_ms, never send 0/NaN.
   if (values.pace_ms !== undefined && !Number.isNaN(values.pace_ms)) {
     entry.pace_ms = Math.max(0, values.pace_ms);
@@ -143,6 +168,8 @@ function toFormValues(server: ServerEntry): ServerFormValues {
     baseUrl: server.base_url ?? "",
     owner: server.owner ?? "",
     authEnv: server.auth_env ?? "",
+    fqdn: server.fqdn ?? "",
+    aliases: (server.aliases ?? []).join(", "),
     pace_ms: server.pace_ms,
   };
 }
@@ -250,6 +277,8 @@ export default function ServersPage(): JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ServerFormValues>(EMPTY_FORM);
   const [tab, setTab] = useState<ServersTab>("list");
+  // Global private-DNS containment flag (deny names outside the allowlist).
+  const [containment, setContainmentState] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -278,6 +307,32 @@ export default function ServersPage(): JSX.Element {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getContainment()
+      .then((state) => {
+        if (!cancelled) {
+          setContainmentState(state.containment);
+        }
+      })
+      .catch(() => {
+        // Best-effort read: a failed probe leaves the toggle at its safe default.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleContainmentToggle(enabled: boolean): Promise<void> {
+    try {
+      const state = await setContainment(enabled);
+      setContainmentState(state.containment);
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
 
   function setField<K extends keyof ServerFormValues>(
     key: K,
@@ -535,6 +590,18 @@ export default function ServersPage(): JSX.Element {
 
       {tab === "config" && (
         <section className="panel" role="tabpanel">
+      <div className="servers-containment">
+        <label htmlFor="containment-toggle" className="servers-containment-label">
+          <input
+            id="containment-toggle"
+            type="checkbox"
+            checked={containment}
+            onChange={(e) => void handleContainmentToggle(e.target.checked)}
+          />
+          Private-DNS containment (deny names outside the allowlist)
+        </label>
+      </div>
+
       <form className="servers-form" onSubmit={(e) => void handleSubmit(e)}>
         <h2>{editingId === null ? "Create server" : `Edit server ${editingId}`}</h2>
 
@@ -621,6 +688,28 @@ export default function ServersPage(): JSX.Element {
             type="text"
             value={form.authEnv}
             onChange={(e) => setField("authEnv", e.target.value)}
+          />
+        </div>
+
+        <div className="servers-form-row">
+          <label htmlFor="server-fqdn">FQDN (private DNS, optional)</label>
+          <input
+            id="server-fqdn"
+            type="text"
+            value={form.fqdn}
+            placeholder="api.github.com"
+            onChange={(e) => setField("fqdn", e.target.value)}
+          />
+        </div>
+
+        <div className="servers-form-row">
+          <label htmlFor="server-aliases">Aliases (comma-separated)</label>
+          <input
+            id="server-aliases"
+            type="text"
+            value={form.aliases}
+            placeholder="github.lab.internal, gh.internal"
+            onChange={(e) => setField("aliases", e.target.value)}
           />
         </div>
 
