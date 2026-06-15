@@ -82,6 +82,13 @@ SERVERS_WITH_FQDN = [
         "mode": "mock_local",
         "port": 9102,
     },
+    {
+        "id": "gh-declared",
+        "system": "github",
+        "mode": "declared_url",
+        "base_url": "http://declared.example:8082",
+        "fqdn": "api.github.com",
+    },
 ]
 
 
@@ -130,6 +137,15 @@ class ResolveProxyFqdnTests(unittest.TestCase):
         self.assertEqual(self._target_name(resolved), "api.github.com")
         # The resolved entry still drives the base_url (mode/port unchanged).
         self.assertEqual(resolved._client.base_url, "http://127.0.0.1:9101")  # noqa: SLF001
+
+    def test_declared_url_server_with_fqdn_threads_fqdn_as_target_name(self) -> None:
+        agent = {"id": "a1", "target_system": "github", "server": "gh-declared"}
+        default = LabHttpProxy("http://localhost:8082")
+        resolved = resolve_proxy(agent, SERVERS_WITH_FQDN, default)
+        self.assertIsInstance(resolved, LabHttpProxy)
+        self.assertEqual(self._target_name(resolved), "api.github.com")
+        # The declared base_url drives the client (mode/base_url unchanged).
+        self.assertEqual(resolved._client.base_url, "http://declared.example:8082")  # noqa: SLF001
 
     def test_server_without_fqdn_has_no_target_name(self) -> None:
         agent = {"id": "a1", "target_system": "github", "server": "gh-mock-nofqdn"}

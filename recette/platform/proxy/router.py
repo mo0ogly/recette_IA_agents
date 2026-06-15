@@ -72,13 +72,12 @@ def resolve_proxy(
     if not server_ref:
         return default
     # Realism resolution (Task 5): resolve the reference by name (fqdn/alias/id)
-    # with containment OFF -- an unknown name returns None and we keep the EXACT
-    # legacy id lookup below (which raises on a dangling reference). The deny path
+    # with containment OFF -- resolve_name's third pass already matches by id, so
+    # an unknown name returns None and the reference is dangling (no separate id
+    # lookup needed). A dangling reference fails the run (fail-safe). The deny path
     # (containment ON) is Task 6 and is intentionally NOT wired here. resolve_name
     # is pure (no I/O), so the router stays pure (I4).
     server = resolve_name(server_ref, servers, containment=False)
-    if server is None:
-        server = next((s for s in servers if s.get("id") == server_ref), None)
     if server is None:
         raise ValueError(f"agent {agent.get('id', '?')!r} references unknown server {server_ref!r}")
     server_id = server.get("id", server_ref)

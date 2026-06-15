@@ -52,7 +52,10 @@ class ProxyTrace:
     target_system: str
     # The resolved server name (fqdn) the side effect was routed to, for trace
     # realism (reads ``api.github.com`` instead of ``127.0.0.1:9101``). Falls
-    # back to ``target_system`` when no name was resolved (back-compat).
+    # back to ``target_system`` when no name was resolved (back-compat). Required
+    # (str, never None) by construction: ``RingTraceRecorder.record`` falls back to
+    # ``event.target_system`` (always a non-empty str), unlike the optional
+    # ``ExecutionResult.target: str | None``.
     target: str
     action_type: str
     resource: str
@@ -127,6 +130,8 @@ class RingTraceRecorder:
                 timestamp=event.timestamp,
                 agent_id=event.agent_id,
                 target_system=event.target_system,
+                # Fallback to event.target_system (always a non-empty str) keeps
+                # ProxyTrace.target a str by construction (see the field comment).
                 target=result.target or event.target_system,
                 action_type=event.action_type,
                 resource=event.resource,
