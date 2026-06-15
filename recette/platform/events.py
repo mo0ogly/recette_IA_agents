@@ -27,6 +27,7 @@ class EventKind(StrEnum):
     APPROVAL_RESOLVED = "approval_resolved"  # approved | denied | timeout
     PLATFORM_ERROR = "platform_error"  # audited internal failure (fail-safe deny)
     BYPASS_DETECTED = "bypass_detected"  # unmediated path observed post-hoc (wire<->audit)
+    RESOLUTION_DENIED = "resolution_denied"  # private-DNS name not in allowlist (containment)
 
 
 class PolicyVerdict(StrEnum):
@@ -103,3 +104,51 @@ class PlatformActionEvent:
             "correlates_event_id": self.correlates_event_id,
             "extra": self.extra,
         }
+
+
+@dataclass(frozen=True)
+class ResolutionDeniedEvent:
+    """A private-DNS name an agent tried to resolve was denied by containment.
+
+    First-class AUDITED signal (I1): the denied ``name`` is not in the agent's
+    declared allowlist, so the resolver refuses it and records this immutable
+    event. Frozen -- corrections are new events, never mutations.
+    """
+
+    agent_id: str
+    name: str  # the denied name
+    reason: str
+    kind: str = EventKind.RESOLUTION_DENIED
+    timestamp: str | None = None  # captured input, never read from the host clock (I4)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict:
+        return {
+            "schema_version": self.schema_version,
+            "kind": self.kind,
+            "timestamp": self.timestamp,
+            "agent_id": self.agent_id,
+            "name": self.name,
+            "reason": self.reason,
+        }
+
+
+def build_resolution_denied(
+    *,
+    agent_id: str,
+    name: str,
+    reason: str,
+    timestamp: str | None = None,
+) -> ResolutionDeniedEvent:
+    """Build the audited ``resolution_denied`` containment event.
+
+    Pure and deterministic: same ``(agent_id, name, reason, timestamp)`` -> same
+    event, byte for byte (I4). ``timestamp`` is an INJECTED input (default
+    ``None``); the builder never reads the host clock.
+    """
+    return ResolutionDeniedEvent(
+        agent_id=agent_id,
+        name=name,
+        reason=reason,
+        timestamp=timestamp,
+    )
