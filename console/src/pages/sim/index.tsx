@@ -863,7 +863,7 @@ export default function SimPage(): JSX.Element {
     <section className="sim-page">
       <div className="page-head">
         <h1>Recette red-team : l'outil d'identification attrape-t-il l'anomalie ?</h1>
-        <PageHelp topic="corpus" />
+        <PageHelp topic="redteam" />
       </div>
       <p className="sim-intro">
         Chaque scenario attaque un agent ; on verifie que le verdict attendu est

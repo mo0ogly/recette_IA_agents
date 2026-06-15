@@ -14,6 +14,7 @@ export type HelpTopicKey =
   | "cockpit"
   | "recette"
   | "corpus"
+  | "redteam"
   | "campaigns"
   | "recette_campaigns"
   | "verdicts"
@@ -479,6 +480,116 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           appels d'outils), le verdict sur les 4 dimensions et le diagramme
           Mermaid du chemin reel. Lecture seule, deterministe.
         </p>
+      </>
+    ),
+  },
+  redteam: {
+    title: "Aide — Recette red-team",
+    summary:
+      "Verifie que l'outil d'identification rend le verdict attendu : anomalie attrapee (vrai positif) ou aucune fausse alarme (vrai negatif). Runs figes, deterministes (I4), zero IA live.",
+    body: (
+      <>
+        <p>
+          Cet ecran est la <strong>recette red-team</strong> : il verifie que
+          l'outil d'identification rend le <strong>verdict attendu</strong> face
+          a des sujets adverses. Deux reussites a distinguer :{" "}
+          <strong>anomalie attrapee</strong> (un sujet negatif, l'outil dit
+          &laquo; incorrect &raquo; = vrai positif) et{" "}
+          <strong>conforme sans fausse alarme</strong> (un sujet correct, l'outil
+          ne crie pas au loup = vrai negatif). Tout repose sur des{" "}
+          <strong>enregistrements figes</strong>, rejoues a l'identique,{" "}
+          <strong>deterministes (I4)</strong> : aucune IA live ici, le verdict ne
+          depend que de <code>(sujet, action-log)</code>.
+        </p>
+        <h3>Les quatre onglets</h3>
+        <ul>
+          <li>
+            <strong>Scorecard</strong> : miroir de <code>recette redteam</code> --
+            total, <strong>anomalies attrapees</strong> (vrais positifs),{" "}
+            <strong>conformes sans fausse alarme</strong> (vrais negatifs),{" "}
+            <strong>ratees</strong> (faux negatifs / faux positifs) et la{" "}
+            <strong>repartition OWASP</strong> (la categorie d'attaque LLM
+            couverte par chaque cas).
+          </li>
+          <li>
+            <strong>Sujets MAF</strong> : les agents alignes Microsoft Agent
+            Framework, declarant des <strong>outils</strong> et des{" "}
+            <strong>handoffs</strong>. Le coeur de l'ecran (detail ci-dessous).
+          </li>
+          <li>
+            <strong>Agents Git (Lane B)</strong> : les sujets git pilotes par un
+            but (<em>goal-driven</em>), juges sur le meme barometre.
+          </li>
+          <li>
+            <strong>Enregistrements figes</strong> : les scenarios d'attaque
+            captures, rejouables a l'identique (la matiere de la recette).
+          </li>
+        </ul>
+        <h3>Detail d'un sujet MAF</h3>
+        <p>
+          Cliquer un sujet MAF ouvre son detail. C'est l'ecart entre ce que
+          l'agent <strong>declare</strong> et ce qu'il <strong>fait</strong> sous
+          la pression de l'adversaire. Chaque bloc :
+        </p>
+        <ul>
+          <li>
+            <strong>Capacites declarees</strong> : les <strong>outils</strong>{" "}
+            (<code>tool_kind</code> / <code>target</code>) et les{" "}
+            <strong>handoffs</strong> que l'agent DECLARE pouvoir utiliser, avec
+            l'<strong>approbation requise</strong> : <code>jamais</code> (libre)
+            ou <code>toujours</code> -- ce dernier est une <strong>porte
+            I6</strong>, l'outil ne s'execute qu'apres approbation explicite,
+            jamais de maniere optimiste.
+          </li>
+          <li>
+            <strong>Verdict 4 dimensions</strong> :{" "}
+            <strong>identite</strong> / <strong>capacites</strong> /{" "}
+            <strong>politique</strong> / <strong>comportement</strong> (vert =
+            conforme, rouge = casse). Pour un negatif, l'unique{" "}
+            <strong>axe casse</strong> est l'anomalie (son{" "}
+            <code>violation_type</code>) ; les trois autres restent conformes
+            (mono-axe).
+          </li>
+          <li>
+            <strong>Timeline d'attaque (escalade crescendo)</strong> :
+            l'adversaire (<em>utilisateur = adversaire</em>) pousse l'agent{" "}
+            <strong>tour apres tour</strong>, montant progressivement la pression
+            jusqu'a l'action sensible visee. La timeline montre cette escalade en
+            ordre.
+          </li>
+          <li>
+            <strong>Journal d'actions (declare vs reel)</strong> : chaque action
+            reellement faite par l'agent porte le verdict du <strong>juge</strong>{" "}
+            -- <strong>conforme</strong> (dans le perimetre declare),{" "}
+            <strong>hors perimetre</strong> (outil/handoff non declare ={" "}
+            <code>capability_overreach</code>), ou <strong>non approuvee</strong>{" "}
+            (un outil <code>approbation: toujours</code> invoque sans approbation
+            = <code>policy_violation</code>, I6). C'est ce marquage qui rend
+            l'anomalie lisible action par action.
+          </li>
+          <li>
+            <strong>Promouvoir vers le corpus</strong> : une anomalie attrapee et{" "}
+            <strong>mono-axe</strong> peut etre figee en{" "}
+            <strong>sujet negatif</strong> (<code>corpus/.../incorrect/&lt;slug&gt;/</code>),
+            reutilisable ensuite par la recette. Si le sujet existe deja, le
+            bouton devient <strong>Remplacer</strong>.
+          </li>
+        </ul>
+        <h3>Le CLI fait la meme chose (l'UI est le miroir)</h3>
+        <ul>
+          <li>
+            <code>recette redteam</code> : produit la scorecard (les compteurs
+            ci-dessus).
+          </li>
+          <li>
+            <code>recette redteam-record</code> : enregistre une attaque live et
+            la fige en scenario rejouable.
+          </li>
+          <li>
+            <code>recette redteam-promote</code> : fige une anomalie attrapee en
+            sujet negatif du corpus.
+          </li>
+        </ul>
       </>
     ),
   },

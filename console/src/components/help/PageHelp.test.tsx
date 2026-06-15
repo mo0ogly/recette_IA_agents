@@ -27,6 +27,14 @@ describe("PageHelp", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("renders the redteam topic with its MAF detail blocks", () => {
+    render(<PageHelp topic="redteam" />);
+    fireEvent.click(screen.getByRole("button", { name: /aide/i }));
+    expect(screen.getByText(HELP_TOPICS.redteam.title)).toBeTruthy();
+    expect(screen.getByText(/Capacites declarees/)).toBeTruthy();
+    expect(screen.getByText(/hors perimetre/)).toBeTruthy();
+  });
+
   it("closes on backdrop click", () => {
     render(<PageHelp topic="catalog" />);
     fireEvent.click(screen.getByRole("button", { name: /aide/i }));
