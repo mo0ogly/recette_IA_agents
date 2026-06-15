@@ -7,6 +7,7 @@ Runners never touch HTTP or asyncio — they are pure orchestration over recette
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 
 from ..adapters import ReferenceDiscoveryAdapter, ReferenceIdentificationAdapter
@@ -62,6 +63,26 @@ def resolve_pace(agent_cfg: dict, servers: list[dict]) -> int:
     if pace is None:
         return 0
     return max(0, min(pace, MAX_PACE_MS))
+
+
+def _paced_on_step(inner, pace_ms: int, should_stop):
+    """Wrap an on_step callback so it sleeps ``pace_ms`` AFTER emitting, in
+    PACE_SLICE_MS ticks, bailing as soon as should_stop() is true. At pace 0 it
+    is a transparent pass-through (never sleeps)."""
+    if pace_ms <= 0:
+        return inner
+
+    def wrapped(i: int, step) -> None:
+        inner(i, step)
+        remaining = pace_ms
+        while remaining > 0:
+            if should_stop():
+                return
+            tick = min(PACE_SLICE_MS, remaining)
+            time.sleep(tick / 1000)
+            remaining -= tick
+
+    return wrapped
 
 
 class ProxyForge:
