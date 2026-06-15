@@ -162,6 +162,12 @@ export default function CockpitPage(): JSX.Element {
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
   const running = runStatus === "running" || runStatus === "pending";
+  // Effective pacing delay of the selected/running agent (legibility-first):
+  // the operator should see at a glance that an agent is deliberately slowed.
+  // The servers list is not in scope in the cockpit, so this resolves to the
+  // agent's own pace_ms (the server-inherited pace_ms ?? server.pace_ms ?? 0
+  // resolution lives where the servers list is available); 0 means no pacing.
+  const effectivePaceMs = selected?.pace_ms ?? 0;
 
   // Re-derive the default mock script whenever the operator switches agent, so
   // the scripted action always matches the selected agent's target domain.
@@ -399,6 +405,11 @@ export default function CockpitPage(): JSX.Element {
             {runId !== null && (
               <span className="cockpit-run-id">
                 {runId} -- {runStatus}
+              </span>
+            )}
+            {effectivePaceMs > 0 && (
+              <span className="cockpit-pace-badge" title="Cadence imposee a l'agent (pace_ms)">
+                pace {effectivePaceMs}ms
               </span>
             )}
           </h2>
