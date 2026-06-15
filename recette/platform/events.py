@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import ClassVar
 
 SCHEMA_VERSION = "2.0"
 
@@ -113,19 +114,25 @@ class ResolutionDeniedEvent:
     First-class AUDITED signal (I1): the denied ``name`` is not in the agent's
     declared allowlist, so the resolver refuses it and records this immutable
     event. Frozen -- corrections are new events, never mutations.
+
+    ``event_id`` is an INJECTED input (sequence-derived upstream, like its sibling
+    ``build_bypass_event``); the builder never generates it (I4). ``kind`` is a
+    non-overridable discriminator (``ClassVar``, excluded from ``__init__``).
     """
 
+    event_id: str
+    timestamp: str | None  # captured input, never read from the host clock (I4)
     agent_id: str
     name: str  # the denied name
     reason: str
-    kind: str = EventKind.RESOLUTION_DENIED
-    timestamp: str | None = None  # captured input, never read from the host clock (I4)
     schema_version: str = SCHEMA_VERSION
+    kind: ClassVar[str] = EventKind.RESOLUTION_DENIED
 
     def to_dict(self) -> dict:
         return {
             "schema_version": self.schema_version,
             "kind": self.kind,
+            "event_id": self.event_id,
             "timestamp": self.timestamp,
             "agent_id": self.agent_id,
             "name": self.name,
@@ -135,6 +142,7 @@ class ResolutionDeniedEvent:
 
 def build_resolution_denied(
     *,
+    event_id: str,
     agent_id: str,
     name: str,
     reason: str,
@@ -142,13 +150,15 @@ def build_resolution_denied(
 ) -> ResolutionDeniedEvent:
     """Build the audited ``resolution_denied`` containment event.
 
-    Pure and deterministic: same ``(agent_id, name, reason, timestamp)`` -> same
-    event, byte for byte (I4). ``timestamp`` is an INJECTED input (default
-    ``None``); the builder never reads the host clock.
+    Pure and deterministic: same ``(event_id, agent_id, name, reason, timestamp)``
+    -> same event, byte for byte (I4). ``event_id`` and ``timestamp`` are INJECTED
+    inputs (sequence-derived / captured upstream, like ``build_bypass_event``);
+    the builder never generates an id nor reads the host clock.
     """
     return ResolutionDeniedEvent(
+        event_id=event_id,
+        timestamp=timestamp,
         agent_id=agent_id,
         name=name,
         reason=reason,
-        timestamp=timestamp,
     )
