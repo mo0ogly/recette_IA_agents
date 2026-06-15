@@ -26,6 +26,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from recette.lab.domains import HANDLER_MODULES
+from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
 from recette.platform.catalog.model import ActionSpec
 
@@ -84,11 +85,21 @@ class TestCoverageGuard(unittest.TestCase):
         self.assertEqual(missing, set(), f"catalogued actions with no coverage campaign: {missing}")
 
     def test_d2_every_action_handled_by_lab_server(self) -> None:
+        # A handler has three outcomes (recette/lab/errors.py): a dict (success),
+        # None (unknown action -> unhandled), or a raised LabActionError (a known
+        # action rejecting the probe input -- still HANDLED). Only None counts as
+        # an unhandled action here.
         missing: list[tuple[str, str]] = []
         for domain in self.domains:
             mod = importlib.import_module(f"recette.lab.domains.{HANDLER_MODULES[domain]}")
             for spec in self.specs:
-                if spec.target_system == domain and mod.handle(spec.action_type, "x/x", {}) is None:
+                if spec.target_system != domain:
+                    continue
+                try:
+                    handled = mod.handle(spec.action_type, "x/x", {}) is not None
+                except LabActionError:
+                    handled = True
+                if not handled:
                     missing.append((domain, spec.action_type))
         self.assertEqual(missing, [], f"catalogued actions no lab server handles: {missing}")
 

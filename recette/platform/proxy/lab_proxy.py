@@ -35,6 +35,29 @@ def _transport_error(base_url: str, exc: Exception) -> str:
     return f"proxy transport error: {exc}"
 
 
+def _error_from_envelope(resp: object) -> str:
+    """Build a legible error from a 4xx lab envelope.
+
+    The double answers a rejected action with ``{success:false, error, code?,
+    detail?}`` (a structured error). Surface ``code: message`` so the failure is
+    legible in the ProxyTrace, falling back to the bare status when the body is
+    not the expected shape."""
+    status = getattr(resp, "status", 0)
+    fallback = f"lab returned HTTP {status}"
+    try:
+        body = resp.json()  # type: ignore[attr-defined]
+    except Exception:
+        return fallback
+    if not isinstance(body, dict):
+        return fallback
+    message = str(body.get("error") or fallback)
+    code = body.get("code")
+    # Keep the HTTP status in the string (callers/tests rely on it) while adding
+    # the structured code + message so the failure is legible in the ProxyTrace.
+    detail = f"{code}: {message}" if code else message
+    return f"lab HTTP {status}: {detail}"
+
+
 class LabHttpProxy:
     def __init__(
         self, base_url: str | None = None, *, timeout: float = 10.0, proxy_url: str | None = None
@@ -60,7 +83,7 @@ class LabHttpProxy:
             )
         if resp.status >= 400:
             return ExecutionResult(
-                ok=False, status_code=resp.status, error=f"lab returned HTTP {resp.status}"
+                ok=False, status_code=resp.status, error=_error_from_envelope(resp)
             )
         envelope = resp.json()
         if not isinstance(envelope, dict) or not envelope.get("success"):

@@ -87,8 +87,15 @@ def _envelope_ok(data: object) -> bytes:
     return json.dumps({"success": True, "data": data}, sort_keys=True).encode("utf-8")
 
 
-def _envelope_err(message: str) -> bytes:
-    return json.dumps({"success": False, "error": message}, sort_keys=True).encode("utf-8")
+def _envelope_err(
+    message: str, code: str | None = None, detail: dict | None = None
+) -> bytes:
+    body: dict = {"success": False, "error": message}
+    if code is not None:
+        body["code"] = code
+    if detail is not None:
+        body["detail"] = detail
+    return json.dumps(body, sort_keys=True).encode("utf-8")
 
 
 def _append_access_log(record: dict) -> None:
@@ -173,7 +180,8 @@ class _Handler(BaseHTTPRequestHandler):
                     payload if isinstance(payload, dict) else {},
                 )
             except LabActionError as err:
-                status, response = err.status_code, _envelope_err(err.message)
+                status = err.status_code
+                response = _envelope_err(err.message, err.code, err.detail)
             else:
                 if result is None:
                     status, response = (

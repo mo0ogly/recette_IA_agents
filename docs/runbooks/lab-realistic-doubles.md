@@ -17,11 +17,40 @@ stays byte-deterministic so replay (I4) holds.
    returns `bucket` + `acl` + `exposed`), not `{"status": "simulated"}`.
 2. **Input validation -> 422** -- a KNOWN action called with INVALID input (a
    negative amount, malformed IBAN, unknown payee ref, bad currency) raises
-   `LabActionError(422, msg)`. The mock server maps it to that HTTP status + an
-   error envelope `{"success": false, "error": msg}`.
+   `LabActionError(422, msg, code=..., detail={...})`. The mock server maps it to
+   that HTTP status + an error envelope `{"success": false, "error": msg, "code":
+   ..., "detail": {...}}`. `code`/`detail` are optional and back-compatible: a
+   message-only raise still works and the envelope omits the absent keys.
 3. **Deterministic coherence** -- all derived values come from a SHA-256 digest
    of `(domain, action_type, resource, payload)`; no clock, no random, no state.
    The same call always yields the same response (I4).
+
+## The entity model (cross-call coherence with no state)
+
+`recette/lab/domains/_entities.py` is the deterministic entity layer. An entity
+(an invoice, account, supplier) is a PURE function of its id:
+`derive_invoice("inv/9")` returns the same `Invoice` for every action that
+touches `inv/9`, this run and every replay. Cross-call coherence therefore needs
+NO mutable state (I4): two actions on the same id observe the same entity because
+both recompute it from the id alone.
+
+Finance is the first adopter. Consequences:
+
+- `read_invoice_status("inv/9")` and `trigger_refund`/`validate_invoice`/
+  `create_credit_note` on `inv/9` agree on status, amount, currency, payee, line
+  items. A no-amount refund is a FULL refund (same amount as the invoice).
+- A PAID invoice is closed: `trigger_refund` on it -> 422 `invoice_paid`
+  (`detail.hint`: use `create_credit_note`). Refundable states are
+  pending/overdue/disputed.
+- Seed discovery: `read_invoice_status` with an empty/`"all"` resource lists the
+  `SEED_INVOICES` so an agent can find what exists before acting -- no new
+  governed action needed. An arbitrary id still derives a valid entity (any id
+  works); seed ids derive a richer one.
+- Time is a relative ordinal (`due_in_days`), never a wall-clock date, so the
+  model stays byte-stable under replay.
+
+The pattern is generic -- `derive_account`/`derive_supplier` are there too, and
+other domains adopt the same derive-by-id approach in later iterations.
 
 ## The toolkit (do not reinvent per domain)
 

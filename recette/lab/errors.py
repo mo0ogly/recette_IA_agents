@@ -20,10 +20,24 @@ class LabActionError(Exception):
     """A known lab action rejected its input, like the real system would.
 
     ``status_code`` is the HTTP status the mock server returns (4xx); the
-    message is surfaced in the error envelope. Deterministic by construction.
+    message is surfaced in the error envelope. ``code`` is a stable machine
+    token (e.g. ``invoice_paid``) and ``detail`` a structured body (the faulty
+    field, the value seen, the expectation) so a third party reading the trace
+    understands WHY the action was refused without re-deriving it. Both are
+    optional and back-compatible: a message-only raise still works and the
+    envelope simply omits the absent keys. Deterministic by construction.
     """
 
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        *,
+        code: str | None = None,
+        detail: dict | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+        self.code = code
+        self.detail = detail

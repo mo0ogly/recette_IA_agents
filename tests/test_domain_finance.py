@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import unittest
 
+from recette.lab.domains import _entities
 from recette.lab.domains import finance as finance_lab
 from recette.lab.errors import LabActionError
 from recette.platform.catalog import load_catalog
@@ -170,6 +171,87 @@ class TestFinanceCoherence(unittest.TestCase):
         with self.assertRaises(LabActionError) as ctx:
             finance_lab.handle("create_payment", "acct-1", {"payee_id": "payee_DOESNOTEXIST"})
         self.assertEqual(ctx.exception.status_code, 422)
+
+
+class TestFinanceEntityModel(unittest.TestCase):
+    """The shared entity model: invoice views are coherent across actions, a paid
+    invoice cannot be refunded, and discovery lists the seed invoices. All pure
+    functions of the id (I4)."""
+
+    # Verified deterministic statuses (entity model is pure on the id):
+    #   inv/2024-0001 -> paid (closed), inv/2024-0002 -> disputed (refundable).
+    PAID_INVOICE = "inv/2024-0001"
+    REFUNDABLE_INVOICE = "inv/2024-0002"
+
+    def test_paid_seed_is_paid_and_refundable_seed_is_not(self) -> None:
+        self.assertEqual(_entities.derive_invoice(self.PAID_INVOICE).status, "paid")
+        self.assertFalse(_entities.derive_invoice(self.PAID_INVOICE).refundable)
+        self.assertTrue(_entities.derive_invoice(self.REFUNDABLE_INVOICE).refundable)
+
+    def test_read_then_refund_is_coherent(self) -> None:
+        read = finance_lab.handle("read_invoice_status", self.REFUNDABLE_INVOICE, {})
+        refund = finance_lab.handle("trigger_refund", self.REFUNDABLE_INVOICE, {})
+        assert read is not None and refund is not None
+        # A no-amount refund is a full refund of the SAME invoice: same amount,
+        # same currency, same invoice id -- coherence with no stored state.
+        self.assertEqual(read["amount_due"], refund["amount"])
+        self.assertEqual(read["currency"], refund["currency"])
+        self.assertEqual(read["invoice_id"], refund["invoice_id"])
+
+    def test_invoice_view_stable_across_actions(self) -> None:
+        iid = self.REFUNDABLE_INVOICE
+        read = finance_lab.handle("read_invoice_status", iid, {})
+        validated = finance_lab.handle("validate_invoice", iid, {})
+        credit = finance_lab.handle("create_credit_note", iid, {})
+        assert read is not None and validated is not None and credit is not None
+        self.assertEqual(read["invoice_status"], validated["invoice_status"])
+        self.assertEqual(read["amount_due"], validated["amount_due"])
+        self.assertEqual(read["amount_due"], credit["amount"])
+
+    def test_refund_paid_invoice_rejected(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            finance_lab.handle("trigger_refund", self.PAID_INVOICE, {})
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "invoice_paid")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["status"], "paid")
+
+    def test_read_with_empty_resource_lists_seed_invoices(self) -> None:
+        listing = finance_lab.handle("read_invoice_status", "", {})
+        assert listing is not None
+        ids = [inv["invoice_id"] for inv in listing["invoices"]]
+        self.assertEqual(ids, list(_entities.SEED_INVOICES))
+
+    def test_read_carries_line_items(self) -> None:
+        read = finance_lab.handle("read_invoice_status", self.REFUNDABLE_INVOICE, {})
+        assert read is not None
+        self.assertTrue(read["line_items"])
+        for line in read["line_items"]:
+            self.assertIn("sku", line)
+            self.assertIn("subtotal", line)
+
+    def test_modify_iban_shows_old_and_new(self) -> None:
+        resp = finance_lab.handle(
+            "modify_iban", "acct-7", {"iban": "DE89370400440532013000"}
+        )
+        assert resp is not None
+        self.assertIn("old_iban", resp)
+        self.assertNotEqual(resp["old_iban"], resp["iban"])
+
+    def test_structured_error_carries_code_and_detail(self) -> None:
+        with self.assertRaises(LabActionError) as ctx:
+            finance_lab.handle("create_payment", "acct-1", {"amount": -5})
+        self.assertEqual(ctx.exception.code, "invalid_amount")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "amount")
+
+    def test_entity_derivation_is_deterministic(self) -> None:
+        self.assertEqual(
+            _entities.derive_invoice("inv/x"), _entities.derive_invoice("inv/x")
+        )
+        self.assertEqual(
+            _entities.derive_account("acct/y"), _entities.derive_account("acct/y")
+        )
 
 
 class TestFinanceInLoadedCatalog(unittest.TestCase):
