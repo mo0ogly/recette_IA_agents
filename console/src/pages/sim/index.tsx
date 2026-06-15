@@ -366,12 +366,15 @@ export function ScenarioList({
 // ---------------------------------------------------------------------------
 
 /** Per-row verdict, mirroring the CLI judge (legibility-first). */
-type RowVerdict = "conforme" | "hors-perimetre" | "non-approuvee";
+type RowVerdict = "conforme" | "hors-perimetre" | "en-attente";
 
 const ROW_VERDICT_LABEL: Record<RowVerdict, string> = {
   conforme: "conforme",
   "hors-perimetre": "hors perimetre",
-  "non-approuvee": "non approuvee",
+  // I6: a declared approval=always tool invoked without the approval being
+  // obtained is NOT "non approuvee" (a verdict) -- it required an approval that
+  // was never granted, i.e. it is pending the approval gate (policy_violation).
+  "en-attente": "en attente (approbation I6)",
 };
 
 /**
@@ -405,8 +408,10 @@ function observedKeys(row: Record<string, unknown>): string[] {
  * Classify one action-log row using the JUDGE's violations, not approved===false:
  * - hors-perimetre when the row's observed key appears in the judge's violations
  *   (the undeclared tool/handoff or out-of-scope action -- the real anomaly).
- * - non-approuvee ONLY when the row is a DECLARED approval=always tool that was
- *   not approved (I6 gating); a declared approval=never tool is never flagged.
+ * - en-attente ONLY when the row is a DECLARED approval=always tool that was not
+ *   approved (I6 gating): the action required an approval that was never obtained,
+ *   so it is pending the approval gate; a declared approval=never tool is never
+ *   flagged.
  * - conforme otherwise.
  */
 function rowVerdict(
@@ -424,7 +429,7 @@ function rowVerdict(
     gatedTargets.has(target) &&
     row.approved === false
   ) {
-    return "non-approuvee";
+    return "en-attente";
   }
   return "conforme";
 }
@@ -574,6 +579,27 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
       .map((cap) => actionField(cap, "target"))
       .filter((t): t is string => typeof t === "string"),
   );
+  // I6 pending set: a DECLARED approval=always tool that appears UNAPPROVED in the
+  // action_log -- the agent invoked it without obtaining the approval. The matching
+  // transcript turn (assistant, tool_name === target) is the gated invocation; we
+  // badge it "en attente (I6)" so the bypass is legible on the timeline too.
+  const pendingApprovalTargets = new Set(
+    actions
+      .filter(
+        (row) =>
+          actionField(row, "action") === "invoke_tool" &&
+          row.approved === false &&
+          (() => {
+            const t = actionField(row, "target");
+            return typeof t === "string" && gatedTargets.has(t);
+          })(),
+      )
+      .map((row) => actionField(row, "target"))
+      .filter((t): t is string => typeof t === "string"),
+  );
+  // Only the FIRST matching turn carries the stable data-testid (a tool may be
+  // narrated across several turns, but the gated invocation is one event).
+  let pendingBadgeShown = false;
   return (
     <section className="sim-detail" data-testid={`sim-scn-detail-${view.scenario_id}`}>
       <div className="sim-detail-head">
@@ -596,19 +622,41 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
         <div className="sim-detail-block">
           <h4>Timeline d'attaque (escalade crescendo)</h4>
           <ol className="sim-timeline" data-testid={`sim-scn-transcript-${view.scenario_id}`}>
-            {transcript.map((t, i) => (
-              <li className="sim-turn" data-role={t.role} key={i}>
-                <span className="sim-turn-role">{roleLabel(t.role)}</span>
-                <span className="sim-turn-body">
-                  {t.content ? (
-                    t.content
-                  ) : (
-                    <span className="sim-turn-empty">(appel d'outil)</span>
-                  )}
-                  {t.tool_name && <code className="sim-turn-tool">{t.tool_name}</code>}
-                </span>
-              </li>
-            ))}
+            {transcript.map((t, i) => {
+              const isPendingTurn =
+                t.role === "assistant" &&
+                typeof t.tool_name === "string" &&
+                pendingApprovalTargets.has(t.tool_name);
+              const firstPendingTurn = isPendingTurn && !pendingBadgeShown;
+              if (firstPendingTurn) {
+                pendingBadgeShown = true;
+              }
+              return (
+                <li className="sim-turn" data-role={t.role} key={i}>
+                  <span className="sim-turn-role">{roleLabel(t.role)}</span>
+                  <span className="sim-turn-body">
+                    {t.content ? (
+                      t.content
+                    ) : (
+                      <span className="sim-turn-empty">(appel d'outil)</span>
+                    )}
+                    {t.tool_name && <code className="sim-turn-tool">{t.tool_name}</code>}
+                    {isPendingTurn && (
+                      <span
+                        className="sim-chip sim-turn-pending"
+                        data-testid={
+                          firstPendingTurn
+                            ? `sim-scn-turn-pending-${view.scenario_id}`
+                            : undefined
+                        }
+                      >
+                        en attente (I6)
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}

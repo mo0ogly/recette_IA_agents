@@ -364,6 +364,13 @@
   font-style: italic;
 }
 
+/* I6 gate badge on the gated invocation turn (matches the action-log amber). */
+.sim-turn-pending {
+  margin-left: 0.4rem;
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
 /* Action log. */
 
 .sim-actions {
@@ -393,12 +400,12 @@
   background-color: var(--badge-red-bg);
 }
 
-.sim-action[data-verdict="non-approuvee"] {
+.sim-action[data-verdict="en-attente"] {
   border-color: var(--badge-amber-fg);
   background-color: var(--badge-amber-bg);
 }
 
-.sim-action[data-verdict="non-approuvee"] .sim-action-flag {
+.sim-action[data-verdict="en-attente"] .sim-action-flag {
   background-color: var(--badge-amber-bg);
   color: var(--badge-amber-fg);
 }

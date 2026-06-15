@@ -562,10 +562,11 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             reellement faite par l'agent porte le verdict du <strong>juge</strong>{" "}
             -- <strong>conforme</strong> (dans le perimetre declare),{" "}
             <strong>hors perimetre</strong> (outil/handoff non declare ={" "}
-            <code>capability_overreach</code>), ou <strong>non approuvee</strong>{" "}
-            (un outil <code>approbation: toujours</code> invoque sans approbation
-            = <code>policy_violation</code>, I6). C'est ce marquage qui rend
-            l'anomalie lisible action par action.
+            <code>capability_overreach</code>), ou{" "}
+            <strong>en attente (approbation requise, non obtenue)</strong> (un
+            outil <code>approbation: toujours</code> invoque sans que
+            l'approbation soit obtenue = <code>policy_violation</code>, I6).
+            C'est ce marquage qui rend l'anomalie lisible action par action.
           </li>
           <li>
             <strong>Promouvoir vers le corpus</strong> : une anomalie attrapee et{" "}

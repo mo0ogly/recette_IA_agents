@@ -19,6 +19,7 @@ import { promoteSimScenario } from "../../api/client";
 import type { SimPromoteResult, SimScenario, SimScenarioView } from "../../api/client";
 import gitScenarioDetailFixture from "./__fixtures__/gitScenarioDetail.fixture.json";
 import gitScenariosFixture from "./__fixtures__/gitScenarios.fixture.json";
+import mafApprovalDetailFixture from "./__fixtures__/mafApprovalDetail.fixture.json";
 import promoteFixture from "./__fixtures__/promote.fixture.json";
 import scenarioDetailFixture from "./__fixtures__/scenarioDetail.fixture.json";
 import scenariosFixture from "./__fixtures__/scenarios.fixture.json";
@@ -233,6 +234,41 @@ describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
     expect(webRow).toHaveAttribute("data-verdict", "conforme");
     // Exactly one row is flagged -- not both (the bug this fixes).
     expect(rows.filter((r) => r.getAttribute("data-verdict") !== "conforme").length).toBe(1);
+  });
+
+  it("marks the I6-gated deploy row 'en attente', web_search conforme (approval-bypass fixture)", () => {
+    // I6: the declared approval=always tool (deploy) was invoked unapproved -- it
+    // required an approval that was never obtained, so the row reads "en attente",
+    // NOT "non approuvee". The declared approval=never web_search stays conforme.
+    const view = mafApprovalDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    const log = screen.getByTestId(`sim-scn-actions-${view.scenario_id}`);
+    const rows = within(log).getAllByRole("listitem");
+    const byTarget = (target: string): HTMLElement | undefined =>
+      rows.find((r) =>
+        Array.from(r.querySelectorAll(".sim-action-target")).some(
+          (el) => el.textContent === target,
+        ),
+      );
+    const deployRow = byTarget("deploy");
+    const webRow = byTarget("web_search");
+    expect(deployRow).toBeDefined();
+    expect(webRow).toBeDefined();
+    expect(deployRow).toHaveAttribute("data-verdict", "en-attente");
+    expect(webRow).toHaveAttribute("data-verdict", "conforme");
+    // The visible FR label conveys pending-approval, not a flat "non approuvee".
+    expect(within(deployRow!).getByText(/en attente/)).toBeInTheDocument();
+  });
+
+  it("badges the gated deploy turn 'en attente (I6)' on the transcript (approval-bypass fixture)", () => {
+    const view = mafApprovalDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    const badge = screen.getByTestId(`sim-scn-turn-pending-${view.scenario_id}`);
+    expect(badge).toHaveTextContent("en attente (I6)");
+    // The badge sits on the assistant turn that invoked the gated deploy tool.
+    const turn = badge.closest('[data-role="assistant"]');
+    expect(turn).not.toBeNull();
+    expect(within(turn as HTMLElement).getByText("deploy")).toBeInTheDocument();
   });
 
   it("renders the git goal and action log without a transcript (git fixture)", () => {
