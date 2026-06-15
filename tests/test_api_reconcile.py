@@ -13,6 +13,7 @@ try:
     from fastapi.testclient import TestClient
 
     from recette.api.app import create_app
+    from recette.platform.eventstore.memory_store import InMemoryEventStore
 
     _HAS_FASTAPI = True
 except ImportError:  # pragma: no cover - depends on the [api] extra
@@ -38,7 +39,9 @@ def _flow(**over: object) -> dict:
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class ReconcileEndpointTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = TestClient(create_app())
+        # Inject a fresh in-memory store so the raise endpoint's idempotency is
+        # tested against a clean log, not a persistent file shared across runs.
+        self.client = TestClient(create_app(event_store=InMemoryEventStore()))
 
     def test_clean_run_reconciles_ok(self) -> None:
         # A single flow to the lab (:8082) -> mediated -> ok.
@@ -53,6 +56,21 @@ class ReconcileEndpointTest(unittest.TestCase):
         body = self.client.get("/proxy/reconcile", params={"run_id": "run-1"}).json()
         self.assertFalse(body["ok"])
         self.assertEqual([f["port"] for f in body["bypass_flows"]], [9113])
+
+    def test_raise_records_one_compensatory_event_and_is_idempotent(self) -> None:
+        self.client.post("/proxy/wire", json=_flow(port=8082))  # mediated
+        self.client.post("/proxy/wire", json=_flow(port=9113, path="/write"))  # ghost
+        first = self.client.post("/proxy/reconcile/raise", params={"run_id": "run-1"}).json()
+        self.assertEqual(first["raised"], 1)
+        self.assertEqual(len(first["event_ids"]), 1)
+        # Re-raising the same bypass appends nothing (idempotent, no log spam).
+        again = self.client.post("/proxy/reconcile/raise", params={"run_id": "run-1"}).json()
+        self.assertEqual(again["raised"], 0)
+
+    def test_raise_on_clean_run_records_nothing(self) -> None:
+        self.client.post("/proxy/wire", json=_flow(port=8082))  # only the lab
+        body = self.client.post("/proxy/reconcile/raise", params={"run_id": "run-1"}).json()
+        self.assertEqual(body["raised"], 0)
 
 
 if __name__ == "__main__":

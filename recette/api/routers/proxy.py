@@ -140,19 +140,11 @@ def set_proxy_route(request: Request, body: dict) -> dict:
     return {"active": chosen.id, "proxy_url": chosen.proxy_url}
 
 
-@router.get("/reconcile")
-def get_reconcile(request: Request, run_id: str | None = None) -> dict:
-    """Wire-vs-audit reconciliation (run-scoped join).
+def _reconcile_report(request: Request, run_id: str | None):
+    """Compute the run-scoped wire<->audit reconciliation over the live recorders.
 
-    Joins the wire view (WireFlow) with the audit view (ProxyTrace) by run_id.
-    A wire flow whose target (host:port) is a mediated endpoint (the lab, a
-    mock_local server) is EXPLAINED; a flow to a non-mediated target (e.g. the
-    shadow-db honeypot :9113) has no matching audit event -- the ghost-agent
-    signal. ``audited_run_ids`` reports which runs produced a genuine mediated
-    side effect. LLM backend hosts are not yet allowlisted (the deterministic
-    proof drives a mock probe, no LLM traffic on the wire); a per-flow
-    side_effect_hash join (ghost via an allowlisted target) is phase 3. The lab
-    OBSERVES the unmediated path; it does not ENFORCE a network block."""
+    Shared by the read endpoint and the raise endpoint so both see the exact
+    same join. Pure given the recorder snapshots (I4); no side effect here."""
     from urllib.parse import urlparse
 
     from ...platform.proxy.lab_proxy import lab_url_from_env
@@ -172,9 +164,61 @@ def get_reconcile(request: Request, run_id: str | None = None) -> dict:
         lab_host=lab_host,
         llm_hosts=set(),
     )
-    report = reconcile_run(
-        [f.to_dict() for f in flows],
-        [t.to_dict() for t in traces],
-        allow,
-    )
+    return reconcile_run([f.to_dict() for f in flows], [t.to_dict() for t in traces], allow)
+
+
+@router.get("/reconcile")
+def get_reconcile(request: Request, run_id: str | None = None) -> dict:
+    """Wire-vs-audit reconciliation (run-scoped join).
+
+    Joins the wire view (WireFlow) with the audit view (ProxyTrace) by run_id.
+    A wire flow whose target (host:port) is a mediated endpoint (the lab, a
+    mock_local server) is EXPLAINED; a flow to a non-mediated target (e.g. the
+    shadow-db honeypot :9113) has no matching audit event -- the ghost-agent
+    signal. ``audited_run_ids`` reports which runs produced a genuine mediated
+    side effect. LLM backend hosts are not yet allowlisted (the deterministic
+    proof drives a mock probe, no LLM traffic on the wire); a per-flow
+    side_effect_hash join (ghost via an allowlisted target) is phase 3. The lab
+    OBSERVES the unmediated path; it does not ENFORCE a network block. Read-only;
+    POST /proxy/reconcile/raise records the bypass as a compensatory event."""
+    report = _reconcile_report(request, run_id)
     return {"run_id": run_id, **report.to_dict()}
+
+
+@router.post("/reconcile/raise")
+def raise_reconcile(request: Request, run_id: str | None = None) -> dict:
+    """Record each detected bypass as a compensatory ``bypass_detected`` event
+    in the append-only audit log (I1) -- the Control Plane alert (scenario step 5).
+
+    Idempotent: a bypass already recorded (same side_effect_hash) is not appended
+    twice, so polling the raise endpoint never spams the log. The decision
+    (reconcile) is pure; the event ``timestamp`` is a wall-clock value captured
+    HERE at the boundary as an INPUT (I4), never read inside the join. Because
+    the result is a normal canonical event, replaying the stream reproduces it
+    (step 6)."""
+    from datetime import UTC, datetime
+
+    from ...platform.events import EventKind
+    from ...platform.proxy.bypass_event import raise_bypass_events
+    from ..app import RestartSafeIdGenerator
+
+    store = request.app.state.event_store
+    report = _reconcile_report(request, run_id)
+    already = {
+        e.payload.get("side_effect_hash")
+        for e in store.read_from(kind=EventKind.BYPASS_DETECTED)
+        if e.payload.get("side_effect_hash")
+    }
+    ids = RestartSafeIdGenerator(store)
+    timestamp = datetime.now(UTC).isoformat()
+    events = raise_bypass_events(
+        report, next_event_id=ids.next_id, timestamp=timestamp, already_raised=already
+    )
+    for event in events:
+        store.append(
+            event_id=event.event_id,
+            kind=EventKind.BYPASS_DETECTED,
+            payload=event.to_dict(),
+            schema_version=event.schema_version,
+        )
+    return {"raised": len(events), "event_ids": [e.event_id for e in events]}

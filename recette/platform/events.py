@@ -26,6 +26,7 @@ class EventKind(StrEnum):
     ACTION_DENIED = "action_denied"  # deny verdict, never executed
     APPROVAL_RESOLVED = "approval_resolved"  # approved | denied | timeout
     PLATFORM_ERROR = "platform_error"  # audited internal failure (fail-safe deny)
+    BYPASS_DETECTED = "bypass_detected"  # unmediated path observed post-hoc (wire<->audit)
 
 
 class PolicyVerdict(StrEnum):
