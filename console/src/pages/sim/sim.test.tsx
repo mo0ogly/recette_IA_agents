@@ -22,7 +22,7 @@ import gitScenariosFixture from "./__fixtures__/gitScenarios.fixture.json";
 import promoteFixture from "./__fixtures__/promote.fixture.json";
 import scenarioDetailFixture from "./__fixtures__/scenarioDetail.fixture.json";
 import scenariosFixture from "./__fixtures__/scenarios.fixture.json";
-import { ScenarioDetail, ScenarioList } from "./index";
+import { computeScorecard, Scorecard, ScenarioDetail, ScenarioList } from "./index";
 
 vi.mock("../../api/client", () => ({
   getSimRuns: vi.fn(),
@@ -54,18 +54,18 @@ describe("ScenarioList (cards)", () => {
     }
   });
 
-  it("shows a green caught badge for an anomaly-caught scenario", () => {
+  it("shows a green caught badge (attrapee) for an anomaly-caught scenario", () => {
     render(<ScenarioList scenarios={maf} />);
     const caught = maf.filter((s) => s.anomaly_caught);
     expect(caught.length).toBeGreaterThan(0);
     for (const s of caught) {
       const badge = screen.getByTestId(`sim-scn-caught-${s.scenario_id}`);
       expect(badge).toHaveClass("sim-caught");
-      expect(badge).toHaveTextContent("caught");
+      expect(badge).toHaveTextContent("attrapee");
     }
   });
 
-  it("shows a red missed badge when anomaly_caught is false", () => {
+  it("shows a red missed badge (ratee) when anomaly_caught is false", () => {
     const missed: SimScenario = {
       scenario_id: "rt-synthetic-missed",
       name: "Synthetic missed scenario",
@@ -79,7 +79,7 @@ describe("ScenarioList (cards)", () => {
     render(<ScenarioList scenarios={[missed]} />);
     const badge = screen.getByTestId("sim-scn-caught-rt-synthetic-missed");
     expect(badge).toHaveClass("sim-missed");
-    expect(badge).toHaveTextContent("missed");
+    expect(badge).toHaveTextContent("ratee");
   });
 
   it("renders the OWASP ASI standards chip when present", () => {
@@ -97,7 +97,7 @@ describe("ScenarioList (cards)", () => {
     render(<ScenarioList scenarios={maf} />);
     const btn = screen.getByTestId(`sim-scn-promote-${incorrect.scenario_id}`);
     expect(btn).not.toBeDisabled();
-    expect(btn).toHaveTextContent("Promote to corpus");
+    expect(btn).toHaveTextContent("Promouvoir vers le corpus");
   });
 
   it("disables Promote for a true negative (verdict=correct)", () => {
@@ -105,7 +105,7 @@ describe("ScenarioList (cards)", () => {
     render(<ScenarioList scenarios={maf} />);
     const btn = screen.getByTestId(`sim-scn-promote-${correct.scenario_id}`);
     expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute("title", "nothing to promote");
+    expect(btn).toHaveAttribute("title", "rien a promouvoir");
   });
 
   it("promotes a caught anomaly and renders the created corpus paths", async () => {
@@ -168,14 +168,65 @@ describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
     const view = scenarioDetailFixture as SimScenarioView;
     render(<ScenarioDetail view={view} />);
     const log = screen.getByTestId(`sim-scn-actions-${view.scenario_id}`);
-    expect(within(log).getAllByText("unapproved").length).toBeGreaterThan(0);
+    expect(within(log).getAllByText(/non approuvee/).length).toBeGreaterThan(0);
   });
 
   it("renders the git goal and action log without a transcript (git fixture)", () => {
     const view = gitScenarioDetailFixture as SimScenarioView;
     render(<ScenarioDetail view={view} />);
-    expect(screen.getByText(/Goal:/)).toBeInTheDocument();
+    expect(screen.getByText(/Objectif :/)).toBeInTheDocument();
     expect(screen.getByTestId(`sim-scn-actions-${view.scenario_id}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`sim-scn-transcript-${view.scenario_id}`)).toBeNull();
+  });
+});
+
+describe("Scorecard (CLI mirror)", () => {
+  it("computes total / caught / missed over both families like recette redteam", () => {
+    const all = [...maf, ...git];
+    const card = computeScorecard(all);
+    // Manual ground truth from the fixtures.
+    const caughtAnomalies = all.filter(
+      (s) => s.anomaly_caught && s.verdict === "incorrect",
+    ).length;
+    const conform = all.filter(
+      (s) => s.anomaly_caught && s.verdict === "correct",
+    ).length;
+    const missed = all.filter((s) => !s.anomaly_caught).length;
+    expect(card.total).toBe(all.length);
+    expect(card.anomaliesCaught).toBe(caughtAnomalies);
+    expect(card.conformNoFalseAlarm).toBe(conform);
+    expect(card.missed).toBe(missed);
+    // caught + missed = total (mirrors the CLI invariant).
+    expect(card.anomaliesCaught + card.conformNoFalseAlarm + card.missed).toBe(
+      all.length,
+    );
+  });
+
+  it("groups by OWASP tag, sorted deterministically", () => {
+    const card = computeScorecard([...maf, ...git]);
+    const tags = card.byOwasp.map(([t]) => t);
+    expect(tags).toEqual([...tags].sort());
+    const sum = card.byOwasp.reduce((acc, [, n]) => acc + n, 0);
+    const tagged = [...maf, ...git].filter((s) => s.tags.owasp_asi).length;
+    expect(sum).toBe(tagged);
+  });
+
+  it("renders the scorecard chips from the fixtures", () => {
+    const all = [...maf, ...git];
+    const card = computeScorecard(all);
+    render(<Scorecard scenarios={all} />);
+    expect(screen.getByTestId("sim-scorecard")).toBeInTheDocument();
+    expect(screen.getByTestId("sim-scorecard-total")).toHaveTextContent(String(all.length));
+    expect(screen.getByTestId("sim-scorecard-caught")).toHaveTextContent(
+      String(card.anomaliesCaught),
+    );
+    expect(screen.getByTestId("sim-scorecard-missed")).toHaveTextContent(
+      String(card.missed),
+    );
+    for (const [tag, n] of card.byOwasp) {
+      expect(screen.getByTestId(`sim-scorecard-owasp-${tag}`)).toHaveTextContent(
+        String(n),
+      );
+    }
   });
 });

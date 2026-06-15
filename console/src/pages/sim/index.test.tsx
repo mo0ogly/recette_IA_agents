@@ -58,11 +58,27 @@ const maf = (scenariosFixture as unknown as { scenarios: SimScenario[] }).scenar
 const git = (gitScenariosFixture as unknown as { scenarios: SimScenario[] }).scenarios;
 
 describe("SimPage", () => {
-  it("renders a card for every MAF and git scenario", async () => {
+  it("defaults to the Scorecard tab and mirrors the CLI counts from both families", async () => {
     render(<SimPage />);
+    // Wait until both lists are loaded (the scorecard depends on them).
+    const total = await screen.findByTestId("sim-scorecard-total");
+    const all = [...maf, ...git];
+    expect(total).toHaveTextContent(String(all.length));
+    const caught = all.filter((s) => s.anomaly_caught && s.verdict === "incorrect").length;
+    const missed = all.filter((s) => !s.anomaly_caught).length;
+    expect(screen.getByTestId("sim-scorecard-caught")).toHaveTextContent(String(caught));
+    expect(screen.getByTestId("sim-scorecard-missed")).toHaveTextContent(String(missed));
+    // On the scorecard tab, no scenario cards are shown.
+    expect(screen.queryByTestId(`sim-scn-card-${maf[0].scenario_id}`)).toBeNull();
+  });
+
+  it("renders a card for every MAF and git scenario once their tabs are active", async () => {
+    render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-maf"));
     for (const s of maf) {
       expect(await screen.findByTestId(`sim-scn-card-${s.scenario_id}`)).toBeInTheDocument();
     }
+    fireEvent.click(screen.getByTestId("sim-tab-git"));
     for (const s of git) {
       expect(await screen.findByTestId(`sim-scn-card-${s.scenario_id}`)).toBeInTheDocument();
     }
@@ -70,6 +86,7 @@ describe("SimPage", () => {
 
   it("opens a MAF detail panel with the broken dimension red and the transcript", async () => {
     render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-maf"));
     const detail = scenarioDetailFixture as SimScenarioView;
     fireEvent.click(await screen.findByTestId(`sim-scn-card-${detail.scenario_id}`));
     // The four-dimension matrix: the broken axis is red, the others conform.
@@ -84,6 +101,7 @@ describe("SimPage", () => {
 
   it("opens a git detail panel (goal + action log, no transcript)", async () => {
     render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-git"));
     const detail = gitScenarioDetailFixture as SimScenarioView;
     fireEvent.click(await screen.findByTestId(`sim-scn-card-${detail.scenario_id}`));
     expect(
@@ -96,6 +114,7 @@ describe("SimPage", () => {
 
   it("renders the frozen-recordings stepper and steps the cursor", async () => {
     render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-recordings"));
     expect(await screen.findByTestId("sim-run-sim-diagnostic-redteam")).toBeInTheDocument();
     expect(screen.getByTestId("sim-run-sim-diagnostic-clean")).toBeInTheDocument();
     expect(await screen.findByTestId("sim-verdict")).toHaveTextContent("incorrect");
@@ -104,14 +123,15 @@ describe("SimPage", () => {
     expect(screen.getByTestId("sim-checks")).toHaveTextContent("FAIL");
 
     await screen.findByTestId("sim-cursor");
-    expect(screen.getByTestId("sim-cursor")).toHaveTextContent("turn 1/");
-    fireEvent.click(screen.getByText("Next"));
-    expect(screen.getByTestId("sim-cursor")).toHaveTextContent("turn 2/");
+    expect(screen.getByTestId("sim-cursor")).toHaveTextContent("tour 1/");
+    fireEvent.click(screen.getByText("Suivant"));
+    expect(screen.getByTestId("sim-cursor")).toHaveTextContent("tour 2/");
   });
 
   it("shows an inline error when the run list fails", async () => {
     vi.mocked(getSimRuns).mockRejectedValue(new Error("boom"));
     render(<SimPage />);
+    fireEvent.click(screen.getByTestId("sim-tab-recordings"));
     await waitFor(() => expect(screen.getByTestId("sim-list-error")).toHaveTextContent("boom"));
   });
 });

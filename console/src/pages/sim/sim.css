@@ -48,6 +48,24 @@
   font-style: italic;
 }
 
+/* --- Scorecard (CLI mirror) --------------------------------------------- */
+
+/* The scorecard reuses the verdicts-page chips (.verdict-scorecard /
+ * .verdict-stat); these add the caught/missed accent and the OWASP label. */
+.sim-stat-caught {
+  border-color: var(--badge-green-fg);
+  color: var(--badge-green-fg);
+}
+
+.sim-stat-missed {
+  border-color: var(--badge-red-fg);
+  color: var(--badge-red-fg);
+}
+
+.sim-owasp-label {
+  align-self: center;
+}
+
 /* --- Scenario card grid ------------------------------------------------- */
 
 .sim-grid {
@@ -137,6 +155,11 @@
 
 .sim-promoted li {
   padding: 0.1rem 0;
+}
+
+.sim-promoted-intro {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .sim-promote-error {
