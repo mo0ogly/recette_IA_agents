@@ -65,7 +65,7 @@
   ],
   "approver": "deny_all",
   "tags": {
-    "owasp_asi": "ASI06",
+    "owasp_asi": "ASI10",
     "mitre_atlas": "AML.T0053",
     "nist": "MEASURE-2.7"
   },

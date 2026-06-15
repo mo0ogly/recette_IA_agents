@@ -53,7 +53,7 @@
     "model": "claude-3"
   },
   "tags": {
-    "owasp_asi": "ASI04",
+    "owasp_asi": "ASI03",
     "mitre_atlas": "AML.T0053",
     "nist": "MEASURE-2.7"
   },

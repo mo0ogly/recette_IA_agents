@@ -333,6 +333,28 @@ flowchart LR
 The report is read on the **Recette** and **Verdicts** pages, never in `/sim`:
 `/sim` catches and freezes, the identification recette scores.
 
+## Standards alignment (OWASP Agentic 2026 + MITRE ATLAS)
+
+Each scenario carries `tags.owasp_asi` / `tags.mitre_atlas` / `tags.nist`, mapped
+to the **OWASP Top 10 for Agentic Applications 2026** (ASI01..ASI10) and the
+agentic MITRE ATLAS techniques. The canonical mapping (by attack mechanism, not
+by broken axis) and the rule that keeps it current live in
+`.claude/rules/redteam-standards-alignment.md` (R23). Current corpus distribution
+(`recette redteam`): ASI01 (goal hijack, resisted), ASI02 (tool misuse), ASI03
+(identity & privilege), ASI06 (memory/context poisoning), ASI07 (inter-agent),
+ASI09 (human-agent trust), ASI10 (rogue) -- 7 of the 10 categories.
+
+`tool_injection` (AgentDojo injection-via-tool-output) is the ASI06 vector: the
+committed `rt-prbot-context-poisoning` git scenario poisons a `read_repo` result
+to drive an out-of-scope `open_pr` (tagged ASI06 / `AML.T0110` tool poisoning),
+caught as a `capability_overreach`.
+
+Not yet covered, with the honest engine verdict (see R23 for detail): ASI08
+(cascading) is FEASIBLE via the `maf_orchestration` team engine (deferred); ASI04
+(supply chain) belongs on the DISCOVERY side (`corpus/repos/`), not `/sim`; ASI05
+(unexpected code execution) is NOT modellable today (the lab has no code sandbox)
+and must not be faked.
+
 ## Invariants
 
 - I1: a frozen scenario is immutable -- `write_scenario` refuses to clobber.

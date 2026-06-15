@@ -303,6 +303,16 @@ verifiee (`pyrit>=0.14`, pas `>=0.5`). Verifier une feature dans un env qui matc
 conteneur ; un venv jetable prouve l'extra mais la declaration (extra + pin + Dockerfile/
 runbook) doit rendre la preuve reproductible. Detail : `.claude/rules/docker-dependency-adequation.md`.
 
+**R23 Red-team Standards Alignment:** Tout scenario red-team (`corpus/sim/*.scenario.json`,
+`*.git-scenario.json`) porte des tags standards (`owasp_asi`, `mitre_atlas`, `nist`) qui
+DOIVENT mapper le standard PUBLIE courant -- **OWASP Top 10 for Agentic Applications 2026**
+(ASI01..ASI10) + MITRE ATLAS agentique (`AML.T0086` tool-invocation exfil, `AML.T0110` tool
+poisoning, `AML.T0051` prompt injection ; `AML.T0053` fallback). Tagger par le MECANISME
+d'attaque (pas l'axe casse) : identite -> ASI03, handoff/inter-agent -> ASI07, context
+poisoning -> ASI06, approval-bypass -> ASI09, spam/rogue -> ASI10, tool misuse -> ASI02.
+Verifier la liste a la source avant de tagger (R13) ; ne jamais inventer un ID ATLAS. Mono-axe
+reste loi (R20). Detail + faisabilite ASI04/05/08 : `.claude/rules/redteam-standards-alignment.md`.
+
 ---
 
 ## REFERENCES RULES
@@ -327,6 +337,7 @@ runbook) doit rendre la preuve reproductible. Detail : `.claude/rules/docker-dep
 | `.claude/rules/no-work-loss-multisession-merge.md` | R21 -- merge multi-session sans perte : status avant switch, snapshot, commit+push, reflog/stash recovery, worktree par session |
 | `.claude/rules/recette-and-test-constraints.md` | R20 -- contraintes recettes+tests : unittest stdlib, determinisme, coverage guard, R16, smoke versionne (pas /tmp) |
 | `.claude/rules/docker-dependency-adequation.md` | R22 -- coherence deps Docker : pyproject/Dockerfile/requirements/env de verif alignes ; extras lourds opt-in hors image, pin a l'API verifiee |
+| `.claude/rules/redteam-standards-alignment.md` | R23 -- tags red-team alignes OWASP Agentic 2026 (ASI01-10) + MITRE ATLAS agentique ; mapping canonique par mecanisme ; faisabilite ASI04/05/08 |
 | `.claude/rules/frontend-contract-gate.md` | R16 |
 | `.claude/rules/vuln-fix-latest-version.md` | R17 |
 | `.claude/rules/no-backslash-line-continuation-copypaste.md` | Commandes copy-paste sures |
