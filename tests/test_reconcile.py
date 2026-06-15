@@ -13,38 +13,46 @@ from recette.platform.proxy.reconcile import (
     ReconcileReport,
     build_allowlist,
     reconcile,
+    target_of,
 )
 
 
-def _flow(seq: int, host: str) -> dict:
-    """Minimal wire-flow view: only host + seq matter for the allowlist diff."""
-    return {"seq": seq, "host": host}
+def _flow(seq: int, host: str, port: int = 0) -> dict:
+    """Minimal wire-flow view (matches WireFlow.to_dict: host + port separate)."""
+    return {"seq": seq, "host": host, "port": port}
 
 
 class TestReconcile(unittest.TestCase):
     def test_clean_run_has_no_bypass(self) -> None:
-        flows = [_flow(1, "127.0.0.1:8082"), _flow(2, "127.0.0.1:9101")]
+        flows = [_flow(1, "127.0.0.1", 8082), _flow(2, "127.0.0.1", 9101)]
         allow = {"127.0.0.1:8082", "127.0.0.1:9101"}
         report = reconcile(flows, allow)
         self.assertIsInstance(report, ReconcileReport)
         self.assertTrue(report.ok)
         self.assertEqual(report.bypass_flows, [])
 
+    def test_localhost_alias_matches_127(self) -> None:
+        # mitmproxy may name the local host "localhost"; it must match a
+        # 127.0.0.1 allowlist entry.
+        report = reconcile([_flow(1, "localhost", 8082)], {"127.0.0.1:8082"})
+        self.assertTrue(report.ok)
+        self.assertEqual(target_of(_flow(1, "localhost", 8082)), "127.0.0.1:8082")
+
     def test_flow_outside_allowlist_is_a_bypass(self) -> None:
-        flows = [_flow(1, "127.0.0.1:8082"), _flow(2, "127.0.0.1:9113")]
+        flows = [_flow(1, "127.0.0.1", 8082), _flow(2, "127.0.0.1", 9113)]
         allow = {"127.0.0.1:8082"}
         report = reconcile(flows, allow)
         self.assertFalse(report.ok)
-        self.assertEqual([f["host"] for f in report.bypass_flows], ["127.0.0.1:9113"])
+        self.assertEqual([f["port"] for f in report.bypass_flows], [9113])
 
     def test_unclassifiable_empty_host_is_suspect_not_allowed(self) -> None:
         # Fail-safe classification: an empty/garbage host is never silently allowed.
-        report = reconcile([_flow(1, "")], {"127.0.0.1:8082"})
+        report = reconcile([_flow(1, "", 0)], {"127.0.0.1:8082"})
         self.assertFalse(report.ok)
         self.assertEqual(len(report.bypass_flows), 1)
 
     def test_is_deterministic_and_seq_ordered(self) -> None:
-        flows = [_flow(2, "evil:1"), _flow(1, "127.0.0.1:8082"), _flow(3, "evil:2")]
+        flows = [_flow(2, "evil.test", 1), _flow(1, "127.0.0.1", 8082), _flow(3, "evil.test", 2)]
         allow = {"127.0.0.1:8082"}
         a = reconcile(flows, allow)
         b = reconcile(flows, allow)
