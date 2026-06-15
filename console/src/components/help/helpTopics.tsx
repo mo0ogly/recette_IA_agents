@@ -9,6 +9,23 @@
 
 import type { ReactNode } from "react";
 
+import Mermaid from "./Mermaid";
+
+/** The full red-team loop: /sim catches -> promote -> corpus -> report. */
+const REDTEAM_LOOP_CHART = `flowchart LR
+  SIM["/sim attrape l'anomalie<br/>(recette redteam)"] -->|"Promouvoir<br/>(recette redteam-promote)"| CORP
+  CORP["corpus/agents (git)<br/>corpus/maf_agents (MAF)<br/>incorrect/&lt;slug&gt;/"] --> REC
+  REC["page Recette<br/>(recette run)"] --> REP(["LE RAPPORT"])
+  CORP --> VER["page Verdicts"]
+  VER --> REP`;
+
+/** The shared Lane B engine: cockpit and /sim both call run_agent + judge. */
+const REDTEAM_ENGINE_CHART = `flowchart TD
+  A1["agent (Agents/Campagnes)<br/>LLM live + forge reelle"] --> RA
+  S1["/sim git red-team<br/>ReplayLlm + LabForge"] --> RA
+  RA["lane_b.run_agent<br/>(decide puis act)"] --> JG["judge_subject<br/>(4 dimensions)"]
+  JG --> VD{"verdict"}`;
+
 export type HelpTopicKey =
   | "dashboard"
   | "cockpit"
@@ -638,6 +655,10 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           verdict, mais reproductible. Promouvoir ne cree pas un agent lancable :
           il fige ce jumeau dans le corpus pour la recette d'identification.
         </p>
+        <Mermaid
+          title="Le meme moteur Lane B (cockpit live et /sim deterministe convergent)"
+          chart={REDTEAM_ENGINE_CHART}
+        />
         <h3>Le CLI fait la meme chose (l'UI est le miroir)</h3>
         <ul>
           <li>
@@ -694,6 +715,10 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           (MAF) -&gt; <strong>Recette/Verdicts notent</strong>. C'est la que se lit
           le rapport, pas dans /sim.
         </p>
+        <Mermaid
+          title="La boucle : /sim attrape, Promouvoir fige, Recette/Verdicts notent"
+          chart={REDTEAM_LOOP_CHART}
+        />
       </>
     ),
   },

@@ -37,6 +37,8 @@ describe("PageHelp", () => {
     expect(screen.getAllByText(/hors perimetre/).length).toBeGreaterThan(0);
     // The git (Lane B) section is present and goal-driven.
     expect(screen.getByText(/Detail d'un agent Git \(Lane B\)/)).toBeTruthy();
+    // The redteam topic embeds the two mermaid diagrams (engine + loop).
+    expect(screen.getAllByTestId("help-mermaid").length).toBeGreaterThanOrEqual(2);
   });
 
   it("closes on backdrop click", () => {
