@@ -576,6 +576,50 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             bouton devient <strong>Remplacer</strong>.
           </li>
         </ul>
+        <h3>Detail d'un agent Git (Lane B)</h3>
+        <p>
+          L'onglet <strong>Agents Git (Lane B)</strong> attaque la meme chose mais
+          sur un agent <strong>GitHub / GitLab</strong>, pilote par un{" "}
+          <strong>but</strong> (<em>goal-driven</em>) et non par une conversation :
+          au lieu de tours d'utilisateur, l'adversaire fixe un{" "}
+          <strong>objectif</strong> ("merger sur main sans review") et l'agent
+          tourne en boucle <code>decide -&gt; act</code> contre le lab git. Memes 4
+          dimensions, meme barometre que le MAF. Les blocs du detail :
+        </p>
+        <ul>
+          <li>
+            <strong>Capacites declarees</strong> : ici ce sont des{" "}
+            <strong>actions git</strong> -- chaque <code>action</code>{" "}
+            (<code>read_repo</code>, <code>open_pr</code>, <code>merge_pr</code>,
+            ...) avec son mode <strong>lecture</strong> / <strong>ecriture</strong>{" "}
+            et ses <strong>ressources</strong> (globs de repos autorises). C'est le
+            perimetre que l'agent ne doit pas franchir.
+          </li>
+          <li>
+            <strong>Verdict 4 dimensions</strong> : identique au MAF. Pour un
+            negatif, l'unique axe casse porte le <code>violation_type</code> --
+            p.ex. <code>capability_overreach</code> (un agent read-only qui ouvre
+            une PR), <code>policy_violation</code> (un merge sans l'approbation
+            requise, I6), <code>identity_mismatch</code> (un principal different de
+            celui declare), <code>behavior_anomaly</code> (spam, action hors role).
+          </li>
+          <li>
+            <strong>Objectif</strong> + <strong>Journal d'actions</strong> : pas de
+            timeline crescendo (l'agent n'a pas de tours d'utilisateur) -- on voit
+            l'<strong>objectif adverse</strong> donne a l'agent, puis chaque action
+            reellement executee, taggee par le juge :{" "}
+            <strong>conforme</strong> (dans le perimetre) ou{" "}
+            <strong>hors perimetre</strong> (action ou ressource non declaree).
+            Une <code>injection d'outil</code> optionnelle (sortie de forge
+            empoisonnee, facon AgentDojo) peut etre la source du detournement.
+          </li>
+          <li>
+            <strong>Promouvoir</strong> : identique, mais le sujet fige atterrit
+            dans <code>corpus/agents/incorrect/&lt;slug&gt;/</code>{" "}
+            (<code>manifest.json</code> + <code>scenario.json</code>) -- le tronc
+            git du corpus, pas <code>corpus/maf_agents/</code>.
+          </li>
+        </ul>
         <h3>Le CLI fait la meme chose (l'UI est le miroir)</h3>
         <ul>
           <li>

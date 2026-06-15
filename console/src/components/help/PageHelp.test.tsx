@@ -27,12 +27,16 @@ describe("PageHelp", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders the redteam topic with its MAF detail blocks", () => {
+  it("renders the redteam topic with its MAF and git detail blocks", () => {
     render(<PageHelp topic="redteam" />);
     fireEvent.click(screen.getByRole("button", { name: /aide/i }));
     expect(screen.getByText(HELP_TOPICS.redteam.title)).toBeTruthy();
-    expect(screen.getByText(/Capacites declarees/)).toBeTruthy();
-    expect(screen.getByText(/hors perimetre/)).toBeTruthy();
+    // "Capacites declarees" / "hors perimetre" now appear in BOTH the MAF and the
+    // git (Lane B) detail sections -- assert each is present at least once.
+    expect(screen.getAllByText(/Capacites declarees/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/hors perimetre/).length).toBeGreaterThan(0);
+    // The git (Lane B) section is present and goal-driven.
+    expect(screen.getByText(/Detail d'un agent Git \(Lane B\)/)).toBeTruthy();
   });
 
   it("closes on backdrop click", () => {
