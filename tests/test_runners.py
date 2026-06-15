@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import unittest
 
+import recette.api.runners as runners_mod
 from recette.api.runners import (
     GatewayForge,
     ProxyForge,
@@ -412,6 +413,29 @@ class TestLaneBRunner(unittest.TestCase):
         first = steps[0]
         self.assertEqual(first["decision"]["tool_name"], "read_repo")
         self.assertEqual(first["action"]["action_type"], "read_repo")
+
+    def test_lane_b_runner_paces_when_pace_set(self) -> None:
+        # Pacing wires through the dashboard runner: the agent carries a
+        # pace_ms, so the wrapped on_step sleeps AFTER each step. The agent has
+        # no server binding, so it runs the in-memory LabForge path (no HTTP,
+        # deterministic). We assert time.sleep was called at least once (proves
+        # on_step was paced); with no pace it must NOT sleep (pass-through).
+        sleeps: list[float] = []
+        original_sleep = runners_mod.time.sleep
+        runners_mod.time.sleep = lambda seconds: sleeps.append(seconds)
+        try:
+            agent = _mock_agent("a1", pace_ms=200)
+            runner = make_lane_b_runner(agent, build_stub_llm(READ_THEN_FINAL))
+            runner({}, lambda kind, data: None, lambda: False)
+            self.assertTrue(sleeps, "expected time.sleep to be called (pace not wired)")
+
+            # No pace set -> no sleep (transparent pass-through).
+            sleeps.clear()
+            unpaced = make_lane_b_runner(_mock_agent("a1"), build_stub_llm(READ_THEN_FINAL))
+            unpaced({}, lambda kind, data: None, lambda: False)
+            self.assertEqual(sleeps, [], "expected no sleep when pace is unset")
+        finally:
+            runners_mod.time.sleep = original_sleep
 
 
 class TestReplayRunner(unittest.TestCase):

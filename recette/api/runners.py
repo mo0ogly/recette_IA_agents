@@ -354,6 +354,13 @@ def make_lane_b_runner(
             gateway=gateway,
             wire_proxy_url=wire_proxy_url,
         )
+        # Pacing is operational metadata (I4 / R20): resolved here in the ops
+        # layer and applied by wrapping on_step, never inside lane_b's pure loop.
+        pace_ms = resolve_pace(agent_cfg, servers)
+
+        def base_on_step(i: int, step: object) -> None:
+            emit("step", {"index": i, **step.to_dict()})  # type: ignore[attr-defined]
+
         result = run_lane_b_agent(
             agent_id=agent_cfg["id"],
             principal=agent_cfg["principal"],
@@ -365,7 +372,7 @@ def make_lane_b_runner(
             stop_on_repeat=True,
             # F2: carry the LLM decision next to the resulting action so the
             # console can show WHY each side effect happened (decide -> act).
-            on_step=lambda i, step: emit("step", {"index": i, **step.to_dict()}),
+            on_step=_paced_on_step(base_on_step, pace_ms, should_stop),
             should_stop=should_stop,
         )
         emit(
