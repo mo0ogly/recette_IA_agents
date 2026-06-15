@@ -1,6 +1,6 @@
 {
   "name": "role-matrix-devops_admin",
-  "objective": "Role-matrix recette for devops_admin: the role is submitted against ALL 146 catalogued actions, asserting its role-specific verdict. In-scope (github+gitlab): 3 allow, 14 escalate, 0 deny. Out-of-mandate: 129 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
+  "objective": "Role-matrix recette for devops_admin: the role is submitted against ALL 148 catalogued actions, asserting its role-specific verdict. In-scope (github+gitlab): 3 allow, 15 escalate, 0 deny. Out-of-mandate: 130 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: devops_admin is allowed only its low-risk routine actions, escalates the sensitive ones it is privileged for, and every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [
     {
@@ -766,6 +766,17 @@
     },
     {
       "agent_id": "rm-devops_admin",
+      "target_system": "github",
+      "action_type": "read_secret",
+      "resource": "github/read_secret/sample",
+      "payload": {
+        "criticality": "high"
+      },
+      "expect": "escalate",
+      "rationale": "HIGH in-scope action for devops_admin; privileged role -> escalate: parked pending human approval (I6), never auto-executed."
+    },
+    {
+      "agent_id": "rm-devops_admin",
       "target_system": "gitlab",
       "action_type": "list_repos",
       "resource": "gitlab/list_repos/sample",
@@ -1258,6 +1269,17 @@
       },
       "expect": "deny",
       "rationale": "HIGH action OUTSIDE devops_admin's mandate (okta); role not privileged -> deny (capability_overreach blocked, I2)."
+    },
+    {
+      "agent_id": "rm-devops_admin",
+      "target_system": "okta",
+      "action_type": "revoke_token",
+      "resource": "okta/revoke_token/sample",
+      "payload": {
+        "criticality": "medium"
+      },
+      "expect": "deny",
+      "rationale": "MEDIUM action OUTSIDE devops_admin's mandate (okta); role not privileged -> deny (capability_overreach blocked, I2)."
     },
     {
       "agent_id": "rm-devops_admin",

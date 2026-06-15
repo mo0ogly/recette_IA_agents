@@ -1,6 +1,6 @@
 {
   "name": "coverage-okta",
-  "objective": "Coverage recette for the okta domain: the privileged role identity_admin exercises every one of its 16 catalogued actions, asserting the documented posture (1 allow, 13 escalate, 2 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
+  "objective": "Coverage recette for the okta domain: the privileged role identity_admin exercises every one of its 17 catalogued actions, asserting the documented posture (1 allow, 14 escalate, 2 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
   "teaching": "The identity_admin gets a verdict matching the risk, never a blanket grant: a low-risk routine action is allowed (least-privilege), a sensitive action escalates to a human (I6), a pure-deny action stays denied for everyone. The whole sweep is replayable for audit (I4).",
   "agents": [
     {
@@ -179,6 +179,17 @@
       },
       "expect": "escalate",
       "rationale": "HIGH action; privileged role identity_admin -> escalate (human approval gate)."
+    },
+    {
+      "agent_id": "cov-okta-admin",
+      "target_system": "okta",
+      "action_type": "revoke_token",
+      "resource": "okta/revoke_token/sample",
+      "payload": {
+        "criticality": "medium"
+      },
+      "expect": "escalate",
+      "rationale": "MEDIUM action; privileged role identity_admin -> escalate (human approval gate)."
     },
     {
       "agent_id": "cov-okta-admin",
