@@ -1,4 +1,4 @@
-"""okta mock handler -- W1 Identity / Access (14 actions).
+"""okta mock handler -- W1 Identity / Access (17 actions).
 
 A realistic deterministic double of an Okta-style identity API. Every response
 is a pure function of (action_type, resource, payload): same input -> identical

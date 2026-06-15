@@ -1,6 +1,6 @@
 """github_devops domain action specs (W2 of the high-risk action catalog plan).
 
-14 sensitive GitHub / DevOps actions. Rows marked ESC or DENY/ESC in the plan
+16 sensitive GitHub / DevOps actions. Rows marked ESC or DENY/ESC in the plan
 escalate for the privileged role (devops_admin) and are denied for any other
 role (deny-by-default). Criticality (Annex C) is the AgentRail default posture,
 independent from the implemented verdict; see catalog/model.py::Criticality.
@@ -137,12 +137,12 @@ ACTIONS: tuple[ActionSpec, ...] = (
         "read_cicd_secrets",
         Criticality.C2,
         RiskLevel.HIGH,
-        "Read a secret from the CI/CD environment.",
+        "Enumerate the CI/CD secret names of an environment (environment-scoped).",
     ),
     _spec(
         "read_secret",
         Criticality.C2,
         RiskLevel.HIGH,
-        "Read a CI/CD secret value.",
+        "Read a single named CI/CD secret value (out-of-build-context).",
     ),
 )

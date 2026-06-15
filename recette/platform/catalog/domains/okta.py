@@ -1,4 +1,4 @@
-"""okta domain action specs -- W1 Identity / Access (14 actions).
+"""okta domain action specs -- W1 Identity / Access (17 actions).
 
 Source of truth: docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md, section W1.
 Criticality (Annex C) is the AgentRail default posture, independent from the
