@@ -201,11 +201,38 @@ describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
     expect(timeline.querySelector('[data-role="user"]')).not.toBeNull();
   });
 
-  it("flags the unapproved action in the action log (MAF fixture)", () => {
+  it("renders the declared capabilities panel with the tool + approval badge (MAF fixture)", () => {
+    const view = scenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    const panel = screen.getByTestId(`sim-scn-scope-${view.scenario_id}`);
+    // The declared tool (web_search) is shown with its I6 approval badge.
+    expect(within(panel).getByText(/web_search\/web_search/)).toBeInTheDocument();
+    expect(within(panel).getByText(/approbation : jamais/)).toBeInTheDocument();
+  });
+
+  it("marks push hors-perimetre and web_search conforme via the judge, not both flagged (MAF fixture)", () => {
+    // The load-bearing fix: the judge's violations drive the marking, NOT a
+    // naive approved===false. The declared web_search (approval=never) is
+    // legit/conforme; the UNDECLARED push is the real anomaly (hors-perimetre).
     const view = scenarioDetailFixture as SimScenarioView;
     render(<ScenarioDetail view={view} />);
     const log = screen.getByTestId(`sim-scn-actions-${view.scenario_id}`);
-    expect(within(log).getAllByText(/non approuvee/).length).toBeGreaterThan(0);
+    const rows = within(log).getAllByRole("listitem");
+    // Match each row by its action-target span (unique per row).
+    const byTarget = (target: string): HTMLElement | undefined =>
+      rows.find((r) =>
+        Array.from(r.querySelectorAll(".sim-action-target")).some(
+          (el) => el.textContent === target,
+        ),
+      );
+    const pushRow = byTarget("push");
+    const webRow = byTarget("web_search");
+    expect(pushRow).toBeDefined();
+    expect(webRow).toBeDefined();
+    expect(pushRow).toHaveAttribute("data-verdict", "hors-perimetre");
+    expect(webRow).toHaveAttribute("data-verdict", "conforme");
+    // Exactly one row is flagged -- not both (the bug this fixes).
+    expect(rows.filter((r) => r.getAttribute("data-verdict") !== "conforme").length).toBe(1);
   });
 
   it("renders the git goal and action log without a transcript (git fixture)", () => {
@@ -214,6 +241,22 @@ describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
     expect(screen.getByText(/Objectif :/)).toBeInTheDocument();
     expect(screen.getByTestId(`sim-scn-actions-${view.scenario_id}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`sim-scn-transcript-${view.scenario_id}`)).toBeNull();
+  });
+
+  it("renders the git declared actions and flags the out-of-scope action (git fixture)", () => {
+    const view = gitScenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    // Declared scope shows the read-only read_repo capability.
+    const panel = screen.getByTestId(`sim-scn-scope-${view.scenario_id}`);
+    expect(within(panel).getByText("read_repo")).toBeInTheDocument();
+    // The out-of-scope write (open_pr) is flagged hors-perimetre by the judge;
+    // the in-scope read_repo stays conforme.
+    const log = screen.getByTestId(`sim-scn-actions-${view.scenario_id}`);
+    const rows = within(log).getAllByRole("listitem");
+    const openPrRow = rows.find((r) => within(r).queryByText("open_pr"));
+    const readRow = rows.find((r) => within(r).queryByText("read_repo"));
+    expect(openPrRow).toHaveAttribute("data-verdict", "hors-perimetre");
+    expect(readRow).toHaveAttribute("data-verdict", "conforme");
   });
 });
 

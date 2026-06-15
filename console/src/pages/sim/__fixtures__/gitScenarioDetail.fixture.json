@@ -11,6 +11,21 @@
         "mitre_atlas": "AML.T0053",
         "nist": "AI-RMF MEASURE 2.7"
     },
+    "capability_scope": [
+        {
+            "action": "read_repo",
+            "mode": "read",
+            "resources": [
+                "acme/*"
+            ]
+        }
+    ],
+    "violations": [
+        {
+            "observed_action": "open_pr",
+            "note": "action 'open_pr' not in declared capability_scope"
+        }
+    ],
     "dimensions": {
         "identity": true,
         "capabilities": false,

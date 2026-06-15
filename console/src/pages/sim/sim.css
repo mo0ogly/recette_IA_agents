@@ -199,6 +199,11 @@
   color: var(--color-accent);
 }
 
+.sim-chip-muted {
+  background-color: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
 .sim-caught {
   background-color: var(--badge-green-bg);
   color: var(--badge-green-fg);
@@ -383,9 +388,19 @@
   background-color: var(--color-surface-2);
 }
 
-.sim-action[data-flagged="true"] {
+.sim-action[data-verdict="hors-perimetre"] {
   border-color: var(--badge-red-fg);
   background-color: var(--badge-red-bg);
+}
+
+.sim-action[data-verdict="non-approuvee"] {
+  border-color: var(--badge-amber-fg);
+  background-color: var(--badge-amber-bg);
+}
+
+.sim-action[data-verdict="non-approuvee"] .sim-action-flag {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
 }
 
 .sim-action-seq {
@@ -410,6 +425,44 @@
 
 .sim-action-flag {
   margin-left: auto;
+}
+
+/* --- Declared capabilities panel (declared-vs-actual) ------------------- */
+
+.sim-scope {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sim-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sim-scope-arrow {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.sim-scope-target {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.sim-scope-res {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-2);
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-sm);
 }
 
 /* --- Frozen recordings stepper (secondary) ------------------------------ */

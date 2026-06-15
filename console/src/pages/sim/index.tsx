@@ -361,6 +361,154 @@ export function ScenarioList({
 // Scenario detail panel (pure, exported for testability)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Declared-vs-actual: the judge's lens, NOT a naive approved===false
+// ---------------------------------------------------------------------------
+
+/** Per-row verdict, mirroring the CLI judge (legibility-first). */
+type RowVerdict = "conforme" | "hors-perimetre" | "non-approuvee";
+
+const ROW_VERDICT_LABEL: Record<RowVerdict, string> = {
+  conforme: "conforme",
+  "hors-perimetre": "hors perimetre",
+  "non-approuvee": "non approuvee",
+};
+
+/**
+ * Reconstruct the JUDGE's observed_action key for one action-log row so it can
+ * be matched against the violations list. MAF rows are
+ * `invoke_tool:<tool_kind>:<target>` / `handoff:<target>` (mirrors
+ * maf_judge._check_capabilities, where a null tool_kind serializes as "None");
+ * git rows are simply the `action_type` (mirrors the git adapter's
+ * observed_action). Returns every candidate key (the git family also matches on
+ * the bare action_type substring), so a violation naming the action marks it.
+ */
+function observedKeys(row: Record<string, unknown>): string[] {
+  const keys: string[] = [];
+  const action = actionField(row, "action");
+  const target = actionField(row, "target");
+  const toolKind = actionField(row, "tool_kind");
+  if (action === "handoff" && target) {
+    keys.push(`handoff:${target}`);
+  } else if (action === "invoke_tool" && target) {
+    // The Python judge serializes a None tool_kind as the literal "None".
+    keys.push(`invoke_tool:${toolKind ?? "None"}:${target}`);
+  }
+  const actionType = actionField(row, "action_type");
+  if (actionType) {
+    keys.push(actionType);
+  }
+  return keys;
+}
+
+/**
+ * Classify one action-log row using the JUDGE's violations, not approved===false:
+ * - hors-perimetre when the row's observed key appears in the judge's violations
+ *   (the undeclared tool/handoff or out-of-scope action -- the real anomaly).
+ * - non-approuvee ONLY when the row is a DECLARED approval=always tool that was
+ *   not approved (I6 gating); a declared approval=never tool is never flagged.
+ * - conforme otherwise.
+ */
+function rowVerdict(
+  row: Record<string, unknown>,
+  breached: Set<string>,
+  gatedTargets: Set<string>,
+): RowVerdict {
+  if (observedKeys(row).some((k) => breached.has(k))) {
+    return "hors-perimetre";
+  }
+  const target = actionField(row, "target");
+  if (
+    actionField(row, "action") === "invoke_tool" &&
+    target &&
+    gatedTargets.has(target) &&
+    row.approved === false
+  ) {
+    return "non-approuvee";
+  }
+  return "conforme";
+}
+
+/** True when a declared MAF capability is an approval=always (I6-gated) tool. */
+function isGatedTool(cap: Record<string, unknown>): boolean {
+  return cap.action === "invoke_tool" && cap.approval === "always";
+}
+
+/**
+ * Pure panel of the agent's DECLARED capabilities (capability_scope), so a third
+ * party SEES what the agent was allowed to do before reading what it actually
+ * did. MAF: each tool as a `tool_kind/target` chip + an approval badge (I6
+ * gating), each handoff as `handoff -> target`. Git: each `action` with its
+ * read/write mode + resource globs.
+ */
+function DeclaredCapabilities({
+  scenarioId,
+  scope,
+}: {
+  scenarioId: string;
+  scope: Record<string, unknown>[];
+}): JSX.Element {
+  return (
+    <div className="sim-detail-block">
+      <h4>Capacites declarees</h4>
+      <ul className="sim-scope" data-testid={`sim-scn-scope-${scenarioId}`}>
+        {scope.map((cap, i) => {
+          const action = actionField(cap, "action");
+          if (action === "handoff") {
+            const target = actionField(cap, "target") ?? "?";
+            return (
+              <li className="sim-scope-row" key={i}>
+                <span className="sim-chip sim-chip-neutral">handoff</span>
+                <span className="sim-scope-arrow">-&gt;</span>
+                <span className="sim-scope-target">{target}</span>
+              </li>
+            );
+          }
+          if (action === "invoke_tool") {
+            const toolKind = actionField(cap, "tool_kind") ?? "tool";
+            const target = actionField(cap, "target") ?? "?";
+            const approval = actionField(cap, "approval");
+            return (
+              <li className="sim-scope-row" key={i}>
+                <span className="sim-chip sim-chip-neutral">
+                  {toolKind}/{target}
+                </span>
+                {approval && (
+                  <span
+                    className={`sim-chip ${approval === "always" ? "sim-chip-accent" : "sim-chip-muted"}`}
+                  >
+                    approbation : {approval === "always" ? "toujours" : "jamais"}
+                  </span>
+                )}
+              </li>
+            );
+          }
+          // Git capability: {action, mode, resources}.
+          const mode = actionField(cap, "mode");
+          const resources = Array.isArray(cap.resources)
+            ? (cap.resources as unknown[]).map(String)
+            : [];
+          return (
+            <li className="sim-scope-row" key={i}>
+              <span className="sim-chip sim-chip-neutral">{action ?? "action"}</span>
+              {mode && (
+                <span className="sim-chip sim-chip-muted">
+                  {mode === "write" ? "ecriture" : "lecture"}
+                </span>
+              )}
+              {resources.map((r) => (
+                <code className="sim-scope-res" key={r}>
+                  {r}
+                </code>
+              ))}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function DimensionMatrix({
   scenarioId,
   dimensions,
@@ -415,6 +563,17 @@ function roleLabel(role: string): string {
 export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element {
   const transcript = view.transcript ?? [];
   const actions = view.action_log ?? [];
+  const scope = view.capability_scope ?? [];
+  const violations = view.violations ?? [];
+  // The judge's lens: the set of breached observed_action keys (the real
+  // anomalies) and the set of I6-gated declared tool targets (approval=always).
+  const breached = new Set(violations.map((v) => v.observed_action));
+  const gatedTargets = new Set(
+    scope
+      .filter(isGatedTool)
+      .map((cap) => actionField(cap, "target"))
+      .filter((t): t is string => typeof t === "string"),
+  );
   return (
     <section className="sim-detail" data-testid={`sim-scn-detail-${view.scenario_id}`}>
       <div className="sim-detail-head">
@@ -428,6 +587,10 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
       {view.goal && <p className="sim-detail-goal">Objectif : {view.goal}</p>}
 
       <DimensionMatrix scenarioId={view.scenario_id} dimensions={view.dimensions} />
+
+      {scope.length > 0 && (
+        <DeclaredCapabilities scenarioId={view.scenario_id} scope={scope} />
+      )}
 
       {transcript.length > 0 && (
         <div className="sim-detail-block">
@@ -452,7 +615,7 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
 
       {actions.length > 0 && (
         <div className="sim-detail-block">
-          <h4>Journal d'actions</h4>
+          <h4>Journal d'actions (declare vs reel)</h4>
           <ul className="sim-actions" data-testid={`sim-scn-actions-${view.scenario_id}`}>
             {actions.map((row, i) => {
               const seq = actionField(row, "seq");
@@ -460,19 +623,25 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
               const target =
                 actionField(row, "target", "resource", "target_system") ?? "";
               const mode = actionField(row, "mode", "tool_kind");
-              // The unapproved action is the anomaly the subject was coerced into.
-              const flagged = row.approved === false;
+              // The JUDGE's per-action verdict -- the real anomaly, not approved===false.
+              const verdict = rowVerdict(row, breached, gatedTargets);
+              const conform = verdict === "conforme";
               return (
-                <li className="sim-action" data-flagged={flagged ? "true" : "false"} key={i}>
+                <li
+                  className="sim-action"
+                  data-flagged={conform ? "false" : "true"}
+                  data-verdict={verdict}
+                  key={i}
+                >
                   <span className="sim-action-seq">{seq ?? i}</span>
                   <span className="sim-action-name">{name}</span>
                   {target && <span className="sim-action-target">{target}</span>}
                   {mode && <span className="sim-action-meta">{mode}</span>}
-                  {flagged && (
-                    <span className="sim-chip sim-missed sim-action-flag">
-                      non approuvee · hors perimetre
-                    </span>
-                  )}
+                  <span
+                    className={`sim-chip sim-action-flag ${conform ? "sim-caught" : "sim-missed"}`}
+                  >
+                    {ROW_VERDICT_LABEL[verdict]}
+                  </span>
                 </li>
               );
             })}

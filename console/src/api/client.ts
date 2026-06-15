@@ -945,6 +945,15 @@ export interface SimScenarioView extends SimScenario {
   /** The ordered actions the subject took (MAF: invoke_tool rows; git: gateway
    *  actions). Free-form per family; the out-of-scope/unapproved one is flagged. */
   action_log?: Record<string, unknown>[];
+  /** The agent's DECLARED capabilities verbatim from the spec/manifest. MAF
+   *  entries carry {action, tool_kind, target, approval}; git entries carry
+   *  {action, mode, resources}. Lets the UI show declared-vs-actual + I6 gating. */
+  capability_scope?: Record<string, unknown>[];
+  /** The JUDGE's per-action capability violations (the real anomalies). Each
+   *  observed_action names the undeclared tool/handoff (MAF, e.g.
+   *  "invoke_tool:None:push") or the out-of-scope action_type (git, e.g.
+   *  "open_pr"). Used to mark a row hors-perimetre -- NOT a naive approved===false. */
+  violations?: { observed_action: string; note: string }[];
 }
 
 /** GET /sim/scenarios: every MAF red-team scenario with its verdict and whether
