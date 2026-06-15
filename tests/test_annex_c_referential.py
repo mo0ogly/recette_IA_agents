@@ -50,24 +50,25 @@ class TestAnnexCReferential(unittest.TestCase):
             "referential is stale -- run: python -m scripts.gen_annex_c_referential",
         )
 
-    def test_count_is_118(self) -> None:
-        self.assertEqual(self.committed["count"], 118)
-        self.assertEqual(len(self.committed["actions"]), 118)
+    def test_count_is_124(self) -> None:
+        self.assertEqual(self.committed["count"], 124)
+        self.assertEqual(len(self.committed["actions"]), 124)
 
     def test_category_counts(self) -> None:
-        """Annex C's eleven categories keep their exact action counts."""
+        """Annex C's twelve categories keep their exact action counts."""
         expected = {
-            "Identite / acces": 13,
-            "GitHub / DevOps": 13,
+            "Identite / acces": 15,
+            "GitHub / DevOps": 14,
             "CRM / Sales": 10,
             "Finance / paiements": 12,
             "Donnees / confidentialite": 11,
             "Slack / communication": 10,
             "Support / customer operations": 10,
-            "Cloud / infrastructure": 12,
+            "Cloud / infrastructure": 13,
             "RH": 9,
-            "Juridique / conformite": 9,
+            "Juridique / conformite": 10,
             "Produit / contenu": 9,
+            "MCP / outils": 1,
         }
         actual = dict(Counter(a["category"] for a in self.committed["actions"]))
         self.assertEqual(actual, expected)

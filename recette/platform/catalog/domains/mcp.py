@@ -9,9 +9,9 @@ the agent's self-declared `require_approval`; it escalates the side effect itsel
 claim; this catalog is the governance posture).
 
 Criticality (Annex C) is the AgentRail default posture, independent from the
-implemented verdict; see catalog/model.py::Criticality. MCP tool governance is
-not in Annex C's initial 118-action referential, so both rows are C2 (systematic
-escalation), matching the escalate verdict.
+implemented verdict; see catalog/model.py::Criticality. The new "MCP / outils"
+Annex C category exposes invoke_tool as C3 (conditional authorization); handoff
+stays C2 (systematic escalation). Both escalate for the privileged role.
 
 Verdict mapping convention (mirrors okta): ESC rows escalate for the privileged
 role and deny for everyone else; privileged_roles = ("tool_operator",).
@@ -46,7 +46,7 @@ def _escalate(
 ACTIONS: tuple[ActionSpec, ...] = (
     _escalate(
         "invoke_tool",
-        Criticality.C2,
+        Criticality.C3,
         RiskLevel.HIGH,
         "Invoke an MCP tool (external side effect): escalate for human approval (I6).",
     ),

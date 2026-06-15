@@ -139,4 +139,10 @@ ACTIONS: tuple[ActionSpec, ...] = (
         RiskLevel.HIGH,
         "Read a secret from the CI/CD environment.",
     ),
+    _spec(
+        "read_secret",
+        Criticality.C2,
+        RiskLevel.HIGH,
+        "Read a CI/CD secret value.",
+    ),
 )

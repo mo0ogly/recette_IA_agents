@@ -41,6 +41,7 @@ _KNOWN_ACTIONS = frozenset(
         "modify_oauth_scopes",
         "invite_external_user",
         "revoke_long_lived_token",
+        "revoke_token",
         "assume_delegation",
     )
 )
@@ -191,6 +192,8 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
             "scopes": _scopes(payload, dig),
         }
     if action_type == "revoke_long_lived_token":
+        return {**base, "status": "REVOKED", "token_id": ref("tok_", dig)}
+    if action_type == "revoke_token":
         return {**base, "status": "REVOKED", "token_id": ref("tok_", dig)}
     if action_type == "assume_delegation":
         return {

@@ -104,6 +104,20 @@ ANNEX_C_SOURCE: tuple[tuple[str, str, str, str, str], ...] = (
         "okta",
         "invite_external_user",
     ),
+    (
+        "Identite / acces",
+        "Revoquer un token",
+        "identity.token.revoke",
+        "okta",
+        "revoke_token",
+    ),
+    (
+        "Identite / acces",
+        "Agir sous la delegation d'un autre agent",
+        "identity.delegation.assume",
+        "okta",
+        "assume_delegation",
+    ),
     # --- GitHub / DevOps ---
     (
         "GitHub / DevOps",
@@ -189,6 +203,13 @@ ANNEX_C_SOURCE: tuple[tuple[str, str, str, str, str], ...] = (
         "scm.collaborator.external_add",
         "github",
         "add_external_collaborator",
+    ),
+    (
+        "GitHub / DevOps",
+        "Lire un secret CI/CD",
+        "scm.secret.read",
+        "github",
+        "read_secret",
     ),
     # --- CRM / Sales ---
     (
@@ -621,6 +642,13 @@ ANNEX_C_SOURCE: tuple[tuple[str, str, str, str, str], ...] = (
         "cloud",
         "modify_cloud_iam",
     ),
+    (
+        "Cloud / infrastructure",
+        "Isoler un serveur",
+        "cloud.host.isolate",
+        "cloud",
+        "isolate_host",
+    ),
     # --- RH ---
     ("RH", "Modifier un salaire", "hr.salary.update", "hris", "modify_salary"),
     ("RH", "Supprimer un employe", "hr.employee.delete", "hris", "delete_employee"),
@@ -719,6 +747,13 @@ ANNEX_C_SOURCE: tuple[tuple[str, str, str, str, str], ...] = (
         "legal_dms",
         "export_audit_file",
     ),
+    (
+        "Juridique / conformite",
+        "Ouvrir une revue KYC",
+        "compliance.kyc.review_open",
+        "compliance",
+        "open_kyc_review",
+    ),
     # --- Produit / contenu ---
     (
         "Produit / contenu",
@@ -782,6 +817,14 @@ ANNEX_C_SOURCE: tuple[tuple[str, str, str, str, str], ...] = (
         "product.onboarding.update",
         "product_cms",
         "modify_user_onboarding",
+    ),
+    # --- MCP / outils ---
+    (
+        "MCP / outils",
+        "Invoquer un outil MCP",
+        "mcp.tool.invoke",
+        "mcp",
+        "invoke_tool",
     ),
 )
 

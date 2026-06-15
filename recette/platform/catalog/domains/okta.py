@@ -101,6 +101,12 @@ ACTIONS: tuple[ActionSpec, ...] = (
     ),
     _escalate("revoke_api_key", Criticality.C3, RiskLevel.MEDIUM, "Revoke an existing API key."),
     _escalate(
+        "revoke_token",
+        Criticality.C3,
+        RiskLevel.MEDIUM,
+        "Revoke an issued token (defensive, reversible).",
+    ),
+    _escalate(
         "generate_long_lived_token",
         Criticality.C2,
         RiskLevel.CRITICAL,

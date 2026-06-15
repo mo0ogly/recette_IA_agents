@@ -154,6 +154,13 @@ def _risky(action_type: str, resource: str, payload: dict) -> dict:
             "environment": str(payload.get("environment") or "production"),
             "secret_names": ["DEPLOY_TOKEN", "DB_PASSWORD"],
         }
+    if action_type == "read_secret":
+        return {
+            **base,
+            "status": "ok",
+            "secret_name": str(payload.get("name") or "DEPLOY_TOKEN"),
+            "secret_ref": ref("sec_", dig),
+        }
     # add_external_collaborator
     permission = str(payload.get("permission") or "pull")
     if permission not in _GH_PERMISSIONS:
@@ -189,6 +196,7 @@ _RISKY_ACTIONS = frozenset(
         "modify_org_permissions",
         "add_external_collaborator",
         "read_cicd_secrets",
+        "read_secret",
     )
 )
 

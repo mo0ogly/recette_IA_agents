@@ -33,6 +33,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("okta", "add_user_to_admin_group"): Criticality.C2,
     ("okta", "create_api_key"): Criticality.C3,
     ("okta", "revoke_api_key"): Criticality.C3,
+    ("okta", "revoke_token"): Criticality.C3,
     ("okta", "generate_long_lived_token"): Criticality.C2,
     ("okta", "modify_mfa_policy"): Criticality.C1,
     ("okta", "disable_sso"): Criticality.C1,
@@ -57,6 +58,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("github", "modify_org_permissions"): Criticality.C2,
     ("github", "add_external_collaborator"): Criticality.C3,
     ("github", "read_cicd_secrets"): Criticality.C2,
+    ("github", "read_secret"): Criticality.C2,
     # --- crm (CRM / Sales) ---
     ("crm", "read_contact_record"): Criticality.C4,
     ("crm", "bulk_modify_contacts"): Criticality.C2,
@@ -177,7 +179,7 @@ EXPECTED: dict[tuple[str, str], Criticality] = {
     ("knowledge_base", "delete_document"): Criticality.C2,
     ("knowledge_base", "purge_index"): Criticality.C1,
     # --- mcp (not in Annex C; posture-mirrored) ---
-    ("mcp", "invoke_tool"): Criticality.C2,
+    ("mcp", "invoke_tool"): Criticality.C3,
     ("mcp", "handoff"): Criticality.C2,
     # --- comms / compliance / gitlab (promoted scenario extras, not in Annex C) ---
     ("comms", "notify_customer"): Criticality.C3,
@@ -226,6 +228,47 @@ class TestActionCriticality(unittest.TestCase):
         """All four Annex C levels appear in the catalog (none is dead)."""
         used = {s.criticality for s in self.catalog.all()}
         self.assertEqual(used, set(Criticality))
+
+    def test_v45_governed_actions_posture(self) -> None:
+        """The six v4.5 Annex C additions carry the exact criticality + verdict."""
+        from recette.platform.events import PolicyVerdict
+
+        kyc = self.catalog.get("compliance", "open_kyc_review")
+        assert kyc is not None
+        self.assertIs(kyc.criticality, Criticality.C3)
+        self.assertIs(kyc.verdict_privileged, PolicyVerdict.ESCALATE)
+        self.assertIs(kyc.verdict_default, PolicyVerdict.DENY)
+
+        revoke_token = self.catalog.get("okta", "revoke_token")
+        assert revoke_token is not None
+        self.assertIs(revoke_token.criticality, Criticality.C3)
+        self.assertIs(revoke_token.verdict_privileged, PolicyVerdict.ESCALATE)
+        self.assertIs(revoke_token.verdict_default, PolicyVerdict.DENY)
+
+        delegation = self.catalog.get("okta", "assume_delegation")
+        assert delegation is not None
+        self.assertIs(delegation.criticality, Criticality.C1)
+        self.assertIs(delegation.verdict_privileged, PolicyVerdict.DENY)
+        self.assertIs(delegation.verdict_default, PolicyVerdict.DENY)
+        self.assertEqual(delegation.privileged_roles, ())
+
+        read_secret = self.catalog.get("github", "read_secret")
+        assert read_secret is not None
+        self.assertIs(read_secret.criticality, Criticality.C2)
+        self.assertIs(read_secret.verdict_privileged, PolicyVerdict.ESCALATE)
+        self.assertIs(read_secret.verdict_default, PolicyVerdict.DENY)
+
+        isolate_host = self.catalog.get("cloud", "isolate_host")
+        assert isolate_host is not None
+        self.assertIs(isolate_host.criticality, Criticality.C2)
+        self.assertIs(isolate_host.verdict_privileged, PolicyVerdict.ESCALATE)
+        self.assertIs(isolate_host.verdict_default, PolicyVerdict.DENY)
+
+        invoke_tool = self.catalog.get("mcp", "invoke_tool")
+        assert invoke_tool is not None
+        self.assertIs(invoke_tool.criticality, Criticality.C3)
+        self.assertIs(invoke_tool.verdict_privileged, PolicyVerdict.ESCALATE)
+        self.assertIs(invoke_tool.verdict_default, PolicyVerdict.DENY)
 
 
 if __name__ == "__main__":

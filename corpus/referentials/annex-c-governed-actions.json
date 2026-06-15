@@ -7,7 +7,7 @@
     "C3": "conditional authorization",
     "C4": "authorization with logging"
   },
-  "count": 118,
+  "count": 124,
   "actions": [
     {
       "category": "Identite / acces",
@@ -216,6 +216,36 @@
       ]
     },
     {
+      "category": "Identite / acces",
+      "label": "Revoquer un token",
+      "annex_c_action_type": "identity.token.revoke",
+      "target_system": "okta",
+      "action_type": "revoke_token",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "identity_admin"
+      ]
+    },
+    {
+      "category": "Identite / acces",
+      "label": "Agir sous la delegation d'un autre agent",
+      "annex_c_action_type": "identity.delegation.assume",
+      "target_system": "okta",
+      "action_type": "assume_delegation",
+      "criticality": "C1",
+      "criticality_label": "refuse by default",
+      "risk_level": "critical",
+      "risk_score": 4,
+      "verdict_privileged": "deny",
+      "verdict_default": "deny",
+      "privileged_roles": []
+    },
+    {
       "category": "GitHub / DevOps",
       "label": "Supprimer un repository",
       "annex_c_action_type": "scm.repo.delete",
@@ -415,6 +445,22 @@
       "action_type": "add_external_collaborator",
       "criticality": "C3",
       "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "devops_admin"
+      ]
+    },
+    {
+      "category": "GitHub / DevOps",
+      "label": "Lire un secret CI/CD",
+      "annex_c_action_type": "scm.secret.read",
+      "target_system": "github",
+      "action_type": "read_secret",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
       "risk_level": "high",
       "risk_score": 3,
       "verdict_privileged": "escalate",
@@ -1454,6 +1500,22 @@
       ]
     },
     {
+      "category": "Cloud / infrastructure",
+      "label": "Isoler un serveur",
+      "annex_c_action_type": "cloud.host.isolate",
+      "target_system": "cloud",
+      "action_type": "isolate_host",
+      "criticality": "C2",
+      "criticality_label": "systematic escalation",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "cloud_admin"
+      ]
+    },
+    {
       "category": "RH",
       "label": "Modifier un salaire",
       "annex_c_action_type": "hr.salary.update",
@@ -1740,6 +1802,22 @@
       ]
     },
     {
+      "category": "Juridique / conformite",
+      "label": "Ouvrir une revue KYC",
+      "annex_c_action_type": "compliance.kyc.review_open",
+      "target_system": "compliance",
+      "action_type": "open_kyc_review",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "medium",
+      "risk_score": 2,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "compliance_admin"
+      ]
+    },
+    {
       "category": "Produit / contenu",
       "label": "Publier en production",
       "annex_c_action_type": "product.release.publish",
@@ -1881,6 +1959,22 @@
       "verdict_default": "deny",
       "privileged_roles": [
         "product_admin"
+      ]
+    },
+    {
+      "category": "MCP / outils",
+      "label": "Invoquer un outil MCP",
+      "annex_c_action_type": "mcp.tool.invoke",
+      "target_system": "mcp",
+      "action_type": "invoke_tool",
+      "criticality": "C3",
+      "criticality_label": "conditional authorization",
+      "risk_level": "high",
+      "risk_score": 3,
+      "verdict_privileged": "escalate",
+      "verdict_default": "deny",
+      "privileged_roles": [
+        "tool_operator"
       ]
     }
   ]

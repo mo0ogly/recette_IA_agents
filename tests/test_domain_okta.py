@@ -30,6 +30,7 @@ W1_TABLE: tuple[tuple[str, PolicyVerdict, PolicyVerdict, RiskLevel], ...] = (
     ("add_user_to_admin_group", ESC, DENY, RiskLevel.CRITICAL),
     ("create_api_key", ESC, DENY, RiskLevel.HIGH),
     ("revoke_api_key", ESC, DENY, RiskLevel.MEDIUM),
+    ("revoke_token", ESC, DENY, RiskLevel.MEDIUM),
     ("generate_long_lived_token", ESC, DENY, RiskLevel.CRITICAL),
     ("modify_mfa_policy", ESC, DENY, RiskLevel.CRITICAL),
     ("disable_sso", DENY, DENY, RiskLevel.CRITICAL),
@@ -47,13 +48,13 @@ class TestOktaCatalog(unittest.TestCase):
         for spec in ACTIONS:
             self.assertEqual(spec.target_system, "okta")
 
-    def test_exactly_14_specs(self) -> None:
-        self.assertEqual(len(ACTIONS), 16)
-        self.assertEqual(len(W1_TABLE), 16)
+    def test_exactly_17_specs(self) -> None:
+        self.assertEqual(len(ACTIONS), 17)
+        self.assertEqual(len(W1_TABLE), 17)
 
     def test_specs_match_w1_table_literally(self) -> None:
         by_action = {spec.action_type: spec for spec in ACTIONS}
-        self.assertEqual(len(by_action), 16, "duplicate action_type in ACTIONS")
+        self.assertEqual(len(by_action), 17, "duplicate action_type in ACTIONS")
         for action_type, verdict_priv, verdict_def, risk in W1_TABLE:
             with self.subTest(action_type=action_type):
                 spec = by_action.get(action_type)
@@ -151,10 +152,10 @@ class TestOktaCoherence(unittest.TestCase):
 
 
 class TestCatalogIntegration(unittest.TestCase):
-    def test_load_catalog_contains_14_okta_actions(self) -> None:
+    def test_load_catalog_contains_17_okta_actions(self) -> None:
         catalog = load_catalog()
         okta_specs = [spec for spec in catalog.all() if spec.target_system == "okta"]
-        self.assertEqual(len(okta_specs), 16)
+        self.assertEqual(len(okta_specs), 17)
         for action_type, _, _, _ in W1_TABLE:
             self.assertIsNotNone(catalog.get("okta", action_type))
 
