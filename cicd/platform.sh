@@ -20,28 +20,10 @@ source "${CICD_DIR}/lib/common.sh"
 API_SH="${CICD_DIR}/api.sh"
 API_PORT_FILE="${RUN_DIR}/api.port"
 
-_port_free() {
-    ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -q ":${1}\$"
-}
-
-_kill_port_holder() {
-    # Policy (R19): the canonical port is enforced, never relocated. If a port
-    # is held, the holder is killed so the service binds where it is expected.
-    local port="$1"
-    local pids
-    pids="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$"' \
-        | grep -oP 'pid=\K[0-9]+' | sort -u | tr '\n' ' ')"
-    [ -z "${pids// /}" ] && return 0
-    warn "port ${port} occupe par pid(s) ${pids}- kill (port canonique impose)"
-    # shellcheck disable=SC2086
-    kill ${pids} 2>/dev/null || true
-    sleep 1
-    if ! _port_free "${port}"; then
-        # shellcheck disable=SC2086
-        kill -9 ${pids} 2>/dev/null || true
-        sleep 1
-    fi
-}
+# Port helpers are shared in lib/common.sh (single source of truth, R19). These
+# thin aliases keep the existing call sites working.
+_port_free()        { port_free "$@"; }
+_kill_port_holder() { kill_port_holder "$@"; }
 
 _resolve_api_port() {
     # Canonical port from common.sh; honor an explicit INSPECT_IA_AGENTS_API_PORT env

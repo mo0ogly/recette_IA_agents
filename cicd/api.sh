@@ -24,6 +24,10 @@ api_start() {
         return 0
     fi
     mkdir -p "${RUN_DIR}"
+    # Free the canonical port before binding: an orphan recette.api (not tracked
+    # in api.pid) squatting ${API_PORT} would make the new process answer with
+    # stale code. The port is enforced, never relocated (R19).
+    kill_port_holder "${API_PORT}"
     hdr "START API sur ${API_HOST}:${API_PORT}"
     ( cd "${REPO_ROOT}" \
         && INSPECT_IA_AGENTS_API_HOST="${API_HOST}" \
@@ -42,15 +46,17 @@ api_start() {
 
 api_stop() {
     local pid
-    if ! pid="$(_api_pid)"; then
-        info "API non demarree"
-        rm -f "${API_PID_FILE}"
-        return 0
+    if pid="$(_api_pid)"; then
+        hdr "STOP API (pid ${pid})"
+        kill "${pid}" 2>/dev/null || true
+        sleep 1
+        kill -0 "${pid}" 2>/dev/null && kill -9 "${pid}" 2>/dev/null || true
+    else
+        info "API non demarree (pid file absent)"
     fi
-    hdr "STOP API (pid ${pid})"
-    kill "${pid}" 2>/dev/null || true
-    sleep 1
-    kill -0 "${pid}" 2>/dev/null && kill -9 "${pid}" 2>/dev/null || true
+    # Always free the canonical port: kill any orphan holding ${API_PORT} that is
+    # not tracked in api.pid, so a following start binds fresh code (R19).
+    kill_port_holder "${API_PORT}"
     rm -f "${API_PID_FILE}"
     ok "API arretee"
 }

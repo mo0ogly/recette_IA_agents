@@ -25,6 +25,32 @@ err()  { echo -e "${RED}[ERREUR]${NC} $1" >&2; }
 sep()  { echo -e "${GRAY}$(printf '%.0s-' {1..68})${NC}"; }
 hdr()  { echo -e "\n${CYAN}== $1 ==${NC}"; }
 
+# -- Port helpers (shared by api.sh + platform.sh) --------------------------
+# Policy (R19): the canonical port is enforced, never relocated. If a port is
+# held -- even by an orphan not tracked in any .run/*.pid -- the holder is
+# killed so the service binds where it is expected.
+port_free() {
+    ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -q ":${1}\$"
+}
+kill_port_holder() {
+    local port="$1" pids
+    # `|| true`: when the port is FREE, grep finds nothing and exits 1; under the
+    # callers' `set -euo pipefail` an unguarded substitution would abort. We want
+    # "free port" to be a clean no-op, so swallow the empty-match failure.
+    pids="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$"' \
+        | grep -oP 'pid=\K[0-9]+' | sort -u | tr '\n' ' ' || true)"
+    [ -z "${pids// /}" ] && return 0
+    warn "port ${port} occupe par pid(s) ${pids}- kill (port canonique impose R19)"
+    # shellcheck disable=SC2086
+    kill ${pids} 2>/dev/null || true
+    sleep 1
+    if ! port_free "${port}"; then
+        # shellcheck disable=SC2086
+        kill -9 ${pids} 2>/dev/null || true
+        sleep 1
+    fi
+}
+
 # -- API server defaults (Track U / U1) -------------------------------------
 API_HOST="${INSPECT_IA_AGENTS_API_HOST:-127.0.0.1}"
 API_PORT="${INSPECT_IA_AGENTS_API_PORT:-8090}"
