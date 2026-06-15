@@ -87,6 +87,37 @@ class TestServerNetnameRoutes(unittest.TestCase):
         self.assertEqual(self.client.post("/config/servers", json=server).status_code, 201)
         self.assertEqual(self.client.post("/config/servers", json=server).status_code, 400)
 
+    def test_update_server_fqdn_collision_is_422(self) -> None:
+        # Regression: patching a server's fqdn to collide with another server
+        # returns 422 (semantic validation) and does not mutate the patched server.
+        server_a = {
+            "id": "s1",
+            "system": "github",
+            "mode": "mock_local",
+            "port": 8081,
+            "fqdn": "api.github.com",
+        }
+        self.assertEqual(self.client.post("/config/servers", json=server_a).status_code, 201)
+
+        server_b = {
+            "id": "s2",
+            "system": "github",
+            "mode": "mock_local",
+            "port": 8082,
+            "fqdn": "git.github.com",
+        }
+        self.assertEqual(self.client.post("/config/servers", json=server_b).status_code, 201)
+
+        # Try to patch s2's fqdn to collide with s1's.
+        r = self.client.put("/config/servers/s2", json={"fqdn": "api.github.com"})
+        self.assertEqual(r.status_code, 422)
+
+        # Verify s2 was not mutated: its fqdn should still be "git.github.com".
+        listed = self.client.get("/config/servers").json()
+        s2 = next((s for s in listed if s["id"] == "s2"), None)
+        self.assertIsNotNone(s2)
+        self.assertEqual(s2["fqdn"], "git.github.com")
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class TestContainmentFlagRoutes(unittest.TestCase):
@@ -120,6 +151,12 @@ class TestContainmentFlagRoutes(unittest.TestCase):
 
     def test_put_missing_enabled_is_422(self) -> None:
         r = self.client.put("/config/containment", json={})
+        self.assertEqual(r.status_code, 422)
+
+    def test_put_enabled_integer_is_422(self) -> None:
+        # Regression: passing an integer instead of a boolean for 'enabled' returns 422
+        # because 'enabled' must be a bool, not an int.
+        r = self.client.put("/config/containment", json={"enabled": 1})
         self.assertEqual(r.status_code, 422)
 
 
