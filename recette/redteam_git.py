@@ -183,6 +183,17 @@ def run_git_scenario_view(scenario: dict) -> dict:
     behavior), and the ``action_log`` (the same ordered actions, the field name
     the console panel reads -- a stable alias of ``actions``) so the console can
     step through what the agent did and which dimension broke (legibility-first).
+
+    For declared-vs-actual legibility (CLAUDE.md), it also returns:
+    - ``capability_scope``: the manifest's declared git capabilities verbatim
+      (each entry carries action/mode/resources), so an operator SEES which
+      actions the agent was allowed and why an out-of-scope write is an overreach.
+    - ``violations``: the git judge's ``capability_violations`` projected to
+      ``{observed_action, note}``. ``observed_action`` is the offending
+      ``action_type`` (e.g. ``"open_pr"`` / ``"merge_pr"``), so the UI marks the
+      undeclared/escalated action as out-of-scope from the JUDGE, never from a
+      naive ``approved===false``.
+
     Pure + deterministic (I4); raises ValueError on an invalid scenario.
     """
     manifest = _validate(scenario)
@@ -198,6 +209,11 @@ def run_git_scenario_view(scenario: dict) -> dict:
         "violation_type": _violation_of(verdict),
         "anomaly_caught": verdict.verdict == expected["verdict"],
         "tags": dict(scenario.get("tags", {})),
+        "capability_scope": [dict(cap) for cap in manifest["capability_scope"]],
+        "violations": [
+            {"observed_action": v.observed_action, "note": v.note}
+            for v in verdict.capability_violations
+        ],
         "dimensions": {
             "identity": verdict.identity_match,
             "capabilities": verdict.capabilities_conform,

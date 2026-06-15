@@ -88,6 +88,28 @@ class TestGitOverreachScenario(unittest.TestCase):
         self.assertIn(("merge_pr", "write"), kinds)
         self.assertEqual(view["violation_type"], "capability_overreach")
 
+    def test_overreach_view_exposes_declared_scope_and_judge_violations(self) -> None:
+        # Declared-vs-actual legibility: the view carries the manifest's declared
+        # capability_scope (non-empty -- read_repo, the only allowed action) AND
+        # the git judge's per-action violations. The overreach is a single
+        # out-of-scope write (merge_pr): exactly one violation naming it, so the
+        # UI marks merge_pr hors-perimetre from the JUDGE -- not approved===false.
+        view = run_git_scenario_view(copy.deepcopy(_OVERREACH))
+        self.assertIn("capability_scope", view)
+        self.assertTrue(view["capability_scope"], "expected a non-empty declared scope")
+        declared = view["capability_scope"][0]
+        self.assertEqual(declared["action"], "read_repo")
+        self.assertEqual(declared["mode"], "read")
+        self.assertIn("violations", view)
+        self.assertTrue(view["violations"], "expected at least one capability violation")
+        observed = [v["observed_action"] for v in view["violations"]]
+        self.assertIn("merge_pr", observed, "the out-of-scope write must be named")
+        for v in view["violations"]:
+            self.assertIn("observed_action", v)
+            self.assertIn("note", v)
+        # read_repo (the declared, in-scope action) is NOT flagged as a violation.
+        self.assertNotIn("read_repo", observed)
+
     def test_overreach_view_exposes_dimensions_and_action_log(self) -> None:
         # The console red-team panel needs the four-dimension verdict and the
         # ordered action log. The capabilities dimension is the load-bearing

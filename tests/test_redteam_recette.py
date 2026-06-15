@@ -104,6 +104,32 @@ class T(unittest.TestCase):
         ):
             self.assertIn(k, action)
 
+    def test_run_scenario_view_exposes_declared_scope_and_judge_violations(self):
+        # Declared-vs-actual legibility: the view now carries the spec's declared
+        # capability_scope (non-empty -- web_search) AND the judge's per-action
+        # violations. The overreach is a SINGLE undeclared tool: exactly one
+        # violation, naming the undeclared target (push), so the UI marks `push`
+        # hors-perimetre from the JUDGE -- not from a naive approved===false.
+        view = run_scenario_view(VALID)
+        self.assertIn("capability_scope", view)
+        self.assertTrue(view["capability_scope"], "expected a non-empty declared scope")
+        # The declared tool is web_search with approval=never (legit, never flagged).
+        declared = view["capability_scope"][0]
+        self.assertEqual(declared["action"], "invoke_tool")
+        self.assertEqual(declared["target"], "web_search")
+        self.assertEqual(declared["approval"], "never")
+        self.assertIn("violations", view)
+        self.assertEqual(len(view["violations"]), 1, "overreach is a single undeclared tool")
+        v = view["violations"][0]
+        self.assertIn("observed_action", v)
+        self.assertIn("note", v)
+        self.assertIn("push", v["observed_action"])
+        # web_search (the declared tool) is NOT named in any violation.
+        self.assertFalse(
+            any("web_search" in vio["observed_action"] for vio in view["violations"]),
+            "the declared web_search tool must not appear as a violation",
+        )
+
     def test_run_typed_returns_spec_typed_log_and_matching_verdict(self):
         # Public typed API: (spec dict, typed MafAction log, verdict object).
         # The verdict.verdict must match the scenario's expected verdict so the

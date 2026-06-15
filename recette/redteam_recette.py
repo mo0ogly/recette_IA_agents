@@ -133,7 +133,8 @@ def run_scenario(scenario: dict) -> ScenarioOutcome:
 
 def run_scenario_view(scenario: dict) -> dict:
     """Replay a scenario and return its outcome fields PLUS the transcript,
-    the four-dimension verdict and the action log.
+    the four-dimension verdict, the action log, the DECLARED capability_scope
+    and the judge's per-action capability violations.
 
     A console-oriented view that keeps all the simulate-wiring in one place: it
     returns the ScenarioOutcome fields (scenario_id, verdict, expected_verdict,
@@ -143,10 +144,22 @@ def run_scenario_view(scenario: dict) -> dict:
     the ``action_log`` (each MafAction serialized -- seq, agent_id, provider,
     model, action, target, tool_kind, approved, matching SimRecording.to_dict)
     so the console can step through what hijacked the subject and which dimension
-    broke (legibility-first). Pure + deterministic (I4); raises ValueError on an
-    invalid scenario.
+    broke (legibility-first).
+
+    For declared-vs-actual legibility (CLAUDE.md), it also returns:
+    - ``capability_scope``: the spec's declared tools/handoffs verbatim (each MAF
+      entry carries action/tool_kind/target/approval so the UI can show the I6
+      gating), so an operator SEES which tools the agent was allowed to use and
+      why ``push`` is an overreach.
+    - ``violations``: the judge's ``capability_violations`` projected to
+      ``{observed_action, note}``. ``observed_action`` is the judge's own string
+      (e.g. ``"invoke_tool:None:push"`` / ``"handoff:X"``), so the UI marks the
+      undeclared tool/handoff as out-of-scope from the JUDGE, never from a naive
+      ``approved===false``.
+
+    Pure + deterministic (I4); raises ValueError on an invalid scenario.
     """
-    _, result, verdict = _replay(scenario)
+    spec, result, verdict = _replay(scenario)
     expected = scenario["expected"]
     return {
         "scenario_id": scenario["scenario_id"],
@@ -156,6 +169,11 @@ def run_scenario_view(scenario: dict) -> dict:
         "violation_type": _violation_of(verdict),
         "anomaly_caught": verdict.verdict == expected["verdict"],
         "tags": dict(scenario.get("tags", {})),
+        "capability_scope": [dict(cap) for cap in spec["capability_scope"]],
+        "violations": [
+            {"observed_action": v.observed_action, "note": v.note}
+            for v in verdict.capability_violations
+        ],
         "dimensions": {
             "identity": verdict.identity_match,
             "capabilities": verdict.capabilities_conform,

@@ -47,6 +47,31 @@ class T(unittest.TestCase):
         self.assertIn("transcript", body)
         self.assertIn("anomaly_caught", body)
 
+    def test_maf_detail_carries_capability_scope_and_violations(self):
+        # Declared-vs-actual legibility: the MAF detail payload must carry the
+        # DECLARED capability_scope (non-empty) and the judge's per-action
+        # violations, so the console mirrors the CLI judge.
+        sid = "rt-diagnostic-overreach"
+        r = self.c.get(f"/sim/scenarios/{sid}")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("capability_scope", body)
+        self.assertTrue(body["capability_scope"], "expected a non-empty declared scope")
+        self.assertIn("violations", body)
+        self.assertTrue(body["violations"], "expected the overreach to carry a violation")
+        observed = [v["observed_action"] for v in body["violations"]]
+        self.assertTrue(any("push" in o for o in observed), "the undeclared push must be named")
+
+    def test_git_detail_carries_capability_scope_and_violations(self):
+        # Same declared-vs-actual contract for the git family.
+        sid = self.c.get("/sim/git-scenarios").json()["scenarios"][0]["scenario_id"]
+        r = self.c.get(f"/sim/git-scenarios/{sid}")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("capability_scope", body)
+        self.assertTrue(body["capability_scope"], "expected a non-empty declared scope")
+        self.assertIn("violations", body)
+
     def test_unknown_scenario_404(self):
         r = self.c.get("/sim/scenarios/does-not-exist")
         self.assertEqual(r.status_code, 404)
