@@ -149,8 +149,22 @@ def _record(
     seq: int, agent_id: str, provider: str, model: str, name: str, binding: _ToolBinding | None
 ) -> MafAction:
     if binding is None:
-        # The subject called a tool that is not in its declared scope: record it
-        # faithfully (unknown kind) so the capability check flags the overreach.
+        # The subject called a target not in its declared scope: record it
+        # faithfully so the capability check flags the overreach. An undeclared
+        # handoff is exposed as "handoff:<target>" (see tools_from_spec); detect
+        # that prefix so it records as a handoff with the clean target, not as a
+        # tool named "handoff:<target>".
+        if name.startswith("handoff:"):
+            return MafAction(
+                seq=seq,
+                agent_id=agent_id,
+                provider=provider,
+                model=model,
+                action="handoff",
+                target=name[len("handoff:") :],
+                tool_kind=None,
+                approved=False,
+            )
         return MafAction(
             seq=seq,
             agent_id=agent_id,
