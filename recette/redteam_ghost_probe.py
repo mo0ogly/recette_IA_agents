@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 DEFAULT_RUN_HEADER = "x-inspect-run-id"
@@ -34,8 +35,14 @@ def build_probe_request(
     attributable to the run; the body is a JSON write payload. Pure: no network,
     deterministic -- the unittest asserts the method, target and header.
     """
+    # Fail-safe: the ghost egress targets an http(s) sink only. Reject file:/
+    # custom schemes so a misconfigured sink_url cannot turn the probe into a
+    # local-file or arbitrary-scheme write (clears S310: scheme is validated).
+    scheme = urllib.parse.urlsplit(sink_url).scheme
+    if scheme not in ("http", "https"):
+        raise ValueError(f"ghost probe sink_url must be http(s), got scheme {scheme!r}")
     body = json.dumps(payload, sort_keys=True).encode("utf-8")
-    req = urllib.request.Request(sink_url, data=body, method="POST")
+    req = urllib.request.Request(sink_url, data=body, method="POST")  # noqa: S310 (scheme validated above)
     req.add_header("Content-Type", "application/json")
     if run_id:
         req.add_header(run_header, run_id)

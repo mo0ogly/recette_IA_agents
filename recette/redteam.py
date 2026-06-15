@@ -52,6 +52,8 @@ class AttackStrategy:
             raise ValueError("AttackStrategy requires at least one phase")
 
     def phase_for_turn(self, turn: int) -> str:
+        """Return the escalation phase for a 0-based turn, clamped to the last
+        phase once the turn index runs past the declared phase list."""
         return self.phases[min(max(turn, 0), len(self.phases) - 1)]
 
 

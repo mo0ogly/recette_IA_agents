@@ -13,6 +13,9 @@ from .redteam_recette import ScenarioOutcome
 
 
 def scorecard(outcomes: list[ScenarioOutcome]) -> dict:
+    """Aggregate red-team outcomes into the scorecard dict: total, caught
+    (predicted == expected), missed, and the per-OWASP-tag distribution
+    (a count of all outcomes carrying each tag, not a catch rate)."""
     by_owasp: Counter[str] = Counter()
     for o in outcomes:
         tag = o.tags.get("owasp_asi")
@@ -39,6 +42,8 @@ def scorecard(outcomes: list[ScenarioOutcome]) -> dict:
 
 
 def render(card: dict) -> str:
+    """Render a scorecard dict (from ``scorecard``) as the human-readable CLI
+    block: the total/caught/missed line plus the sorted OWASP distribution."""
     lines = [
         "redteam scorecard",
         f"total={card['total']} caught={card['caught']} missed={card['missed']}",

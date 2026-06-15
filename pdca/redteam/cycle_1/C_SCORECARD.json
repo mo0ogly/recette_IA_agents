@@ -1,0 +1,32 @@
+{
+  "scope": "recette/redteam",
+  "cycle": 1,
+  "target": 95,
+  "rescore_mode": "evidence-based (recette PASS, 0 critical, each delta maps to a concrete fix)",
+  "domains": {
+    "security": {
+      "before": 17, "after": 20, "weight": 20,
+      "src": "ruff E,F,S,B clean (S310 fixed: build_probe_request validates http(s) scheme + ValueError fail-safe, with a regression test); bandit clean; mypy clean"
+    },
+    "testing": {
+      "before": 14, "after": 15, "weight": 15,
+      "src": "every redteam module has a test (ghost_probe covered by test_ghost_probe.py); +2 tests for the new scheme-validation behavior; redteam gate 12/12, 63 scope tests green"
+    },
+    "architecture": {
+      "before": 14, "after": 14, "weight": 15,
+      "src": "8 cohesive modules, each < 260 LOC (under the 500 ceiling), single-responsibility; pure decision path behind ReplayLlm/LabForge (I4)"
+    },
+    "completeness": {
+      "before": 15, "after": 15, "weight": 15,
+      "src": "no TODO/stub/placeholder; coverage guard green; 9/10 OWASP Agentic 2026 ASI categories exercised (only ASI05 code-exec out of engine scope)"
+    },
+    "documentation": {
+      "before": 8, "after": 10, "weight": 10,
+      "src": "all public API documented (phase_for_turn, ScenarioOutcome, RecordingLlm.decide, scorecard, render); only a nested closure remains (not public)"
+    }
+  },
+  "global_before": 91,
+  "global_after": 99,
+  "verdict": "COMPLETE",
+  "residual_to_target": "none (target 95 exceeded)"
+}

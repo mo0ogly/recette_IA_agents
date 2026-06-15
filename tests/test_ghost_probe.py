@@ -37,6 +37,17 @@ class GhostProbeRequestTest(unittest.TestCase):
         b = build_probe_request("http://h/x", {"a": 1, "b": 2}).data
         self.assertEqual(a, b)  # sort_keys -> deterministic body
 
+    def test_https_sink_is_accepted(self) -> None:
+        req = build_probe_request("https://sink.internal/write", {})
+        self.assertEqual(req.full_url, "https://sink.internal/write")
+
+    def test_non_http_scheme_is_rejected_fail_safe(self) -> None:
+        # A file:/ or custom-scheme sink must be refused so the probe can never
+        # turn into a local-file or arbitrary-scheme write (fail-safe, S310).
+        for bad in ("file:///etc/passwd", "ftp://h/x", "gopher://h"):
+            with self.assertRaises(ValueError):
+                build_probe_request(bad, {})
+
 
 if __name__ == "__main__":
     unittest.main()

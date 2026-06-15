@@ -44,6 +44,10 @@ def _approver_for(name: str):
 
 @dataclass(frozen=True)
 class ScenarioOutcome:
+    """One red-team scenario's result: the predicted vs expected verdict, the
+    broken-axis violation_type, whether the anomaly was caught (predicted ==
+    expected), and the standards tags for the scorecard distribution."""
+
     scenario_id: str
     verdict: str  # predicted: "correct" | "incorrect"
     expected_verdict: str

@@ -51,6 +51,8 @@ class RecordingLlm:
     recorded: list[LlmDecision] = field(default_factory=list)
 
     def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:
+        """Delegate to the wrapped backend and record each decision in order, so
+        the live run can be frozen into a deterministic replayable program (I4)."""
         decision = self.inner.decide(system=system, history=history, tools=tools)
         self.recorded.append(decision)
         return decision
