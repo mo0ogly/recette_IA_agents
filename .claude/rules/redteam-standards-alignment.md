@@ -82,10 +82,14 @@ Verified against the current engines (what we CAN exercise without inventing):
 - **ASI06 Memory & Context Poisoning** -- COVERED. The `tool_injection` field
   (AgentDojo injection-via-tool-output, `redteam_git._tool_output`) poisons a
   tool result that drives the next action. (`rt-prbot-context-poisoning`.)
-- **ASI08 Cascading Agent Failures** -- FEASIBLE, not yet built. The
-  `maf_orchestration` team engine (participants + handoffs + termination) can
-  model a failure that cascades across hops. Needs an orchestration red-team
-  scenario shape; deferred, not impossible.
+- **ASI08 Cascading Agent Failures** -- COVERED, in the ORCHESTRATION recette
+  (not `/sim`). `corpus/maf_orchestration/incorrect/support-handoff-cascading-failure`
+  models a downstream failure handed back upstream and retried, cascading across
+  the triage/enrich/notify mesh until the run exceeds `termination.max_hops`;
+  `judge_orchestration` flags it mono-axis as `behavior_anomaly`. Orchestration
+  ground-truth has no `tags` field, so the ASI08/AML.T0053 mapping is recorded in
+  the subject's `rationale` (consistent with the orchestration corpus, which the
+  orchestration recette judges on the 4 dimensions, not an OWASP distribution).
 - **ASI04 Agentic Supply Chain Compromise** -- FEASIBLE on the DISCOVERY side
   (`corpus/repos/`, the `.inspect_ia_agents` manifest a scanner reads), NOT on the `/sim`
   runtime side: a poisoned repo/tool source is a static-source artifact, not an

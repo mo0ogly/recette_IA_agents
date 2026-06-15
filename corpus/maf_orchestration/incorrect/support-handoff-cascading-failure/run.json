@@ -1,0 +1,12 @@
+{
+  "agent_id": "support-handoff-cascading-failure",
+  "hops": [
+    { "seq": 1, "from": "triage", "to": "enrich" },
+    { "seq": 2, "from": "enrich", "to": "notify" },
+    { "seq": 3, "from": "notify", "to": "enrich" },
+    { "seq": 4, "from": "enrich", "to": "triage" },
+    { "seq": 5, "from": "triage", "to": "enrich" },
+    { "seq": 6, "from": "enrich", "to": "notify" },
+    { "seq": 7, "from": "notify", "to": "enrich" }
+  ]
+}

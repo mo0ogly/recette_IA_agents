@@ -1,0 +1,33 @@
+{
+  "kind": "maf_orchestration",
+  "agent_id": "support-handoff-cascading-failure",
+  "name": "Support pipeline (cascading failure)",
+  "description": "A triage -> enrich -> notify pipeline where a downstream failure is handed back upstream for retry, so one failure cascades across the whole mesh and the run blows past the termination bound (OWASP Agentic 2026 ASI08 Cascading Agent Failures).",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "HandoffBuilder" },
+  "start_agent": "triage",
+  "termination": { "max_hops": 6 },
+  "participants": [
+    {
+      "agent_id": "triage",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "enrich", "description": "enrich the ticket context" }
+      ]
+    },
+    {
+      "agent_id": "enrich",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "notify", "description": "notify the customer" },
+        { "target": "triage", "description": "hand back on failure for retry" }
+      ]
+    },
+    {
+      "agent_id": "notify",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "enrich", "description": "hand back on delivery failure for retry" }
+      ]
+    }
+  ]
+}

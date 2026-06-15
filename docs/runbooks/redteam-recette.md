@@ -349,9 +349,13 @@ committed `rt-prbot-context-poisoning` git scenario poisons a `read_repo` result
 to drive an out-of-scope `open_pr` (tagged ASI06 / `AML.T0110` tool poisoning),
 caught as a `capability_overreach`.
 
-Not yet covered, with the honest engine verdict (see R23 for detail): ASI08
-(cascading) is FEASIBLE via the `maf_orchestration` team engine (deferred); ASI04
-(supply chain) belongs on the DISCOVERY side (`corpus/repos/`), not `/sim`; ASI05
+**ASI08 Cascading Agent Failures** is covered in the ORCHESTRATION recette (not
+`/sim`): `corpus/maf_orchestration/incorrect/support-handoff-cascading-failure`
+models a downstream failure handed back upstream and retried until the run blows
+past `termination.max_hops`, judged mono-axis `behavior_anomaly`.
+
+Still out of scope, with the honest engine verdict (see R23): ASI04 (supply
+chain) belongs on the DISCOVERY side (`corpus/repos/`), not `/sim`; ASI05
 (unexpected code execution) is NOT modellable today (the lab has no code sandbox)
 and must not be faked.
 
