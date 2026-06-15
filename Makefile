@@ -1,4 +1,8 @@
 # inspect_ia_agents recette -- local + Docker lab targets.
+# Use the project venv when present (it carries recette + the [api]/[bundle]
+# extras that bnp/system-recette need); fall back to system python3. Override
+# with `make PY=/path/to/python <target>`.
+PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 .PHONY: help install install-check validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
@@ -47,52 +51,52 @@ install-check:
 
 # --- local ---
 validate:
-	python3 -m recette validate
+	$(PY) -m recette validate
 
 run:
-	python3 -m recette run
+	$(PY) -m recette run
 
 discovery:
-	python3 -m recette discovery --adapter reference
+	$(PY) -m recette discovery --adapter reference
 
 report:
-	python3 -m recette report
+	$(PY) -m recette report
 
 bnp:
-	python3 scripts/run_bnp_scenarios.py
+	$(PY) scripts/run_bnp_scenarios.py
 
 role-matrix:
-	python3 scripts/run_role_matrix.py
+	$(PY) scripts/run_role_matrix.py
 
 role-matrix-live:
-	python3 scripts/run_role_matrix_live_groq.py
+	$(PY) scripts/run_role_matrix_live_groq.py
 
 coverage-guard:
-	python3 -m unittest tests.test_coverage_guard
+	$(PY) -m unittest tests.test_coverage_guard
 
 rag:
-	python3 scripts/run_role_matrix.py --dir campaigns/rag
+	$(PY) scripts/run_role_matrix.py --dir campaigns/rag
 
 rag-live:
-	python3 scripts/run_rag_poisoning_live_groq.py
+	$(PY) scripts/run_rag_poisoning_live_groq.py
 
 rag-kb:
-	python3 -m recette rag-kb list
+	$(PY) -m recette rag-kb list
 
 rag-e2e:
-	python3 scripts/run_rag_poisoning_e2e.py
+	$(PY) scripts/run_rag_poisoning_e2e.py
 
 system-recette:
-	python3 scripts/run_system_recette.py
+	$(PY) scripts/run_system_recette.py
 
 system-recette-live:
-	python3 scripts/run_system_recette.py --live
+	$(PY) scripts/run_system_recette.py --live
 
 recette: coverage-guard validate run discovery bnp role-matrix rag system-recette
 	@echo "recette: ALL PASS"
 
 test:
-	python3 -m unittest discover -s tests
+	$(PY) -m unittest discover -s tests
 
 smoke:
 	./recette.sh smoke
@@ -105,7 +109,7 @@ gates:
 	@echo "gates: PASS"
 
 api:
-	python3 -m recette.api
+	$(PY) -m recette.api
 
 # --- docker lab ---
 docker-build:

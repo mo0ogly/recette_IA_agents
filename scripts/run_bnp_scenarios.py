@@ -26,6 +26,13 @@ import tempfile
 from pathlib import Path
 from typing import cast
 
+# Make recette importable when run as a script (python3 scripts/run_bnp_scenarios.py):
+# sys.path[0] is then scripts/, not the repo root. Mirrors scripts/smoke_*.py so
+# `make bnp` works without the package being pip-installed.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from recette.api.app import create_app
 from recette.api.config_store import ConfigStore
 from recette.campaign import CampaignRunner, HttpClient, load_campaign
