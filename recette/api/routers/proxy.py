@@ -138,3 +138,34 @@ def set_proxy_route(request: Request, body: dict) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"active": chosen.id, "proxy_url": chosen.proxy_url}
+
+
+@router.get("/reconcile")
+def get_reconcile(request: Request, run_id: str | None = None) -> dict:
+    """Wire-vs-audit reconciliation (allowlist slice).
+
+    A wire flow whose target (host:port) is outside the allowlist of mediated
+    systems (the lab, the mock_local servers) is an UNMEDIATED path -- the
+    ghost-agent signal. Slice 1 does not allowlist LLM backend hosts (the
+    deterministic proof drives a mock probe, no LLM traffic on the wire); a
+    real-run LLM allowlist + an audit-event join are phase 2. The lab OBSERVES
+    the unmediated path; it does not ENFORCE a network block."""
+    from urllib.parse import urlparse
+
+    from ...platform.proxy.lab_proxy import lab_url_from_env
+    from ...platform.proxy.reconcile import build_allowlist, reconcile, target_of
+
+    flows = request.app.state.wire_flow_recorder.snapshot()
+    if run_id is not None:
+        flows = [f for f in flows if f.run_id == run_id]
+    lab = urlparse(lab_url_from_env())
+    # Normalize through target_of so "localhost:8082" matches a flow recorded as
+    # "127.0.0.1:8082" (and vice versa).
+    lab_host = target_of({"host": lab.hostname or "127.0.0.1", "port": lab.port or 8082})
+    allow = build_allowlist(
+        servers=request.app.state.config_store.list_servers(),
+        lab_host=lab_host,
+        llm_hosts=set(),
+    )
+    report = reconcile([f.to_dict() for f in flows], allow)
+    return {"run_id": run_id, **report.to_dict()}
