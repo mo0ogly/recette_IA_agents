@@ -57,19 +57,44 @@ at least one surface. Example output (2 subjects):
 (1/2) -- the ghost is the hook blind spot. `false_negatives` lists any agent seen
 nowhere (the thesis failure); a non-empty list exits 1.
 
+This gate runs inside `make recette` (it is a dep of the `recette` target): a
+simulated agent that RailNode would see on NO surface turns the whole recette
+RED, in CI, automatically -- never something to catch by hand.
+
+## The red gate -- the `vanished` negative subject
+
+`corpus/surface/_negative/vanished` is a committed NEGATIVE subject: an agent
+that produced nothing observable (empty `proxy_traces` AND empty `wire_flows`),
+so it is detected on NO surface. Its ground-truth is `detected_anywhere: false`.
+
+It lives under `_negative/` so the green `recette surface` run does NOT score it
+(the loader `load_surface_subjects` skips `_`-prefixed dirs). It is loaded
+separately by `load_surface_negatives()` and exercised by
+`tests/test_surface_negative.py`, which asserts the scorecard turns RED on it
+(`ok == false`, `false_negatives == ("vanished",)`). This proves the thesis gate
+fires from a committed corpus subject, not just a unit-test literal.
+
 ## Wiring the real RailNode
 
 The reference oracle (`ReferenceSurfaceDiscoveryAdapter`) is the template. A real
 RailNode plugs in by implementing the `SurfaceDiscoveryAdapter` protocol
 (`recette/surface/detect.py`) -- given a `SurfaceObservation`, return a
-`DiscoveryResult`. Mirrors how `recette/http_adapter.py` wires a real scanner to
-the `SourceScanAdapter` protocol.
+`DiscoveryResult`.
+
+`recette/surface/http_adapter.py::HttpSurfaceDiscoveryAdapter` is the ready HTTP
+implementation (mirrors `recette/http_adapter.py`): it POSTs each observation
+(`{surface, visible}`) to the RailNode detection route (`/v1/detect`, ASSUMED
+pending the RailNode API), unwraps a `{success, data}` envelope, and returns a
+`DiscoveryResult`. Config (R5/R8): base URL from `INSPECT_IA_AGENTS_RAILNODE_URL`
+(default `http://127.0.0.1:8085`), bearer token from `INSPECT_IA_AGENTS_RAILNODE_TOKEN`,
+tenant from `INSPECT_IA_AGENTS_TENANT`. httpx is imported lazily with a
+zero-dependency stdlib fallback, so the package needs no network to import.
 
 ## Gates
 
 ```
 .venv/bin/python -m unittest discover -s tests
-make recette
+make recette        # includes the `surface` detection gate
 .venv-pyaudit/bin/ruff check recette/ tests/ && .venv-pyaudit/bin/mypy recette/
 ```
 
