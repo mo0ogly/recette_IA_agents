@@ -10,8 +10,10 @@
 
 #![deny(missing_docs)]
 
+pub mod bridge;
 pub mod sink;
 
+pub use bridge::recording_from_traces;
 pub use sink::{CaptureSink, RingCaptureRecorder};
 
 use serde::{Deserialize, Serialize};

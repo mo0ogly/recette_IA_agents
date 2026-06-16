@@ -163,6 +163,7 @@ dependencies = [
 name = "discoveryprobe-capture"
 version = "0.1.0"
 dependencies = [
+ "discoveryprobe-core",
  "serde",
  "serde_json",
 ]
