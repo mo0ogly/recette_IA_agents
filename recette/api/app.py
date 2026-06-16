@@ -48,6 +48,7 @@ from .routers import campaigns as campaigns_router
 from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
+from .routers import discovery as discovery_router
 from .routers import events as events_router
 from .routers import policies as policies_router
 from .routers import probe as probe_router
@@ -327,4 +328,5 @@ def create_app(
     app.include_router(sim_router.router)
     app.include_router(events_router.router)
     app.include_router(probe_router.router)
+    app.include_router(discovery_router.router)
     return app
