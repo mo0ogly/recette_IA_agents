@@ -1,0 +1,19 @@
+# discoveryprobe-capture -- the agent-capture trace schema + sink, in Rust.
+#
+# Migrates the Python observability logic of the upstream repos into Rust:
+# - the enriched per-call trace FIELD SET from tensorstax/agenttrace (MIT),
+# - the hook + callback-sink MECHANISM from cyberark/agentwatch (Apache-2.0).
+# Re-homed natively so the Rust wire/eBPF capture (discoveryprobe) and this trace
+# schema share one type. JSON-compatible with the Python bridge
+# (recette/capture/llm_trace.py::LlmCallTrace.to_dict). Attribution in NOTICE +
+# docs/migration-provenance.md.
+[package]
+name = "discoveryprobe-capture"
+version = "0.1.0"
+edition = "2021"
+description = "Agent-capture trace schema + sink (agenttrace/agentwatch logic migrated to Rust)."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
