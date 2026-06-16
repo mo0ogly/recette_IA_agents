@@ -20,6 +20,18 @@ from recette.surface.recording import (
     detect_from_recording,
     score_recording,
 )
+from recette.surface.surfaces import ObservationSurface
+
+# GR4/GR5 cross-language contract: the EXACT bytes the Rust loader emits for a
+# reconciled ebpf_wire recording (process exec + outbound connect), produced by
+# `cargo run -p discoveryprobe --example emit_wire_recording`. Frozen here so the
+# Rust kernel-egress capture and this Python judge can never silently diverge: a
+# hook-blind agent ("ghost-llm-bot") is still caught on the wire by its LLM
+# provider connect. If the Rust serialiser changes shape, this test goes red.
+_RUST_WIRE_RECORDING = (
+    '[{"agent_id":"ghost-llm-bot","surfaces":'
+    '{"ebpf_wire":["connect:140.82.112.3:443","exec:llm-bot:4242"]}}]'
+)
 
 # A broker BrokerResponse::Ok envelope: pr-bot seen on the wire, ghost nowhere.
 _BROKER_OK = json.dumps(
@@ -73,6 +85,21 @@ class TestSurfaceRecording(unittest.TestCase):
         first = json.dumps(asdict(score_recording(_BROKER_OK)), sort_keys=True)
         second = json.dumps(asdict(score_recording(_BROKER_OK)), sort_keys=True)
         self.assertEqual(first, second)
+
+    def test_rust_emitted_wire_recording_is_judged_detected(self) -> None:
+        # The kernel-egress recording produced by the Rust loader (GR4) is judged
+        # identically by this Python surface judge -- cross-language agreement.
+        scorecard = score_recording(_RUST_WIRE_RECORDING)
+        self.assertTrue(scorecard.ok)
+        self.assertEqual(scorecard.false_negatives, ())
+        self.assertEqual(scorecard.detected_per_surface, {"ebpf_wire": 1})
+
+    def test_rust_emitted_connect_intent_parses_back(self) -> None:
+        recording = CaptureRecording.from_dict(json.loads(_RUST_WIRE_RECORDING)[0])
+        self.assertEqual(
+            recording.surfaces[ObservationSurface("ebpf_wire")],
+            ("connect:140.82.112.3:443", "exec:llm-bot:4242"),
+        )
 
 
 if __name__ == "__main__":
