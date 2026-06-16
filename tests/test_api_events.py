@@ -108,6 +108,40 @@ class TestEventsStreamApi(unittest.TestCase):
         body = self.client.get("/events/status").json()
         self.assertEqual(body, {"degraded": False, "pending": 0, "dropped": 0})
 
+    def test_stream_registers_subscriber_before_body_is_iterated(self) -> None:
+        # Race guard (the /live smoke flakiness): the browser fires EventSource
+        # `onopen` on the 200 response headers, which Starlette sends BEFORE it
+        # iterates the streaming body. So the handler must subscribe in its OWN
+        # body (before returning the StreamingResponse), not inside the generator;
+        # otherwise an event published between onopen and the first body chunk is
+        # lost because no subscriber is registered yet.
+        #
+        # Asserted at the handler seam (not over a live SSE socket): await the
+        # handler, and BEFORE touching the body iterator, the subscriber must
+        # already exist. Closing the body iterator runs the generator's finally
+        # and removes it (no leak). No socket -> deterministic, no timing/hang.
+        import asyncio
+        from types import SimpleNamespace
+
+        from recette.api.routers.events import stream_events
+
+        async def exercise() -> None:
+            request = SimpleNamespace(
+                app=SimpleNamespace(state=SimpleNamespace(realtime_transport=self.transport))
+            )
+            self.assertEqual(self.transport.subscriber_count(), 0)
+            response = await stream_events(request)  # type: ignore[arg-type]
+            # Handler returned -> subscribe() already ran -> onopen-safe.
+            self.assertEqual(self.transport.subscriber_count(), 1)
+            # Pull the greeting (the `onopen` chunk); this enters the generator's
+            # try-block so aclose() below actually runs its finally (sub.close()).
+            greeting = await response.body_iterator.__anext__()
+            self.assertEqual(greeting, ": connected\n\n")
+            await response.body_iterator.aclose()  # runs finally -> sub.close()
+            self.assertEqual(self.transport.subscriber_count(), 0)
+
+        asyncio.run(exercise())
+
 
 if __name__ == "__main__":
     unittest.main()

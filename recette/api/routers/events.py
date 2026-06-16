@@ -27,9 +27,16 @@ async def stream_events(request: Request) -> StreamingResponse:
     client disconnect. A keepalive comment is emitted on idle so proxies do not
     time the connection out."""
     transport = request.app.state.realtime_transport
+    # Subscribe HERE, before the StreamingResponse is returned, not inside the
+    # generator body. The browser fires EventSource `onopen` on the 200 response
+    # headers -- which Starlette sends BEFORE it starts iterating the generator.
+    # If the subscribe() ran inside the generator, an event published in the
+    # window between onopen and the first body chunk would be missed (the
+    # subscriber was not registered yet). Subscribing in the handler closes that
+    # race: by the time onopen fires, the subscriber is already in the fan-out set.
+    sub = transport.subscribe()
 
     async def event_source() -> AsyncIterator[str]:
-        sub = transport.subscribe()
         try:
             # Greet immediately so EventSource fires `onopen` without waiting.
             yield ": connected\n\n"
