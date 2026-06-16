@@ -12,14 +12,23 @@ from __future__ import annotations
 
 import unittest
 
-from recette.api.app import RestartSafeIdGenerator
-from recette.platform.eventstore.memory_store import InMemoryEventStore
+try:
+    # RestartSafeIdGenerator lives in recette.api.app, which imports fastapi at
+    # module level, so collection needs the [api] extra. Guard the import so the
+    # suite collects cleanly without it (R20); the test runs where fastapi is.
+    from recette.api.app import RestartSafeIdGenerator
+    from recette.platform.eventstore.memory_store import InMemoryEventStore
+
+    _HAS_API = True
+except ImportError:  # pragma: no cover - depends on the [api] extra (fastapi)
+    _HAS_API = False
 
 
 def _seed(store: InMemoryEventStore, event_id: str) -> None:
     store.append(event_id=event_id, kind="action_executed", payload={}, schema_version="1.0")
 
 
+@unittest.skipUnless(_HAS_API, "requires the [api] extra (fastapi)")
 class TestRestartSafeIdGenerator(unittest.TestCase):
     def test_fresh_store_keeps_the_historical_first_id(self) -> None:
         gen = RestartSafeIdGenerator(InMemoryEventStore())

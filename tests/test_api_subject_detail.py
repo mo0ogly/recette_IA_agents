@@ -1,14 +1,23 @@
 """Subject detail finder: full manifest + ground-truth by agent_id.
 
-Pure (no FastAPI needed): exercises find_subject_detail against the on-disk
-corpus so the console explain modal has a real source. Deterministic.
+Exercises find_subject_detail against the on-disk corpus so the console explain
+modal has a real source. Deterministic. The finder is pure logic, but it lives
+in recette.api.routers.subjects which imports fastapi at module level, so the
+import is guarded: the suite collects cleanly without the [api] extra (R20) and
+the test runs wherever fastapi is installed.
 """
 
 import unittest
 
-from recette.api.routers.subjects import find_subject_detail
+try:
+    from recette.api.routers.subjects import find_subject_detail
+
+    _HAS_API = True
+except ImportError:  # pragma: no cover - depends on the [api] extra (fastapi)
+    _HAS_API = False
 
 
+@unittest.skipUnless(_HAS_API, "requires the [api] extra (fastapi)")
 class SubjectDetailTest(unittest.TestCase):
     def test_known_git_subject_returns_manifest_and_ground_truth(self) -> None:
         detail = find_subject_detail("gh-issue-triager")
