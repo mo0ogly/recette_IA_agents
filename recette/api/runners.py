@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from ..adapters import ReferenceDiscoveryAdapter, ReferenceIdentificationAdapter
 from ..discovery_harness import (
@@ -28,6 +29,9 @@ from ..platform.catalog.model import RISK_SCORE, RiskLevel
 from ..platform.events import PlatformActionEvent
 from ..platform.gateway import ActionRequest, Gateway
 from ..platform.netname.resolver import ResolutionDenied
+
+if TYPE_CHECKING:
+    from ..capture.llm_trace import LlmCallTrace
 from ..platform.proxy.lab_proxy import LabHttpProxy, lab_url_from_env
 from ..platform.proxy.protocol import ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
@@ -372,7 +376,21 @@ def make_lane_b_runner(
     run_id: str | None = None,
     gateway: Gateway | None = None,
     wire_proxy_url: str | None = None,
+    capture_sink: Callable[[LlmCallTrace], None] | None = None,
 ) -> Callable[[dict, Emit, ShouldStop], None]:
+    # Opt-in in-process hook capture (G1): wrap the backend so every decision is
+    # recorded to the sink, transparently to the decide->act loop. Default None =
+    # no capture, zero behaviour change. The wrap is the ONLY change.
+    if capture_sink is not None:
+        from ..capture.capturing_llm import CapturingLlm
+
+        llm = CapturingLlm(
+            llm,
+            agent_id=str(agent_cfg.get("id", "")),
+            model=str(agent_cfg.get("ai_backend_id", "")),
+            sink=capture_sink,
+        )
+
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
         # Proxy resolution happens inside the runner so a dangling server
         # reference surfaces as an explicit run failure (status=failed +
