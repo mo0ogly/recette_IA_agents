@@ -81,3 +81,6 @@ data/backend_secrets.json
 # discoveryprobe Rust crate build artifacts (native, out of base image -- R22)
 discoveryprobe/target/
 discoveryprobe/discoveryprobe-ebpf/target/
+
+# PDCA audit work-memory at repo root is forbidden (R25) -- belongs under docs/tracking/pdca/
+pdca/
