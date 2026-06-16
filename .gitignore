@@ -65,6 +65,9 @@ data/*.events.db-wal
 config/campaigns.json
 data/recordings/
 
+# Runtime operational state sidecar (e.g. containment flag) -- never the corpus
+config/*.runtime.json
+
 # Runtime verdict submissions + lab access logs (regenerated at runtime)
 data/verdicts.json
 data/lab/

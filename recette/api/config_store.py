@@ -236,12 +236,29 @@ class ConfigStore:
         self._write(cfg)
 
     # --- containment (private-DNS allowlist gate, Task 6) ---
+    def _runtime_state_path(self) -> Path:
+        """Sidecar holding mutable OPERATIONAL state, NOT the versioned corpus.
+
+        Derived from the config path so a test ConfigStore(tmp) stays isolated.
+        The seed config (agents/servers/backends) is a tracked corpus; toggling
+        an operational flag must NOT dirty that versioned file, so runtime state
+        lives in a gitignored sibling (``*.runtime.json``).
+        """
+        return self.path.parent / f"{self.path.stem}.runtime.json"
+
+    def _read_runtime_state(self) -> dict:
+        p = self._runtime_state_path()
+        if not p.exists():
+            return {}
+        return json.loads(p.read_text(encoding="utf-8"))
+
     def containment_enabled(self) -> bool:
         """Whether the private-DNS CONTAINMENT gate is enforced (fail-safe).
 
-        Sourced from the top-level ``containment`` flag of the config document.
-        BOTH settings BLOCK execution on an undeclared server name; they differ
-        only in the signal + audit, never allow-vs-deny:
+        Sourced from the gitignored runtime-state sidecar (operational state),
+        with a fallback to a legacy top-level ``containment`` key in the config
+        document for back-compat. BOTH settings BLOCK execution on an undeclared
+        server name; they differ only in the signal + audit, never allow-vs-deny:
         - False (default, realism-only): an unknown name is a dangling reference
           and ``resolve_proxy`` raises ``ValueError`` -- the run fails, no audit
           event. Never a silent allow.
@@ -250,20 +267,27 @@ class ConfigStore:
           ``resolution_denied`` event (I2/I5) and fails the run. No proxy is
           built, no proxy/HTTP call is made.
         """
+        state = self._read_runtime_state()
+        if "containment" in state:
+            return bool(state["containment"])
+        # Back-compat: honour a legacy flag baked into the config document.
         return bool(self.read().get("containment", False))
 
     def set_containment(self, enabled: bool) -> None:
-        """Persist the top-level ``containment`` flag (atomic write).
+        """Persist the containment flag to the runtime-state sidecar (atomic).
 
-        The flag governs the private-DNS allowlist gate; see
-        ``containment_enabled`` for the BOTH-block-never-allow semantics. This
-        is operational config, not an audited event, so a plain overwrite of
-        the flag (no compensating event) is correct here -- the event store is
-        untouched (I1 N/A).
+        Written to the gitignored ``*.runtime.json`` sibling, NEVER the tracked
+        config corpus -- a UI toggle must not produce a versioned-file diff. This
+        is operational state, not an audited event, so a plain overwrite is
+        correct (the event store is untouched, I1 N/A).
         """
-        cfg = self.read()
-        cfg["containment"] = bool(enabled)
-        self._write(cfg)
+        state = self._read_runtime_state()
+        state["containment"] = bool(enabled)
+        p = self._runtime_state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, p)
 
     # --- servers ---
     def list_servers(self) -> list[dict]:

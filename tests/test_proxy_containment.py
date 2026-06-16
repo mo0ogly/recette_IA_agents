@@ -239,6 +239,71 @@ class ContainmentRunnerTests(unittest.TestCase):
         # Fail-safe: the agent never ran -> no step/result frame emitted.
         self.assertEqual([k for k, _ in emitted], [])
 
+    def test_lane_b_runner_with_gateway_denies_undeclared_server_and_audits(self) -> None:
+        """End-to-end deny path (the live scenario): containment ON + an agent
+        bound to an UNDECLARED server name -> the run raises ResolutionDenied,
+        NO execution happens (proxy untouched, no step/result frame), and a
+        resolution_denied event carrying the denied name is audited (I1/I2/I5)."""
+        import tempfile
+        from pathlib import Path
+
+        from recette.api.runners import make_lane_b_runner
+        from recette.llm import StubLlm
+        from recette.platform.catalog import Catalog
+        from recette.platform.eventstore.memory_store import InMemoryEventStore
+        from recette.platform.gateway import AgentResolver, Gateway
+        from recette.platform.ids import SequenceIdGenerator
+        from recette.platform.policy.store import PolicyStore
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        store = InMemoryEventStore()
+        proxy = _RecordingProxy()
+        gateway = Gateway(
+            catalog=Catalog(()),
+            policy_store=PolicyStore(Path(tmp.name) / "policies"),
+            event_store=store,
+            proxy=proxy,  # type: ignore[arg-type]
+            id_generator=SequenceIdGenerator(),
+            agent_resolver=AgentResolver(lambda _id: None),
+        )
+
+        class _ContainmentOnStore:
+            def list_servers(self) -> list[dict]:
+                return list(SERVERS)
+
+            def containment_enabled(self) -> bool:
+                return True
+
+        agent_cfg = {
+            "id": "ghost-probe",
+            "principal": "probe@acme",
+            "target_system": "github",
+            "goal": "probe an undeclared server under containment",
+            "capability_scope": ["read_repo"],
+            "server": "ghost-undeclared-mock",
+        }
+        runner = make_lane_b_runner(
+            agent_cfg,
+            StubLlm([]),
+            config_store=_ContainmentOnStore(),  # type: ignore[arg-type]
+            gateway=gateway,
+        )
+        emitted: list[tuple[str, dict]] = []
+
+        with self.assertRaises(ResolutionDenied):
+            runner({}, lambda kind, data: emitted.append((kind, data)), lambda: False)
+
+        # Fail-safe: no execution -> proxy untouched, no step/result frame.
+        self.assertEqual(proxy.calls, 0)
+        self.assertEqual([k for k, _ in emitted], [])
+        # The deny is audited as a resolution_denied event carrying the name (I1).
+        denied = [e for e in store.read_from(0) if e.kind == EventKind.RESOLUTION_DENIED]
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(denied[0].payload["name"], "ghost-undeclared-mock")
+        self.assertEqual(denied[0].payload["agent_id"], "ghost-probe")
+        self.assertEqual(denied[0].payload["reason"], "not_in_allowlist")
+
 
 if __name__ == "__main__":
     unittest.main()

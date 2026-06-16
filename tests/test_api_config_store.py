@@ -371,3 +371,65 @@ class ServerSectionTests(unittest.TestCase):
             self.store.update_server("s1", {"mode": "real_saas"})
         # the bad patch must not have been persisted
         self.assertEqual(self.store.get_server("s1")["mode"], "mock_local")
+
+
+class ContainmentStateTests(unittest.TestCase):
+    """The containment flag is OPERATIONAL state: it persists to a gitignored
+    runtime sidecar, NEVER the versioned config corpus -- a UI toggle must not
+    produce a diff on the tracked config file."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "cfg.json"
+        self.store = ConfigStore(self.path)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _sidecar(self) -> Path:
+        return self.path.parent / f"{self.path.stem}.runtime.json"
+
+    def test_default_is_off(self) -> None:
+        self.assertFalse(self.store.containment_enabled())
+
+    def test_set_containment_roundtrips_through_a_fresh_store(self) -> None:
+        self.store.set_containment(True)
+        self.assertTrue(self.store.containment_enabled())
+        # A fresh store over the same path reads the persisted flag.
+        self.assertTrue(ConfigStore(self.path).containment_enabled())
+        self.store.set_containment(False)
+        self.assertFalse(ConfigStore(self.path).containment_enabled())
+
+    def test_set_containment_writes_the_sidecar_not_the_config(self) -> None:
+        # No config file yet; toggling containment must NOT create or touch it.
+        self.store.set_containment(True)
+        self.assertFalse(self.path.exists(), "containment toggle dirtied the config file")
+        self.assertTrue(self._sidecar().exists())
+        self.assertEqual(json.loads(self._sidecar().read_text())["containment"], True)
+
+    def test_set_containment_leaves_an_existing_config_byte_identical(self) -> None:
+        self.store.add_agent(
+            {
+                "id": "a1",
+                "principal": "p@github",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": [],
+                "runtime": "lab",
+            }
+        )
+        before = self.path.read_bytes()
+        self.store.set_containment(True)
+        self.store.set_containment(False)
+        # The tracked corpus file is untouched by containment toggles.
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_legacy_config_flag_is_honoured_when_no_sidecar(self) -> None:
+        # Back-compat: a containment flag baked into an old config still applies
+        # until the sidecar takes over.
+        self.path.write_text(json.dumps({"schema_version": "1.0", "containment": True}))
+        self.assertTrue(self.store.containment_enabled())
+        self.assertFalse(self._sidecar().exists())
+        # The sidecar wins once written.
+        self.store.set_containment(False)
+        self.assertFalse(self.store.containment_enabled())
