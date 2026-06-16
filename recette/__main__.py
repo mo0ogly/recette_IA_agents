@@ -297,6 +297,35 @@ def _cmd_discovery(adapter_name: str, surface: str) -> int:
     return 0 if all_ok else 1
 
 
+def _cmd_surface() -> int:
+    """Run the per-surface detection recette over the corpus, print the scorecard.
+
+    Proves RailNode SEES each simulated agent on each observation surface
+    (subprocess/MCP/SDK hooks + eBPF/wire). Exit 1 if any agent is detected on no
+    surface (the thesis failure). Design: docs/plans/2026-06-16-railnode-*-design.md.
+    """
+    import json
+    from dataclasses import asdict
+
+    from .surface.corpus import load_surface_subjects
+    from .surface.detect import ReferenceSurfaceDiscoveryAdapter, detect_agent
+    from .surface.scorecard import score_detections
+
+    adapter = ReferenceSurfaceDiscoveryAdapter()
+    detections = [
+        detect_agent(
+            agent_id=s["agent_id"],
+            proxy_traces=s["run"]["proxy_traces"],
+            wire_flows=s["run"]["wire_flows"],
+            adapter=adapter,
+        )
+        for s in load_surface_subjects()
+    ]
+    card = score_detections(detections)
+    print(json.dumps(asdict(card), sort_keys=True, indent=2))
+    return 0 if card.ok else 1
+
+
 def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
     from .bundle import verify_bundle_file
 
@@ -777,6 +806,10 @@ def build_parser() -> argparse.ArgumentParser:
     ragkb.add_argument("--id", default=None, dest="doc_id", help="document id (for del)")
     ragkb.add_argument("--scenario", default=None, help="scenario name (for apply)")
     sub.add_parser(
+        "surface",
+        help="per-surface detection recette (does RailNode SEE each agent?)",
+    )
+    sub.add_parser(
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",
     )
@@ -902,6 +935,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_benchmark(args.json)
     if args.command == "import-maf":
         return _cmd_import_maf(args.spec, args.out)
+    if args.command == "surface":
+        return _cmd_surface()
     if args.command == "redteam":
         return _cmd_redteam()
     if args.command == "redteam-promote":
