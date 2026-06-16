@@ -75,18 +75,29 @@ fn try_capture_connect(ctx: &TracePointContext) -> Result<(), i64> {
     // at the kernel, without the agent's cooperation (catches a hook-blind
     // ghost). Read the userspace `sockaddr` pointer from the tracepoint record,
     // then probe-read its sockaddr_in fields.
+    // SAFETY: `read_at` reads a fixed-size pointer field at a verifier-checked
+    // offset within the tracepoint record the kernel itself populated; the
+    // offset is within the record bounds for sys_enter_connect.
     let uservaddr = unsafe { ctx.read_at::<*const u8>(USERVADDR_OFFSET)? };
     if uservaddr.is_null() {
         return Err(0);
     }
     // sockaddr_in layout: sin_family u16 @0, sin_port u16 (network order) @2,
     // sin_addr u32 (network order) @4.
+    // SAFETY: `bpf_probe_read_user` is the kernel-sanctioned fallible read of
+    // userspace memory from an eBPF program -- a bad/unmapped address returns
+    // Err (propagated by `?`) instead of faulting, so dereferencing the user
+    // `sockaddr` pointer is sound.
     let family = unsafe { bpf_probe_read_user::<u16>(uservaddr as *const u16)? };
     if family != AF_INET {
         // IPv4 only for now; other families are dropped (documented boundary).
         return Err(0);
     }
+    // SAFETY: same as above -- a fallible userspace read at the sin_port (+2)
+    // offset within the sockaddr_in; an out-of-bounds read returns Err.
     let port = unsafe { bpf_probe_read_user::<u16>(uservaddr.wrapping_add(2) as *const u16)? };
+    // SAFETY: same as above -- a fallible userspace read at the sin_addr (+4)
+    // offset within the sockaddr_in; an out-of-bounds read returns Err.
     let addr = unsafe { bpf_probe_read_user::<u32>(uservaddr.wrapping_add(4) as *const u32)? };
 
     let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
