@@ -38,6 +38,7 @@ from ..platform.scheduler import ScheduledTask, build_scheduler_from_env
 from ..rag_store import KnowledgeBaseStore
 from .auth import AuthError, decode_token, principal_from_claims
 from .campaign_store import CampaignStore, RecordingStore
+from .capture_store import CaptureStore
 from .config_store import ConfigStore
 from .recette_campaigns import RecetteCampaignCatalog
 from .routers import actions as actions_router
@@ -45,6 +46,7 @@ from .routers import agent_actions as agent_actions_router
 from .routers import approvals as approvals_router
 from .routers import audit as audit_router
 from .routers import campaigns as campaigns_router
+from .routers import capture as capture_router
 from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import config as config_router
@@ -205,6 +207,9 @@ def create_app(
     # set in production, unset in dev/test. Resolved from env (R8), never hardcoded.
     auth_key = os.environ.get("INSPECT_IA_AGENTS_JWT_SIGNING_KEY") or None
     app.state.auth_key = auth_key
+    # In-process hook capture store (G1): a run's CapturingLlm sink writes here,
+    # GET /capture/llm-traces reads it back. Jettable view (I1 truth = audit log).
+    app.state.capture_store = CaptureStore()
     if auth_key is None:
         _auth_logger.warning(
             "AUTH DISABLED: INSPECT_IA_AGENTS_JWT_SIGNING_KEY is unset -- the API accepts "
@@ -329,4 +334,5 @@ def create_app(
     app.include_router(events_router.router)
     app.include_router(probe_router.router)
     app.include_router(discovery_router.router)
+    app.include_router(capture_router.router)
     return app
