@@ -60,7 +60,7 @@ class PacedOnStepTest(unittest.TestCase):
         finally:
             runners.time.sleep = original
 
-        self.assertEqual(calls, [0])           # inner ran first
+        self.assertEqual(calls, [0])  # inner ran first
         self.assertAlmostEqual(sum(slept), 0.25, places=3)  # total slept == pace
 
     def test_stop_breaks_sleep_early(self):
