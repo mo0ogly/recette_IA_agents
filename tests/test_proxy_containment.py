@@ -66,6 +66,18 @@ class ContainmentRouterTests(unittest.TestCase):
         self.assertIsInstance(resolved, LabHttpProxy)
         self.assertEqual(resolved._client.base_url, "http://127.0.0.1:9101")  # noqa: SLF001
 
+    def test_known_id_with_containment_on_resolves_no_false_deny(self) -> None:
+        # A server declared in the registry is reachable by its id even under
+        # containment ON and even if it carries NO fqdn/alias: containment denies
+        # only UNDECLARED names, it never breaks an id-referenced server (no
+        # silent gap where a legit server is falsely denied).
+        servers = [{"id": "bare-mock", "system": "github", "mode": "mock_local", "port": 9200}]
+        agent = {"id": "a1", "target_system": "github", "server": "bare-mock"}
+        default = LabHttpProxy("http://localhost:8082")
+        resolved = resolve_proxy(agent, servers, default, containment=True)
+        self.assertIsInstance(resolved, LabHttpProxy)
+        self.assertEqual(resolved._client.base_url, "http://127.0.0.1:9200")  # noqa: SLF001
+
     def test_unknown_name_with_containment_off_keeps_dangling_valueerror(self) -> None:
         # Back-compat: containment OFF + unknown name -> the legacy dangling-ref
         # ValueError, NOT ResolutionDenied (no behaviour change off the gate).

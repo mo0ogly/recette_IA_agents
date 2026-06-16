@@ -17,7 +17,16 @@ mode="local"
 
 run_local() {
     case "${target}" in
-        test)      "$(py)" -m unittest discover -s "${REPO_ROOT}/tests" ;;
+        test)      # Isolate the config path: the suite runs against a throwaway
+                   # COPY of the corpus so no test can ever write the tracked
+                   # config/inspect_ia_agents.config.json (R20 anti-pollution).
+                   # Reads see identical content; writes land in the copy.
+                   _cfgdir="$(mktemp -d)"
+                   cp "${REPO_ROOT}/config/inspect_ia_agents.config.json" \
+                      "${_cfgdir}/inspect_ia_agents.config.json"
+                   INSPECT_IA_AGENTS_CONFIG_PATH="${_cfgdir}/inspect_ia_agents.config.json" \
+                       "$(py)" -m unittest discover -s "${REPO_ROOT}/tests"
+                   rm -rf "${_cfgdir}" ;;
         gates)     ( cd "${REPO_ROOT}" && make gates ) ;;
         report)    ( cd "${REPO_ROOT}" && "$(py)" -m recette report ) ;;
         validate)  ( cd "${REPO_ROOT}" && "$(py)" -m recette validate ) ;;

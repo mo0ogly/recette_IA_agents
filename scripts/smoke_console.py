@@ -279,6 +279,47 @@ def _stop_server(page: Page, console: str) -> None:
     print("[4/5] /servers: Stop -> status down")
 
 
+def _drive_containment(page: Page, console: str, api: str) -> None:
+    # Live wiring of the private-DNS containment toggle: the controlled checkbox
+    # on the /servers Configuration tab drives PUT /config/containment. Flip it
+    # via the UI, assert the API reflects the flip, then restore the initial
+    # state (no lasting side effect). The flag persists to the gitignored runtime
+    # sidecar, never the tracked corpus -- guarded by tests/test_config_corpus_clean.
+    _, before = _api("GET", f"{api}/config/containment")
+    initial = bool(before.get("containment")) if isinstance(before, dict) else False
+    page.goto(f"{console}/servers", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_role("tab", name="Configuration", exact=True).click()
+    box = page.locator("#containment-toggle")
+    box.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect(box.is_checked() == initial, "containment checkbox does not reflect the API on load")
+
+    target = not initial
+    box.click()  # controlled checkbox: flips only after the async PUT resolves
+
+    def _api_is(state: bool) -> bool:
+        _, body = _api("GET", f"{api}/config/containment")
+        return isinstance(body, dict) and bool(body.get("containment")) is state
+
+    page.wait_for_function(
+        "(want) => document.getElementById('containment-toggle').checked === want",
+        arg=target,
+        timeout=UI_TIMEOUT_MS,
+    )
+    _expect(_api_is(target), f"PUT /config/containment did not persist {target}")
+    # Restore the initial state so the smoke leaves no lasting change.
+    box.click()
+    page.wait_for_function(
+        "(want) => document.getElementById('containment-toggle').checked === want",
+        arg=initial,
+        timeout=UI_TIMEOUT_MS,
+    )
+    _expect(_api_is(initial), "containment toggle did not restore the initial state")
+    print(f"[2c] /servers: containment toggle {initial}->{target}->{initial} via PUT (live)")
+    # Leave the page on the list tab so the following steps see the server row.
+    page.get_by_role("tab", name="Serveurs", exact=True).click()
+    _server_row(page).wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+
+
 def _drive_test(page: Page) -> None:
     # The "Test" verb: fire one action at the running server from the UI and
     # assert it answers like a real server (ok + HTTP 200 in the result panel).
@@ -394,6 +435,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # Order matters: the agent is bound to the server, so the server
             # must be UP for the campaign's proxied actions to succeed (I5).
             _start_server(page, console)
+            _drive_containment(page, console, api)
             _drive_test(page)
             _drive_campaign(page, console)
             _drive_dashboard_campaign(page, console)

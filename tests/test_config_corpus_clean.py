@@ -14,9 +14,16 @@ dependence (I4).
 from __future__ import annotations
 
 import json
+import os
 import unittest
+from pathlib import Path
 
 from recette.api.config_store import default_config_path
+
+# Audit the REPO's tracked corpus directly (not default_config_path(), which the
+# suite redirects to a throwaway copy): this gate must always read the committed
+# artifact so a leak in version control fails the build.
+TRACKED_CORPUS = Path(__file__).resolve().parents[1] / "config" / "inspect_ia_agents.config.json"
 
 # The seed corpus is agents/servers/backends + the schema version. Anything else
 # at the top level is either op-state (belongs in the sidecar) or junk.
@@ -29,10 +36,9 @@ FORBIDDEN_OP_STATE_KEYS = {"containment"}
 
 class ConfigCorpusCleanTests(unittest.TestCase):
     def setUp(self) -> None:
-        path = default_config_path()
-        if not path.exists():
-            self.skipTest(f"no tracked corpus at {path}")
-        self.cfg = json.loads(path.read_text(encoding="utf-8"))
+        if not TRACKED_CORPUS.exists():
+            self.skipTest(f"no tracked corpus at {TRACKED_CORPUS}")
+        self.cfg = json.loads(TRACKED_CORPUS.read_text(encoding="utf-8"))
         self.keys = set(self.cfg)
 
     def test_no_operational_state_leaked_into_the_corpus(self) -> None:
@@ -52,6 +58,26 @@ class ConfigCorpusCleanTests(unittest.TestCase):
             f"unexpected top-level key(s) {sorted(unexpected)} in the tracked corpus; "
             f"allowed: {sorted(ALLOWED_TOP_LEVEL_KEYS)} (op-state goes in the sidecar)",
         )
+
+
+class SuiteConfigIsolationTests(unittest.TestCase):
+    """When the suite runs via ./recette.sh test, the config path is redirected
+    to a throwaway COPY so no test can write the tracked corpus. This asserts the
+    isolation is actually in effect (it is a no-op skip when run ad hoc without
+    the wrapper, e.g. a bare `python -m unittest`)."""
+
+    def test_suite_config_path_is_not_the_tracked_corpus(self) -> None:
+        env_path = os.environ.get("INSPECT_IA_AGENTS_CONFIG_PATH")
+        if not env_path:
+            self.skipTest("ad-hoc run: INSPECT_IA_AGENTS_CONFIG_PATH not set by the wrapper")
+        self.assertNotEqual(
+            Path(env_path).resolve(),
+            TRACKED_CORPUS.resolve(),
+            "the test suite is pointed at the TRACKED corpus; a writing test would "
+            "pollute it -- the recette.sh wrapper must redirect to a throwaway copy",
+        )
+        # And default_config_path() honours that redirection.
+        self.assertEqual(default_config_path().resolve(), Path(env_path).resolve())
 
 
 if __name__ == "__main__":
