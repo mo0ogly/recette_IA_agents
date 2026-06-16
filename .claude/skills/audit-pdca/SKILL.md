@@ -89,19 +89,94 @@ excluded path is INVALID and must be dropped, not scored.
 
 ---
 
-## Phase P -- PLAN (Observe + Orient)
+## Recette-specific audit subjects (scope-aware -- NOT generic source)
 
-### P.0 : Pre-flight (BLOCKING)
+This repo is a ground-truth CORPUS + its harness, plus a native eBPF discovery engine. Three
+of its subjects are NOT audited by generic Rust/React grep -- they have their OWN gates. When
+`<scope>` targets one, audit it through the subject's gates below, not the default pipeline.
+A subject judged by the wrong gate (e.g. clippy on a corpus agent, or a per-handler-auth grep
+on the gateway) produces false findings -- pick the gate by subject.
 
-See `agentic-core.md` section 5 for full pre-flight protocol.
+### Subject A -- corpus agents / ground-truth (`corpus/`, `agents`, `maf_agents`, `repos`, `sim`, `surface`, or an agent slug)
+
+The corpus is the ETALON two external tools are tested against (identification + discovery).
+Its quality = ground-truth integrity, measured by the recette's own gates, never by source
+metrics. A gap here is a RED test, never something to find by hand (R20, no-silent-recette-gaps):
 
 ```bash
-cargo build 2>&1 | tail -5
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health
-cargo clippy --all-targets --all-features -- -D warnings 2>&1 | grep -c "warning:"
+make recette          # coverage-guard + validate + run + discovery + bnp + role-matrix + rag + system-recette + surface
+./recette.sh test     # python3 -m unittest discover -s tests  (incl. test_coverage_guard D1-D6, mono-axis negatives)
 ```
 
-If FAIL: STOP, fix. Exception: if the scope IS the broken component.
+Domain checks for this subject (replace the generic security/hygiene grids):
+- **Coverage guard (D1-D6) GREEN** -- D1 action-in-campaign, D2 action-has-lab-handler, D3 role-matrix, D4 domain triplet, D5 identification enum, D6 no campaign action without verdict / no orphan agent. RED = FAIL, no manual patch.
+- **Schema validity** -- `make validate` (agents + discovery repos schema-valid).
+- **Mono-axis negatives** -- `test_each_negative_breaks_exactly_one_dimension`: every negative breaks EXACTLY one of the 4 dimensions (identity/capabilities/policy/behavior).
+- **Positives AND negatives, GitHub AND GitLab** -- >= 1 correct + 1 incorrect per `violation_type` on both (recette-corpus.md).
+- **Identification recette** -- `make run` -> 4-dimension scorecard matches ground-truth.
+- **Discovery recette** -- `make discovery` -> INVARIANT scorecard only (detection, count/dedup, action_pattern coverage, relative risk order, determinism, policy presence) -- NEVER opaque values (`canonical_agent_id`, exact score).
+- **MAF subjects** -- `kind: "maf_agent"`, tool/handoff caps, deterministic judge, I6 approval-gated tools (maf-standard.md).
+- **Redteam tags** -- `corpus/sim/*` tags align OWASP Agentic 2026 ASI01-10 + MITRE ATLAS agentic, by mechanism (R23). Verify at source, never invent an ID.
+
+The judge/decision paths here are I4-deterministic: any new judge ships a replay test (no clock/random). Audit that too.
+
+### Subject B -- discoveryprobe (native Rust + eBPF engine, `discoveryprobe/`)
+
+A SEPARATE cargo workspace (members: core, common, broker, cli). Do NOT audit it with the
+platform's root `cargo build` -- `cd discoveryprobe` first. The `discoveryprobe-ebpf` crate is
+EXCLUDED from the host workspace (builds for `bpfel-unknown-none` with its own toolchain +
+build-std) -- it is built separately.
+
+```bash
+cd discoveryprobe && cargo build && cargo clippy --all-targets -- -D warnings && cargo test
+# ebpf crate: separate target. If the bpfel toolchain/build-std is absent -> mark that bloc
+# N/A (R18, never invent a result), NOT a FAILURE. Audit its source statically instead.
+```
+
+- **Security domain** -- run `/rust-recette` Bloc D (clippy + cargo-audit + cargo-deny + cargo-geiger) ON the discoveryprobe crates, scored /20 like any backend (build-pipeline-rust.md). `cargo-geiger` matters here: eBPF/loader code is `unsafe`-heavy by nature -- audit the unsafe surface, do not blanket-penalize it.
+- **CAP_BPF pre-flight is graduated, not blocking** -- the broker needs `CAP_BPF` for a LIVE capture; a no-capability env makes live capture N/A (WARNING + flag `audit_mode: degrade_no_cap`), but the static code audit + host-crate build/clippy/test still run. Never STOP the whole cycle because the kernel capability is missing (compile was verified; live capture needs CAP_BPF -- memory `discoveryprobe-ebpf-reference`).
+- **Discovery invariants (I4)** -- the recording -> `recette/surface` bridge is source-agnostic + deterministic. Verify via `make surface` + `make discovery`; a probe-sourced recording and a fixture-sourced one must judge identically (byte-stable).
+- The Rust recette scorer crate `cmd/inspect_ia_agents_recette` is a third host crate -- same backend gates.
+
+### Routing
+
+| `<scope>` contains | Subject | Primary gate |
+|--------------------|---------|--------------|
+| `corpus`, `agents`, `maf_`, `repos`, `sim`, `surface`, an agent slug | A -- ground-truth | `make recette` + `./recette.sh test` |
+| `discoveryprobe`, a probe crate | B -- eBPF engine | `cd discoveryprobe && cargo ...` + `/rust-recette` |
+| `recette/` (Python harness) | Python backend | `make gates` + `/python-recette` |
+| platform `src/`, console `*.tsx` | default Rust/React | root `cargo` / vite + `/rust-recette` `/react-recette` |
+
+---
+
+## Phase P -- PLAN (Observe + Orient)
+
+### P.0 : Pre-flight (graduated -- BLOCKING vs WARNING, scope-aware)
+
+See `agentic-core.md` section 5. Run the pre-flight FOR THE SUBJECT (routing table above) --
+a corpus or probe audit must not hard-fail on the platform's root build it never touches.
+Graduated like the Wattson model: BLOCKING (audit impossible without) vs WARNING (audit runs
+degraded, flag `audit_mode` in `C_SCORECARD.json` + a Limitations section in `A_RETEX.md`).
+
+```bash
+# Default (platform src/ or console)
+cargo build 2>&1 | tail -5                                              # BLOCKING for backend scope
+cargo clippy --all-targets --all-features -- -D warnings 2>&1 | grep -c "warning:"   # BLOCKING
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health  # WARNING (offline audit OK)
+
+# Subject A -- corpus/ground-truth
+python3 -c "import jsonschema; print('schema OK')"                       # BLOCKING (no validate without it)
+./recette.sh test 2>&1 | tail -3                                        # baseline corpus state
+
+# Subject B -- discoveryprobe
+cd discoveryprobe && cargo build 2>&1 | tail -5                          # BLOCKING (host crates)
+# CAP_BPF for live capture: WARNING only -- static audit + host build still run
+capsh --print 2>/dev/null | grep -q cap_bpf && echo "CAP_BPF OK" || echo "CAP_BPF WARNING: live capture N/A"
+```
+
+BLOCKING KO: STOP, fix (exception: the scope IS the broken component). WARNING KO: continue +
+flag limitations. A missing eBPF toolchain or CAP_BPF is a WARNING, never a STOP (R18: mark the
+affected bloc N/A, never invent its result).
 
 ### P.1 : Learning (load cycle N-1)
 
@@ -118,6 +193,7 @@ If FAIL: STOP, fix. Exception: if the scope IS the broken component.
 ### P.2 : Scope detection
 
 Cartograph: Rust/Python/React files, LOC, crates/packages, NATS subjects, event schemas, endpoints, components.
+For recette-specific subjects also cartograph: corpus agents (identification subjects `corpus/agents/`, discovery repos `corpus/repos/`, MAF `corpus/maf_agents/`, redteam `corpus/sim/`, surface), their ground-truth files, the coverage-guard dimensions exercised; discoveryprobe crates (core/common/broker/cli + the excluded ebpf crate). Classify the subject (A/B/Python/default) via the routing table.
 Create: `docs/tracking/pdca/{scope}/cycle_{N}/` + `P_PLAN.md` (IMMEDIATELY).
 
 **Tracking lives in gitignored `docs/tracking/pdca/` (R25 -- BLOCKING).** Every PDCA
