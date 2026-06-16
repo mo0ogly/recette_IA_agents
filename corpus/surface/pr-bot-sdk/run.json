@@ -1,0 +1,8 @@
+{
+  "proxy_traces": [
+    {"action_type": "open_pr", "resource": "acme/web#42"}
+  ],
+  "wire_flows": [
+    {"seq": 0, "method": "POST", "host": "api.github.com", "port": 443, "path": "/repos/acme/web/pulls"}
+  ]
+}

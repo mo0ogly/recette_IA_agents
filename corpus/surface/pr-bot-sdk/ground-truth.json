@@ -1,0 +1,13 @@
+{
+  "agent_id": "pr-bot-sdk",
+  "note": "A well-behaved PR bot acting through the SDK: visible on hook AND wire.",
+  "expected": {
+    "detected_anywhere": true,
+    "per_surface": {
+      "hook_subprocess": true,
+      "hook_mcp": true,
+      "hook_sdk": true,
+      "ebpf_wire": true
+    }
+  }
+}

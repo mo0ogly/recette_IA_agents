@@ -1,0 +1,6 @@
+{
+  "proxy_traces": [],
+  "wire_flows": [
+    {"seq": 0, "method": "POST", "host": "shadow-db.acme.internal", "port": 5432, "path": "/write"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "agent_id": "ghost-direct-db",
+  "note": "Ghost agent: native egress to a DB, bypasses the SDK. Invisible on the hook surface, caught only on the wire/eBPF surface. The keystone of the thesis.",
+  "expected": {
+    "detected_anywhere": true,
+    "per_surface": {
+      "hook_subprocess": false,
+      "hook_mcp": false,
+      "hook_sdk": false,
+      "ebpf_wire": true
+    }
+  }
+}
