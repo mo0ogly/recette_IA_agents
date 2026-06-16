@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 aya-ebpf = "0.1.1"
+railprobe-common = { path = "../railprobe-common" }
 
 [[bin]]
 name = "railprobe-trace"

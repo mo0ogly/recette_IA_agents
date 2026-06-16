@@ -137,10 +137,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "railprobe-common"
+version = "0.1.0"
+
+[[package]]
 name = "railprobe-ebpf"
 version = "0.1.0"
 dependencies = [
  "aya-ebpf",
+ "railprobe-common",
 ]
 
 [[package]]

@@ -33,6 +33,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "railprobe-common"
+version = "0.1.0"
+
+[[package]]
 name = "railprobe-core"
 version = "0.1.0"
 dependencies = [

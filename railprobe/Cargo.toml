@@ -6,7 +6,7 @@
 # workspace starts with the userspace recording contract (stable Rust).
 [workspace]
 resolver = "2"
-members = ["railprobe-core"]
+members = ["railprobe-core", "railprobe-common"]
 # railprobe-ebpf builds for the bpfel-unknown-none target (its own toolchain +
 # build-std), so it is NOT a member of this host workspace -- it is built
 # separately. Excluded so a host `cargo build` never tries to compile it.
