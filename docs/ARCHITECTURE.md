@@ -446,7 +446,7 @@ l'identite declaree dans le manifest -- c'est ainsi qu'on fabrique un
 
 Le mode read/write est derive de l'action (`mode_for_action`,
 `recette/events.py`) : mapping canonique pour les actions git, heuristique de
-prefixe (`read_`, `list_`, `export_`...) pour les 9 autres systemes. Un
+prefixe (`read_`, `list_`, `export_`...) pour les 14 autres systemes. Un
 `export_` est un read (pas de mutation) meme si son risque est eleve --
 le risque et le mode sont deux axes distincts.
 
@@ -575,7 +575,7 @@ Les profils donnent a la recette des cas gradues : un bon outil discovery doit
 classer `legit < suspect < destructive` en risque relatif, et un bon outil
 d'identification doit accepter les `legit` et refuser les deux autres.
 
-### 6.4 Catalogue d'actions : 127 actions / 12 systemes
+### 6.4 Catalogue d'actions : 152 actions / 16 systemes
 
 Source de verite : `recette.tools.agent_action_catalog()`. Chaque action porte
 `target_system`, `action`, `description`, `kind` (`read` | `bounded_write` |
@@ -583,21 +583,25 @@ Source de verite : `recette.tools.agent_action_catalog()`. Chaque action porte
 
 | Systeme | Actions | Exemples |
 |---|---|---|
-| okta | 13 | suspend_user, add_user_to_admin_group, generate_long_lived_token |
-| cloud | 12 | make_bucket_public, delete_database, delete_kms_key |
-| finance | 12 | validate_invoice, launch_wire_transfer, modify_supplier_bank_details |
-| github | 11 | read_repo, open_pr, merge_pr, push, manage_webhook |
+| okta | 17 | read_user_profile, revoke_api_key, revoke_token |
+| cloud | 14 | read_resource_inventory, delete_backups, delete_critical_pod |
+| finance | 14 | export_financial_data, read_invoice_status, add_payee |
+| data_platform | 12 | download_full_database, export_customer_data, query_curated_dataset |
+| crm | 11 | export_customer_base, read_contact_record, modify_sales_pipeline |
+| github | 11 | list_repos, read_ci, read_repo |
 | gitlab | 11 | memes actions canoniques git |
-| data_platform | 11 | extract_data_to_external_llm, delete_audit_evidence |
-| crm | 10 | export_customer_base, sync_crm_to_external |
-| slack | 10 | send_message_as_executive, export_slack_history |
-| support_desk | 10 | access_vip_tickets, export_customer_conversations |
-| hris | 9 | modify_salary, export_employee_data |
-| legal_dms | 9 | delete_evidence_item, modify_contract_clause |
-| product_cms | 9 | modify_pricing, publish_production |
+| slack | 11 | export_slack_history, read_public_channel, create_public_channel |
+| support_desk | 11 | export_customer_conversations, read_ticket, bulk_close_tickets |
+| hris | 10 | export_employee_data, read_org_directory, create_employee_record |
+| legal_dms | 10 | export_audit_file, read_published_policy, accept_contract_terms |
+| product_cms | 10 | read_content_draft, delete_content, modify_public_page |
+| knowledge_base | 6 | export_knowledge_base, ingest_document, query_knowledge_base |
+| mcp | 2 | handoff, invoke_tool |
+| comms | 1 | notify_customer |
+| compliance | 1 | open_kyc_review |
 
 Les actions github/gitlab sont l'enum canonique historique (`ActionType`) ;
-les 9 autres systemes viennent du catalogue de gouvernance et s'executent dans
+les 14 autres systemes viennent du catalogue de gouvernance et s'executent dans
 le lab via les handlers deterministes de `recette/lab/domains/`.
 
 ---
@@ -646,7 +650,7 @@ confronter l'outil discovery a une activite passee.
 
 > Issu du plan "Plateforme d'execution gouvernee -- 118 actions sensibles /
 > 11 domaines" (`docs/tracking/PLAN_high-risk-action-catalog_2026-06-12.md`),
-> depuis etendu a **146 actions / 16 systemes** (formalisation des actions de
+> depuis etendu a **152 actions / 16 systemes** (formalisation des actions de
 > scenario : containment SOC, fraude, KYC, git-family + criticite Annex C C1-C4).
 > Ce chantier depasse le perimetre recette-only initial : il instancie en
 > Python, dans ce repo, une version executable des trois planes inspect_ia_agents

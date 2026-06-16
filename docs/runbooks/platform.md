@@ -49,7 +49,7 @@ Docker services (docker-compose.yml):
 | Service | Image target | Role |
 |---------|--------------|------|
 | `platform-init` | runtime (as root, one-shot) | chown the fresh `platform-data` volume to the non-root `recette` user |
-| `lab-mock` | runtime | lab double of the 11 external systems, `:8082` |
+| `lab-mock` | runtime | lab double of the 16 external systems, `:8082` |
 | `api` | runtime | gateway + control/audit API, `:8090`, state on `platform-data` |
 | `e2e` | audit | runs `tests/e2e/test_governed_flow.py` against `api` |
 
@@ -106,8 +106,8 @@ subscribers. First frame is always `start`, last is `end` with the final status.
 | `campaign` | (via `/campaigns/{id}/run`) | `agent_start` / `step` / `agent_done` per step, final `campaign_done`; one recording persisted per step |
 | `replay` | (via `/recordings/{id}/replay`) | `step` per replayed decision, `replay_result` with `matches_original` (I4) |
 
-`capability_scope` is the set of catalog actions an agent may call (127
-actions across 12 systems, `GET /agent-actions`), not a system name. The 11
+`capability_scope` is the set of catalog actions an agent may call (152
+actions across 16 systems, `GET /agent-actions`), not a system name. The 11
 canonical git actions (`read_repo` ... `trigger_ci`) are the github/gitlab
 subset.
 
@@ -134,7 +134,7 @@ the run -- never a silent fallback.
 | `INSPECT_IA_AGENTS_E2E_API_URL` | e2e tests | unset (suite skipped) | `http://api:8090` |
 | `LAB_HOST_PORT` | compose port mapping | `8082` | host port for lab-mock |
 | `API_HOST_PORT` | compose port mapping | `8090` | host port for api |
-| `VITE_INSPECT_IA_AGENTS_API_URL` | console (Vite) | `http://localhost:8080` | set to the api URL |
+| `VITE_INSPECT_IA_AGENTS_API_URL` | console (Vite) | `http://localhost:8090` | set to the api URL |
 
 ## Failure modes (fail-safe, never fail-open)
 
@@ -297,7 +297,8 @@ domain and return 404 (the run then fails explicitly, by design).
 
 The `servers` section of the config ships one `mock_local` server per
 `target_system` an agent can face. The set is CONFIG-DRIVEN and grows with the
-corpus (do not hardcode a count); ports run 9101+. As of 2026-06-14 there are 8:
+corpus (do not hardcode a count); ports run 9101+. As of 2026-06-17 there are 13
+(12 `mock_local` + 1 `honeypot`):
 
 | Server id | `system` | port |
 |-----------|----------|------|
@@ -309,6 +310,11 @@ corpus (do not hardcode a count); ports run 9101+. As of 2026-06-14 there are 8:
 | `cloud-mock` | cloud | 9106 |
 | `hris-mock` | hris | 9107 |
 | `legal-dms-mock` | legal_dms | 9108 |
+| `product-cms-mock` | product_cms | 9109 |
+| `knowledge-base-mock` | knowledge_base | 9110 |
+| `mcp-mock` | mcp | 9111 |
+| `gitlab-mock` | gitlab | 9112 |
+| `shadow-db-sink` (honeypot) | - | 9113 |
 
 An agent that hits a real HTTP target binds it through its `server` field (an
 agent with no `server` falls back to the in-process LabForge). All servers run
