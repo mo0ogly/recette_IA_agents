@@ -26,7 +26,21 @@ from ..probe_relay import ProbeUnavailable, relay_capture
 router = APIRouter(prefix="/probe", tags=["probe"])
 
 _SOCKET_ENV = "INSPECT_IA_AGENTS_PROBE_SOCKET"
-_MAX_DURATION_MS = 30_000
+_MAX_DURATION_ENV = "INSPECT_IA_AGENTS_PROBE_MAX_DURATION_MS"
+_DEFAULT_MAX_DURATION_MS = 30_000
+
+
+def _max_duration_ms() -> int:
+    """The API-side friendly cap (the broker manifest is the real bound). Config
+    first (R5): overridable via env, never a magic literal in the request path."""
+    raw = os.environ.get(_MAX_DURATION_ENV)
+    if raw is None:
+        return _DEFAULT_MAX_DURATION_MS
+    try:
+        value = int(raw)
+    except ValueError:
+        return _DEFAULT_MAX_DURATION_MS
+    return value if value > 0 else _DEFAULT_MAX_DURATION_MS
 
 
 @router.get("/status")
@@ -60,10 +74,11 @@ def capture(body: dict[str, Any]) -> dict:
     duration_ms = body.get("duration_ms", 3000)
     if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or duration_ms <= 0:
         raise HTTPException(status_code=400, detail="duration_ms must be a positive integer")
-    if duration_ms > _MAX_DURATION_MS:
+    ceiling = _max_duration_ms()
+    if duration_ms > ceiling:
         raise HTTPException(
             status_code=400,
-            detail=f"duration_ms exceeds the API ceiling {_MAX_DURATION_MS}",
+            detail=f"duration_ms exceeds the API ceiling {ceiling}",
         )
 
     try:
