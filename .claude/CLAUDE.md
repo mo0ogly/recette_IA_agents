@@ -313,6 +313,16 @@ poisoning -> ASI06, approval-bypass -> ASI09, spam/rogue -> ASI10, tool misuse -
 Verifier la liste a la source avant de tagger (R13) ; ne jamais inventer un ID ATLAS. Mono-axe
 reste loi (R20). Detail + faisabilite ASI04/05/08 : `.claude/rules/redteam-standards-alignment.md`.
 
+**R25 Tracking Artifacts Gitignored:** Tout artefact de SUIVI d'agent (PDCA, APEX,
+plans, decision log, RETEX, TODO, sorties de boucle, scratch de tache) vit SOUS
+`docs/tracking/` -- un repertoire **gitignore** (`.gitignore`), JAMAIS committe,
+JAMAIS pousse. Le repo de recette est un CORPUS ground-truth + son harnais : la
+trace de travail d'un agent n'est pas un livrable et ne doit pas le polluer ni
+gonfler l'historique. Ne JAMAIS eparpiller un fichier de suivi a la racine ni dans
+`recette/`, `corpus/`, `console/` ; ne JAMAIS `git add -f` un fichier de tracking.
+Les livrables durables (doc produit, runbook) vont dans `docs/` committe ; le suivi
+ephemere reste dans `docs/tracking/` gitignore. Detail : `.claude/rules/agentic-traceability.md`.
+
 ---
 
 ## REFERENCES RULES
@@ -328,7 +338,7 @@ reste loi (R20). Detail + faisabilite ASI04/05/08 : `.claude/rules/redteam-stand
 | `.claude/rules/determinism-replay.md` | I4 -- replay deterministe, capture du non-determinisme |
 | `.claude/rules/event-store-decision.md` | Choix persistance (NON FIGE) -- options + criteres |
 | `.claude/rules/rust-conventions.md` | Conventions Rust/Axum (erreurs, tracing, modules) |
-| `.claude/rules/agentic-traceability.md` | Decision log + plans persistants |
+| `.claude/rules/agentic-traceability.md` | R25 -- decision log + plans + tracking PDCA/APEX sous `docs/tracking/` GITIGNORE (jamais committe/pousse) |
 | `.claude/rules/no-deduction-verify-facts.md` | R13 |
 | `.claude/rules/no-fix-without-live-verification.md` | R14 |
 | `.claude/rules/no-hardcoded-secrets.md` | R8/R15 |

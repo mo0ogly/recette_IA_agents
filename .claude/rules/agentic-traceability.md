@@ -3,6 +3,24 @@
 Tracking du projet dans `docs/tracking/` (a la racine du repo, cree au besoin).
 Ne PAS eparpiller de fichiers de suivi a la racine du projet.
 
+## `docs/tracking/` est GITIGNORE -- jamais committe (R25)
+
+`docs/tracking/` est dans `.gitignore` : tout artefact de suivi d'agent (PDCA,
+APEX, `PLAN_*.md`, `decision_log.jsonl`, RETEX, TODO, sorties de boucle, scratch
+de tache) y vit et n'est **jamais committe ni pousse**. Raison : ce repo est un
+CORPUS ground-truth + son harnais de recette ; la trace de travail d'un agent
+n'est pas un livrable, elle ne doit ni polluer le corpus ni gonfler l'historique
+git. Regles fermes :
+
+- Ecrire le suivi UNIQUEMENT sous `docs/tracking/` (jamais a la racine, ni dans
+  `recette/`, `corpus/`, `console/`).
+- JAMAIS `git add` / `git add -f` un fichier de tracking. S'il apparait dans
+  `git status`, il doit rester untracked (ou etre couvert par `.gitignore`).
+- Un livrable DURABLE (doc produit, runbook, ADR officiel) va dans `docs/`
+  committe -- pas dans `docs/tracking/`. Le suivi ephemere reste gitignore.
+- Les sorties de tache ephemeres du harnais (ex. `/tmp/.../tasks/*.output`) sont
+  hors repo et auto-nettoyees : ne jamais les recopier dans le repo.
+
 ## Decision Log (pour decisions non-triviales)
 
 Fichier : `docs/tracking/decision_log.jsonl`
