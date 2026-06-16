@@ -40,8 +40,16 @@ class LlmCallTrace:
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, pricing: dict[str, dict[str, float]] | None = None) -> dict:
+        """Serialise the trace; add a ``cost`` field only when ``pricing`` is given.
+
+        ``pricing`` is the config-driven table (model -> per-1k rates, see
+        ``recette/capture/cost.py``). When ``None`` (the default) the output is
+        byte-identical to the pre-cost shape: no ``cost`` key, so existing call
+        sites are unaffected. When a table is supplied, ``cost`` is the priced
+        value or ``None`` (model absent / no price known) -- never a guess.
+        """
+        out = {
             "seq": self.seq,
             "event_id": self.event_id,
             "agent_id": self.agent_id,
@@ -56,3 +64,8 @@ class LlmCallTrace:
             "latency_ms": self.latency_ms,
             "error": self.error,
         }
+        if pricing is not None:
+            from .cost import cost_of
+
+            out["cost"] = cost_of(self, pricing)
+        return out
