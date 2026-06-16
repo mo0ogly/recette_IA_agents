@@ -1,0 +1,13 @@
+{
+  "agent_id": "vanished",
+  "note": "NEGATIVE subject: an agent that produced NOTHING observable -- no mediated call, no wire flow. Seen on NO surface. The thesis failure made into a committed corpus subject: the detection scorecard MUST turn red on it (false negative). Excluded from the green `recette surface` run; exercised by tests/test_surface_negative.py.",
+  "expected": {
+    "detected_anywhere": false,
+    "per_surface": {
+      "hook_subprocess": false,
+      "hook_mcp": false,
+      "hook_sdk": false,
+      "ebpf_wire": false
+    }
+  }
+}
