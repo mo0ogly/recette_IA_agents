@@ -1,0 +1,51 @@
+{
+  "count": 3,
+  "run_id": "demo-run",
+  "traces": [
+    {
+      "agent_id": "demo-gh-bot",
+      "completion_tokens": 11,
+      "error": null,
+      "event_id": "LC000001",
+      "intent": "read_repo:acme/x",
+      "kind": "tool_call",
+      "latency_ms": 512,
+      "model": "llama-3.3-70b-versatile",
+      "prompt_tokens": 142,
+      "resource": "acme/x",
+      "seq": 1,
+      "tool_name": "read_repo",
+      "total_tokens": 153
+    },
+    {
+      "agent_id": "demo-gh-bot",
+      "completion_tokens": 23,
+      "error": null,
+      "event_id": "LC000002",
+      "intent": "open_pr:acme/x",
+      "kind": "tool_call",
+      "latency_ms": 689,
+      "model": "llama-3.3-70b-versatile",
+      "prompt_tokens": 168,
+      "resource": "acme/x",
+      "seq": 2,
+      "tool_name": "open_pr",
+      "total_tokens": 191
+    },
+    {
+      "agent_id": "demo-gh-bot",
+      "completion_tokens": 4,
+      "error": null,
+      "event_id": "LC000003",
+      "intent": ":",
+      "kind": "final",
+      "latency_ms": 233,
+      "model": "llama-3.3-70b-versatile",
+      "prompt_tokens": 170,
+      "resource": "",
+      "seq": 3,
+      "tool_name": null,
+      "total_tokens": 174
+    }
+  ]
+}

@@ -10,8 +10,9 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { captureProbe, getProbeStatus } from "../../api/client";
-import type { ProbeCaptureResult, SurfaceRecording } from "../../api/client";
+import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
+import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
+import LlmTracePanel from "./LlmTracePanel";
 import "./probe.css";
 
 /** The four observation surfaces, in the order RailNode is reasoned about. */
@@ -80,6 +81,8 @@ export default function ProbePage(): JSX.Element {
   const [result, setResult] = useState<ProbeCaptureResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [runId, setRunId] = useState("");
+  const [traces, setTraces] = useState<LlmTrace[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -108,6 +111,12 @@ export default function ProbePage(): JSX.Element {
         setError(e instanceof Error ? e.message : String(e));
         setCapturing(false);
       });
+  }
+
+  function loadTraces(): void {
+    getLlmTraces(runId)
+      .then((r) => setTraces(r.traces))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }
 
   return (
@@ -198,6 +207,35 @@ export default function ProbePage(): JSX.Element {
           </div>
         </>
       )}
+
+      <h2 className="probe-subtitle">Trace LLM (surface hook in-process)</h2>
+      <p className="probe-note">
+        L&apos;autre surface : ce que l&apos;agent a DECIDE in-process (intention +
+        tokens + latence), capture par le hook. Reconcilie avec la surface eBPF
+        ci-dessus -- un agent vu ici mais absent du wire (ou l&apos;inverse) est la
+        divergence qui revele un ghost.
+      </p>
+      <div className="probe-control">
+        <label className="probe-field">
+          <span className="probe-field-label">Run id</span>
+          <input
+            className="probe-input"
+            value={runId}
+            onChange={(e) => setRunId(e.target.value)}
+            data-testid="probe-run-input"
+          />
+        </label>
+        <button
+          type="button"
+          className="probe-button"
+          onClick={loadTraces}
+          disabled={runId.length === 0}
+          data-testid="probe-traces-button"
+        >
+          Voir traces
+        </button>
+      </div>
+      {traces !== null && <LlmTracePanel traces={traces} />}
     </section>
   );
 }

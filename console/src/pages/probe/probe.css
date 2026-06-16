@@ -285,3 +285,55 @@
   font-style: italic;
   color: var(--color-text-muted);
 }
+
+/* In-process hook capture (LLM trace) panel. */
+.probe-trace {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.probe-trace-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.probe-trace-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.probe-trace-table th,
+.probe-trace-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+
+.probe-trace-table th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.probe-trace-intent {
+  font-family: var(--font-mono);
+}
+
+.probe-trace-ok {
+  color: var(--badge-green-fg);
+}
+
+.probe-trace-err {
+  color: var(--badge-red-fg);
+  font-weight: 600;
+}
+
+.probe-subtitle {
+  margin-top: 2rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.25rem;
+}

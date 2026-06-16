@@ -898,6 +898,35 @@ export function captureProbe(req: ProbeCaptureRequest): Promise<ProbeCaptureResu
   });
 }
 
+/** One captured in-process LLM decision (the hook surface): intent + ops metrics. */
+export interface LlmTrace {
+  seq: number;
+  event_id: string;
+  agent_id: string;
+  model: string;
+  kind: string;
+  tool_name: string | null;
+  resource: string;
+  intent: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number;
+  error: string | null;
+}
+
+export interface LlmTracesResult {
+  run_id: string;
+  traces: LlmTrace[];
+  count: number;
+}
+
+/** GET /capture/llm-traces: the in-process hook capture for a run (the hook
+ *  surface, complementary to the eBPF wire surface). */
+export function getLlmTraces(runId: string): Promise<LlmTracesResult> {
+  return request<LlmTracesResult>(`/capture/llm-traces?run_id=${encodeURIComponent(runId)}`);
+}
+
 export interface CorpusSubject {
   agent_id: string;
   name: string | null;
