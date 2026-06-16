@@ -12,6 +12,7 @@ members = [
     "discoveryprobe",
     "discoveryprobe-broker",
     "discoveryprobe-capture",
+    "discoveryprobe-catalog",
 ]
 # discoveryprobe-ebpf builds for the bpfel-unknown-none target (its own toolchain +
 # build-std), so it is NOT a member of this host workspace -- it is built

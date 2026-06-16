@@ -1,0 +1,18 @@
+# discoveryprobe-catalog -- ingest a declarative agent-catalog registry index.
+#
+# A discovery/registry source for the Rust discovery engine: parses a published
+# machine-readable catalog index (an agent registry) and projects it onto the
+# INVARIANT discovery properties the recette judges (count, name de-dup, tool
+# coverage, tag set) -- never opaque values (R20). Carries only the field
+# contract of the public declarative-catalog format, no external data.
+[package]
+name = "discoveryprobe-catalog"
+version = "0.1.0"
+edition = "2021"
+description = "Parse a declarative agent-catalog registry index into invariant discovery properties."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
