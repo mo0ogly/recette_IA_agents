@@ -54,7 +54,10 @@ pub fn serve(config: &ServerConfig) -> Result<()> {
         match stream {
             Ok(stream) => {
                 if let Err(error) = handle_conn(stream, &manifest, config) {
-                    tracing::warn!(%error, "connection failed");
+                    // `{:#}` so the full anyhow cause chain (e.g. the verifier /
+                    // errno behind a BPF load failure) is logged, not just the
+                    // top context.
+                    tracing::warn!(error = format!("{error:#}"), "connection failed");
                 }
             }
             Err(error) => tracing::warn!(%error, "accept failed"),

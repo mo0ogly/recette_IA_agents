@@ -50,12 +50,14 @@ pub fn discoveryprobe_exec(ctx: TracePointContext) -> u32 {
 }
 
 fn try_capture(_ctx: &TracePointContext) -> Result<(), ()> {
-    // reserve -> write -> submit, the canonical aya RingBuf idiom
-    // (aya test/integration-ebpf/src/ring_buf.rs). `write` initialises the
-    // reserved MaybeUninit in place, so no unsafe pointer juggling is needed.
-    let mut entry = EXEC_EVENTS.reserve::<ExecEvent>(0).ok_or(())?;
+    // Do every FALLIBLE step BEFORE reserving the ring entry. A reserved entry
+    // must be submitted or discarded on every path; bailing out (`?`) after a
+    // reserve leaks the reference and the verifier rejects the program
+    // ("Unreleased reference ... BPF_EXIT would lead to reference leak"). So
+    // read pid + comm first, then reserve and UNCONDITIONALLY write + submit.
     let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
     let comm = bpf_get_current_comm().map_err(|_| ())?;
+    let mut entry = EXEC_EVENTS.reserve::<ExecEvent>(0).ok_or(())?;
     entry.write(ExecEvent { pid, comm });
     entry.submit(0);
     Ok(())
