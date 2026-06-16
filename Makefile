@@ -7,7 +7,7 @@ PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
         bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb rag-e2e \
-        system-recette system-recette-live recette
+        system-recette system-recette-live surface recette
 
 help:
 	@echo "Setup:"
@@ -86,13 +86,16 @@ rag-kb:
 rag-e2e:
 	$(PY) scripts/run_rag_poisoning_e2e.py
 
+surface:
+	$(PY) -m recette surface
+
 system-recette:
 	$(PY) scripts/run_system_recette.py
 
 system-recette-live:
 	$(PY) scripts/run_system_recette.py --live
 
-recette: coverage-guard validate run discovery bnp role-matrix rag system-recette
+recette: coverage-guard validate run discovery bnp role-matrix rag system-recette surface
 	@echo "recette: ALL PASS"
 
 test:
