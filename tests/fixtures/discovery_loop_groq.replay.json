@@ -1,0 +1,66 @@
+{
+  "agent_id": "demo-gh-bot",
+  "goal": "Read the repository, then open a single pull request. Do both, once each.",
+  "model": "llama-3.3-70b-versatile",
+  "principal": "bot@acme",
+  "provider": "groq",
+  "schema_version": "1.0",
+  "steps": [
+    {
+      "action": {
+        "action_type": "read_repo",
+        "agent_id": "demo-gh-bot",
+        "approved": false,
+        "event_id": "evt-0001",
+        "mode": "read",
+        "params": {},
+        "principal": "bot@acme",
+        "resource": "github/repository",
+        "seq": 1,
+        "target_system": "github",
+        "timestamp": "2023-11-14T22:13:20Z"
+      },
+      "decision": {
+        "kind": "tool_call",
+        "text": "",
+        "tool_args": {
+          "resource": "github/repository"
+        },
+        "tool_name": "read_repo"
+      }
+    },
+    {
+      "action": {
+        "action_type": "open_pr",
+        "agent_id": "demo-gh-bot",
+        "approved": false,
+        "event_id": "evt-0002",
+        "mode": "write",
+        "params": {},
+        "principal": "bot@acme",
+        "resource": "github/repository",
+        "seq": 2,
+        "target_system": "github",
+        "timestamp": "2023-11-14T22:13:21Z"
+      },
+      "decision": {
+        "kind": "tool_call",
+        "text": "",
+        "tool_args": {
+          "resource": "github/repository"
+        },
+        "tool_name": "open_pr"
+      }
+    },
+    {
+      "action": null,
+      "decision": {
+        "kind": "final",
+        "text": "The goal has been met. The repository has been read and a single pull request has been opened.",
+        "tool_args": {},
+        "tool_name": null
+      }
+    }
+  ],
+  "target_system": "github"
+}
