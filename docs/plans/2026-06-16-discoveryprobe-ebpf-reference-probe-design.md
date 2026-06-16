@@ -236,8 +236,14 @@ Sources : https://falco.org , https://tetragon.io , https://aya-rs.dev , ebpf.io
    `DetectionScorecard` (I4). Entree CLI : `python -m recette surface --recording
    <fichier>`. Un nom de surface inconnu = bridge mismatch (leve), un agent capture
    nulle part = `false_negative` (echec these). Test : `tests/test_surface_recording.py`.
-5. [A FAIRE] API `POST /probe/capture` (relai vers le broker) + R16 fixture + endpoint
-   de comparaison conformite.
+5. [FAIT] API `POST /probe/capture` (NON-privilegiee) : relaie la commande au broker
+   par socket Unix (`INSPECT_IA_AGENTS_PROBE_SOCKET`), retourne le recording + la
+   `DetectionScorecard` (juge source-agnostique). Fail-safe : socket absent /
+   injoignable -> 503, jamais de capture fabriquee. `GET /probe/status`.
+   `recette/api/probe_relay.py` + `routers/probe.py`. Test :
+   `tests/test_api_probe.py` (stub socket broker, relai prouve sans privilege).
+   Fixture R16 reelle : `console/src/pages/probe/__fixtures__/probe-capture.fixture.json`.
+   La comparaison conformite (sonde-ref vs HttpSurfaceDiscoveryAdapter) reste en §7.
 6. [A FAIRE] Console : vue Probe (lancement + detail + comparaison).
 7. [A FAIRE] Recette de la recette : un recording fige promu en sujet `corpus/surface/`
    (regression deterministe), + test d'accord sonde-ref vs HttpSurfaceDiscoveryAdapter

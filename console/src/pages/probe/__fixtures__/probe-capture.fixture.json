@@ -1,0 +1,30 @@
+{
+  "recording": {
+    "recording_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "recordings": [
+      {
+        "agent_id": "pr-bot-sdk",
+        "surfaces": {
+          "ebpf_wire": [
+            "exec:pr-bot:42"
+          ]
+        }
+      },
+      {
+        "agent_id": "ghost-direct-db",
+        "surfaces": {}
+      }
+    ],
+    "status": "ok"
+  },
+  "scorecard": {
+    "detected_per_surface": {
+      "ebpf_wire": 1
+    },
+    "false_negatives": [
+      "ghost-direct-db"
+    ],
+    "ok": false,
+    "total_agents": 2
+  }
+}
