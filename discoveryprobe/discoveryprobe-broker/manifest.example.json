@@ -1,0 +1,7 @@
+{
+  "max_duration_ms": 5000,
+  "agents": {
+    "pr-bot-sdk": { "comm_marker": "pr-bot" },
+    "ghost-direct-db": { "comm_marker": "ghost-proc" }
+  }
+}

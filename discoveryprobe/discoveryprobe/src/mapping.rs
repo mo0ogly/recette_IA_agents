@@ -11,7 +11,7 @@ use discoveryprobe_core::{CaptureRecording, ObservationSurface};
 /// What the broker launched: an agent and the process command name the kernel
 /// will report for it. `comm_marker` must be <= 15 bytes (the kernel truncates
 /// `comm` to `TASK_COMM_LEN`); a longer marker can never match.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentProcessSpec {
     /// The simulated agent's identifier (matches `corpus/surface/<id>`).
     pub agent_id: String,

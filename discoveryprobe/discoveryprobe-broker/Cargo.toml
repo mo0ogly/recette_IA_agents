@@ -1,0 +1,36 @@
+# discoveryprobe-broker -- the ONLY privileged component (CAP_BPF).
+#
+# Listens on a local Unix socket (strict 0600 perms), accepts exactly ONE
+# parameterised command -- `capture { agents, duration_ms }` -- validates it
+# deny-by-default against a declared-agents manifest, runs the bounded eBPF
+# capture, and appends an immutable audit record (I1). The API relays to it; the
+# API never holds privilege itself. Launched by ./recette.sh only (R19).
+#
+# Native by design (R22): cargo crate, target/ gitignored, never in the base
+# Docker image. The privileged socket/capture path runs only under CAP_BPF; the
+# pure validation/audit/orchestration logic is unit-tested without privilege.
+[package]
+name = "discoveryprobe-broker"
+version = "0.1.0"
+edition = "2021"
+description = "Privilege-separated broker: validates and runs a bounded eBPF capture, audits it (I1)."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "discoveryprobe_broker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "discoveryprobe-broker"
+path = "src/main.rs"
+
+[dependencies]
+discoveryprobe-common = { path = "../discoveryprobe-common" }
+discoveryprobe-core = { path = "../discoveryprobe-core" }
+discoveryprobe = { path = "../discoveryprobe" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+sha2 = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
