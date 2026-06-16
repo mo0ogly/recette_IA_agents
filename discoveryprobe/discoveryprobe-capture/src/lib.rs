@@ -10,6 +10,10 @@
 
 #![deny(missing_docs)]
 
+pub mod sink;
+
+pub use sink::{CaptureSink, RingCaptureRecorder};
+
 use serde::{Deserialize, Serialize};
 
 /// One captured LLM decision: the agent's intent plus operational metrics.
