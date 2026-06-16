@@ -1,0 +1,23 @@
+[package]
+name = "railprobe-ebpf"
+version = "0.1.0"
+edition = "2021"
+description = "eBPF kernel programs for railprobe (execve/connect/sendto/write capture)."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+aya-ebpf = "0.1.1"
+
+[[bin]]
+name = "railprobe-trace"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 3
+debug = false
+overflow-checks = false
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1

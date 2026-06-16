@@ -80,3 +80,4 @@ data/backend_secrets.json
 
 # railprobe Rust crate build artifacts (native, out of base image -- R22)
 railprobe/target/
+railprobe/railprobe-ebpf/target/
