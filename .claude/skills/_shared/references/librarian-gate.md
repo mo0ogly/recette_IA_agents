@@ -25,10 +25,12 @@
 [ ] 6. DASHBOARD MAJ   : pdca/{perimetre}/DASHBOARD.md (si PDCA)
 [ ] 7. DOC LIBRARIAN   : doc_classifier.py init + doc_librarian.py reindex (si doc creee)
 [ ] 8. UI HELP (BLOQUANT) : INSERT ui_help_content + verify SELECT pour CHAQUE composant *Tab/*Panel/*Dashboard/*Editor/*Manager/*Status cree. Contenu 200-800 car., anglais (R8). HelpButton sans contenu DB = PLACEHOLDER INTERDIT (R4). Cycle NE PEUT PAS fermer si manquant.
-[ ] 9. DOCS-SITE (SI DOC MODIFIEE) : Si un .md a ete cree/modifie dans _alire/01_DOCUMENTATION/ :
-                         cd docs-site && npm run build:search (Docusaurus + Pagefind)
-                         rsync -avz --delete docs-site/build/ /opt/inspect_ia_agents/source/docs-site/
-                         Verifier : curl -s -o /dev/null -w "%{http_code}" https://inspect_ia_agents.example/docs/ = 200
+[ ] 9. DOCS-SITE (SI DOC MODIFIEE) : Si un .md a ete cree/modifie sous docs/ (hors
+                         docs/plans, docs/tracking, docs/screenshots, exclus du site) :
+                         ./recette.sh docs-build  (Docusaurus build du docs-site/)
+                         Sortie REQUISE : "[SUCCESS] Generated static files" + "docs-build OK".
+                         Le site surface docs/ (runbooks + architecture + ADR + provenance) ;
+                         pas de rsync/VPS dans ce repo (corpus + harnais, pas de prod hebergee).
 [ ] 10. COMMIT PROPRE  : fichiers de session uniquement (pas git add -A)
                          Stager UNIQUEMENT les fichiers de la session
 [ ] 11. PUSH           : max 5 commits non pushes

@@ -5,6 +5,7 @@ set -euo pipefail
 #
 # Usage: checks.sh test|gates|report|validate|run|discovery [--docker]
 #        checks.sh console-build|console-test          (React console, local only)
+#        checks.sh docs-build                           (Docusaurus doc site, local only)
 #   default runs locally (.venv); --docker runs inside the lab image.
 # ===========================================================================
 
@@ -38,6 +39,9 @@ run_local() {
                          && node node_modules/.bin/vite build ) ;;
         console-test)  ( cd "${REPO_ROOT}/console" \
                          && node node_modules/.bin/vitest run ) ;;
+        docs-build)    ( cd "${REPO_ROOT}/docs-site" \
+                         && { [ -d node_modules ] || npm ci; } \
+                         && npm run build ) ;;
         *) err "cible inconnue: ${target}"; exit 1 ;;
     esac
 }

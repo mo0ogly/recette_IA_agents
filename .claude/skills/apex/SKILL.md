@@ -416,6 +416,11 @@ Invoke via Skill tool (mandatory delegation):
   `./recette.sh test`. A coverage gap is a RED test, never patched by hand (R20). Discovery
   ground-truth stays invariant-based (detection/dedup/coverage/risk-order/determinism/policy),
   never opaque values. Negatives stay mono-axis (`test_each_negative_breaks_exactly_one_dimension`).
+- Touched **docs** (any `.md` under `docs/` except `docs/plans`, `docs/tracking`,
+  `docs/screenshots`, which the site excludes) -> the gate is `./recette.sh docs-build`
+  (Docusaurus build of `docs-site/`). Output must show "[SUCCESS] Generated static files"
+  + "docs-build OK". A doc that breaks the site build is a FAILURE (return to BUILD).
+  Also enforced at cycle close by librarian-gate item 9.
 - Touched **discoveryprobe** (separate Rust workspace) -> `cd discoveryprobe` before any cargo;
   the `discoveryprobe-ebpf` crate is EXCLUDED from the host workspace (`bpfel-unknown-none`
   target) -- if its toolchain/CAP_BPF is absent, mark that bloc N/A (R18), never a FAILURE.

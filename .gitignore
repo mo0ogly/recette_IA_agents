@@ -18,6 +18,7 @@ node_modules/
 dist/
 build/
 .vite/
+.docusaurus/
 *.local
 npm-debug.log*
 yarn-error.log*

@@ -16,6 +16,7 @@ set -euo pipefail
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
+#   ./recette.sh docs-build                    # Docusaurus doc site (docs-site/)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
 #   ./recette.sh wire up|down|status|logs|ca           # optional mitmproxy wire-interception overlay (Docker)
 #   ./recette.sh llm-proxy up|down|status|logs         # optional LiteLLM LLM-gateway overlay (Docker)
@@ -125,14 +126,14 @@ case "${cmd}" in
     platform)                          "${PLATFORM_SH}" "$@" ;;
     console)                           "${PLATFORM_SH}" console "$@" ;;
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
-    test|gates|report|validate|run|discovery|console-build|console-test)
+    test|gates|report|validate|run|discovery|console-build|console-test|docs-build)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     wire)                              "${WIRE_SH}" "$@" ;;
     llm-proxy)                         "${LLM_PROXY_SH}" "$@" ;;
     git)                               "${GIT_SH}" "$@" ;;
     -h|--help|help)
-        sed -n '4,21p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
+        sed -n '4,23p' "${ROOT}/recette.sh" | sed 's/^# \{0,1\}//' ;;
     *)  err "commande inconnue: ${cmd}"; \
         echo "  voir: ./recette.sh --help"; exit 1 ;;
 esac

@@ -138,6 +138,16 @@ cd discoveryprobe && cargo build && cargo clippy --all-targets -- -D warnings &&
 - **Discovery invariants (I4)** -- the recording -> `recette/surface` bridge is source-agnostic + deterministic. Verify via `make surface` + `make discovery`; a probe-sourced recording and a fixture-sourced one must judge identically (byte-stable).
 - The Rust recette scorer crate `cmd/inspect_ia_agents_recette` is a third host crate -- same backend gates.
 
+### Subject C -- documentation site (`docs/` -> `docs-site/`)
+
+Any `.md` created/modified under `docs/` (except `docs/plans`, `docs/tracking`,
+`docs/screenshots`, which the site excludes) must keep the Docusaurus site building.
+Gate: `./recette.sh docs-build` -- output must show "[SUCCESS] Generated static files"
++ "docs-build OK". The site surfaces runbooks + architecture + ADR + migration-provenance
+from the existing `docs/` tree (no copy, no VPS deploy). Also enforced at cycle close by
+librarian-gate item 9. NOTE: the `doc-librarian` skill targets the archived LIA-SEC layout
+(`_alire/`, VPS rsync) and does NOT apply to this repo -- use `./recette.sh docs-build`.
+
 ### Routing
 
 | `<scope>` contains | Subject | Primary gate |
@@ -146,6 +156,7 @@ cd discoveryprobe && cargo build && cargo clippy --all-targets -- -D warnings &&
 | `discoveryprobe`, a probe crate | B -- eBPF engine | `cd discoveryprobe && cargo ...` + `/rust-recette` |
 | `recette/` (Python harness) | Python backend | `make gates` + `/python-recette` |
 | platform `src/`, console `*.tsx` | default Rust/React | root `cargo` / vite + `/rust-recette` `/react-recette` |
+| `docs/` (`.md` outside plans/tracking/screenshots) | C -- doc site | `./recette.sh docs-build` (Docusaurus build of `docs-site/`) |
 
 ---
 
