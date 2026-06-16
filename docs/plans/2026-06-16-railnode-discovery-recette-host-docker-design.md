@@ -349,3 +349,129 @@ Invariants engages par CE design :
 
 > Etape suivante recommandee : passer ce design en plan d'implementation
 > (skill `writing-plans`).
+
+---
+
+## Annexe A -- eBPF et hook inline en detail
+
+Les deux surfaces d'observation de RailNode reposent sur deux mecanismes Linux
+fondamentalement differents. Les comprendre est necessaire pour construire une recette
+fidele : on ne simule pas une comm de la meme maniere selon la surface visee.
+
+### A.1 eBPF -- une machine virtuelle dans le noyau
+
+eBPF (*extended Berkeley Packet Filter*) est une petite machine virtuelle **dans le noyau
+Linux**. On charge un mini-programme ; le noyau l'execute a des points precis (syscalls,
+paquets reseau, fonctions kernel). Pas de module noyau a compiler, pas de reboot.
+
+Chaine de vie d'un programme eBPF :
+
+```
+code C/Rust -> bytecode eBPF -> syscall bpf() -> VERIFIER (noyau)
+   -> JIT (bytecode -> code natif) -> attache a un hook point -> s'execute a chaque event
+```
+
+Pieces cles :
+
+- **Verifier** : le noyau REFUSE le programme s'il peut boucler a l'infini, dereferencer un
+  pointeur invalide, ou depasser la pile. Garantie : un programme eBPF ne peut pas planter
+  le noyau. C'est ce qui rend eBPF sur en production.
+- **Hook points** (ou on attache) : `kprobe`/`kretprobe` (entree/sortie de fonction
+  kernel), `tracepoint` (points stables du noyau), `LSM` (Linux Security Modules, pour
+  decider allow/deny), `XDP`/`tc` (paquets reseau au plus tot), `uprobe` (fonctions
+  userspace).
+- **Maps** : structures cle/valeur partagees noyau<->userspace. Le programme eBPF ecrit
+  dans une map, le demon userspace (RailNode) la lit. C'est le canal de remontee des events
+  -- et le cache du chemin chaud (`identity_cache`, `decision_cache` du diagramme AgentRail,
+  lookup sub-microseconde).
+
+Mecanisme RailNode (surface eBPF) :
+
+```mermaid
+sequenceDiagram
+    participant AG as Agent (process)
+    participant K as Noyau (tracepoint syscall)
+    participant BPF as Programme eBPF
+    participant MAP as BPF map (kernel cache)
+    participant RN as RailNode (userspace)
+
+    AG->>K: syscall connect/write/execve/openat
+    K->>BPF: declenche le hook
+    BPF->>BPF: lit args (fd, addr, bytes, pid, cgroup_id)
+    BPF->>MAP: ecrit l'event
+    MAP->>RN: relai userspace lit la map
+    RN->>RN: normalise -> AgentActionEvent -> decision (Regorus local)
+    RN->>MAP: ecrit le verdict (decision_cache)
+    Note over BPF,MAP: lookup sub-us sur le chemin chaud (allow/deny sans remonter)
+```
+
+**Ce que eBPF voit** : tout syscall de tout process -- `execve` (un agent demarre),
+`connect`/`sendto` (il parle reseau), `openat`/`write` (il touche un fichier/DB). C'est le
+filet **catch-all** ("Any AI Agent") : aucune cooperation de l'agent requise.
+
+**MVP userspace vs roadmap eBPF** : au depart RailNode capture en userspace (proxy,
+`LD_PRELOAD`, ou ptrace) -- plus simple, moins performant, contournable. La roadmap = vrai
+eBPF noyau pour la perf et la couverture totale (un agent ne peut pas l'eviter).
+
+### A.2 Hook inline -- un shim dans le process de l'agent
+
+Un hook inline vit **dans le process applicatif de l'agent**, pas dans le noyau. L'agent
+appelle un outil ; l'appel passe d'abord par le shim RailNode, qui voit l'appel
+**structure** (action, ressource, payload) avant toute execution.
+
+Variantes (diagramme AgentRail) :
+- **subprocess hook** (Claude Code) : wrapper du process / interception des sous-process.
+- **SDK intercept** (LangGraph/CrewAI) : middleware dans le SDK ; chaque tool-call y passe.
+- **MCP / tool-call intercept** (Cursor, serveurs MCP) : coupure sur le protocole MCP.
+
+```
+agent.appelle_outil("github.merge_pr", {repo, number})
+   -> shim RailNode intercepte AVANT execution
+   -> voit l'appel STRUCTURE (action_type, resource, payload)
+   -> decision -> laisse passer / bloque
+```
+
+### A.3 eBPF vs hook -- la difference qui compte
+
+| | eBPF / syscall | Hook inline |
+|---|---|---|
+| **Ou** | noyau (hors process) | dans le process de l'agent |
+| **Voit** | syscalls + octets reseau (bas niveau) | l'appel d'outil semantique (haut niveau) |
+| **Semantique** | brute : `connect(2.3.4.5:443)`, `write(fd, bytes)` -- intention a reconstruire | riche : `merge_pr` sur tel repo, deja structuree |
+| **Contournable ?** | non (l'agent ne choisit pas) | oui si l'agent evite le SDK (fantome en Python natif) |
+| **Cooperation agent** | aucune | oui (l'agent charge le shim) |
+| **Couverture** | universelle (tout process) | par framework (un shim par SDK) |
+
+RailNode a **les deux** parce qu'ils sont complementaires : le hook donne l'intention
+claire mais contournable ; l'eBPF est incontournable mais semantiquement pauvre.
+
+### A.4 Le combo = detection du ghost agent
+
+```mermaid
+flowchart LR
+    GHOST["Agent fantome<br/>(Python natif, hors SDK)"]
+    GHOST -->|"PAS d'appel SDK"| HOOKX["Hook inline<br/>(rien vu)"]
+    GHOST -->|"syscall connect()"| EBPF["eBPF<br/>(vu)"]
+    HOOKX --> AUDIT["Chaine d'audit<br/>(absent)"]
+    EBPF --> WIRE["Vue reseau / wire<br/>(present)"]
+    AUDIT --> REC{"reconcile<br/>wire vs audit"}
+    WIRE --> REC
+    REC -->|"vu sur le wire,<br/>absent de l'audit"| ALERT["ALERTE<br/>chemin non-medie"]
+```
+
+Un agent qui parle direct a une DB en Python natif **echappe au hook** (pas dans le SDK)
+mais **apparait en eBPF** (le syscall `connect` existe). "Vu en eBPF/wire, absent du
+hook/audit" = alerte. C'est exactement le `reconcile` wire-vs-audit du banc.
+
+### A.5 Pourquoi eBPF resout la frontiere Docker
+
+eBPF s'attache au **noyau de l'hote**. Hote + conteneurs = **un seul noyau**. Un eBPF sur
+l'hote voit donc les syscalls des process **dans les conteneurs** (il a meme le `cgroup_id`
+pour identifier quel conteneur). Le namespace Docker isole le reseau et les PID *entre
+conteneurs*, pas le **noyau** vis-a-vis d'un observateur privilegie de l'hote.
+
+Cote banc :
+- **surface eBPF** : l'agent simule (dockerise ou non) emet un vrai syscall reseau
+  observable (vrai `connect`/HTTP). L'overlay mitmproxy fournit deja cette vue reseau.
+- **surface hook** : l'agent simule charge le shim RailNode -> il tourne en natif.
+
