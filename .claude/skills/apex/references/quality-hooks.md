@@ -83,19 +83,19 @@ Before creating or writing any file, verify:
 **APEX Artifacts**
 
 ```
-_alire/temp/apex/{task-id}/{PHASE}_{ITEM}_{STATUS}.{ext}
+docs/tracking/apex/{task-id}/{PHASE}_{ITEM}_{STATUS}.{ext}
 ```
 
 **Documentation**
 
 ```
-_alire/01_DOCUMENTATION/{type}/{module}_{doctype}_en.md
+docs/{type}/{module}_{doctype}_en.md
 ```
 
 **Plans**
 
 ```
-_alire/tracking/PLAN_{TASK}_{YYYY-MM-DD}.md
+docs/tracking/PLAN_{TASK}_{YYYY-MM-DD}.md
 ```
 
 If naming convention fails:
@@ -148,7 +148,7 @@ For actions marked as SUPERVISED (see autonomy levels in agent-delegation-protoc
 When the conversation context approaches 70% of the window:
 
 1. **Summarize** completed phases into a compact status block
-2. **Write** the summary to `_alire/temp/apex/{task-id}/context_checkpoint.md`
+2. **Write** the summary to `docs/tracking/apex/{task-id}/context_checkpoint.md`
 3. **Update** PLAN_*.md Working Memory section with current state
 4. **Continue** with the summarized context
 
@@ -182,7 +182,7 @@ Step: {current step}
 ### Pre-session Injection (INIT phase)
 
 At APEX session start, inject relevant context:
-- Last 3 APEX sessions from `_alire/temp/apex/` (read 09-finish.md summaries)
+- Last 3 APEX sessions from `docs/tracking/apex/` (read 09-finish.md summaries)
 - Active constraints from CLAUDE.md rules
 - Known pitfalls from recent RETEX files
 
@@ -194,7 +194,7 @@ At APEX session start, inject relevant context:
 
 ### Post-session Persistence (FINISH phase)
 
-- Write final summary to `_alire/temp/apex/{task-id}/09-finish_summary_FINAL.md`
+- Write final summary to `docs/tracking/apex/{task-id}/09-finish_summary_FINAL.md`
 - Update PLAN_*.md with full results
 - Write RETEX if score < 40/50
 - Log session metadata in FILE_TRACKER.json
@@ -240,7 +240,7 @@ SUPERVISED ACTION REQUIRED:
 ```
 Context utilization: 72%
 -> QH-A5: Triggering context offload
--> Writing checkpoint to _alire/temp/apex/remediation-export/context_checkpoint.md
+-> Writing checkpoint to docs/tracking/apex/remediation-export/context_checkpoint.md
 -> Summarizing phases INIT through EXECUTE (4 phases -> 12 lines)
 -> Continuing with VALIDATE phase
 ```

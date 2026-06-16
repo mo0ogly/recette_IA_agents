@@ -18,7 +18,7 @@ Complements `decision_log.jsonl` (decisions only) with granular action tracking.
 After every significant action within an APEX step, append to the session journal:
 
 ```
-_alire/temp/apex/{task-id}/action_journal.jsonl
+docs/tracking/apex/{task-id}/action_journal.jsonl
 ```
 
 One JSON line per action:
@@ -65,7 +65,7 @@ One JSON line per action:
 
 ```bash
 log_apex_action() {
-  local JOURNAL="_alire/temp/apex/${APEX_SESSION}/action_journal.jsonl"
+  local JOURNAL="docs/tracking/apex/${APEX_SESSION}/action_journal.jsonl"
   echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"session\":\"${APEX_SESSION}\",\"phase\":\"$1\",\"step\":$2,\"agent_role\":\"$3\",\"action\":\"$4\",\"tool\":\"$5\",\"input\":\"$6\",\"output\":\"$7\",\"autonomy\":\"$8\",\"approval\":\"N/A\",\"security\":\"CLEAR\",\"status\":\"$9\",\"file\":\"${10}\"}" >> "$JOURNAL"
 }
 ```
@@ -102,7 +102,7 @@ All APEX intermediate artifacts go through staging before archival.
 ### Staging Directory
 
 ```
-_alire/temp/apex/{task-id}/
+docs/tracking/apex/{task-id}/
 ```
 
 ### File Naming Convention
@@ -119,7 +119,7 @@ Where:
 ### Examples
 
 ```
-_alire/temp/apex/remediation-export/
+docs/tracking/apex/remediation-export/
   00-init_context_FINAL.md
   01-analyze_dependency-map_FINAL.md
   01-analyze_health-scan_FINAL.md
@@ -147,7 +147,7 @@ _alire/temp/apex/remediation-export/
 Track all files produced during an APEX session in a machine-readable manifeste:
 
 ```
-_alire/temp/apex/{task-id}/manifeste.jsonl
+docs/tracking/apex/{task-id}/manifeste.jsonl
 ```
 
 One line per file:

@@ -121,19 +121,25 @@ c54 bakes this preventive scan to prevent recurrence.
 
 1. **Parse** the task description: identify domain (backend Rust, backend Python, frontend React, rules, infra, mixed)
 2. **Resume check** (`-r <id>` flag):
-   - If resume: load `_alire/temp/apex/{id}/FILE_TRACKER.json`, resume from last incomplete subtask
+   - If resume: load `docs/tracking/apex/{id}/FILE_TRACKER.json`, resume from last incomplete subtask
    - If fresh: generate session id `apex-{YYYYMMDD}-{slug}` and feed it to `apex_journal_init`
-3. **Create PLAN immediately**: `_alire/tracking/PLAN_APEX_{slug}_{date}.md` (template from agentic-core.md)
+3. **Create PLAN immediately**: `docs/tracking/PLAN_APEX_{slug}_{date}.md` (template from agentic-core.md)
 4. **Pre-flight** (BLOCKING):
    - Rust: `cargo build 2>&1 | tail -20` (must compile; `-p <crate>` if multi-crate workspace)
    - React: `cd inspect_ia_agents-console && node node_modules/.bin/vite build 2>&1 | tail -5` (must pass)
    - Backend health: `curl -s http://localhost:8081/api/health | head -1` (WARN only, not BLOCK)
 5. **Test pre-flight** (WARN, not BLOCK):
    - `cargo test --no-run 2>&1 | tail -5` then `cargo test 2>&1 | grep -cE 'FAILED|test result: FAILED'` -- note pre-existing failures for regression baseline
-6. **Initialize session artifacts** in `_alire/temp/apex/{session-id}/`:
+6. **Initialize session artifacts** in `docs/tracking/apex/{session-id}/`:
    - `action_journal.jsonl` (empty)
    - `FILE_TRACKER.json` (empty)
    - `swarm_memory.json` (if `--swarms`, see swarm-memory-protocol.md)
+
+**Tracking is gitignored work-memory (R25 -- BLOCKING).** Every APEX artifact (session dir,
+journals, FILE_TRACKER, swarm_memory, PLAN, RETEX, decision_log) lives under `docs/tracking/`,
+which is gitignored. This repo is a ground-truth corpus; committing APEX work-trace pollutes it.
+NEVER write an APEX artifact at the repo root, NEVER `git add` anything under `docs/tracking/`.
+Durable deliverables (product doc, runbook) go in committed `docs/`, not `docs/tracking/`.
 
 Gate: pre-flight MUST pass. If failure and the task is NOT to fix the pre-requisite -> STOP.
 
@@ -144,14 +150,17 @@ Gate: pre-flight MUST pass. If failure and the task is NOT to fix the pre-requis
 **OODA: Observe + Orient**
 
 1. **Collect data**: read relevant files, map dependencies, check git status
-2. **Load previous RETEX**: search `_alire/02_LOGS/Journals/retex/` for same-domain RETEX. Apply lessons learned. Do NOT repeat documented mistakes.
-3. **Health scan** (MANDATORY, display results):
+2. **Load previous RETEX**: search `docs/tracking/retex/` for same-domain RETEX. Apply lessons learned. Do NOT repeat documented mistakes.
+3. **Health scan** (MANDATORY, display results). Every grep appends the transverse exclusion
+   set `-vE '/target/|/node_modules/|/dist/|/\.worktrees/|docs/tracking/|/pdca/|__pycache__|\.orig$|\.bak$'`
+   -- a match only in a build artifact, vendored dep, worktree, or tracking file is a GHOST, not
+   a finding (this repo guarantees all of those paths exist). Drop it, never score it.
    - Input validation: handler extractors without typed parse/validation (e.g. raw `String` path param without `Uuid`/`Ulid` parse)
    - Error-handling debt: `.unwrap()`/`.expect()`/`panic!` on fallible paths in non-test code (grep `-rn '\.unwrap()\|\.expect(\|panic!' src/ --include='*.rs'`)
    - Test coverage: `.rs` files > 200 LOC without a `#[cfg(test)]` mod or matching `tests/` file
    - Structural debt: files exceeding LOC limit without @allow-long-file
 4. **Orient**: load relevant context
-   - Documentation: `_alire/01_DOCUMENTATION/` -- existing docs for this domain
+   - Documentation: `docs/` -- existing docs for this domain
    - Skills: CLAUDE.md rules, anti-patterns
    - Previous decision_log entries for this domain
 
@@ -167,7 +176,7 @@ This phase produces a structured, critiqued plan BEFORE any code is written.
 
 ### 2a. Research
 
-- **Codebase search**: "Has someone already done this?" -- Grep/Glob for existing implementations, patterns, utilities that can be reused. Check `_alire/01_DOCUMENTATION/` for existing specs.
+- **Codebase search**: "Has someone already done this?" -- Grep/Glob for existing implementations, patterns, utilities that can be reused. Check `docs/` for existing specs.
 - **Web search** (if `--research` flag): use WebSearch/WebFetch for recent technical references, security advisories, best practices. Cite sources.
 - **Log all research** in action_journal.jsonl with action `RESEARCH_CODEBASE` or `RESEARCH_WEB`.
 
@@ -218,7 +227,7 @@ SUBTASK {N}/{total}
 **Konrad-Kurze pre-load (BEFORE the critique agent fires).**
 Check for a recent (< 24h) meta-cognitive directive that targets Malcador or both:
 ```bash
-ls -t _alire/02_LOGS/Journals/meta/directives/KD-*.json 2>/dev/null | head -1
+ls -t docs/tracking/directives/KD-*.json 2>/dev/null | head -1
 ```
 If a directive exists with `primary_target` in {Malcador, both}, `injection.operation = ADD`, AND `risk_level = LOW`: include its `injection.payload` and `expected_impact` in the critique agent's input prompt. If it has `requires_approval: true` and is not yet APPROVED: surface it in the plan as "Pending Konrad directive" but do NOT auto-apply.
 If APEX has REPLANned >= 2 times on the same subtask in this session, INVOKE `/konrad-kurze` via the Skill tool (model: **sonnet**) BEFORE 2d, with scope = current WAVE id. The directive that comes back feeds into 2d.
@@ -259,7 +268,9 @@ For each subtask, execute the complete OODA cycle:
 
 Execute the subtask. Rules:
 - inspect_ia_agents conventions: R1-R17, invariants I1-I6, deny-by-default, no emoji (see project CLAUDE.md)
-- Policy gates: NO STUB, NO MOCK, NO DISABLE, USAGE TRIAGE
+- Policy gates: NO STUB, NO DISABLE, USAGE TRIAGE
+- **NO CONFABULATION**: never invent a finding, file path, symbol, or score -- every claim is backed by a command output. A claim of "X missing/absent" requires the verify command + its output attached, else mark it `A_VERIFIER`, never a real severity (applied R13).
+- **NO MOCK in production paths, EXCEPT the declared legitimate mocks.** The recette is mock-first by design: `StubLlm`/`ReplayLlm` (deterministic replay I4), `LabForge` + `recette/lab/mock_server.py` (simulated lab :8082), `mock_local` servers, and `tests/`/`__fixtures__` fixtures are the corpus HARNESS, not violations -- NEVER flag them as mock-data (false positive against the repo's own architecture).
 - 1 file at a time, gate after each file
 - Log in `action_journal.jsonl`:
   ```json
@@ -398,6 +409,18 @@ Invoke via Skill tool (mandatory delegation):
   via `scripts/install_python_audit.sh` (missing tool -> bloc N/A).
 - For each `*.tsx`/`*.ts` touched -> `/react-recette {file}` (48 checks, Bloc E = R17 Contract Gate).
 
+**Recette-specific subjects (route by what the build touched, not just file extension):**
+- Touched **corpus ground-truth** (`corpus/agents/`, `corpus/repos/`, `corpus/maf_agents/`,
+  `corpus/sim/`, surface, an agent slug) -> the gate is the recette's OWN harness, not cargo:
+  `make recette` (coverage-guard D1-D6 + validate + run + discovery + surface) and
+  `./recette.sh test`. A coverage gap is a RED test, never patched by hand (R20). Discovery
+  ground-truth stays invariant-based (detection/dedup/coverage/risk-order/determinism/policy),
+  never opaque values. Negatives stay mono-axis (`test_each_negative_breaks_exactly_one_dimension`).
+- Touched **discoveryprobe** (separate Rust workspace) -> `cd discoveryprobe` before any cargo;
+  the `discoveryprobe-ebpf` crate is EXCLUDED from the host workspace (`bpfel-unknown-none`
+  target) -- if its toolchain/CAP_BPF is absent, mark that bloc N/A (R18), never a FAILURE.
+  `cargo-geiger` audits the unsafe eBPF/loader surface; do not blanket-penalize necessary unsafe.
+
 **Minimum scores**:
 - `/rust-recette` >= 39/44 (or >= 35 with E+F N/A) AND zero CRITICAL in FAIL
 - `/react-recette` >= 36/40
@@ -521,15 +544,13 @@ escalate.
 Follow [librarian-gate.md](../_shared/references/librarian-gate.md):
 
 ```
-[ ] 1. PLAN up to date : _alire/tracking/PLAN_APEX_{NAME}_{DATE}.md (Status: TERMINE)
-[ ] 2. RETEX written   : _alire/02_LOGS/Journals/retex/RETEX_APEX_{DATE}.md
+[ ] 1. PLAN up to date : docs/tracking/PLAN_APEX_{NAME}_{DATE}.md (Status: TERMINE)
+[ ] 2. RETEX written   : docs/tracking/retex/RETEX_APEX_{DATE}.md
 [ ] 3. RETEX DISPLAYED : RETEX content DISPLAYED in the conversation (not just written to file)
-[ ] 4. INDEX updated   : _alire/tracking/INDEX.md
-[ ] 5. DOC LIBRARIAN   : doc_classifier.py init + doc_librarian.py reindex (if doc created)
-[ ] 6. UI HELP (BLOQUANT) : INSERT ui_help_content + verify SELECT for EACH new *Tab/*Panel/*Dashboard/*Editor component. FAIL = cycle CANNOT close.
-[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on inspect_ia_agents.example/docs/.
-[ ] 8. Clean commit    : session files only (not git add -A)
-[ ] 9. Push            : max 5 unpushed commits
+[ ] 4. DURABLE DOC (SI PRODUIT) : a lasting doc/runbook change goes in committed `docs/` (NOT docs/tracking/). Rebuild a docs site only if this repo has one.
+[ ] 5. UI HELP (BLOQUANT, SI FRONTEND) : INSERT ui_help_content + verify SELECT for EACH new *Tab/*Panel/*Dashboard/*Editor component. FAIL = cycle CANNOT close.
+[ ] 6. Clean commit    : ONLY committed deliverables (source, corpus, the skill). NEVER `git add` anything under docs/tracking/ (R25). Never `git add -A`.
+[ ] 7. Push            : max 5 unpushed commits
 ```
 
 ### RETEX (MANDATORY -- display in conversation)
@@ -611,8 +632,8 @@ Detailed in [agentic-core.md](../_shared/references/agentic-core.md). Summary:
 
 ### Level 2: Long-term memory (inter-session)
 
-- `_alire/02_LOGS/Journals/retex/`: previous session RETEX
-- `_alire/02_LOGS/Journals/decision_log.jsonl`: non-trivial decisions
+- `docs/tracking/retex/`: previous session RETEX
+- `docs/tracking/decision_log.jsonl`: non-trivial decisions
 - `.claude/memory/`: user feedback, preferences
 
 ### Level 3: Action Journal (append-only, audit trail)

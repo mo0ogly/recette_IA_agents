@@ -170,7 +170,7 @@ Each agent role operates within strict boundaries:
 - ANALYST: read-only, produces reports only
 - PLANNER: produces plans only, no file modifications
 - EXECUTOR: modifies files but only within plan scope
-- MEMORY: writes only to `_alire/tracking/` and `_alire/02_LOGS/`
+- MEMORY: writes only to `docs/tracking/` and `docs/tracking/`
 - LIBRARIAN: writes only to archive paths and manifeste
 
 ### Inter-Agent Trust
