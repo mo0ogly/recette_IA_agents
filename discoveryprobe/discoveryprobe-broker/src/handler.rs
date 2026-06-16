@@ -3,12 +3,11 @@
 //! The capture step is INJECTED (a closure), so the whole flow -- validation,
 //! auditing, hashing, response shaping -- is unit-tested with a stub capture,
 //! without CAP_BPF. The real binary injects the privileged eBPF capture; tests
-//! inject canned exec events.
+//! inject canned exec + connect events.
 
 use std::time::Duration;
 
-use discoveryprobe::{recordings_from_execs, AgentProcessSpec};
-use discoveryprobe_common::ExecEvent;
+use discoveryprobe::{recordings_from_capture, AgentProcessSpec, Capture};
 use discoveryprobe_core::CaptureRecording;
 use serde::Serialize;
 
@@ -37,11 +36,12 @@ pub enum BrokerResponse {
 /// Handle one capture request end-to-end.
 ///
 /// `capture` is the (privileged, in the real binary) function that observes the
-/// given process specs for the window and returns the captured exec events. A
-/// rejected request returns `BrokerResponse::Rejected` and runs NO capture and
-/// writes NO audit (it was never a run). A validated request audits start, runs
-/// the capture, builds normalised recordings, hashes them, audits end, and
-/// returns `BrokerResponse::Ok`.
+/// given process specs for the window and returns the captured kernel events
+/// (execs + connects). A rejected request returns `BrokerResponse::Rejected`
+/// and runs NO capture and writes NO audit (it was never a run). A validated
+/// request audits start, runs the capture, builds normalised recordings
+/// reconciling both surfaces, hashes them, audits end, and returns
+/// `BrokerResponse::Ok`.
 pub fn handle<F>(
     request: &CaptureRequest,
     manifest: &Manifest,
@@ -49,7 +49,7 @@ pub fn handle<F>(
     capture: F,
 ) -> anyhow::Result<BrokerResponse>
 where
-    F: FnOnce(&[AgentProcessSpec], Duration) -> anyhow::Result<Vec<ExecEvent>>,
+    F: FnOnce(&[AgentProcessSpec], Duration) -> anyhow::Result<Capture>,
 {
     let validated = match validate(request, manifest) {
         Ok(v) => v,
@@ -71,8 +71,8 @@ where
         recording_sha256: None,
     })?;
 
-    let events = capture(&validated.specs, validated.duration)?;
-    let recordings = recordings_from_execs(&validated.specs, &events);
+    let captured = capture(&validated.specs, validated.duration)?;
+    let recordings = recordings_from_capture(&validated.specs, &captured.execs, &captured.connects);
     let recordings_json = serde_json::to_string(&recordings)?;
     let recording_sha256 = sha256_hex(recordings_json.as_bytes());
 
@@ -100,6 +100,7 @@ pub fn rejected(reason: &RejectReason) -> BrokerResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use discoveryprobe_common::{ConnectEvent, ExecEvent};
     use discoveryprobe_core::ObservationSurface;
 
     fn manifest() -> Manifest {
@@ -117,12 +118,29 @@ mod tests {
         }
     }
 
-    fn exec(pid: u32, name: &str) -> ExecEvent {
+    fn comm_of(name: &str) -> [u8; discoveryprobe_common::COMM_LEN] {
         let mut comm = [0u8; discoveryprobe_common::COMM_LEN];
         let bytes = name.as_bytes();
         let n = bytes.len().min(discoveryprobe_common::COMM_LEN);
         comm[..n].copy_from_slice(&bytes[..n]);
-        ExecEvent { pid, comm }
+        comm
+    }
+
+    fn exec(pid: u32, name: &str) -> ExecEvent {
+        ExecEvent {
+            pid,
+            comm: comm_of(name),
+        }
+    }
+
+    fn connect(pid: u32, daddr: [u8; 4], port: u16, name: &str) -> ConnectEvent {
+        ConnectEvent {
+            pid,
+            daddr,
+            dport: port.to_be_bytes(),
+            _pad: [0u8; 2],
+            comm: comm_of(name),
+        }
     }
 
     fn audit_path(tag: &str) -> std::path::PathBuf {
@@ -142,7 +160,10 @@ mod tests {
             &mut audit,
             |specs, _| {
                 assert_eq!(specs.len(), 1);
-                Ok(vec![exec(42, "pr-bot")])
+                Ok(Capture {
+                    execs: vec![exec(42, "pr-bot")],
+                    connects: vec![],
+                })
             },
         )
         .unwrap();
@@ -176,7 +197,7 @@ mod tests {
             &mut audit,
             |_, _| {
                 capture_ran = true;
-                Ok(vec![])
+                Ok(Capture::default())
             },
         )
         .unwrap();
@@ -193,12 +214,43 @@ mod tests {
             &req(&["pr-bot-sdk"], 9999),
             &manifest(),
             &mut audit,
-            |_, _| Ok(vec![]),
+            |_, _| Ok(Capture::default()),
         )
         .unwrap();
         match resp {
             BrokerResponse::Rejected { reason } => assert!(reason.contains("exceeds max")),
             other => panic!("expected Rejected, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn capture_reconciles_exec_and_connect_on_one_recording() {
+        let path = audit_path("reconcile");
+        let mut audit = AuditLog::open(&path);
+        let resp = handle(
+            &req(&["pr-bot-sdk"], 3000),
+            &manifest(),
+            &mut audit,
+            |_, _| {
+                Ok(Capture {
+                    execs: vec![exec(42, "pr-bot")],
+                    connects: vec![connect(42, [140, 82, 112, 3], 443, "pr-bot")],
+                })
+            },
+        )
+        .unwrap();
+        match resp {
+            BrokerResponse::Ok { recordings, .. } => {
+                assert_eq!(
+                    recordings[0].surfaces.get(&ObservationSurface::EbpfWire),
+                    Some(&vec![
+                        "connect:140.82.112.3:443".to_string(),
+                        "exec:pr-bot:42".to_string()
+                    ])
+                );
+            }
+            other => panic!("expected Ok, got {other:?}"),
+        }
+        let _ = std::fs::remove_file(&path);
     }
 }

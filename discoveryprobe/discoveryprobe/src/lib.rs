@@ -15,5 +15,5 @@
 pub mod mapping;
 pub mod probe;
 
-pub use mapping::{recordings_from_execs, AgentProcessSpec};
-pub use probe::{capture, CaptureConfig};
+pub use mapping::{recordings_from_capture, recordings_from_execs, AgentProcessSpec};
+pub use probe::{capture, Capture, CaptureConfig};

@@ -17,8 +17,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use discoveryprobe::{capture, AgentProcessSpec, CaptureConfig};
-use discoveryprobe_common::ExecEvent;
+use discoveryprobe::{capture, AgentProcessSpec, Capture, CaptureConfig};
 
 use crate::audit::AuditLog;
 use crate::command::CaptureRequest;
@@ -77,8 +76,9 @@ fn handle_conn(stream: UnixStream, manifest: &Manifest, config: &ServerConfig) -
         &request,
         manifest,
         &mut audit,
-        move |_specs: &[AgentProcessSpec], window: Duration| -> Result<Vec<ExecEvent>> {
-            // The eBPF program captures every exec; mapping filters by marker.
+        move |_specs: &[AgentProcessSpec], window: Duration| -> Result<Capture> {
+            // The eBPF programs capture every exec + connect; mapping filters by
+            // marker and reconciles both onto the ebpf_wire surface.
             capture(&CaptureConfig {
                 object_path,
                 window,
