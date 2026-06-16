@@ -77,3 +77,6 @@ data/backend_secrets.json
 
 # Coverage measurement artifact (local only)
 .coverage
+
+# railprobe Rust crate build artifacts (native, out of base image -- R22)
+railprobe/target/
