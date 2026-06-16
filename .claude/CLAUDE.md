@@ -320,8 +320,12 @@ JAMAIS pousse. Le repo de recette est un CORPUS ground-truth + son harnais : la
 trace de travail d'un agent n'est pas un livrable et ne doit pas le polluer ni
 gonfler l'historique. Ne JAMAIS eparpiller un fichier de suivi a la racine ni dans
 `recette/`, `corpus/`, `console/` ; ne JAMAIS `git add -f` un fichier de tracking.
-Les livrables durables (doc produit, runbook) vont dans `docs/` committe ; le suivi
-ephemere reste dans `docs/tracking/` gitignore. Detail : `.claude/rules/agentic-traceability.md`.
+Gitignore NE veut PAS dire jetable : `docs/tracking/` est la **memoire de travail**
+de l'operateur -- un agent ne DOIT JAMAIS `rm`/nettoyer/ecraser ces fichiers
+(ils ne sont pas sauves par git, donc une suppression = perte definitive). On y
+AJOUTE, on ne purge pas. Les livrables durables (doc produit, runbook) vont dans
+`docs/` committe ; le suivi ephemere reste dans `docs/tracking/` gitignore.
+Detail : `.claude/rules/agentic-traceability.md`.
 
 ---
 

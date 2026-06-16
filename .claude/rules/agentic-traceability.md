@@ -21,6 +21,22 @@ git. Regles fermes :
 - Les sorties de tache ephemeres du harnais (ex. `/tmp/.../tasks/*.output`) sont
   hors repo et auto-nettoyees : ne jamais les recopier dans le repo.
 
+## Gitignore != jetable -- ne JAMAIS perdre le tracking
+
+`docs/tracking/` n'est PAS sauve par git : c'est la **memoire de travail** locale
+de l'operateur (PDCA/APEX/plans/RETEX/decision log). Consequence directe :
+
+- Un agent ne DOIT JAMAIS `rm`, `git clean`, ecraser ou tronquer un fichier de
+  `docs/tracking/`. Une suppression n'est PAS recuperable via git (le fichier
+  n'y est pas) -- c'est une perte definitive.
+- On AJOUTE au tracking, on ne le purge jamais "pour faire propre".
+- Si un fichier de `docs/tracking/` apparait absent ou vide, NE PAS le recreer a
+  l'aveugle : verifier d'abord un backup local hors repo
+  (`~/recette_tracking_backups/*.tgz`) ou un commit dangling pre-squash
+  (`git log --all -- 'docs/tracking/*'`, `git fsck --lost-found`).
+- Sauvegarde recommandee hors repo (anti-perte, hors git) :
+  `tar czf ~/recette_tracking_backups/tracking_$(date +%Y%m%d).tgz -C docs tracking`.
+
 ## Decision Log (pour decisions non-triviales)
 
 Fichier : `docs/tracking/decision_log.jsonl`
