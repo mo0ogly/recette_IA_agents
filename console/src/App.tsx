@@ -12,6 +12,7 @@ import DashboardPage from "./pages/dashboard";
 import DiscoveryPage from "./pages/discovery";
 import FluxPage from "./pages/flux";
 import LivePage from "./pages/live";
+import ProbePage from "./pages/probe";
 import ProxyNavBadge from "./components/ProxyNavBadge";
 import ProxyPage from "./pages/proxy";
 import RagPage from "./pages/rag";
@@ -57,6 +58,9 @@ export default function App(): JSX.Element {
           <NavLink to="/discovery" className={navLinkClass}>
             Discovery
           </NavLink>
+          <NavLink to="/probe" className={navLinkClass}>
+            Probe
+          </NavLink>
           <NavLink to="/sim" className={navLinkClass}>
             Red-team
           </NavLink>
@@ -98,6 +102,7 @@ export default function App(): JSX.Element {
           <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/rag" element={<RagPage />} />
           <Route path="/discovery" element={<DiscoveryPage />} />
+          <Route path="/probe" element={<ProbePage />} />
           <Route path="/corpus" element={<CorpusPage />} />
           <Route path="/sim" element={<SimPage />} />
           <Route path="/agents" element={<AgentsPage />} />

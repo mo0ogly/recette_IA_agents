@@ -840,6 +840,64 @@ export function getRecetteScorecard(): Promise<RecetteScorecard> {
   return request<RecetteScorecard>("/subjects/scorecard");
 }
 
+// ---------------------------------------------------------------------------
+// Probe (/probe/*): the discoveryprobe eBPF reference capture (design 12.5/12.6)
+// ---------------------------------------------------------------------------
+
+/** One agent's capture: the identifiers visible on each observation surface. */
+export interface SurfaceRecording {
+  agent_id: string;
+  surfaces: Record<string, string[]>;
+}
+
+/** The broker reply: ok with recordings, or rejected with a reason. */
+export interface BrokerRecording {
+  status: string;
+  recordings?: SurfaceRecording[];
+  recording_sha256?: string;
+  reason?: string;
+}
+
+/** The source-agnostic detection scorecard (recette/surface). */
+export interface DetectionScorecard {
+  ok: boolean;
+  total_agents: number;
+  detected_per_surface: Record<string, number>;
+  false_negatives: string[];
+}
+
+/** POST /probe/capture result: the broker recording + (when ok) its scorecard. */
+export interface ProbeCaptureResult {
+  recording: BrokerRecording;
+  scorecard?: DetectionScorecard;
+}
+
+/** GET /probe/status: whether the privileged broker socket is configured. */
+export interface ProbeStatus {
+  configured: boolean;
+  socket_env: string;
+}
+
+export interface ProbeCaptureRequest {
+  agents: string[];
+  duration_ms?: number;
+}
+
+/** GET /probe/status: is the capture broker reachable for the UI to enable capture? */
+export function getProbeStatus(): Promise<ProbeStatus> {
+  return request<ProbeStatus>("/probe/status");
+}
+
+/** POST /probe/capture: relay a bounded eBPF capture to the broker and get the
+ *  recording + detection scorecard. The API is non-privileged; the broker holds
+ *  CAP_BPF. A 503 means the broker is not launched / unreachable (fail-safe). */
+export function captureProbe(req: ProbeCaptureRequest): Promise<ProbeCaptureResult> {
+  return request<ProbeCaptureResult>("/probe/capture", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
 export interface CorpusSubject {
   agent_id: string;
   name: string | null;
