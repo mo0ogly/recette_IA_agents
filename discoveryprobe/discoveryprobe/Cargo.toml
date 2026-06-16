@@ -1,0 +1,24 @@
+# discoveryprobe -- the userspace loader for the eBPF capture program.
+#
+# Loads the compiled BPF object (built separately for bpfel-unknown-none),
+# attaches the sched_process_exec tracepoint, and drains the ring buffer into
+# per-agent CaptureRecordings (discoveryprobe-core). The load/attach/poll path needs
+# CAP_BPF and runs only under the privileged broker; the pure capture->recording
+# mapping is dependency-light and unit-tested without privilege.
+#
+# Native by design (R22): built on the host with cargo, never in the base Docker
+# image. The BPF object is produced by the discoveryprobe-ebpf crate's own toolchain;
+# this loader reads it at runtime from a path, so the host `cargo build`/`test`
+# stays decoupled from the bpf-linker toolchain.
+[package]
+name = "discoveryprobe"
+version = "0.1.0"
+edition = "2021"
+description = "Userspace loader: attach the eBPF capture program and drain it into surface recordings."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+discoveryprobe-common = { path = "../discoveryprobe-common" }
+discoveryprobe-core = { path = "../discoveryprobe-core" }
+aya = "0.13.1"
+anyhow = "1"

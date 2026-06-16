@@ -1,13 +1,13 @@
-# railprobe -- native eBPF reference probe for the surface-detection recette.
-# Design: docs/plans/2026-06-16-railprobe-ebpf-reference-probe-design.md
+# discoveryprobe -- native eBPF reference probe for the surface-detection recette.
+# Design: docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md
 #
 # Native by design (R22): built with cargo on the host, never baked into the base
 # Docker image. The eBPF program crate is added later as a separate member; this
 # workspace starts with the userspace recording contract (stable Rust).
 [workspace]
 resolver = "2"
-members = ["railprobe-core", "railprobe-common"]
-# railprobe-ebpf builds for the bpfel-unknown-none target (its own toolchain +
+members = ["discoveryprobe-core", "discoveryprobe-common", "discoveryprobe"]
+# discoveryprobe-ebpf builds for the bpfel-unknown-none target (its own toolchain +
 # build-std), so it is NOT a member of this host workspace -- it is built
 # separately. Excluded so a host `cargo build` never tries to compile it.
-exclude = ["railprobe-ebpf"]
+exclude = ["discoveryprobe-ebpf"]

@@ -1,13 +1,13 @@
-# railprobe-common -- the event struct shared between the eBPF kernel program
+# discoveryprobe-common -- the event struct shared between the eBPF kernel program
 # and the userspace loader. Pure no_std, ZERO dependencies, so it compiles for
 # both the host workspace (std tests) and the bpfel-unknown-none target
 # (build-std core only). The userspace side parses the captured bytes manually
 # (no aya::Pod marker), keeping this crate dependency-free (R22).
 [package]
-name = "railprobe-common"
+name = "discoveryprobe-common"
 version = "0.1.0"
 edition = "2021"
-description = "Capture event layout shared by the railprobe eBPF program and its userspace loader."
+description = "Capture event layout shared by the discoveryprobe eBPF program and its userspace loader."
 license = "MIT OR Apache-2.0"
 
 [dependencies]

@@ -1,4 +1,4 @@
-# railprobe -- sonde eBPF de reference + conformite (design)
+# discoveryprobe -- sonde eBPF de reference + conformite (design)
 
 Date : 2026-06-16
 Statut : FONDATEUR (design valide en brainstorm, avant implementation)
@@ -12,7 +12,7 @@ I5 (agents -> lab via proxy), I2 (pas de contournement), securite deny-by-defaul
 
 Le banc `recette/surface/` prouve aujourd'hui la LOGIQUE de detection sur des vues
 ENREGISTREES (ProxyTrace = hook, WireFlow = wire). Il ne prouve pas encore que la
-comm d'un agent est **reellement observable** sur l'hote en live. `railprobe` comble
+comm d'un agent est **reellement observable** sur l'hote en live. `discoveryprobe` comble
 ce trou : une **sonde native eBPF** qui observe pour de vrai des agents simules
 vivants, produit les memes surfaces, et alimente le **meme** `DetectionScorecard`.
 
@@ -24,7 +24,7 @@ Double usage (decide en brainstorm) :
    outil-equipe sur les memes agents, meme scorecard, depuis la console.
 
 These fondatrice (rappel) : **si l'outil ne voit pas les agents, c'est un echec.**
-`railprobe` rend cette these mesurable en conditions reelles.
+`discoveryprobe` rend cette these mesurable en conditions reelles.
 
 ## 1. Scope (et hors-scope)
 
@@ -39,10 +39,10 @@ DANS le scope :
 HORS scope (decide) :
 - Les **scanners statiques** (OpenAPI/GitHub/Temporal/MCP) : c'est de l'enrichissement
   STATIQUE, deja couvert en Python (`corpus/repos/` + `SourceScanAdapter` +
-  `recette/http_adapter.py`). `railprobe` ne les double pas.
+  `recette/http_adapter.py`). `discoveryprobe` ne les double pas.
 - L'**enforcement** (blocage/kill inline) : le banc OBSERVE, il ne bloque pas. Le
   hard-block reste la plateforme AgentRail.
-- Le **vrai RailNode prod** : `railprobe` est la sonde de REFERENCE du banc, pas le
+- Le **vrai RailNode prod** : `discoveryprobe` est la sonde de REFERENCE du banc, pas le
   produit. Le produit se branche via le contrat.
 
 ## 2. Decision de langage : Rust
@@ -65,7 +65,7 @@ flowchart TB
         CONSOLE["console :5173"]
         API["API recette :8090<br/>NON-privilegie"]
 
-        subgraph BROKER["railprobe-broker -- PRIVILEGIE (CAP_BPF)"]
+        subgraph BROKER["discoveryprobe-broker -- PRIVILEGIE (CAP_BPF)"]
             direction TB
             B0["socket local Unix<br/>1 seule commande: capture{agents, duration_ms}<br/>deny-by-default, audite (I1)"]
             B1["1. attache eBPF (aya)"]
@@ -75,7 +75,7 @@ flowchart TB
             B0 --> B1 --> B2 --> B3 --> B4
         end
 
-        subgraph PROBE["railprobe -- crate Rust + aya"]
+        subgraph PROBE["discoveryprobe -- crate Rust + aya"]
             EBPF["eBPF: execve / connect / sendto / write<br/>(pid, cgroup_id)<br/>= surface hook + ebpf_wire"]
         end
 
@@ -105,8 +105,8 @@ flowchart TB
 
 | Composant | Nouveau | Role | Privilege |
 |-----------|---------|------|-----------|
-| `railprobe` (crate Rust + aya) | oui | sonde eBPF : programmes kernel + relai userspace -> observations par surface | charge par le broker |
-| `railprobe-broker` | oui | seul porteur CAP_BPF ; socket local ; 1 commande etroite ; orchestre la capture bornee ; rend le rapport | PRIVILEGIE |
+| `discoveryprobe` (crate Rust + aya) | oui | sonde eBPF : programmes kernel + relai userspace -> observations par surface | charge par le broker |
+| `discoveryprobe-broker` | oui | seul porteur CAP_BPF ; socket local ; 1 commande etroite ; orchestre la capture bornee ; rend le rapport | PRIVILEGIE |
 | API `POST /probe/capture` | oui | relaie la requete console au broker via socket local ; jamais d'escalade dans l'API | NON-priv |
 | Lane B runner (mode HTTP) | reutilise | lance de VRAIS process agents qui font un VRAI socket vers le lab (observable par eBPF) | NON-priv |
 | `recette/surface/` | reutilise | projection + `DetectionScorecard` + `SurfaceDiscoveryAdapter` | - |
@@ -119,7 +119,7 @@ flowchart TB
 sequenceDiagram
     participant U as Operateur (console)
     participant API as API recette (non-priv)
-    participant BR as railprobe-broker (priv)
+    participant BR as discoveryprobe-broker (priv)
     participant BPF as eBPF (aya)
     participant AG as agents simules (process reels)
     participant LAB as lab :8082/:91xx
@@ -178,7 +178,7 @@ detect.py`) -> meme `DetectionScorecard`. Le rapport de capture porte les deux c
 ```mermaid
 flowchart LR
     CAP["recording d'une capture<br/>(observations par surface)"]
-    CAP --> REF["sonde reference (railprobe)<br/>-> scorecard A"]
+    CAP --> REF["sonde reference (discoveryprobe)<br/>-> scorecard A"]
     CAP --> TEAM["outil equipe<br/>(HttpSurfaceDiscoveryAdapter)<br/>-> scorecard B"]
     REF --> CMP{"comparaison<br/>A vs B vs ground-truth"}
     TEAM --> CMP
@@ -202,7 +202,7 @@ R16 : fixture payload reelle du rapport + render-and-assert (contrat frontend).
 
 ## 10. Contraintes (R20/R22/R19) & pre-requis
 
-- **R22 Docker adequation** : `railprobe`/broker = crate cargo, `target/` gitignore,
+- **R22 Docker adequation** : `discoveryprobe`/broker = crate cargo, `target/` gitignore,
   **hors image Docker de base** (la sonde est NATIVE par nature). `aya` pin a la
   version dont l'API est verifiee. Le broker est documente comme service natif opt-in.
 - **R20 gates** : cote Rust -> `cargo build` + `cargo clippy -D warnings` +
@@ -224,9 +224,9 @@ Sources : https://falco.org , https://tetragon.io , https://aya-rs.dev , ebpf.io
 ## 12. Prochaines etapes (a transformer en plan d'implementation)
 
 1. Pin `aya` (version a l'API verifiee) + un PoC eBPF minimal `execve` -> map -> userspace.
-2. Crate `railprobe` : programmes (execve/connect/sendto/write) + relai -> observations
+2. Crate `discoveryprobe` : programmes (execve/connect/sendto/write) + relai -> observations
    par surface (format = celui que `project_surfaces` consomme).
-3. `railprobe-broker` : socket local, commande etroite, capture bornee, audit (I1).
+3. `discoveryprobe-broker` : socket local, commande etroite, capture bornee, audit (I1).
 4. `recette/surface/` : adaptateur qui consomme un recording de capture (le juge ne
    change pas, il devient agnostique a la SOURCE des observations).
 5. API `POST /probe/capture` (relai) + R16 fixture + endpoint de comparaison conformite.

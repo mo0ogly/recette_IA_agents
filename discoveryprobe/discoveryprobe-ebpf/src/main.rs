@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-//! railprobe eBPF capture program.
+//! discoveryprobe eBPF capture program.
 //!
 //! Attaches to the `sched:sched_process_exec` tracepoint (more stable across
 //! kernel versions than the raw `execve` syscall tracepoint). For every process
@@ -21,14 +21,14 @@ use aya_ebpf::{
     maps::RingBuf,
     programs::TracePointContext,
 };
-use railprobe_common::ExecEvent;
+use discoveryprobe_common::ExecEvent;
 
 /// Ring buffer the userspace loader drains (256 KiB: power-of-two page multiple).
 #[map]
 static EXEC_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
 
 #[tracepoint]
-pub fn railprobe_exec(ctx: TracePointContext) -> u32 {
+pub fn discoveryprobe_exec(ctx: TracePointContext) -> u32 {
     // A failed capture (full ring buffer, comm read error) drops the event
     // rather than disturbing the traced process -- the probe is passive.
     let _ = try_capture(&ctx);

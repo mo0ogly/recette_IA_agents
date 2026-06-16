@@ -1,8 +1,8 @@
 [package]
-name = "railprobe-core"
+name = "discoveryprobe-core"
 version = "0.1.0"
 edition = "2021"
-description = "Recording contract bridging the railprobe eBPF capture to the Python surface-detection judge."
+description = "Recording contract bridging the discoveryprobe eBPF capture to the Python surface-detection judge."
 license = "MIT OR Apache-2.0"
 
 [dependencies]

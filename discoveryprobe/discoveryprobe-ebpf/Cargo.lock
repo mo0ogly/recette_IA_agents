@@ -95,6 +95,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "discoveryprobe-common"
+version = "0.1.0"
+
+[[package]]
+name = "discoveryprobe-ebpf"
+version = "0.1.0"
+dependencies = [
+ "aya-ebpf",
+ "discoveryprobe-common",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -134,18 +146,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "railprobe-common"
-version = "0.1.0"
-
-[[package]]
-name = "railprobe-ebpf"
-version = "0.1.0"
-dependencies = [
- "aya-ebpf",
- "railprobe-common",
 ]
 
 [[package]]

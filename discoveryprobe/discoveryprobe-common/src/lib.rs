@@ -1,4 +1,4 @@
-//! Capture event layout shared by the railprobe eBPF kernel program and the
+//! Capture event layout shared by the discoveryprobe eBPF kernel program and the
 //! userspace loader.
 //!
 //! The kernel program writes one [`ExecEvent`] per observed process exec into a

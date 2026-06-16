@@ -1,16 +1,16 @@
 [package]
-name = "railprobe-ebpf"
+name = "discoveryprobe-ebpf"
 version = "0.1.0"
 edition = "2021"
-description = "eBPF kernel programs for railprobe (execve/connect/sendto/write capture)."
+description = "eBPF kernel programs for discoveryprobe (execve/connect/sendto/write capture)."
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 aya-ebpf = "0.1.1"
-railprobe-common = { path = "../railprobe-common" }
+discoveryprobe-common = { path = "../discoveryprobe-common" }
 
 [[bin]]
-name = "railprobe-trace"
+name = "discoveryprobe-trace"
 path = "src/main.rs"
 
 [profile.dev]

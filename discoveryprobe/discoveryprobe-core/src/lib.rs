@@ -1,4 +1,4 @@
-//! Recording contract for the railprobe eBPF reference probe.
+//! Recording contract for the discoveryprobe eBPF reference probe.
 //!
 //! The native probe observes a live simulated agent (syscalls / wire) and emits
 //! a [`CaptureRecording`] per agent: the set of identifiers visible on each
