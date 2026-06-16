@@ -11,11 +11,11 @@ LIA-SEC documentation pipeline.
 %%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#0d1b2a', 'primaryTextColor': '#a8dadc', 'primaryBorderColor': '#1e6091', 'lineColor': '#00b4d8', 'secondaryColor': '#1a1a2e', 'tertiaryColor': '#0f3460', 'background': '#050d1a', 'mainBkg': '#0d1b2a', 'nodeBorder': '#1e6091', 'clusterBkg': '#0f1e30', 'titleColor': '#90e0ef', 'edgeLabelBackground': '#0f3460', 'fontSize': '14px', 'fontFamily': 'JetBrains Mono, monospace'}}}%%
 ```
 
-**This block is mandatory for all `.mmd` files in `_alire/01_DOCUMENTATION/diagrams/`.**
+**This block is mandatory for all `.mmd` files in `docs/diagrams/`.**
 Without it, `mmdc` will render with default white theme and `render_diagrams.sh` will
 produce inconsistent SVG output.
 
-> NOTE (2026-05-29): render_diagrams.sh / SVG pre-rendering is VESTIGIAL -- the actual rendering is client-side (mermaidClient.js, dark theme global). diagrams/svg/ is not consumed by any .md file and is empty. Do not install mmdc for this reason. See _alire/01_DOCUMENTATION/architecture/mermaid_render_pipeline_arch_en.md.
+> NOTE (2026-05-29): render_diagrams.sh / SVG pre-rendering is VESTIGIAL -- the actual rendering is client-side (mermaidClient.js, dark theme global). diagrams/svg/ is not consumed by any .md file and is empty. Do not install mmdc for this reason. See docs/architecture/mermaid_render_pipeline_arch_en.md.
 
 ---
 
@@ -41,8 +41,8 @@ processes. Do NOT mix paradigms in one diagram.
 ## File Naming Convention
 
 ```
-_alire/01_DOCUMENTATION/diagrams/{module}_{type}.mmd
-_alire/01_DOCUMENTATION/diagrams/{module}_{type}.json   <- descriptor for generate_mermaid.py
+docs/diagrams/{module}_{type}.mmd
+docs/diagrams/{module}_{type}.json   <- descriptor for generate_mermaid.py
 ```
 
 Examples:
@@ -157,7 +157,7 @@ C4Container
 
 ```bash
 # Detect
-grep -rL '%%{init' _alire/01_DOCUMENTATION/diagrams/*.mmd
+grep -rL '%%{init' docs/diagrams/*.mmd
 
 # Fix (manual): prepend the init block at line 1
 # Use Edit tool: old_string = first line, new_string = init_block + "\n" + first_line
@@ -169,7 +169,7 @@ grep -rL '%%{init' _alire/01_DOCUMENTATION/diagrams/*.mmd
 
 ```bash
 # Detect
-grep -rl "^\`\`\`mermaid" _alire/01_DOCUMENTATION/diagrams/
+grep -rl "^\`\`\`mermaid" docs/diagrams/
 
 # Fix: remove the fence lines (first and last line)
 # The file should start directly with %%{init}%% or the diagram keyword
@@ -201,15 +201,15 @@ service api(server)["Go Backend :8081"] in vps
 
 ## Rendering Commands
 
-> NOTE (2026-05-29): render_diagrams.sh / SVG pre-rendering is VESTIGIAL -- the actual rendering is client-side (mermaidClient.js, dark theme global). diagrams/svg/ is not consumed by any .md file and is empty. Do not install mmdc for this reason. See _alire/01_DOCUMENTATION/architecture/mermaid_render_pipeline_arch_en.md.
+> NOTE (2026-05-29): render_diagrams.sh / SVG pre-rendering is VESTIGIAL -- the actual rendering is client-side (mermaidClient.js, dark theme global). diagrams/svg/ is not consumed by any .md file and is empty. Do not install mmdc for this reason. See docs/architecture/mermaid_render_pipeline_arch_en.md.
 
 ```bash
 # Pre-render all Category A diagrams (stable, committed)
 bash .claude/skills/doc-librarian/scripts/render_diagrams.sh
 
 # Render a single diagram manually
-mmdc -i _alire/01_DOCUMENTATION/diagrams/platform_arch.mmd \
-     -o _alire/01_DOCUMENTATION/diagrams/svg/platform_arch.svg \
+mmdc -i docs/diagrams/platform_arch.mmd \
+     -o docs/diagrams/svg/platform_arch.svg \
      -b "#050d1a"
 
 # Validate before rendering (syntax check only -- exit 0 = OK)
@@ -224,7 +224,7 @@ python3 .claude/skills/doc-code/scripts/generate_mermaid.py \
 
 ## Checklist: New .mmd File
 
-- [ ] File lives in `_alire/01_DOCUMENTATION/diagrams/`
+- [ ] File lives in `docs/diagrams/`
 - [ ] Filename: `{module}_{type}.mmd` (lowercase, no spaces)
 - [ ] First line: `%%{init}%%` block (full LIA-SEC dark theme)
 - [ ] No markdown fence wrappers

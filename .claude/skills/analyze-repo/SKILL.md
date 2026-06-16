@@ -1,12 +1,12 @@
 ---
 name: analyze-repo
-description: Analyse un repo externe (GitHub, code source, lib) pour identifier ce qui est reutilisable et planifier la transposition vers Go/React LIA-SEC. Se declenche sur "analyse ce repo", "regarde ce code", "on peut reprendre ca", "transpose ca", "porte ca en Go", "adapte ce code". INTERDIT de coder avant validation de chaque phase par l'utilisateur.
+description: Analyse un repo externe (GitHub, code source, lib) pour identifier ce qui est reutilisable et planifier la transposition vers Rust/React inspect_ia_agents (Axum + React console + Python recette). Se declenche sur "analyse ce repo", "regarde ce code", "on peut reprendre ca", "transpose ca", "porte ca en Rust", "adapte ce code". INTERDIT de coder avant validation de chaque phase par l'utilisateur.
 ---
 
 # Analyze Repo v3.0 - Analyse et transposition de code externe
 
 Analyse un repo/code externe pour identifier ce qui est reutilisable
-et planifier la transposition vers la stack LIA-SEC (Go/React/PostgreSQL).
+et planifier la transposition vers la stack inspect_ia_agents (Rust/Axum + React console + Python recette).
 
 ---
 
@@ -16,8 +16,8 @@ et planifier la transposition vers la stack LIA-SEC (Go/React/PostgreSQL).
 |-------|------|---------------|
 | Phase 1 Inventaire | COLLECTOR | Lire repo, lister structure, compter fichiers/LOC, identifier stack |
 | Phase 2 Analyse fonctionnelle | ANALYST | Extraire fonctionnalites, E/S, logique metier, deps critiques |
-| Phase 3 Delta LIA-SEC | ANALYST | Grep/Glob codebase LIA-SEC, classifier EXISTE/SIMILAIRE/ABSENT |
-| Phase 4 Plan transposition | PLANNER | Mapping langage/libs, adaptations LIA-SEC, ordre implementation |
+| Phase 3 Delta inspect_ia_agents | ANALYST | Grep/Glob codebase inspect_ia_agents, classifier EXISTE/SIMILAIRE/ABSENT |
+| Phase 4 Plan transposition | PLANNER | Mapping langage/libs, adaptations inspect_ia_agents, ordre implementation |
 | Phase 5 Implementation | EXECUTOR | Coder une fonctionnalite a la fois, build gates, montrer diffs |
 | Tracabilite | LIBRARIAN | Plan persistant, decision_log, preuves de recette, RETEX |
 
@@ -28,9 +28,9 @@ et planifier la transposition vers la stack LIA-SEC (Go/React/PostgreSQL).
 | Hook | Declenchement | Action |
 |------|--------------|--------|
 | GATE_USER_VALIDATION | Fin de chaque phase (1-4) | STOP, presenter livrable, attendre validation explicite |
-| BUILD_GATE | Apres chaque transposition (Phase 5) | `build_secure_lia.sh` (Go) + `vite build` (React) -- BLOQUANT |
+| BUILD_GATE | Apres chaque transposition (Phase 5) | `cargo build` + `cargo clippy --all-targets -- -D warnings` (Rust) + `vite build` (React console) -- BLOQUANT |
 | REGRESSION_GATE | Apres chaque transposition (Phase 5) | Tests existants ne cassent pas, imports valides |
-| DELTA_FRESHNESS | Debut Phase 3 | Grep/Glob sur LIA-SEC actuel (pas de cache) |
+| DELTA_FRESHNESS | Debut Phase 3 | Grep/Glob sur inspect_ia_agents actuel (pas de cache) |
 
 ---
 
@@ -51,11 +51,11 @@ L'implementation (Phase 5) requiert TOUJOURS une validation avant de coder.
 Si 2 etapes echouent consecutivement (repo inaccessible, build casse, pattern incompatible) :
 1. Logger l'echec dans `decision_log.jsonl` avec `confidence: low`
 2. INVOQUER `/replan` -- ne pas improviser
-3. Le nouveau plan remplace l'ancien dans `_alire/tracking/`
+3. Le nouveau plan remplace l'ancien dans `docs/tracking/`
 
 Cas typiques de replanification :
 - Repo prive sans acces -> demander credentials ou URL alternative
-- Lib source sans equivalent Go -> proposer implementation from scratch vs lib tierce
+- Lib source sans equivalent Rust (crates.io) -> proposer implementation from scratch vs crate tiers
 - Conflit d'architecture -> redefinir le scope avec l'utilisateur
 
 ---
@@ -63,10 +63,10 @@ Cas typiques de replanification :
 ## Tracabilite (OBLIGATOIRE)
 
 ### Plan persistant
-Creer `_alire/tracking/PLAN_ANALYZE_{REPO}_{YYYY-MM-DD}.md` (template: `_alire/tracking/PLAN_TEMPLATE.md`).
+Creer `docs/tracking/PLAN_ANALYZE_{REPO}_{YYYY-MM-DD}.md` (template: `docs/tracking/PLAN_TEMPLATE.md`).
 
 ### Decision log
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` les decisions non-triviales.
+Logger dans `docs/tracking/decision_log.jsonl` les decisions non-triviales.
 Format: `{"timestamp","session","action","reasoning","alternatives_rejected":[],"outcome","confidence","plan_ref"}`
 
 ### Action journal
@@ -100,7 +100,7 @@ AVANT de passer a la phase suivante.
 
 ## Phase 1 : INVENTAIRE (COLLECTOR)
 
-**Creer `_alire/tracking/TRACKER_ANALYZE_{REPO}_{YYYY-MM-DD}.json`** (schema `lia-file-tracker-v1`, voir `audit-pdca/references/file-tracker-spec.md`). Peupler `files[]` avec les fichiers du repo analyses, tous en `status=PENDING`, `action=AUDIT`.
+**Creer `docs/tracking/TRACKER_ANALYZE_{REPO}_{YYYY-MM-DD}.json`** (schema `lia-file-tracker-v1`, voir `audit-pdca/references/file-tracker-spec.md`). Peupler `files[]` avec les fichiers du repo analyses, tous en `status=PENDING`, `action=AUDIT`.
 
 ### Ce que tu fais
 1. Lire le README / documentation du repo
@@ -160,11 +160,11 @@ FONCTIONNALITE 2 : [nom]
 
 ---
 
-## Phase 3 : DELTA LIA-SEC (ANALYST)
+## Phase 3 : DELTA inspect_ia_agents (ANALYST)
 
 ### Ce que tu fais (uniquement sur les fonctionnalites validees en Phase 2)
-1. Chercher dans LIA-SEC si on a deja quelque chose de similaire
-   - Glob + Grep dans `cmd/sigma_web/`, `pkg/`, `sigma-react-frontend/src/`
+1. Chercher dans inspect_ia_agents si on a deja quelque chose de similaire
+   - Glob + Grep dans `src/`, `cmd/`, `discoveryprobe/`, `recette/`, `inspect_ia_agents-console/src/`
 2. Pour chaque fonctionnalite voulue, classifier :
    - **EXISTE** : on a deja ca (fichier:ligne)
    - **SIMILAIRE** : on a un truc proche qu'on peut etendre
@@ -173,10 +173,10 @@ FONCTIONNALITE 2 : [nom]
 
 ### Ce que tu livres
 ```
-=== DELTA LIA-SEC ===
+=== DELTA inspect_ia_agents ===
 
 FONCTIONNALITE 1 : [nom]
-  Statut LIA-SEC : EXISTE | SIMILAIRE | ABSENT
+  Statut inspect_ia_agents : EXISTE | SIMILAIRE | ABSENT
   Fichier existant : [path:ligne] (si existe/similaire)
   Ce qui manque    : [description precise]
   Conflit potentiel: [convention, archi, nommage]
@@ -203,20 +203,20 @@ RESUME :
 ### Ce que tu fais (uniquement sur le scope valide en Phase 3)
 Pour chaque fonctionnalite a transposer :
 1. **Mapping langage** : equivalences syntaxiques et idiomatiques
-   - Python dict -> Go map/struct
-   - JS async/await -> Go goroutines/channels
-   - Python list comprehension -> Go for range
+   - Python dict -> Rust struct/HashMap
+   - JS async/await -> Rust async/.await (tokio)
+   - Python list comprehension -> Rust iterator chains (`.iter().map().collect()`)
 2. **Mapping libs** : equivalences de dependances
-   - requests (Python) -> net/http (Go)
-   - express (JS) -> net/http handlers (Go)
-   - pandas (Python) -> database/sql (Go)
+   - requests (Python) -> reqwest (Rust)
+   - express (JS) -> axum handlers (Rust)
+   - pandas (Python) -> sqlx / SQL (Rust)
    - React hooks (JS) -> React hooks (TS, memes patterns)
-3. **Adaptation LIA-SEC** : ce qu'on change par rapport au source
-   - Logger : `logger.LogSystemEvent()` pas `print()`
-   - Config : `ConfigurationService` pas de hardcode
-   - API : `fetchWithConfig()` pas `fetch()`
-   - SQL : requetes parametrees
-   - Error handling : Go style (`if err != nil`)
+3. **Adaptation inspect_ia_agents** : ce qu'on change par rapport au source
+   - Logger : `tracing` structure (spans + fields) pas `print()` (R6)
+   - Config : env + fichier de config versionne pas de hardcode (R5)
+   - API : enveloppe de reponse `{success,data}` cote console pas `fetch()` brut
+   - Persistance : event store derriere le trait `EventStore` (SQLite phase 1 -> PostgreSQL phase 2), requetes parametrees
+   - Error handling : Rust `Result<T,E>` + operateur `?`, `thiserror`/`anyhow` en frontiere (R7)
 4. **Ordre d'implementation** : par quoi commencer
 
 ### Ce que tu livres
@@ -225,11 +225,11 @@ Pour chaque fonctionnalite a transposer :
 
 FONCTIONNALITE 1 : [nom]
   Source       : [langage/fichier]
-  Cible LIA-SEC: [fichier Go/TS a creer ou modifier]
+  Cible inspect_ia_agents: [fichier Rust .rs / TS .tsx a creer ou modifier]
   Transpositions :
-    - [pattern source] -> [pattern Go/TS]
-    - [lib source] -> [lib Go/TS]
-  Adaptations LIA-SEC :
+    - [pattern source] -> [pattern Rust/TS]
+    - [lib source] -> [lib Rust (crate) / TS]
+  Adaptations inspect_ia_agents :
     - [ce qui change par rapport au source]
   Estimation : [petit/moyen/gros]
 
@@ -252,17 +252,17 @@ ORDRE D'IMPLEMENTATION :
 Seulement apres validation explicite des 4 phases precedentes.
 
 1. Implementer UNE fonctionnalite a la fois
-2. Gate apres chaque fonctionnalite : `go build` / `npm run build`
+2. Gate apres chaque fonctionnalite : `cargo build` / `npm run build`
 3. Montrer le diff a l'utilisateur
 4. Passer a la suivante seulement apres validation
 
 ### VERIFICATION GATE TRANSPOSITION (BLOQUANT)
 
-Apres chaque transposition de code vers Go/React LIA-SEC, AVANT de declarer "termine" :
+Apres chaque transposition de code vers Rust/React inspect_ia_agents, AVANT de declarer "termine" :
 
-1. **BUILD GATE** : `bash cmd/sigma_web/build_secure_lia.sh` (Go) + `cd sigma-react-frontend && node node_modules/.bin/vite build` (React)
-2. **TEST GATE** : `cd sigma-react-frontend && npx vitest run` (tests existants ne cassent pas)
-3. **IMPORT GATE** : Verifier imports manquants (alpha, useTheme, fetchWithConfig, customLogger)
+1. **BUILD GATE** : `cargo build` + `cargo clippy --all-targets -- -D warnings` (Rust) + `cd inspect_ia_agents-console && node node_modules/.bin/vite build` (React console)
+2. **TEST GATE** : `cargo test` (Rust) + `python3 -m unittest discover -s tests` (recette Python) + `cd inspect_ia_agents-console && npx vitest run` (tests existants ne cassent pas)
+3. **IMPORT GATE** : Verifier imports/usages manquants (modules Rust `use`, hooks React, enveloppe de reponse)
 4. **REGRESSION GATE** : Le code transpose ne doit pas introduire de nouveaux bugs
 5. **SMOKE TEST** : Verifier que les endpoints/pages fonctionnent
 
@@ -277,17 +277,17 @@ Incident de reference : 188 fichiers casses par imports manquants (2026-03-17).
 |----------|---------|
 | Lire le README et commencer a coder | Lire le README et presenter l'inventaire |
 | "Je vais adapter tout le repo" | "Quelles parties t'interessent ?" |
-| Copier-coller du code source | Transposer avec les conventions LIA-SEC |
+| Copier-coller du code source | Transposer avec les conventions inspect_ia_agents |
 | Creer de nouveaux fichiers sans demander | Presenter le plan de fichiers AVANT |
 | "Ca devrait marcher comme ca" | Montrer le build qui passe |
-| Reinventer ce qui existe deja | Chercher dans LIA-SEC d'abord (Phase 3) |
+| Reinventer ce qui existe deja | Chercher dans inspect_ia_agents d'abord (Phase 3) |
 | Sauter les phases | CHAQUE phase a une gate utilisateur |
 
 ## Declencheurs
 
 - "Analyse ce repo [url/path]"
 - "Regarde ce code, on peut reprendre quelque chose ?"
-- "Transpose ca en Go"
-- "Adapte ce code pour LIA-SEC"
-- "Porte cette lib en Go/React"
+- "Transpose ca en Rust"
+- "Adapte ce code pour inspect_ia_agents"
+- "Porte cette lib en Rust/React"
 - "Y a un truc similaire dans [repo], regarde"

@@ -11,10 +11,10 @@ pondere, detecte les regressions vs cycle precedent, et applique les quality gat
 ## TRACABILITE AGENTIQUE (OBLIGATOIRE)
 
 ### Plan persistant
-Creer `_alire/tracking/PLAN_SCORECARD_{CYCLE}_{YYYY-MM-DD}.md` (template: `_alire/tracking/PLAN_TEMPLATE.md`).
+Creer `docs/tracking/PLAN_SCORECARD_{CYCLE}_{YYYY-MM-DD}.md` (template: `docs/tracking/PLAN_TEMPLATE.md`).
 
 ### Decision log
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` les decisions non-triviales.
+Logger dans `docs/tracking/decision_log.jsonl` les decisions non-triviales.
 Format: `{"timestamp","session","action","reasoning","alternatives_rejected":[],"outcome","confidence","plan_ref"}`
 
 ### Replanification
@@ -71,14 +71,16 @@ SI --security fourni :
   penalite_secu = MIN(penalite_secu, 0.30)  # Cap a 30%
 
 SI --tests fourni :
-  EXTRAIRE go_compiles = "go build" resultat (0 ou 1)
-  EXTRAIRE react_compiles = "npm run build" resultat (0 ou 1)
-  EXTRAIRE coverage_go = pourcentage (0-100)
+  EXTRAIRE rust_compiles = "cargo build" resultat (0 ou 1)   # backend = Rust (inspect_ia_agents)
+  EXTRAIRE react_compiles = "vite build" resultat (0 ou 1)
+  EXTRAIRE py_ok          = "python3 -m unittest" resultat (0 ou 1)  # recette harness
+  EXTRAIRE coverage_rust = pourcentage (0-100)
   EXTRAIRE coverage_react = pourcentage (0-100)
   penalite_tests = 0
-  SI go_compiles == 0 : penalite_tests += 0.20
+  SI rust_compiles == 0 : penalite_tests += 0.20
   SI react_compiles == 0 : penalite_tests += 0.20
-  SI coverage_go < 30 : penalite_tests += 0.05
+  SI py_ok == 0 : penalite_tests += 0.20
+  SI coverage_rust < 30 : penalite_tests += 0.05
   SI coverage_react < 30 : penalite_tests += 0.05
 ```
 
@@ -212,26 +214,26 @@ pie title Score par domaine (Cycle {N})
 ```bash
 # Scorecard cycle 1 (pas de precedent)
 /scorecard-builder \
-  --brainstorm=_alire/pdca/grc/cycle_001/D_BRAINSTORM/ \
-  --security=_alire/pdca/grc/cycle_001/C_SECURITY.md \
-  --tests=_alire/pdca/grc/cycle_001/C_TESTS.md \
-  --config=_alire/pdca/grc/SCORING_CONFIG.json \
-  --output=_alire/pdca/grc/cycle_001/C_SCORECARD.json
+  --brainstorm=docs/tracking/pdca/grc/cycle_001/D_BRAINSTORM/ \
+  --security=docs/tracking/pdca/grc/cycle_001/C_SECURITY.md \
+  --tests=docs/tracking/pdca/grc/cycle_001/C_TESTS.md \
+  --config=docs/tracking/pdca/grc/SCORING_CONFIG.json \
+  --output=docs/tracking/pdca/grc/cycle_001/C_SCORECARD.json
 
 # Scorecard cycle 2 (avec detection regressions + quality gates)
 /scorecard-builder \
-  --brainstorm=_alire/pdca/grc/cycle_002/D_BRAINSTORM/ \
-  --security=_alire/pdca/grc/cycle_002/C_SECURITY.md \
-  --tests=_alire/pdca/grc/cycle_002/C_TESTS.md \
-  --config=_alire/pdca/grc/SCORING_CONFIG.json \
-  --prev=_alire/pdca/grc/cycle_001/C_SCORECARD.json \
-  --output=_alire/pdca/grc/cycle_002/C_SCORECARD.json \
+  --brainstorm=docs/tracking/pdca/grc/cycle_002/D_BRAINSTORM/ \
+  --security=docs/tracking/pdca/grc/cycle_002/C_SECURITY.md \
+  --tests=docs/tracking/pdca/grc/cycle_002/C_TESTS.md \
+  --config=docs/tracking/pdca/grc/SCORING_CONFIG.json \
+  --prev=docs/tracking/pdca/grc/cycle_001/C_SCORECARD.json \
+  --output=docs/tracking/pdca/grc/cycle_002/C_SCORECARD.json \
   --gate
 
 # Score rapide (brainstorm seul, pas de secu/tests)
 /scorecard-builder \
-  --brainstorm=_alire/temp/brainstorm/engine/ \
-  --config=_alire/pdca/engine/SCORING_CONFIG.json
+  --brainstorm=docs/tracking/temp/brainstorm/engine/ \
+  --config=docs/tracking/pdca/engine/SCORING_CONFIG.json
 ```
 
 ---

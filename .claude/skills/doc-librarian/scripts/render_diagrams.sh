@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-DIAGRAMS_DIR="${DIAGRAMS_DIR:-_alire/01_DOCUMENTATION/diagrams}"
-SVG_OUT="${SVG_OUT:-_alire/01_DOCUMENTATION/diagrams/svg}"
+DIAGRAMS_DIR="${DIAGRAMS_DIR:-docs/diagrams}"
+SVG_OUT="${SVG_OUT:-docs/diagrams/svg}"
 FORCE="${1:-}"
 
 # Category B diagrams (runtime rendering, skip mmdc pre-render)

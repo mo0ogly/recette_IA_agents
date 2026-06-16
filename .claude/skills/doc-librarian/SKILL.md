@@ -32,7 +32,7 @@ Options:
 ## Source Layout
 
 ```
-_alire/01_DOCUMENTATION/          <- SEUL repertoire doc (R15)
+docs/          <- SEUL repertoire doc (R15)
 ├── api/                           TYPE=API  (*_api_en.md)
 ├── architecture/                  TYPE=ARCH (*_arch_en.md)
 ├── technical/                     TYPE=TECH (*_tech_en.md)
@@ -47,7 +47,7 @@ _alire/01_DOCUMENTATION/          <- SEUL repertoire doc (R15)
 
 docs-site/                        Docusaurus 3 project (built artifact)
 ├── docusaurus.config.js
-├── docs/ -> symlink to _alire/01_DOCUMENTATION/
+├── docs/ -> symlink to docs/
 └── build/                        Generated static site
 ```
 
@@ -63,8 +63,8 @@ Identifier au demarrage selon la commande :
 
 ## Plan d'execution
 
-Creer `_alire/tracking/PLAN_DOC_LIBRARIAN_{YYYY-MM-DD}.md` avant toute action.
-Template : `_alire/tracking/PLAN_TEMPLATE.md`.
+Creer `docs/tracking/PLAN_DOC_LIBRARIAN_{YYYY-MM-DD}.md` avant toute action.
+Template : `docs/tracking/PLAN_TEMPLATE.md`.
 Cocher chaque etape a la completion `[x]`.
 Si replanification : Status -> REPLANIFIE, creer PLAN_*_REPLAN_*.md avec lien.
 
@@ -96,21 +96,21 @@ cd /opt/lia-sec/dev
 python3 scripts/enrich_metadata.py --dry-run
 
 # 2. Compter les GAP dans SOMMAIRE
-grep -c "GAP - A CREER" _alire/01_DOCUMENTATION/SOMMAIRE.md
+grep -c "GAP - A CREER" docs/SOMMAIRE.md
 
 # 3. VRAI chemin de rendu = fences ```mermaid dans les .md (rendus client-side par
 #    mermaidClient.js, theme dark global). Compter les .md porteurs de fences.
 #    NOTE: une fence sans %%{init} rend dark via la config globale -- ce n'est PAS un defaut.
 #    Le pattern .mmd source (`grep -rL '%%{init' diagrams/*.mmd`) ne reflete PAS l'affichage.
-echo "MD avec fence mermaid: $(grep -rln '```mermaid' _alire/01_DOCUMENTATION/ --include='*.md' 2>/dev/null | grep -v archive | wc -l)"
+echo "MD avec fence mermaid: $(grep -rln '```mermaid' docs/ --include='*.md' 2>/dev/null | grep -v archive | wc -l)"
 # Sanity : la config dark globale doit exister (sinon les fences nues rendraient en blanc)
 grep -q "theme: 'dark'" docs-site/src/clientModules/mermaidClient.js && echo "global dark: OK" || echo "global dark: ABSENT (defaut blanc -- corriger mermaidClient.js)"
 
 # 4. Rapport
 echo "=== Doc Audit Report ==="
-echo "Docs: $(find _alire/01_DOCUMENTATION -name '*.md' | grep -v archive | wc -l)"
-echo "Meta: $(find _alire/01_DOCUMENTATION -name '*.doc-meta.json' | wc -l)"
-echo "MMD source: $(find _alire/01_DOCUMENTATION/diagrams -name '*.mmd' | wc -l) (refs, pas le rendu)"
+echo "Docs: $(find docs/tracking/01_DOCUMENTATION -name '*.md' | grep -v archive | wc -l)"
+echo "Meta: $(find docs/tracking/01_DOCUMENTATION -name '*.doc-meta.json' | wc -l)"
+echo "MMD source: $(find docs/diagrams -name '*.mmd' | wc -l) (refs, pas le rendu)"
 ```
 
 ## Workflow Enrich
@@ -187,20 +187,20 @@ Problemes courants et fix :
 Detecter les .mmd broken :
 ```bash
 # Sans %%{init}%%
-grep -rL '%%{init' _alire/01_DOCUMENTATION/diagrams/*.mmd
+grep -rL '%%{init' docs/diagrams/*.mmd
 
 # Avec fence markdown
-grep -rl "^\`\`\`mermaid" _alire/01_DOCUMENTATION/diagrams/
+grep -rl "^\`\`\`mermaid" docs/diagrams/
 ```
 
 ## Tracabilite agentique
 
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` pour toute decision non-triviale :
+Logger dans `docs/tracking/decision_log.jsonl` pour toute decision non-triviale :
 ```bash
-echo '{"timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","session":"doc-librarian","action":"ACTION","reasoning":"...","alternatives_rejected":[],"outcome":"...","confidence":"high","plan_ref":"PLAN_doc-librarian_*.md"}' >> _alire/02_LOGS/Journals/decision_log.jsonl
+echo '{"timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","session":"doc-librarian","action":"ACTION","reasoning":"...","alternatives_rejected":[],"outcome":"...","confidence":"high","plan_ref":"PLAN_doc-librarian_*.md"}' >> docs/tracking/decision_log.jsonl
 ```
 
-RETEX en fin de session si score agentique < 40/50 -> `_alire/02_LOGS/Journals/retex/RETEX_doc-librarian_{YYYY-MM-DD}.md`.
+RETEX en fin de session si score agentique < 40/50 -> `docs/tracking/retex/RETEX_doc-librarian_{YYYY-MM-DD}.md`.
 
 ## VERIFICATION GATE (BLOQUANT)
 

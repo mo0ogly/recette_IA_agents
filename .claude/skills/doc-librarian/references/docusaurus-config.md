@@ -9,8 +9,8 @@ docs-site/
 ├── package.json
 ├── static/
 │   ├── img/logo.svg
-│   └── diagrams/          <- Symlink or copy of _alire/01_DOCUMENTATION/diagrams/svg/
-└── docs/                  <- Symlink to _alire/01_DOCUMENTATION/ OR copy at build time
+│   └── diagrams/          <- Symlink or copy of docs/diagrams/svg/
+└── docs/                  <- Symlink to docs/ OR copy at build time
 ```
 
 ## docusaurus.config.js
@@ -214,7 +214,7 @@ npm install @docusaurus/theme-mermaid@3.7.0
 
 # Replace generated config files with LIA-SEC versions (above)
 # Then link docs directory
-ln -s ../_alire/01_DOCUMENTATION docs/
+ln -s ../docs/tracking/01_DOCUMENTATION docs/
 
 # Test locally (port 3001 -- free port)
 npm run start -- --port 3001
@@ -244,7 +244,7 @@ docs: {
 ```js
 // In docusaurus.config.js docs preset:
 docs: {
-  homePageId: 'SOMMAIRE',   // _alire/01_DOCUMENTATION/SOMMAIRE.md becomes landing page
+  homePageId: 'SOMMAIRE',   // docs/SOMMAIRE.md becomes landing page
   // ...
 }
 ```
