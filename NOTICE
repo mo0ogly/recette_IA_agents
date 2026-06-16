@@ -1,0 +1,21 @@
+inspect_ia_agents (AgentRail) -- runtime governance + recette bench for AI agents.
+
+This product re-homes (adapts, does not vendor wholesale) proven mechanisms from
+the following open-source projects into its own architecture. Attribution is
+preserved per their licenses.
+
+-------------------------------------------------------------------------------
+cyberark/agentwatch -- Apache License 2.0
+  https://github.com/cyberark/agentwatch
+  Adapted: the in-process interception MECHANISM for observing an agent's LLM and
+  tool calls. Re-homed in recette/capture/ as an LlmBackend wrapper
+  (CapturingLlm), feeding this project's existing surface-recording and
+  proxy-trace seams. No agentwatch source is vendored; the mechanism is
+  reimplemented against this codebase's interfaces.
+-------------------------------------------------------------------------------
+tensorstax/agenttrace -- MIT License
+  https://github.com/tensorstax/agenttrace
+  Adapted: the enriched per-call trace FIELD SET (LLM/tool call + tokens +
+  latency + error + session). Re-homed in recette/capture/llm_trace.py and the
+  existing ProxyTrace recorder. No agenttrace source is vendored.
+-------------------------------------------------------------------------------
