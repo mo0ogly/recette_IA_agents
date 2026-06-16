@@ -7,6 +7,32 @@ eBPF wire surface (discoveryprobe); both reconcile into one detection scorecard.
 Design: `docs/plans/2026-06-16-agent-capture-multisurface-design.md`.
 Plan: `docs/plans/2026-06-16-agent-capture-g1.md`. Attribution: `NOTICE`.
 
+## Two surfaces, reconciled (not a menu)
+
+The hook (Python, in-process) and the eBPF wire (Rust, kernel) run TOGETHER and
+reconcile into one scorecard -- defense in depth. eBPF is kernel ground truth
+(sees an agent even when in-process instrumentation is disabled); the hook adds
+rich application intent (the "why"). The VALUE is the divergence: an agent caught
+on eBPF but blind on hook is a ghost.
+
+```mermaid
+flowchart TB
+    AG["agent run"]
+    AG -->|in-process, cooperates| HOOK["CapturingLlm (Python)<br/>LlmCallTrace: intent + tokens + latency"]
+    AG -->|kernel, no cooperation| EBPF["discoveryprobe (Rust eBPF)<br/>wire flows"]
+    HOOK -->|hook_sdk intents| REC["SurfaceRecording<br/>(shared bridge)"]
+    EBPF -->|ebpf_wire keys| REC
+    HOOK -->|tokens/latency| TRACE["CaptureStore -> /capture/llm-traces"]
+    REC --> SC["DetectionScorecard<br/>per-surface, reconciled"]
+    SC -->|seen on hook AND wire| OK["coherent"]
+    SC -->|wire-only = blind on hook| GHOST["GHOST flagged"]
+    SC --> UX["console Probe view"]
+    TRACE --> UX
+```
+
+A menu (hook OR wire) would destroy the cross-check. The only "menu" is a UX
+view-filter over surface columns, never a capture mode.
+
 ## What it is
 
 `recette/capture/`:
