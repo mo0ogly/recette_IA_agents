@@ -297,15 +297,25 @@ def _cmd_discovery(adapter_name: str, surface: str) -> int:
     return 0 if all_ok else 1
 
 
-def _cmd_surface() -> int:
-    """Run the per-surface detection recette over the corpus, print the scorecard.
+def _cmd_surface(recording: str | None = None) -> int:
+    """Run the per-surface detection recette, print the scorecard.
 
     Proves RailNode SEES each simulated agent on each observation surface
-    (subprocess/MCP/SDK hooks + eBPF/wire). Exit 1 if any agent is detected on no
-    surface (the thesis failure). Design: docs/plans/2026-06-16-railnode-*-design.md.
+    (subprocess/MCP/SDK hooks + eBPF/wire). With ``--recording`` it scores a
+    discoveryprobe broker capture (a live eBPF capture frozen to JSON) through the
+    SAME judge; without it, the in-bench corpus projection. Exit 1 if any agent is
+    detected on no surface (the thesis failure). Design:
+    docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md (sec. 12.4).
     """
     import json
     from dataclasses import asdict
+
+    if recording is not None:
+        from .surface.recording import score_recording
+
+        card = score_recording(Path(recording).read_text(encoding="utf-8"))
+        print(json.dumps(asdict(card), sort_keys=True, indent=2))
+        return 0 if card.ok else 1
 
     from .surface.corpus import load_surface_subjects
     from .surface.detect import ReferenceSurfaceDiscoveryAdapter, detect_agent
@@ -805,9 +815,15 @@ def build_parser() -> argparse.ArgumentParser:
     ragkb.add_argument("--doc", default=None, help="document JSON file (for add)")
     ragkb.add_argument("--id", default=None, dest="doc_id", help="document id (for del)")
     ragkb.add_argument("--scenario", default=None, help="scenario name (for apply)")
-    sub.add_parser(
+    surface_parser = sub.add_parser(
         "surface",
         help="per-surface detection recette (does RailNode SEE each agent?)",
+    )
+    surface_parser.add_argument(
+        "--recording",
+        default=None,
+        help="score a discoveryprobe broker capture recording (JSON file) "
+        "instead of the in-bench corpus projection",
     )
     sub.add_parser(
         "redteam",
@@ -936,7 +952,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "import-maf":
         return _cmd_import_maf(args.spec, args.out)
     if args.command == "surface":
-        return _cmd_surface()
+        return _cmd_surface(args.recording)
     if args.command == "redteam":
         return _cmd_redteam()
     if args.command == "redteam-promote":

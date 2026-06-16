@@ -221,18 +221,44 @@ nouveaute n'est pas le substrat (eprouve) mais son application a la **discovery 
 IA** et son usage comme **sonde de reference d'un banc de recette**.
 Sources : https://falco.org , https://tetragon.io , https://aya-rs.dev , ebpf.io .
 
-## 12. Prochaines etapes (a transformer en plan d'implementation)
+## 12. Etapes (suivi)
 
-1. Pin `aya` (version a l'API verifiee) + un PoC eBPF minimal `execve` -> map -> userspace.
-2. Crate `discoveryprobe` : programmes (execve/connect/sendto/write) + relai -> observations
-   par surface (format = celui que `project_surfaces` consomme).
-3. `discoveryprobe-broker` : socket local, commande etroite, capture bornee, audit (I1).
-4. `recette/surface/` : adaptateur qui consomme un recording de capture (le juge ne
-   change pas, il devient agnostique a la SOURCE des observations).
-5. API `POST /probe/capture` (relai) + R16 fixture + endpoint de comparaison conformite.
-6. Console : vue Probe (lancement + detail + comparaison).
-7. Recette de la recette : un recording fige promu en sujet `corpus/surface/` (regression
-   deterministe), + test d'accord sonde-ref vs HttpSurfaceDiscoveryAdapter sur le meme recording.
+1. [FAIT] PoC eBPF minimal `execve` -> objet BPF valide (commit 517df27).
+2. [FAIT] Capture reelle `sched_process_exec` -> ring buffer (pid+comm) + loader
+   userspace (`discoveryprobe-common`/`-ebpf`/loader, commits 753f5ea, b1cd140).
+   Le format du recording = celui que `recette/surface/` consomme.
+3. [FAIT] `discoveryprobe-broker` : socket local 0600, commande etroite
+   `capture{agents,duration_ms}` deny-by-default, capture bornee, audit append-only
+   I1 + sha256 du recording (commit 228a414).
+4. [FAIT] `recette/surface/recording.py` : ingere le recording broker (JSON) et le
+   passe au MEME juge (`detect` + `score_detections`). Le juge devient agnostique a
+   la SOURCE -- capture live eBPF ou projection in-bench produisent la meme
+   `DetectionScorecard` (I4). Entree CLI : `python -m recette surface --recording
+   <fichier>`. Un nom de surface inconnu = bridge mismatch (leve), un agent capture
+   nulle part = `false_negative` (echec these). Test : `tests/test_surface_recording.py`.
+5. [A FAIRE] API `POST /probe/capture` (relai vers le broker) + R16 fixture + endpoint
+   de comparaison conformite.
+6. [A FAIRE] Console : vue Probe (lancement + detail + comparaison).
+7. [A FAIRE] Recette de la recette : un recording fige promu en sujet `corpus/surface/`
+   (regression deterministe), + test d'accord sonde-ref vs HttpSurfaceDiscoveryAdapter
+   sur le meme recording.
+8. [A FAIRE] PREUVE LIVE sous CAP_BPF via `recette.sh` (R19) : le vrai "voit l'agent
+   Docker". Tant que non faite -> "compile verifie, capture live NON prouvee".
+
+### Bridge capture -> juge (source-agnostique, I4)
+
+```mermaid
+flowchart LR
+    EBPF["eBPF sched_process_exec<br/>(discoveryprobe-ebpf)"] --> LOAD["loader aya<br/>(discoveryprobe, CAP_BPF)"]
+    LOAD --> BR["broker<br/>recordings + sha256 (audit I1)"]
+    BR -->|JSON recording| REC["recette/surface/recording.py<br/>score_recording"]
+    PROJ["projection in-bench<br/>(corpus/surface, detect_agent)"] --> JUDGE
+    REC --> JUDGE["MEME juge<br/>detect + score_detections"]
+    JUDGE --> CARD["DetectionScorecard<br/>ok / false_negatives / per_surface"]
+```
+
+Les deux sources (capture live eBPF, projection in-bench) convergent vers UN juge
+pur : un agent vu nulle part est un `false_negative` quelle que soit la source.
 
 ## Lien
 
