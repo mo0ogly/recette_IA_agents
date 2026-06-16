@@ -20,12 +20,12 @@ After FINALIZE (target met) OR after a PARTIAL close, ONLY if `--evolve`
 is passed. One pass per invocation. Inputs:
 
 - the cycle scorecards (all cycles in the arc)
-- `_alire/02_LOGS/Journals/decision_log.jsonl`
+- `docs/tracking/decision_log.jsonl`
 - the displayed RETEX(s)
 - current `scoring-config.md`
 
 Output: a staged proposal at
-`pdca/{scope}/SELF_EVOLVE_PROPOSAL_{date}.md` containing a unified diff +
+`docs/tracking/pdca/{scope}/SELF_EVOLVE_PROPOSAL_{date}.md` containing a unified diff +
 per-entry rationale. NEVER auto-merged except SAFE-AUTO (below).
 
 ## Change classification (BLOCKING gate)
@@ -52,7 +52,7 @@ Each proposed diff entry is classified before anything is written:
 3. **Target is immutable.** SELF-EVOLVE may never read or write
    `--target` / `target`. Only the user changes it.
 4. **Provenance ledger.** Append every proposed/applied/rejected entry
-   to `_alire/02_LOGS/Journals/SELF_EVOLUTION_LEDGER.jsonl` (append-only)
+   to `docs/tracking/SELF_EVOLUTION_LEDGER.jsonl` (append-only)
    AND `decision_log.jsonl`. Schema:
    `{ts, scope, class, change, evidence_ref, recomputed_delta, disposition}`.
 5. **Reversibility.** Applied SAFE-AUTO = exactly one commit, message

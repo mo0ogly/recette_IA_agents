@@ -86,7 +86,7 @@ Session:      pdca-grc-001-20260402
 Phase:        D
 Step:         D.2
 Objective:    Audit GRC module security domain against CISO Assistant benchmark
-Input:        pdca/grc/cycle_001/D_INVENTORY.json + D_BENCHMARK.json
+Input:        docs/tracking/pdca/grc/cycle_001/D_INVENTORY.json + D_BENCHMARK.json
 Constraints:  R4 (no mock), R6 (logger), NO STUB, USAGE TRIAGE (grep symbols before reporting bugs)
 Autonomy:     AUTONOMOUS
 Expected out: D_BRAINSTORM/security.md with score /100, gaps list, acquis list
@@ -103,7 +103,7 @@ Session:      pdca-grc-001-20260402
 Phase:        A
 Step:         A.2
 Objective:    Fix SEC-01 violations (hardcoded backend URL) in GRC services
-Input:        pdca/grc/cycle_001/A_REMEDIATION/phase_1_critical.md
+Input:        docs/tracking/pdca/grc/cycle_001/A_REMEDIATION/phase_1_critical.md
 Constraints:  R5 (no hardcoded URL), R6, verify imports after each file
 Autonomy:     SUPERVISED (>5 files affected)
 Expected out: All hardcoded URLs replaced with config base URL, build passes
@@ -207,7 +207,7 @@ When loading cycle N-1 artifacts:
 Per-cycle structured logging:
 
 ```
-pdca/{perimetre}/cycle_{N}/action_journal.jsonl
+docs/tracking/pdca/{perimetre}/cycle_{N}/action_journal.jsonl
 ```
 
 One JSON line per significant action:
@@ -238,12 +238,12 @@ One JSON line per significant action:
 At cycle end (A.4), generate:
 
 ```
-pdca/{perimetre}/cycle_{N}/manifeste.jsonl
+docs/tracking/pdca/{perimetre}/cycle_{N}/manifeste.jsonl
 ```
 
 ```json
 {"timestamp":"ISO8601","file":"crates/gateway/src/grc/campaign.rs","action":"MODIFIED","phase":"A.2","loc":12,"status":"FINAL","gate":"build_pass","domain":"security"}
-{"timestamp":"ISO8601","file":"pdca/grc/cycle_001/C_SCORECARD.json","action":"CREATED","phase":"C.3","loc":85,"status":"FINAL","gate":"N/A","domain":"scoring"}
+{"timestamp":"ISO8601","file":"docs/tracking/pdca/grc/cycle_001/C_SCORECARD.json","action":"CREATED","phase":"C.3","loc":85,"status":"FINAL","gate":"N/A","domain":"scoring"}
 ```
 
 Enables: post-cycle audit, regression correlation, selective rollback.

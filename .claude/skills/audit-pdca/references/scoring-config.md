@@ -6,7 +6,7 @@
 
 ## Structure
 
-Le SCORING_CONFIG.json est place a la racine du repertoire `pdca/{perimetre}/`.
+Le SCORING_CONFIG.json est place a la racine du repertoire `docs/tracking/pdca/{perimetre}/`.
 Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a chaque A.4.
 
 ## JSON par defaut
@@ -63,7 +63,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
         {"id": "HYG-05", "name": "MUI v7 Grid syntax", "type": "grep_count", "pattern": "<Grid item |<Grid.*item ", "scope": "inspect_ia_agents-console/src/", "target": 0, "description": "Ancienne syntaxe MUI v5/v6 interdite"},
         {"id": "HYG-06", "name": "No hardcoded fontFamily", "type": "grep_count", "pattern": "fontFamily:.*['\"]monospace['\"]|fontFamily:.*['\"]Arial|fontFamily:.*['\"]Fira Code", "scope": "inspect_ia_agents-console/src/components/", "target": 0, "description": "Utiliser fontFamily: 'inherit' ou theme.typography.fontFamily"},
         {"id": "HYG-07", "name": "Chip borderRadius: 1", "type": "manual", "description": "Tous les composants Chip MUI ont borderRadius: 1 (pas oval par defaut). Verifier via grep -rn 'Chip' dans le perimetre"},
-        {"id": "HYG-08", "name": "No mock/placeholder data", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,inspect_ia_agents-console/src/", "target": 0}
+        {"id": "HYG-08", "name": "No mock/placeholder data (in production paths)", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,inspect_ia_agents-console/src/", "exclude_pattern": "StubLlm|ReplayLlm|LabForge|mock_server|mock_local|/tests/|__fixtures__|recette/lab/", "target": 0, "description": "Forbids NEW mock/fake data in production paths. EXEMPTS the repo's DECLARED legitimate mock infrastructure -- the recette is mock-first by design (lab simulated on :8082 by default, StubLlm/ReplayLlm for deterministic replay I4). These are not violations, they are the corpus harness. See declared-mock exemption below."}
       ]
     },
     "completeness": {
@@ -77,7 +77,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
     "documentation": {
       "weight": 10,
       "checks": [
-        {"id": "DOC-01", "name": "Module docs exist", "type": "file_exists", "path": "_alire/01_DOCUMENTATION/"},
+        {"id": "DOC-01", "name": "Module docs exist", "type": "file_exists", "path": "docs/"},
         {"id": "DOC-02", "name": "API documented", "type": "manual"},
         {"id": "DOC-03", "name": "CLAUDE.md current", "type": "file_exists", "path": "CLAUDE.md"},
         {"id": "DOC-04", "name": "UI Help content exists", "type": "grep_count", "pattern": "HelpButton|useHelp", "scope": "inspect_ia_agents-console/src/components/{perimetre}*/", "target": ">0", "description": "Les ecrans du perimetre doivent avoir des HelpButton integres et du contenu dans ui_help_content"}
@@ -142,6 +142,45 @@ Excluding > defaulting.
 
 A domain may only be re-included once a real data source exists (e.g.
 `--benchmark <repo>` is passed and BNC checks produce real gap counts).
+
+## Penalty model -- reproducible, never "+X au feeling" (BLOCKING)
+
+A score must be reproducible across cycles (I4 mindset applied to scoring): same tree + same
+config => same number. An ad-hoc penalty invented mid-cycle ("+15 SEC because the fix felt
+worth it") is NOT reproducible -- the next cycle cannot replay it. So every deductive check
+carries three explicit fields:
+
+- `scale`: formula from match-count to points, e.g. `"1 match = -3 pts"` or `"(inputs - sanitized)/inputs * 20"`.
+- `max_penalty`: cap, so one noisy check cannot zero a domain.
+- `evidence_grep` / `cmd`: the exact command whose output count drives `scale` (with the transverse exclusions appended).
+
+Canonical form (add these fields to every deductive check in SCORING_CONFIG.json):
+
+```json
+{
+  "id": "SEC-05", "name": "No SQL injection (dynamic query)",
+  "type": "grep_count", "pattern": "format!.*(SELECT|INSERT|UPDATE|DELETE)",
+  "scope": "src/", "target": 0,
+  "scale": "1 match = -7 pts", "max_penalty": 20,
+  "evidence_grep": "grep -rnE 'format!.*(SELECT|INSERT|UPDATE|DELETE)' src/ --include='*.rs' | grep -vE '/target/|/pdca/|docs/tracking/'"
+}
+```
+
+**Domain score formula (replaces the undefined `penalite_secu`/`penalite_tests`):**
+
+```
+domain_score = max(0, 100 - SUM( min(matches_c * per_match_c, max_penalty_c) for c in domain.checks ))
+global_score = ( SUM(weight_d * domain_score_d) for d in MEASURED ) / SUM(weight_d for MEASURED)
+```
+
+Every finding MUST cite its `check_id`, report the match count, and apply the check's `scale`.
+A penalty with no `check_id` + count + scale is INVALID and dropped -- it is a feeling, not a
+measurement (anti-confabulation: a number with no command behind it is a hallucinated score).
+
+**Per-cycle target cap (anti unrealistic delta).** A new cycle's target may not exceed the
+previous score by more than a bounded delta -- target 45 on a 20.5 baseline is a fantasy that
+guarantees a "missed target" RETEX. Cap: `target(N+1) <= score(N) + 15` autonomous,
+`<= score(N) + 25` interactive. Record the target + cap basis in `P_PLAN.md`.
 
 ## Evolution du SCORING_CONFIG
 

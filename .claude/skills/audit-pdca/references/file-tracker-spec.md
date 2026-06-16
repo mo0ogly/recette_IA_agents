@@ -7,9 +7,9 @@ Chaque session produit un fichier `FILE_TRACKER.json` dans son repertoire de tra
 
 | Skill | Chemin |
 |-------|--------|
-| APEX | `_alire/temp/apex/{task-id}/FILE_TRACKER.json` |
-| PDCA | `pdca/{perimetre}/cycle_{N}/FILE_TRACKER.json` |
-| analyze-repo | `_alire/tracking/TRACKER_ANALYZE_{REPO}_{DATE}.json` |
+| APEX | `docs/tracking/apex/{task-id}/FILE_TRACKER.json` |
+| PDCA | `docs/tracking/pdca/{perimetre}/cycle_{N}/FILE_TRACKER.json` |
+| analyze-repo | `docs/tracking/TRACKER_ANALYZE_{REPO}_{DATE}.json` |
 
 ## Schema JSON
 
@@ -26,7 +26,7 @@ Chaque session produit un fichier `FILE_TRACKER.json` dans son repertoire de tra
     "updated_at": "2026-03-27T12:30:00Z",
     "status": "IN_PROGRESS|COMPLETED|ABANDONED|REMASTERED",
     "cycle": 1,
-    "plan_ref": "_alire/tracking/PLAN_FOO_2026-03-27.md"
+    "plan_ref": "docs/tracking/PLAN_FOO_2026-03-27.md"
   },
   "stats": {
     "total": 12,

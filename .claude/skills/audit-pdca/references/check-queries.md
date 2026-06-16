@@ -103,18 +103,21 @@ Classification :
 | Ultimate | `./validate_rules_ultimate.sh {rule_dir}` | 91 checks |
 | ReportRule | `./validate_reportrules.sh {rule_dir}/R-*.json` | 8 checks |
 
-## Formule de scoring (C.3)
+## Formule de scoring (C.3) -- see scoring-config.md "Penalty model" (authoritative)
+
+Penalties are reproducible (scale + max_penalty + evidence per check), never "+X au feeling".
 
 ```
-Pour chaque domaine :
-  score_domaine = agent_score * (1 - penalite_secu - penalite_tests)
-  score_pondere = score_domaine * weight / 100
-
-score_global = SUM(score_pondere)
+domain_score = max(0, 100 - SUM( min(matches_c * per_match_c, max_penalty_c) for c in domain.checks ))
+global_score = ( SUM(weight_d * domain_score_d) for d in MEASURED ) / SUM(weight_d for MEASURED)
+# N/A domains excluded + renormalized, never defaulted to 50 (scoring-config.md)
 
 SI cycle > 1 :
-  CHARGER cycle_{N-1}/C_SCORECARD.json
-  CALCULER delta par domaine
-  DETECTER regressions (score baisse > 5 points)
-  CALCULER tendance (improving / stable / declining)
+  CHARGER docs/tracking/pdca/{scope}/cycle_{N-1}/C_SCORECARD.json
+  CALCULER delta par domaine ; DETECTER regressions (baisse > 5 pts) ; tendance
+  target(N+1) <= score(N) + 15 (autonome) / +25 (interactif)
 ```
+
+Every grep above must append the transverse exclusion set
+(`/target/|/node_modules/|/dist/|/.worktrees/|docs/tracking/|/pdca/|__pycache__`) and obey
+the declared-mock exemption (HYG-08: StubLlm/ReplayLlm/LabForge/mock_server/mock_local/tests are not findings).

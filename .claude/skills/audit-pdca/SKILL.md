@@ -66,6 +66,29 @@ These files contain reusable protocols. Read them, do not duplicate their conten
 
 ---
 
+## Transverse rule: grep exclusions (MANDATORY -- anti ghost-findings)
+
+**Every grep/count in any phase MUST exclude generated, vendored, and tracking paths.**
+A finding inside a build artifact, a vendored dep, a parallel git worktree, or a PDCA
+report is a ghost: it is not source the cycle can fix, and it inflates the gap count with
+noise that drags the score down for nothing. This repo guarantees such paths exist:
+`target/` (Rust build), `node_modules/` + `dist/` (React/vite build), `docs/tracking/`
+(gitignored work memory, R25), per-session git worktrees (R21), `pdca/` (self-referential
+audit reports that quote the very code being audited).
+
+**Standard exclusion filter -- append to every grep:**
+
+```bash
+grep -rn 'PATTERN' {scope}/ \
+  | grep -vE '/target/|/node_modules/|/dist/|/\.worktrees/|docs/tracking/|/pdca/|__pycache__|\.orig$|\.bak$|\.before_|\.snap$'
+```
+
+Skip this and ghost findings are guaranteed (the analogous Wattson audit hit 5/15 false
+positives on cycle 001 before this rule existed). A finding whose only matches fall in an
+excluded path is INVALID and must be dropped, not scored.
+
+---
+
 ## Phase P -- PLAN (Observe + Orient)
 
 ### P.0 : Pre-flight (BLOCKING)
@@ -87,7 +110,7 @@ If FAIL: STOP, fix. Exception: if the scope IS the broken component.
 - **DO NOT repeat errors documented in previous RETEX.**
 - **Konrad-Kurze directive load.** Check for a recent KD targeting LemanRuss for this scope:
   ```bash
-  ls -t _alire/02_LOGS/Journals/meta/directives/KD-*.json 2>/dev/null | head -5
+  ls -t docs/tracking/directives/KD-*.json 2>/dev/null | head -5
   ```
   For each directive whose `primary_target` is in {LemanRuss, both} AND `scope.module` matches the current scope: extract `expected_impact.domains_affected` and use it to seed the cycle's domain priorities. If `requires_approval = true` and the lifecycle state is still `PENDING_APPROVAL`: surface the directive in `P_PLAN.md` under "Pending Konrad directives" and proceed without applying it. If state is `APPROVED`: apply during DO phase.
 - **Konrad-Kurze auto-trigger.** If cycle >= 3 AND score_delta(N-1, N-2) < +10 AND no APPROVED KD already addresses this stall: INVOKE `/konrad-kurze` via the Skill tool (model: **sonnet**) with scope = `{module}/cycle_{N-1}`. The directive returned is loaded as above before P.2.
@@ -95,14 +118,53 @@ If FAIL: STOP, fix. Exception: if the scope IS the broken component.
 ### P.2 : Scope detection
 
 Cartograph: Rust/Python/React files, LOC, crates/packages, NATS subjects, event schemas, endpoints, components.
-Create: `pdca/{scope}/cycle_{N}/` + `P_PLAN.md` (IMMEDIATELY).
+Create: `docs/tracking/pdca/{scope}/cycle_{N}/` + `P_PLAN.md` (IMMEDIATELY).
+
+**Tracking lives in gitignored `docs/tracking/pdca/` (R25 -- BLOCKING).** Every PDCA
+artifact (cycle dirs, scorecards, RETEX, swarm_memory, decision_log, DASHBOARD) is agent
+work-memory, NOT a repo deliverable. This repo is a ground-truth corpus; committing PDCA
+reports pollutes it and bloats history. `docs/tracking/` is gitignored -- write there and
+ONLY there. NEVER write `pdca/` at the repo root, NEVER `git add` a tracking file. If a
+prior run left a tracked `pdca/` at root, flag it (do not silently delete -- R25), it must
+be `git rm --cached`'d and moved under `docs/tracking/pdca/`.
 
 ### P.2b : Health Scan (MANDATORY -- display BEFORE agents)
 
-3 diagnostics on the scope:
+Run each diagnostic and DISPLAY its table to the user BEFORE launching agents (legibility-
+first: a third party must see what the scope looks like before it is judged). All greps use
+the transverse exclusion set.
+
 1. Error-handling debt: `.unwrap()`/`.expect()`/`panic!` on fallible paths in non-test `.rs` (grep `-rn '\.unwrap()\|\.expect(\|panic!' src/ --include='*.rs'`)
 2. Test coverage: `.rs` files > 200 LOC without a `#[cfg(test)]` mod or matching `tests/` file
-3. Structural debt: files exceeding LOC limit
+3. Structural debt: files exceeding LOC limit (.rs 800 / .ts 500 / .tsx 400)
+4. Secrets/input surface: `grep -rnE 'std::env::var|request\.|fetch\(' {scope}` cross-checked against R8 (no hardcoded secret) and config-from-env -- surface, do not yet score
+
+Present each as a table `| File | Metric | Value | Gap |`.
+
+### P.2b-bis : Anti-false-positive PRE-CHECKS (run BEFORE scoring those axes)
+
+A finding scored without these pre-checks is a likely ghost. Each maps a global guarantee
+this repo provides, so a per-file "missing" finding is wrong.
+
+- **Control-plane mediation (I2) -- before scoring "handler/route without auth".** This repo
+  mediates EVERY external action through the Gateway + Policy Engine (deny-by-default), not
+  per-handler `#[login_required]`. Pre-check the global mediation exists, then do NOT score
+  per-handler auth as a gap:
+  ```bash
+  grep -rnE 'PolicyEngine|control_plane|deny.by.default|evaluate_policy|Gateway' src/ --include='*.rs' | head -3
+  # match => auth is global (I2). A per-route "no auth" finding is a false positive.
+  ```
+- **Recette integration -- before scoring "test/recette integration absent".** The corpus is
+  wired through the coverage guard + recette CLI. Pre-check the scope is covered, then do NOT
+  score it as missing:
+  ```bash
+  grep -rn '{scope}' tests/test_coverage_guard.py
+  python3 -m recette validate 2>&1 | tail -3
+  # covered => integration present. A "not integrated" finding is a false positive.
+  ```
+
+Record each pre-check result in `P_HEALTH_SCAN.md`. If a pre-check shows the guarantee holds,
+the corresponding finding axis is OFF-LIMITS for the scoring agents this cycle.
 
 Output: `P_HEALTH_SCAN.md`
 
@@ -137,7 +199,7 @@ See `references/scoring-config.md` for full JSON schema and check definitions.
 
 ### T.2 : Create swarm_memory.json
 
-BEFORE launching any agent, create `pdca/{scope}/cycle_{N}/swarm_memory.json`:
+BEFORE launching any agent, create `docs/tracking/pdca/{scope}/cycle_{N}/swarm_memory.json`:
 
 ```json
 {
@@ -185,9 +247,31 @@ inferior. Do not duplicate.
 backend, or /react-recette BLOC B (converted /20) for frontend.
 
 **Policy gates in each agent prompt:**
-- NO STUB, NO MOCK, USAGE TRIAGE (grep before reporting), NO DISABLE
+- NO STUB, USAGE TRIAGE (grep before reporting), NO DISABLE
+- **NO CONFABULATION**: never invent a finding, a file path, a symbol, or a score. Every claim is backed by a command output (see EVIDENCE-REQUIRED below). A score with no check evidence behind it is a hallucination, not a measurement -- drop it.
+- **NO MOCK in production paths, EXCEPT the declared legitimate mocks.** Do not recommend new mock/fake data. But the recette is mock-first BY DESIGN: `StubLlm`/`ReplayLlm` (deterministic replay, I4), `LabForge` + `recette/lab/mock_server.py` (simulated lab on :8082), `mock_local` servers, and `tests/`/`__fixtures__` fixtures are the corpus HARNESS, not violations. NEVER flag these as mock-data findings -- doing so is a false positive against the repo's own architecture (R4 scopes fixtures to `tests/`/`__fixtures__`; the lab/StubLlm are declared runtime mocks).
 - Score /100 mandatory in the return
 - Findings with file:line mandatory
+- **GREP EXCLUSIONS**: every grep filters the transverse exclusion set (`target/`, `node_modules/`, `dist/`, `.worktrees/`, `docs/tracking/`, `pdca/`, `__pycache__`) -- see the transverse rule above. A match only in an excluded path is not a finding.
+
+**EVIDENCE-REQUIRED (anti-false-positive -- BLOCKING in every agent prompt).**
+Before any finding of the form "X absent / missing / not implemented / not configured",
+the agent MUST run the verification command and attach its output to the finding. If the
+command shows X actually exists, the finding is INVALID and must be deleted from the
+report. If the agent cannot verify, it marks the finding `SEVERITY: A_VERIFIER` -- never a
+real severity (CRITICAL/HIGH/MEDIUM). No finding carries an operational severity without
+concrete evidence attached. Mandatory verify patterns for this stack:
+
+- "file `X` absent" -> `ls -la X 2>&1` (attach output)
+- "fn/struct/trait `Y` not implemented" (Rust) -> `grep -rn 'fn Y\|struct Y\|trait Y' --include='*.rs'` (attach)
+- "component/hook `Y` missing" (React) -> `grep -rn 'function Y\|const Y\|export.*Y' --include='*.tsx' --include='*.ts'` (attach)
+- "config/env `K` not set" -> `grep -rn 'K' src/ config/ *.toml .env.example 2>/dev/null` (attach)
+- "endpoint/route `R` missing" -> `grep -rn 'R' src/ --include='*.rs'` (attach)
+- "recette/test for `M` absent" -> `ls tests/ | grep M ; grep -rn 'M' tests/test_coverage_guard.py` (attach)
+
+Why: in the analogous Wattson audit, "evidence-or-A_VERIFIER" was the single highest-yield
+anti-false-positive control (RETEX cycle 005-014). It is the exact applied form of this
+repo's R13 (verify-facts-no-deduction) -- a finding is a claim, and a claim needs a command.
 
 ### T.4 : crewai mode (cycle 2+ only)
 
@@ -296,7 +380,7 @@ violation.
 Legitimate handling (do NOT skip recette):
 
 1. Confirm the fix agents are still in-flight (D_FIXES.md absent in
-   `pdca/{scope}/cycle_{N}/`, scope files show as `M`).
+   `docs/tracking/pdca/{scope}/cycle_{N}/`, scope files show as `M`).
 2. Write a `decision_log.jsonl` entry: action `DEFER_RECETTE_TO_CHECK`,
    reasoning that DO is in-flight and `/react-recette` (or pattern-scan
    equivalent, see C.1 A4) runs in CHECK C.1 on agent completion.
@@ -371,9 +455,24 @@ For each file modified in the cycle:
   - **BLOC B SCORE = security domain score in SCORING_CONFIG (converted /20)**
   - Reference: `.claude/commands/react-recette.md`
 
+**Sub-skill SCORE CONTRACT (BLOCKING -- every delegated recette returns a number).**
+A delegated recette is not a pass/fail vibe; it MUST return a numeric score that maps into
+the scorecard. The cycle CANNOT score a domain whose recette returned no number -- that
+domain is `A_VERIFIER` (re-run the recette), never scored at feeling (anti-confabulation).
+
+| Sub-skill | Returns | Maps into domain |
+|-----------|---------|------------------|
+| `/rust-recette` | /44 total + Bloc D /N | testing+hygiene+arch from total; **Bloc D -> security /20** |
+| `/python-recette` | /44 total + Bloc D /N | same; **Bloc D -> security /20** |
+| `/react-recette` | /40 (6 blocs/48 checks) + Bloc B /N | hygiene+arch+completeness; **Bloc B -> security (B/10*20)** |
+
+The returned number is recorded verbatim in `C_SCORECARD.json.domains[].src` (which recette,
+which bloc, what value). A domain score that does not trace to a recette number or a config
+check `evidence_grep` count is INVALID (anti-confabulation, see scoring-config.md penalty model).
+
 **Security domain score integration:**
 ```
-security domain score = Rust security score /20 (build-pipeline-rust.md)
+security domain score = Rust/Python security score /20 (build-pipeline, Bloc D)
                         OR
                         react-recette BLOC B score / 10 * 20
 ```
@@ -518,7 +617,7 @@ bgcolor: alpha(theme.palette.background.default, 0.6)
 Skill({skill: "frontend-design", args: "WCAG-audit: verify contrast ratio on all modified .tsx files
 and their transitive imports through the 6 active themes (Cyber, CyberMatrix, CyberRed, Classic,
 Heaven, Default). Threshold: >=4.5:1 normal text, >=3:1 large text (WCAG AA).
-Report: PASS/FAIL per component per theme. Output to _alire/02_LOGS/Journals/design_audit/YYYY-MM-DD_cycle-N_design.md"})
+Report: PASS/FAIL per component per theme. Output to docs/tracking/pdca/{scope}/cycle_{N}/design_audit.md"})
 ```
 Verdict `FAILURE` (>=1 component unreadable in any theme) -> REPLAN obligatoire. Reference: R25.
 
@@ -640,14 +739,13 @@ below an aspirational `--target=100`.
 Follow `librarian-gate.md` for full checklist:
 
 ```
-[ ] 1. PLAN updated    : _alire/tracking/PLAN_PDCA_{NAME}_{DATE}.md
-[ ] 2. RETEX written   : _alire/02_LOGS/Journals/retex/RETEX_PDCA_{DATE}.md
+[ ] 1. PLAN updated    : docs/tracking/PLAN_PDCA_{NAME}_{DATE}.md            (gitignored, R25)
+[ ] 2. RETEX written   : docs/tracking/retex/RETEX_PDCA_{DATE}.md            (gitignored, R25)
 [ ] 3. RETEX DISPLAYED : RETEX content displayed in the conversation
-[ ] 4. INDEX updated   : _alire/tracking/INDEX.md
-[ ] 5. DASHBOARD updated : pdca/{scope}/DASHBOARD.md
-[ ] 6. UI HELP (BLOQUANT) : INSERT ui_help_content for EACH new *Tab/*Panel/*Dashboard/*Editor. Verify with SELECT. Cycle CANNOT close if HelpButton has no DB content.
-[ ] 7. DOCS-SITE (SI DOC MODIFIEE) : Si .md cree/modifie dans _alire/01_DOCUMENTATION/ -> cd docs-site && npm run build:search && rsync build/ to source/docs-site/. Verify HTTP 200 on inspect_ia_agents.example/docs/.
-[ ] 8. Commit + push   : session files only (max 5 unpushed commits)
+[ ] 4. DASHBOARD updated : docs/tracking/pdca/{scope}/DASHBOARD.md           (gitignored, R25)
+[ ] 5. DOCS (SI DOC PRODUIT MODIFIEE) : a durable doc/runbook change goes in committed `docs/` (NOT docs/tracking/). Rebuild only if a docs site exists for this repo.
+[ ] 6. UI HELP (BLOQUANT, SI FRONTEND) : INSERT ui_help_content for EACH new *Tab/*Panel/*Dashboard/*Editor. Verify with SELECT. Cycle CANNOT close if HelpButton has no DB content.
+[ ] 7. Commit + push   : ONLY committed deliverables (source, corpus, the skill itself). NEVER `git add` anything under docs/tracking/ (R25). Max 5 unpushed commits.
 ```
 
 ### F.2 : RETEX (MANDATORY -- DISPLAY in conversation)
