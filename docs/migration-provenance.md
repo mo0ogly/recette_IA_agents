@@ -52,7 +52,32 @@ Compare with `recette/capture/capturing_llm.py` and `recette/capture/llm_trace.p
 ## Rust parts (different skill)
 
 The native eBPF wire surface (`discoveryprobe/`) is Rust, built under the
-`rust-best-practices` skill (idiomatic borrowing, clippy `-D warnings`, fmt). It
-is NOT a migration of these Python repos -- it is the no-cooperation kernel
-backstop that complements the Python hook. See
-`docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md`.
+`rust-best-practices` skill (idiomatic borrowing, clippy `-D warnings`, fmt). The
+trace schema + sink (`discoveryprobe-capture`, GR1-GR3) migrate the agenttrace
+FIELD SET and the agentwatch callback MECHANISM (see the tables above) into Rust.
+See `docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md`.
+
+### GR4 -- agentwatch egress observation, relocated to the kernel
+
+agentwatch observes an agent's LLM traffic IN-PROCESS at the `httpcore`/HTTP
+transport layer (`BaseHook` over the HTTP client). The eBPF connect program
+(`discoveryprobe-ebpf::discoveryprobe_connect`) observes the SAME egress -- the
+agent's outbound TCP dial to the provider -- but at the KERNEL
+(`syscalls:sys_enter_connect`), so it needs NO cooperation from the agent and
+catches a hook-blind ghost.
+
+| Upstream (real mechanism) | Local adaptation | Reuse vs adapt |
+|---------------------------|------------------|----------------|
+| agentwatch `BaseHook` over `httpcore` HTTP transport (in-process egress observation) | `discoveryprobe_connect` reads the `connect(2)` `sockaddr_in` at the kernel -> `ConnectEvent{daddr:dport}` | OBSERVATION POINT relocated (in-process httpcore -> kernel syscall) |
+| agentwatch sees host+port from the HTTP request | kernel sees dest `a.b.c.d:port` from the socket | SAME signal, different layer |
+
+This is an ADAPTATION of WHERE agentwatch observes (layer relocated for
+no-cooperation capture), not a line-by-line port of its Python. The syscall
+tracepoint ABI used (`uservaddr` at offset 24; `sockaddr_in` `sin_family`@0 /
+`sin_port`@2 BE / `sin_addr`@4 BE; `AF_INET=2`) is the stable Linux
+syscall-enter format, cross-checked against the kernel tracepoint `format` file
+(root-gated) and public references; never invented (R13).
+
+Compile-verified: the eBPF crate builds a real `Linux BPF` object carrying both
+tracepoint programs + both maps (readelf). Live attach/capture needs CAP_BPF
+(the broker) and is NOT proven outside a privileged run (R14 boundary).
