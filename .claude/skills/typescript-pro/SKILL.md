@@ -10,24 +10,26 @@ metadata:
   role: specialist
   scope: implementation
   output-format: code
-  related-skills: fullstack-guardian, api-designer
+  related-skills: react-expert, api-designer
 ---
 
-# TypeScript Pro (LIA-SEC Edition)
+# TypeScript Pro (inspect_ia_agents Edition)
 
-## LIA-SEC Adaptations (MANDATORY)
+## inspect_ia_agents Adaptations (MANDATORY)
 
-- **Stack** : TypeScript 4.9 strict mode, React 19, MUI v7, Vite, in `sigma-react-frontend/`
+- **Stack** : TypeScript strict mode, React, Vite, vitest, in `console/`
 - **API envelope typing** : every backend response is `{ success: boolean; data: T; error?: string }`.
-  Define a generic `ApiResponse<T>` once, UNWRAP `.data` at service layer, never leak envelope to components (R17)
-- **fetchWithConfig** : all calls go through `src/config/apiConfig.ts` -- type its return; never `fetch()` brut
-- **Discriminated unions** for state machines :
-  `type State = {kind:'idle'}|{kind:'loading'}|{kind:'ok',data:T}|{kind:'error',msg:string}`
-- **Branded types** for IDs (`CampaignId`, `RuleId`, `CveId`) to prevent cross-domain misuse
-- **Runtime validation** at boundaries (Zod or manual) -- types alone are not contracts (R17 / R18)
+  Define a generic `ApiResponse<T>` once, UNWRAP `.data` at service layer, never leak envelope to components (R16)
+- **API config** : all calls go through the console's API config layer -- type its return; never `fetch()` brut
+- **Discriminated unions** for state machines and governed enums :
+  `type State = {kind:'idle'}|{kind:'loading'}|{kind:'ok',data:T}|{kind:'error',msg:string}`.
+  Cover every variant of `approval_state` (`none | pending | approved | denied | timeout`)
+  and `policy_decision` (`allow | deny | escalate`) -- an unhandled variant is a prod display bug (R16)
+- **Branded types** for IDs (`AgentId`, `EventId`, `RunId`) to prevent cross-domain misuse
+- **Runtime validation** at boundaries (Zod or manual) -- types alone are not contracts (R16 / R13)
 - **No `any`** in production code ; use `unknown` + narrowing
-- **Companion skills** : `/react-expert` (components), `/api-handoff` (contract), `/test-first` (tests),
-  `/debug-react` (fix), `/react-recette` (audit OWASP frontend)
+- **Companion skills** : `/react-expert` (components), `/api-designer` (contract), `/test-first` (tests),
+  `/systematic-debugging` (fix), `/react-recette` (audit OWASP frontend)
 
 ---
 
@@ -164,7 +166,7 @@ Au demarrage, decomposer toute demande en sous-taches independantes :
 - [ ] Sous-tache 2 : identifier les violations (any, envelopes non typees, boundaries sans runtime validation)
 - [ ] Sous-tache 3 : design des types publics (ApiResponse<T>, branded IDs, discriminated unions)
 - [ ] Sous-tache 4 : implementation avec type guards + runtime validation aux boundaries
-- [ ] Sous-tache 5 : `npx tsc --noEmit` gate -- zero erreur avant de continuer
+- [ ] Sous-tache 5 : `npx tsc --noEmit` gate (ou `./recette.sh console-build`) -- zero erreur avant de continuer
 - [ ] Sous-tache 6 : verification qu'aucun `any` n'a ete introduit
 
 Sous-taches 1-2 parallelisables. Sous-tache 5 depend de 4.
@@ -173,8 +175,8 @@ Sous-taches 1-2 parallelisables. Sous-tache 5 depend de 4.
 
 Pour tout refactor de types ou ajout de feature typee non trivial (> 2 fichiers ou nouveau domaine) :
 
-1. Creer `_alire/tracking/PLAN_TYPESCRIPT_PRO_{FEATURE}_{YYYY-MM-DD}.md` avant d'ecrire une ligne.
-2. Template : `_alire/tracking/PLAN_TEMPLATE.md`.
+1. Creer `docs/tracking/PLAN_TYPESCRIPT_PRO_{FEATURE}_{YYYY-MM-DD}.md` avant d'ecrire une ligne.
+2. Template : `docs/tracking/PLAN_TEMPLATE.md`.
 3. Cocher chaque sous-tache a la completion.
 4. Si replanification : Status -> REPLANIFIE + lien vers nouveau plan.
 
@@ -209,7 +211,7 @@ Selection dynamique : outil choisi selon le contexte, pas de liste figee.
 
 ## Tracabilite agentique
 
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` chaque decision non triviale :
+Logger dans `docs/tracking/decision_log.jsonl` chaque decision non triviale :
 
 - Choix d'architecture de types (branded vs opaque, union discriminee vs flag boolean)
 - Rejet d'une alternative (ex: Zod vs manuel, `satisfies` vs `as`)
@@ -220,15 +222,15 @@ Format :
 {"timestamp":"...","session":"typescript-pro-{feature}","action":"...","reasoning":"...","alternatives_rejected":["..."],"outcome":"...","confidence":"high","plan_ref":"PLAN_TYPESCRIPT_PRO_*.md"}
 ```
 
-RETEX en fin de session si score agentique < 40/50 -> `_alire/02_LOGS/Journals/retex/RETEX_TYPESCRIPT_PRO_YYYY-MM-DD.md`.
+RETEX en fin de session si score agentique < 40/50 -> `docs/tracking/retex/RETEX_TYPESCRIPT_PRO_YYYY-MM-DD.md`.
 
 ## VERIFICATION GATE (BLOQUANT)
 
 Apres execution, AVANT de declarer termine :
 
-- [ ] `cd /opt/lia-sec/dev/sigma-react-frontend && npx tsc --noEmit` exits 0 (zero erreur)
+- [ ] `cd console && npx tsc --noEmit` (ou `./recette.sh console-build`) exits 0 (zero erreur)
 - [ ] `grep -rn ": any" --include="*.ts" --include="*.tsx" src/` -- zero nouveau `any` introduit
-- [ ] Discriminated unions utilisees pour tout state machine (pas de flag booleans multiples)
+- [ ] Discriminated unions utilisees pour tout state machine et tout enum gouverne (`approval_state`, `policy_decision` -- toutes les variantes couvertes)
 - [ ] Runtime validation presente aux boundaries API (`ApiResponse<T>` unwrap au service layer)
 - [ ] Aucun `as X` sans type guard adjacent justifie
 

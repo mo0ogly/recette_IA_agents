@@ -4,7 +4,7 @@
     {
       "id": 1,
       "name": "close-session-after-work",
-      "prompt": "j'ai fini le banner-server COUCHE 5 - 30 banners detectes par LiaProbe, tout est en prod depuis le commit 3b82e8bfe5. je veux clore la session research discovery pour cette partie",
+      "prompt": "j'ai fini le SqliteEventStore append-only - 30 evenements committes et rejoues a l'identique (replay deterministe I4), tout est en prod depuis le commit 3b82e8bfe5. je veux clore la session research discovery pour cette partie",
       "expected_output": "Mise a jour des 3 fichiers de cloture : tracking, RESEARCH_LOG, INDEX. Fichier validated/ cree avec preuve.",
       "files": [],
       "expectations": [
@@ -43,7 +43,7 @@
         "Lit ce SKILL.md (ou annonce qu'il l'a deja lu dans la session)",
         "Lit INDEX.md du topic discovery",
         "Lit RESEARCH_LOG.md pour les dernieres entrees",
-        "Lit le fichier tracking actif dans _alire/tracking/",
+        "Lit le fichier tracking actif dans docs/tracking/",
         "Annonce la phase actuelle, la gate bloquante et les decisions prises",
         "Ne commence PAS a coder ou proposer une architecture avant d'avoir fini les 9 etapes"
       ]

@@ -7,10 +7,10 @@ description: >
 metadata:
   user_invocable: "true"
   argument_hint: "[topic] | status | close | update | schema | gaps | mapping"
-compatibility: "Referentiel: _alire/research_discovery/. Outils: WebSearch, Glob, Read, Write, Grep, mcp__claude_ai_Mermaid_Chart."
+compatibility: "Referentiel: docs/tracking/research_discovery/. Outils: WebSearch, Glob, Read, Write, Grep, mcp__claude_ai_Mermaid_Chart."
 ---
 
-# Research Skill v2.3 - Methodologie de Recherche Technique LIA-Scan
+# Research Skill v2.3 - Methodologie de Recherche Technique inspect_ia_agents
 
 > **PREMIERE ACTION OBLIGATOIRE (avant tout) :** Annoncer "Using research skill. Reading state files..." comme premiere ligne de reponse.
 
@@ -25,10 +25,10 @@ qu'on devra refaire. On documente au fil de l'eau. On ne perd jamais une informa
 ## TRACABILITE AGENTIQUE (OBLIGATOIRE)
 
 ### Plan persistant
-Creer `_alire/tracking/PLAN_RESEARCH_{TOPIC}_{YYYY-MM-DD}.md` (template: `_alire/tracking/PLAN_TEMPLATE.md`).
+Creer `docs/tracking/PLAN_RESEARCH_{TOPIC}_{YYYY-MM-DD}.md` (template: `docs/tracking/PLAN_TEMPLATE.md`).
 
 ### Decision log
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` les decisions non-triviales.
+Logger dans `docs/tracking/decision_log.jsonl` les decisions non-triviales.
 Format: `{"timestamp","session","action","reasoning","alternatives_rejected":[],"outcome","confidence","plan_ref"}`
 
 ### Replanification
@@ -58,7 +58,7 @@ Ces rationalisations ont ete documentees lors d'evaluations reelles. Elles sont 
 | Rationalisation observee | Pourquoi c'est faux |
 |--------------------------|---------------------|
 | "Je suis en train de lire SKILL.md, l'annonce est implicite." | L'annonce est EXPLICITE, dite en premiere ligne avant toute autre action. Lire le skill n'est pas l'annoncer. |
-| "Je connais deja l'etat du projet depuis MEMORY.md / le contexte." | Le referentiel (`_alire/research_discovery/`) est la seule source de verite. MEMORY.md peut etre perime. Lire les fichiers est obligatoire. |
+| "Je connais deja l'etat du projet depuis MEMORY.md / le contexte." | Le referentiel (`docs/tracking/research_discovery/`) est la seule source de verite. MEMORY.md peut etre perime. Lire les fichiers est obligatoire. |
 | "Le contexte est clair, je peux proposer une solution directement." | Aucune proposition de code ou d'architecture avant que les 9 etapes de relecture ne soient completees. Periode. |
 | "Ce cas est simple, les gates ne s'appliquent pas." | Les gates s'appliquent TOUJOURS. La simplicite apparente est un symptome de mauvaise analyse, pas une exemption. |
 | "J'ai deja mentionne le commit, [COMMIT] est redondant." | Le tag `[COMMIT]` est explicite dans le RESEARCH_LOG, pas inline dans un paragraphe. Format = `[COMMIT] abc123`. |
@@ -73,7 +73,7 @@ Apres chaque compression de contexte, RELIRE CE SKILL EN ENTIER avant de continu
 1. Lire ce SKILL.md en entier
 2. Lire le INDEX.md du topic en cours (phase actuelle)
 3. Lire le RESEARCH_LOG.md (dernieres entrees)
-4. Lire le fichier tracking actif dans `_alire/tracking/` (le plus recent)
+4. Lire le fichier tracking actif dans `docs/tracking/` (le plus recent)
 5. Lire la SYNTHESE du sujet (`investigated/YYYY-MM-DD_SYNTHESE-*.md`)
 6. Lire le mapping existant (`investigated/YYYY-MM-DD_mapping-existant.md`)
 7. Identifier la phase actuelle + gate bloquante
@@ -86,8 +86,8 @@ Apres chaque compression de contexte, RELIRE CE SKILL EN ENTIER avant de continu
 
 Pourquoi 9 etapes : sans lire le tracking et les decisions, le comportement derive vers :
 - Implementer Option B apres avoir choisi A
-- Oublier des decisions critiques (nomenclature, scanner autonome, vecteur L_FILE)
-- Inventer des champs de struct au lieu de lire le modele existant
+- Oublier des decisions critiques (nomenclature, schema d'evenement, choix d'event store)
+- Inventer des champs de struct au lieu de lire le modele existant (ex: `AgentActionEvent`)
 
 ---
 
@@ -133,7 +133,7 @@ Chaque fichier de recherche contient OBLIGATOIREMENT :
 ## REGLE ABSOLUE N.4 : JOURNAL TRACKING APRES CHAQUE ETAPE
 
 Avant de passer a l'etape N+1 :
-1. `_alire/tracking/NOM_DU_TRACKING.md` → entree journal
+1. `docs/tracking/NOM_DU_TRACKING.md` → entree journal
 2. `RESEARCH_LOG.md` → entree avec tag
 3. `{topic}/INDEX.md` → statuts et phase mis a jour
 
@@ -191,7 +191,7 @@ Descriptions detaillees → `references/phases.md`
 ## Referentiel
 
 ```
-BASE = /home/mo0ogly/Bureau/vscode_lia_audit/_alire/research_discovery/
+BASE = docs/tracking/research_discovery/
 
 {BASE}/
 +-- RESEARCH_INDEX.md          # Index global de tous les sujets
@@ -273,13 +273,13 @@ Livrable : `{topic}/investigated/YYYY-MM-DD_{sujet}-gaps.md`
 
 ### `/research mapping [topic]`
 
-Lire code Go existant → matrice HAVE / ADAPT / NEED
+Lire le code existant (Rust `src/`+`cmd/*`, eBPF `discoveryprobe/`, harness Python `recette/`, console `console/`) → matrice HAVE / ADAPT / NEED
 Livrable : `{topic}/investigated/YYYY-MM-DD_mapping-existant.md`
 
 ### `/research close [topic]`
 
 Dans cet ordre :
-1. Tracking → entree journal dans `_alire/tracking/`
+1. Tracking → entree journal dans `docs/tracking/`
 2. RESEARCH_LOG.md → entree cloture avec tags (format ci-dessous)
 3. `{topic}/validated/YYYY-MM-DD_{nom}.md` → creer ce fichier avec commit hash
 4. INDEX.md → statuts + chiffres mis a jour
@@ -296,9 +296,9 @@ Preuves : {scan #N / test pass / screenshot / endpoint}
 
 Exemple :
 ```
-[DISCOVERY] [VALIDATED] [COMMIT] 3b82e8bfe5 - Banner-server COUCHE 5 30/30 detectes (2026-03-02)
-Contexte : 30 banners TCP/HTTP sur ports 9001-9030 detects par LiaProbe en production.
-Preuves : scan #145 (23/23) + scan #148 (7/7). Commit 3b82e8bfe5 en prod.
+[DISCOVERY] [VALIDATED] [COMMIT] 3b82e8bfe5 - SqliteEventStore append-only 30/30 evenements rejoues (2026-03-02)
+Contexte : 30 evenements committes via le trait EventStore, replay deterministe (I4) byte-identique.
+Preuves : recette run #145 (23/23) + run #148 (7/7). Commit 3b82e8bfe5 en prod.
 ```
 
 ---

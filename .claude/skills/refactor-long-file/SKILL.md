@@ -1,21 +1,21 @@
 ---
 name: refactor-long-file
-description: Split a React or Go file that exceeds the project size ceiling (400 LOC for .tsx, 500 LOC for .ts, 800 LOC for .go) into an orchestrator + presentation/helper modules, each under the ceiling. Produces a dependency graph, candidate module boundaries, per-module R17 fixture + render-and-assert test, and a migration commit. Invoke when a file trips the pre-commit file-size hook, when a file carries // @allow-long-file as technical debt, or when a TDZ/hook-ordering bug surfaces in a monolithic component (the split makes hook order explicit and closes the bug class). Triggers on "/refactor-long-file", "split this file", "trop long", "refactor monolithique", "@allow-long-file cleanup", or automatically after a file crosses its ceiling in /react-recette or /go-recette. References the successful Nis2ByArticles precedent (2026-04-24, 1145 -> 334 LOC + 9 modules, 4/4 tests green).
+description: Split a React or Rust file that exceeds the project size ceiling (400 LOC for .tsx, 500 LOC for .ts, 800 LOC for .rs) into an orchestrator + presentation/helper modules, each under the ceiling. Produces a dependency graph, candidate module boundaries, per-module R16 fixture + render-and-assert test, and a migration commit. Invoke when a file trips the pre-commit file-size hook, when a file carries // @allow-long-file as technical debt, or when a TDZ/hook-ordering bug surfaces in a monolithic component (the split makes hook order explicit and closes the bug class). Triggers on "/refactor-long-file", "split this file", "trop long", "refactor monolithique", "@allow-long-file cleanup", or automatically after a file crosses its ceiling in /react-recette or /rust-recette. References a successful refactor precedent (1145 -> 334 LOC orchestrator + 9 modules, 4/4 tests green).
 ---
 
-# /refactor-long-file -- split a monolithic .tsx / .ts / .go into orchestrator + modules
+# /refactor-long-file -- split a monolithic .tsx / .ts / .rs into orchestrator + modules
 
 ## Why this skill exists
 
 Files above the project ceiling (400 LOC `.tsx`, 500 LOC `.ts`, 800 LOC
-`.go`) accumulate multiple classes of bugs:
+`.rs`) accumulate multiple classes of bugs:
 
 - **TDZ / hook-ordering bugs** : a derived value references a `useState`
   declared below it. Minified bundles crash as "Cannot access 'C' before
-  initialization" (Nis2ByArticles incident 2026-04-24).
+  initialization".
 - **Implicit coupling** : presentation code knows internal state of the
   orchestrator, making each fix risky.
-- **No R17 gate** : a 1000-LOC component is too big to mock / fixture
+- **No R16 gate** : a 1000-LOC component is too big to mock / fixture
   / render-test in one file.
 - **Pre-commit hook noise** : `// @allow-long-file` markers silently
   pile up and become permanent.
@@ -31,7 +31,7 @@ fixture if it touches an API).
 - Any file that trips `check_file_size.sh` pre-commit hook
 - A file containing a TDZ bug reported in production (refactor closes
   the class, not just the symptom)
-- `/react-recette` or `/go-recette` reports "file too long" finding
+- `/react-recette` or `/rust-recette` reports "file too long" finding
 - User asks "refactor X" / "split X" / "X est trop long"
 
 DO NOT invoke this skill:
@@ -43,9 +43,9 @@ DO NOT invoke this skill:
 
 | Extension | Ceiling | Rationale |
 |---|---|---|
-| `.tsx` | 400 LOC | React component complexity budget (Nis2 precedent) |
+| `.tsx` | 400 LOC | React component complexity budget |
 | `.ts`  | 500 LOC | Logic-heavy modules tolerable but harder to test at 500+ |
-| `.go`  | 800 LOC | Go handlers tolerate more volume but 800+ hurts godoc |
+| `.rs`  | 800 LOC | Rust modules tolerate more volume but 800+ hurts rustdoc |
 | `.py`  | 500 LOC | Scripts readable below 500 |
 
 Override only with a commented `// @allow-long-file -- justification` line
@@ -91,20 +91,20 @@ split further.
 ### Phase 3 : BOOTSTRAP the new tree
 
 ```bash
-MODULE_DIR="sigma-react-frontend/src/components/{parent}/{module}"
+MODULE_DIR="console/src/components/{parent}/{module}"
 mkdir -p "$MODULE_DIR"
 ```
 
-For Go:
+For Rust:
 
 ```bash
-PKG_DIR="pkg/{parent}/{module}"
-mkdir -p "$PKG_DIR"
+MOD_DIR="src/{parent}/{module}"
+mkdir -p "$MOD_DIR"
 ```
 
 Create files in order of dependency (leaf first): `types.ts` -> helpers
 -> presentation -> custom hook -> orchestrator. Each creation is a
-small, compilable step. Run `npx tsc --noEmit` (or `go build`) after
+small, compilable step. Run `npx tsc --noEmit` (or `cargo build`) after
 each step to catch regressions immediately.
 
 ### Phase 4 : HOOK ORDERING (critical)
@@ -117,7 +117,7 @@ enforce this ordering in the orchestrator:
 2. Any derived `const filterKey = ...` computation
 3. Any `useMemo` / `useCallback`
 4. `useEffect` for initial load
-5. Custom hook invocation (e.g. useNis2Actions)
+5. Custom hook invocation (e.g. useAgentActions)
 6. Derived render data (pagination, filters applied)
 7. Early-return loading / error branches
 8. JSX return
@@ -128,7 +128,7 @@ This explicit ordering closes the TDZ class of bugs. A `const filterKey
 setApplicabilityFilter] = useState(...)` in the source IS a TDZ waiting
 to crash in minified production bundles.
 
-### Phase 5 : R17 fixture + test
+### Phase 5 : R16 fixture + test
 
 For each file that touches an API (the orchestrator, or a sub-component
 with its own fetch), create:
@@ -138,7 +138,7 @@ with its own fetch), create:
 - `__tests__/{OrchestratorName}.test.tsx` with at least:
   1. fixture shape sanity (asserts every key the code reads)
   2. render without crashing with the fixture
-  3. fetchWithConfig called with the expected URL
+  3. fetch called with the expected URL
   4. fallback branch covered if applicable
   5. empty-data branch covered if applicable
 
@@ -167,7 +167,7 @@ Sometimes a long file is the right answer. Do not split when:
 - The file is a **single long switch/case** that maps opaque codes
   (CWE catalog, CVSS vectors, country codes). Splitting spreads a
   single table across multiple files without helping readability.
-- The file is a **migration SQL** in `cmd/sigma_web/migrations/`. SQL
+- The file is a **migration SQL** under `migrations/`. SQL
   migrations are intentionally monolithic and timestamped.
 - The orchestrator after split would still be > 400 LOC. Recurse: split
   sub-components further before declaring the refactor done.
@@ -284,43 +284,43 @@ export function use{Feature}Actions(opts: { items: {Feature}Item[] }) {
 }
 ```
 
-## Go variant
+## Rust variant
 
-For Go files above 800 LOC, the split pattern is:
+For Rust files above 800 LOC, the split pattern is:
 
 ```
-pkg/{module}/
-  types.go         // domain types
-  {module}_service.go       // interface + main service impl (orchestrator)
-  {module}_loader.go        // data ingestion helpers
-  {module}_repository.go    // PostgreSQL queries (sql.Rows scanning)
-  {module}_api.go           // http.HandlerFunc registrations
-  {module}_api_handlers.go  // individual handlers
-  {module}_test.go          // table-driven tests
-  {module}_repository_test.go
+src/{module}/
+  mod.rs                // module root: re-exports + public surface
+  types.rs              // domain types / structs / enums
+  service.rs            // trait + main service impl (orchestrator)
+  loader.rs             // data ingestion helpers
+  store.rs              // event store / persistence queries
+  routes.rs             // Axum router registration
+  handlers.rs           // individual handler functions
+  tests.rs              // unit + replay tests (or #[cfg(test)] mod tests)
 ```
 
-Apply the same rules: loaders + repo are leaf-first, service is the
-orchestrator, API file is a thin Register function + handlers.
+Apply the same rules: loaders + store are leaf-first, service is the
+orchestrator, routes file is a thin Router builder + handlers.
 
 ## Integration with other skills
 
 | After /refactor-long-file | Next skill | Why |
 |---|---|---|
 | Refactor delivered | `/test-first` | Ensure each new module has a test |
-| Refactor delivered | `/verify-fix` | R17 render verifies fixture + bundle in prod |
-| Tests green | `/react-recette` or `/go-recette` | Anti-pattern scan on the new tree |
+| Refactor delivered | `/verify-fix` | R16 render verifies fixture + bundle in prod |
+| Tests green | `/react-recette` or `/rust-recette` | Anti-pattern scan on the new tree |
 | All green | Commit + push | Done |
 
 ## Tracing
 
 Each refactor writes:
 
-- `_alire/tracking/PLAN_REFACTOR_{module}_{YYYY-MM-DD}.md` with the
+- `docs/tracking/PLAN_REFACTOR_{module}_{YYYY-MM-DD}.md` with the
   proposed split + rationale
-- `_alire/02_LOGS/Journals/decision_log.jsonl` with a `REFACTOR_SPLIT`
+- `docs/tracking/decision_log.jsonl` with a `REFACTOR_SPLIT`
   entry citing the bug class closed
-- `_alire/02_LOGS/Journals/retex/RETEX_REFACTOR_{module}_{date}.md`
+- `docs/tracking/retex/RETEX_REFACTOR_{module}_{date}.md`
   with LOC delta, test count, rollback instructions
 
 ## Anti-patterns (forbidden)
@@ -328,26 +328,27 @@ Each refactor writes:
 - Splitting into files that each contain a single 3-line function
   (over-decomposition; aim for 80-250 LOC per presentation file)
 - Creating a `*_helpers.ts` dumping ground -- name the file for the
-  domain concept it serves (`nis2Utils.ts`, not `utils.ts`)
+  domain concept it serves (`agentUtils.ts`, not `utils.ts`)
 - Moving state out of the orchestrator into the presentation (creates
   prop-drilling instead of coupling reduction)
 - Committing the orchestrator shrink without the new tree (broken
   build) -- stage and commit atomically
 - Leaving `// @allow-long-file` on the orchestrator "just in case"
-- Skipping the R17 fixture + test for the orchestrator after split
-  (the split itself doesn't close R17 gate, the tests do)
+- Skipping the R16 fixture + test for the orchestrator after split
+  (the split itself doesn't close R16 gate, the tests do)
 
-## Precedent : Nis2ByArticles (2026-04-24, commit 11debc02c0)
+## Precedent : a monolithic page split
 
 | Metric | Before | After |
 |---|---|---|
 | Monolithic LOC | 1145 | 334 (orchestrator) |
 | Files | 1 | 10 (orchestrator + 9 modules) |
-| Largest module | 1145 | 208 (nis2Utils.ts) |
+| Largest module | 1145 | 208 (featureUtils.ts) |
 | Tests | 0 | 4 (vitest 4/4 PASS) |
 | `// @allow-long-file` markers | 1 | 0 |
 | TDZ bug class (hook ordering) | open | closed |
 | Bundle TDZ crash in prod | yes ("Cannot access 'C' before initialization") | no |
 
-Reference : `pdca/nis2-by-articles/cycle_001/` and
-`_alire/02_LOGS/Journals/retex/RETEX_PDCA_NIS2_BY_ARTICLES_2026-04-24.md`.
+Reference : the proposed split + rationale live in
+`docs/tracking/PLAN_REFACTOR_*.md` and the RETEX in
+`docs/tracking/retex/RETEX_REFACTOR_*.md`.

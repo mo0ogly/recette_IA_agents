@@ -1,56 +1,61 @@
 ---
 name: sql-pro
-description: Idiomatic SQL writer for LIA-SEC PostgreSQL 17 daily work -- writes queries, CTEs, window functions, joins, aggregations, set-based operations with parameterized statements. Invoke AVANT toute ecriture de SQL dans le code Go (handlers, services, DAO), dans les migrations courtes (sans changement schema majeur), ou quand on lit/transforme des donnees existantes. Differe de `/db-schema-designer` (DESIGN nouveau schema + migration NNN) et `/postgres-pro` (optimisation perf avancee, EXPLAIN, VACUUM, replication, pgvector tuning) -- ici c'est ECRITURE QUOTIDIENNE de SQL idiomatique, parameterized, set-based, avec respect strict de R7 (SQL injection prevention) et R5 (PostgreSQL = source).
-license: MIT (upstream Jeffallan/claude-skills) -- adapted for LIA-SEC
+description: Idiomatic SQL writer for inspect_ia_agents daily work -- writes queries, CTEs, window functions, joins, aggregations, set-based operations with parameterized statements over the `sqlx` event-store layer (SQLite Phase 1 -> PostgreSQL Phase 2 behind the `EventStore` trait). Invoke AVANT toute ecriture de SQL dans le code Rust (event store impl, read-model projections, queries), dans les migrations courtes (sans changement schema majeur), ou quand on lit/transforme des donnees existantes. Differe de `/db-schema-designer` (DESIGN nouveau schema + migration NNN) et `/postgres-pro` (optimisation perf avancee, EXPLAIN, VACUUM, replication) -- ici c'est ECRITURE QUOTIDIENNE de SQL idiomatique, parameterized, set-based, avec respect strict de R7 (SQL injection prevention), R5 (config source unique) et des invariants I1 (append-only) / I4 (ordre de replay deterministe).
+license: MIT (upstream Jeffallan/claude-skills) -- adapted for inspect_ia_agents
 metadata:
-  author: mo0ogly@proton.me
+  author: inspect_ia_agents
   upstream: https://github.com/Jeffallan/claude-skills/blob/main/skills/sql-pro/SKILL.md
-  version: "2.0.0-lia"
+  version: "2.0.0-inspect_ia_agents"
   domain: language
-  triggers: ecrire SQL, write SQL, query Postgres, JOIN, CTE, WITH, window function, GROUP BY, aggregation, parameterized query, prepared statement, SELECT, INSERT, UPDATE, DELETE, MERGE, UPSERT, ON CONFLICT, RETURNING, db.Query, db.QueryRow, db.Exec, JSONB query, ARRAY operation, recursive query, lateral join, CASE WHEN, COALESCE
+  triggers: ecrire SQL, write SQL, query Postgres, query SQLite, sqlx, JOIN, CTE, WITH, window function, GROUP BY, aggregation, parameterized query, prepared statement, SELECT, INSERT, UPDATE, DELETE, MERGE, UPSERT, ON CONFLICT, RETURNING, query_as, fetch_one, fetch_all, execute, JSONB query, ARRAY operation, recursive query, lateral join, CASE WHEN, COALESCE
   role: specialist
   scope: implementation
-  output-format: code (Go + SQL embedded)
-  related-skills: db-schema-designer, postgres-pro, golang-pro, secure-code-guardian, rag-architect
+  output-format: code (Rust + SQL embedded)
+  related-skills: db-schema-designer, postgres-pro, rust-best-practices, secure-code-guardian
   enforces-rules: R5, R6, R7, R10, R12, R16
 ---
 
-# SQL Pro (LIA-SEC adaptation)
+# SQL Pro (inspect_ia_agents adaptation)
 
-> **Quand m'invoquer** : ecriture de SQL quotidien dans le code Go LIA-SEC.
+> **Quand m'invoquer** : ecriture de SQL quotidien dans le code Rust
+> inspect_ia_agents (event store, read-model projections, queries forensiques).
 > SELECT/INSERT/UPDATE/DELETE/MERGE, JOINs, CTEs, window functions, JSONB
 > queries, ARRAY operations, RETURNING, ON CONFLICT, parameterized statements.
 >
 > **NE PAS m'invoquer pour** :
 > - Design d'un NOUVEAU schema (tables, indexes, migrations majeures) -> `/db-schema-designer`
-> - EXPLAIN ANALYZE, perf monitoring, VACUUM tuning, replication, pgvector tuning -> `/postgres-pro`
-> - Embedding/retrieval pgvector + ExecuteWithRAG -> `/rag-architect`
+> - EXPLAIN ANALYZE, perf monitoring, VACUUM tuning, replication -> `/postgres-pro`
 > - Audit securite SQL injection POST-ecriture -> `/security-reviewer`
+>
+> **Rappel invariants (event store)** : le log d'evenements est append-only (I1) --
+> JAMAIS d'`UPDATE`/`DELETE` sur la table `events` ; une correction = un evenement
+> compensatoire. L'ordre de replay est porte par `seq` monotone (I4). Detail :
+> `.claude/rules/event-store-decision.md`, `.claude/rules/invariants.md`.
 >
 > **Toujours combinable** : `/sql-pro` ecrit la query, `/postgres-pro` la tune
 > apres EXPLAIN, `/secure-code-guardian` valide la sanitization.
 
 ---
 
-## 0. Stack LIA-SEC -- contexte obligatoire
+## 0. Stack inspect_ia_agents -- contexte obligatoire
 
 | Item | Valeur |
 |------|--------|
-| RDBMS | **PostgreSQL 17** uniquement (pas MySQL, pas Oracle, pas SQL Server) |
-| User | `lia_admin` (DDL/DML), via `LIA_DB_PASS` ou `DATABASE_URL` (R8) |
-| Database | `lia_scan` (268+ tables, 332K CVE, 5+ GB) |
-| Driver Go | `database/sql` + `lib/pq` (la plupart) ou `pgx/v5` (futur migration) |
-| Extensions actives | `vector` (pgvector v0.8.2 HNSW), `pg_trgm`, `unaccent`, `uuid-ossp` |
+| RDBMS | **SQLite** (Phase 1, mono-hote) -> **PostgreSQL** (Phase 2, distribue) derriere le trait `EventStore` (cf `.claude/rules/event-store-decision.md`) |
+| Connection string | via `INSPECT_IA_AGENTS_DATABASE_URL` / `INSPECT_IA_AGENTS_EVENT_STORE=sqlite\|postgres` (R5/R8) -- jamais en dur |
+| Event log | table `events` INSERT-only, `seq INTEGER PRIMARY KEY AUTOINCREMENT` (ordre total monotone, I4) |
+| Immutabilite | ENFORCEE par triggers anti-`UPDATE`/`DELETE` (I1), pas seulement par discipline |
+| Integrite | hash chain `prev_hash` + `side_effect_hash` calcules a l'append |
+| Driver Rust | `sqlx` (queries verifiees a la compilation ; supporte SQLite et PostgreSQL) |
+| Pragmas SQLite | `PRAGMA journal_mode=WAL;` `PRAGMA foreign_keys=ON;` |
 | Naming | `snake_case` partout (tables, colonnes, indexes, contraintes) |
-| PK convention | `UUID` (gen_random_uuid()) ou `BIGSERIAL` selon volumetrie |
-| Timestamps | `TIMESTAMPTZ` (jamais `TIMESTAMP`), default `now()` |
-| JSON | `JSONB` (jamais `JSON`), avec index GIN si recherche |
-| Numeriques | `DECIMAL/NUMERIC` (jamais `FLOAT/REAL` -- precision critique pour CVSS) |
-| Whitelist columns | Pour SQL dynamique cf `enforcement-backend.md` (R7) |
-| Logger | `LogSystemEvent("ERROR"|"WARN"|"INFO", "DB", action, details)` (R6) |
-| Migrations | `cmd/sigma_web/postgres/migrations/NNN_*.sql` (numerotees) |
-| Connection pool | `getDB()`, `getSmsiDB()`, etc. -- ne JAMAIS faire `sql.Open` ad-hoc |
-| Backend single-instance | R16 -- attention aux locks ACCESS EXCLUSIVE sur unified_logs (244M rows) |
+| PK convention | `seq` monotone (ordre) + `event_id` ULID/UUIDv7 (identite ordonnable) |
+| Timestamps | en Postgres `TIMESTAMPTZ` ; le `timestamp` d'un evenement est un INPUT capture, jamais `now()` dans la decision (I4) |
+| JSON | `JSONB` en Postgres (index GIN si recherche) ; `TEXT`/`json` en SQLite |
+| Acces SQL | UNIQUEMENT derriere le trait `EventStore` -- aucune query SQLite/PG directe hors de l'impl du trait |
+| Logger | `tracing` structure (spans + fields), correle par `event_id`/`agent_id` (R6) |
+| Migrations | `migrations/NNN_*.sql` (numerotees, idempotentes) via `sqlx migrate` |
+| Dialect portable | une query doit fonctionner SQLite ET PostgreSQL ; isoler les specificites de dialecte dans l'impl du trait |
 
 ---
 
@@ -58,62 +63,66 @@ metadata:
 
 ### La regle d'or
 
-```go
-// INTERDIT -- f"...{var}..." / fmt.Sprintf injection direct
-query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", name) // VULNERABLE
+```rust
+// INTERDIT -- format!() injection direct dans la query
+let query = format!("SELECT * FROM events WHERE agent_id = '{agent_id}'"); // VULNERABLE
 
-// CORRECT -- placeholders $1, $2 + arguments separes
-query := "SELECT * FROM users WHERE name = $1"
-rows, err := db.Query(query, name)
+// CORRECT -- bind parameters (sqlx echappe et type-check a la compilation)
+let rows = sqlx::query_as::<_, EventRow>(
+    "SELECT seq, event_id, agent_id FROM events WHERE agent_id = $1",
+)
+.bind(&agent_id)
+.fetch_all(pool)
+.await?;
 ```
 
-### Cas legitimes de `fmt.Sprintf` dans une query
+### Cas legitimes de `format!()` dans une query
 
-Trois cas seulement ou `fmt.Sprintf` dans une query est OK :
+Trois cas seulement ou `format!()` dans une query est OK :
 
-1. **Format `%d` int APRES validation/clamp**
-```go
-months := parseMonths(r) // strconv.Atoi + clamp [1, 36]
-query := fmt.Sprintf("WHERE date >= NOW() - INTERVAL '%d months'", months)
-// %d ne peut pas injecter, parseMonths garantit int dans plage
+1. **Format `{}` int APRES validation/clamp**
+```rust
+let days: i64 = parse_days(req).clamp(1, 365); // i64 garanti dans la plage
+let query = format!("WHERE timestamp >= NOW() - INTERVAL '{days} days'");
+// {} sur un i64 valide ne peut pas injecter
 ```
 
-2. **Nom de colonne issu d'une whitelist verifie**
-```go
-var allowedColumns = map[string]bool{"name": true, "email": true, "status": true}
+2. **Nom de colonne issu d'une whitelist verifiee**
+```rust
+const ALLOWED_COLUMNS: &[&str] = &["agent_id", "action_type", "target_system"];
 
-if !allowedColumns[col] {
-    LogSystemEvent("WARN", "SECURITY", "SQL_INJECTION_ATTEMPT",
-        fmt.Sprintf("Blocked invalid column '%s'", col))
-    return fmt.Errorf("invalid column: %s", col)
+if !ALLOWED_COLUMNS.contains(&col) {
+    tracing::warn!(column = %col, "SQL_INJECTION_ATTEMPT: invalid column blocked");
+    return Err(StoreError::InvalidColumn(col.to_string()));
 }
-query := fmt.Sprintf("UPDATE users SET %s = $1 WHERE id = $2", col)
-db.Exec(query, value, id)
+let query = format!("SELECT seq, {col} FROM events WHERE seq = $1");
 ```
 
-3. **Nom de table fixe par la liste de schemas LIA-SEC**
-```go
-table := "smsi_" + suffix
-allowed := map[string]bool{"smsi_assets": true, "smsi_risks": true}
-if !allowed[table] { return errors.New("invalid table") }
-query := fmt.Sprintf("SELECT count(*) FROM %s", table)
+3. **Nom de table fixe par une whitelist de read-models**
+```rust
+let table = format!("projection_{suffix}");
+const ALLOWED: &[&str] = &["projection_approvals", "projection_risk"];
+if !ALLOWED.contains(&table.as_str()) {
+    return Err(StoreError::InvalidTable(table));
+}
+let query = format!("SELECT count(*) FROM {table}");
 ```
 
 ### Patterns INTERDITS (refus immediat)
 
-```go
+```rust
 // INTERDIT 1 -- string concat
-query := "SELECT * FROM users WHERE name = '" + name + "'"
+let query = "SELECT * FROM events WHERE agent_id = '".to_string() + &agent_id + "'";
 
-// INTERDIT 2 -- Sprintf %s (string injection direct)
-query := fmt.Sprintf("WHERE email = '%s'", email)
+// INTERDIT 2 -- format! interpolant une string user (string injection direct)
+let query = format!("WHERE target_system = '{target}'");
 
-// INTERDIT 3 -- whitelist contournee
-query := fmt.Sprintf("ORDER BY %s", r.URL.Query().Get("sort"))
+// INTERDIT 3 -- whitelist contournee (tri pilote par l'utilisateur)
+let query = format!("ORDER BY {}", req.sort_param());
 
 // INTERDIT 4 -- LIKE concatenation
-query := "WHERE name LIKE '%" + search + "%'"
-// Correct : query := "WHERE name LIKE $1"; db.Query(query, "%"+search+"%")
+let query = format!("WHERE action_type LIKE '%{search}%'");
+// Correct : "WHERE action_type LIKE $1" puis .bind(format!("%{search}%"))
 ```
 
 ---
@@ -141,17 +150,18 @@ query := "WHERE name LIKE '%" + search + "%'"
     - NULL safe : `COALESCE`, `IS DISTINCT FROM`, `NULLIF`
     - Format SQL : indenter, mettre les keywords en MAJUSCULES, commenter
 
-[4] WRAP en Go
-    - `db := getDB()` (ne pas re-ouvrir)
-    - `defer rows.Close()` IMPERATIF apres `db.Query`
-    - Scan dans struct typee, pas dans `interface{}`
-    - Erreur PostgreSQL -> `LogSystemEvent("ERROR", "DB", "<ACTION>_FAILED", err.Error())`
-    - HTTP 500 generique cote utilisateur (ne JAMAIS leak le SQL/erreur PG)
+[4] WRAP en Rust (derriere le trait EventStore)
+    - utiliser le `Pool` partage du store, ne pas re-ouvrir une connexion ad-hoc
+    - `query_as::<_, Row>(...)` map directement dans une struct typee (`FromRow`), pas de scan manuel
+    - propager l'erreur avec `?` ; type d'erreur explicite (`thiserror`), pas de `.unwrap()`/`.expect()` en prod (R7)
+    - log d'erreur structure : `tracing::error!(error = %e, %event_id, "...")` (R6)
+    - cote frontiere (Gateway) : erreur generique vers l'appelant, ne JAMAIS leak le SQL/erreur driver
 
 [5] VERIFY
-    - Test query directement via psql avant compilation Go
+    - sqlx verifie les queries a la compilation -- `cargo build` doit etre propre
+    - Test query directement via la CLI du moteur (`sqlite3` / `psql`) avant le code Rust
     - EXPLAIN si SELECT touche > 10K rows
-    - Check qu'il n'y a pas Seq Scan sur table > 100K rows
+    - Check qu'il n'y a pas de scan complet sur une table volumineuse
     - Si lent -> invoquer `/postgres-pro` pour tuning index
 ```
 
@@ -168,228 +178,218 @@ query := "WHERE name LIKE '%" + search + "%'"
 | Dialect differences | `references/dialect-differences.md` | **PostgreSQL specifics uniquement** -- ignorer MySQL/SQL Server |
 
 > Les references upstream comparent PostgreSQL/MySQL/SQL Server/Oracle.
-> En LIA-SEC, **seul PostgreSQL 17 compte**. Quand une reference montre du
-> SQL Server (`TOP`, `[brackets]`, `GETDATE()`) ou MySQL (`LIMIT a, b`,
-> backticks), traduire en PostgreSQL idiomatique avant utilisation.
+> En inspect_ia_agents, **seuls SQLite (Phase 1) et PostgreSQL (Phase 2)
+> comptent**. Une query doit rester portable entre les deux ; isoler toute
+> specificite de dialecte dans l'impl du trait `EventStore`. Quand une
+> reference montre du SQL Server (`TOP`, `[brackets]`, `GETDATE()`) ou MySQL
+> (`LIMIT a, b`, backticks), traduire en SQL standard / PostgreSQL idiomatique
+> avant utilisation, et verifier que l'equivalent SQLite tient.
 
 ---
 
-## 4. Patterns LIA-SEC frequents (copy-friendly)
+## 4. Patterns inspect_ia_agents frequents (copy-friendly)
 
-### 4.1 Lecture simple parameterized
+> Domaine : la table append-only `events` (modele canonique `AgentActionEvent`),
+> les read-models/projections reconstruits depuis le log, et les queries
+> forensiques. Toutes ces queries vivent DERRIERE le trait `EventStore`.
 
-```go
-// Read user by id
-query := `
-    SELECT id, email, name, role, status, created_at, updated_at
-    FROM users
-    WHERE id = $1
-      AND status != 'archived'
-`
-var u User
-err := db.QueryRow(query, userID).Scan(
-    &u.ID, &u.Email, &u.Name, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+### 4.1 Lecture simple parameterized (un evenement par id)
+
+```rust
+// Read one event by event_id
+let row = sqlx::query_as::<_, EventRow>(
+    "SELECT seq, event_id, timestamp, agent_id, action_type, target_system, \
+            policy_decision, approval_state \
+     FROM events \
+     WHERE event_id = $1",
 )
-if err == sql.ErrNoRows {
-    http.Error(w, "Not found", http.StatusNotFound)
-    return
-}
-if err != nil {
-    LogSystemEvent("ERROR", "DB", "USER_FETCH_FAILED", err.Error())
-    http.Error(w, "Internal error", http.StatusInternalServerError)
-    return
-}
+.bind(&event_id)
+.fetch_optional(pool)            // None si absent, pas d'erreur
+.await
+.map_err(|e| {
+    tracing::error!(error = %e, %event_id, "EVENT_FETCH_FAILED");
+    StoreError::Query(e)
+})?;
 ```
 
 ### 4.2 Query liste avec filtres dynamiques (whitelist)
 
-```go
-var allowedSorts = map[string]string{
-    "name_asc":  "name ASC",
-    "name_desc": "name DESC",
-    "date_desc": "created_at DESC",
-}
-sortKey := r.URL.Query().Get("sort")
-sortClause, ok := allowedSorts[sortKey]
-if !ok {
-    sortClause = "created_at DESC"
-}
+```rust
+// Sort whitelisted; user input only via bind parameters
+let sort_clause = match sort_key {
+    "seq_asc"  => "seq ASC",
+    "seq_desc" => "seq DESC",
+    _          => "seq ASC",      // default deterministe (I4)
+};
 
-query := fmt.Sprintf(`
-    SELECT id, name, status, created_at
-    FROM smsi_assets
-    WHERE client_id = $1
-      AND ($2 = '' OR status = $2)
-    ORDER BY %s
-    LIMIT $3 OFFSET $4
-`, sortClause)
+let query = format!(
+    "SELECT seq, event_id, agent_id, action_type, policy_decision \
+     FROM events \
+     WHERE agent_id = $1 \
+       AND ($2 = '' OR action_type = $2) \
+     ORDER BY {sort_clause} \
+     LIMIT $3 OFFSET $4"
+);
 
-rows, err := db.Query(query, clientID, statusFilter, limit, offset)
-if err != nil {
-    LogSystemEvent("ERROR", "DB", "ASSETS_LIST_FAILED", err.Error())
-    return nil, err
-}
-defer rows.Close()
+let rows = sqlx::query_as::<_, EventRow>(&query)
+    .bind(&agent_id)
+    .bind(&action_filter)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, %agent_id, "EVENTS_LIST_FAILED");
+        StoreError::Query(e)
+    })?;
 ```
 
-### 4.3 UPSERT avec ON CONFLICT (idempotent)
+### 4.3 UPSERT avec ON CONFLICT (idempotent -- read-model, PAS le log)
 
-```go
-query := `
-    INSERT INTO rag_documents (id, content, embedding, source, source_type, metadata)
-    VALUES ($1, $2, $3::vector, $4, $5, $6)
-    ON CONFLICT (id) DO UPDATE SET
-        content = EXCLUDED.content,
-        embedding = EXCLUDED.embedding,
-        metadata = rag_documents.metadata || EXCLUDED.metadata,  -- JSONB merge
-        updated_at = NOW()
-    RETURNING id, created_at, updated_at
-`
-var (
-    id        string
-    createdAt, updatedAt time.Time
-)
-err := db.QueryRow(query, docID, content, embeddingStr, source, srcType, metadataJSON).
-    Scan(&id, &createdAt, &updatedAt)
+```rust
+// Read-models/projections are rebuildable and MAY be upserted.
+// The append-only `events` log is NEVER upserted (I1).
+let query = r#"
+    INSERT INTO projection_approvals (agent_id, pending_count, last_event_seq, metadata)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (agent_id) DO UPDATE SET
+        pending_count  = EXCLUDED.pending_count,
+        last_event_seq = EXCLUDED.last_event_seq,
+        metadata       = projection_approvals.metadata || EXCLUDED.metadata
+    RETURNING agent_id, last_event_seq
+"#;
+let updated = sqlx::query_as::<_, ProjectionRow>(query)
+    .bind(&agent_id)
+    .bind(pending_count)
+    .bind(last_event_seq)
+    .bind(&metadata_json)
+    .fetch_one(pool)
+    .await?;
 ```
 
-### 4.4 CTE + window function (top-N par categorie)
+### 4.4 CTE + window function (dernier evenement par agent)
 
 ```sql
--- Top 5 critical CVEs per vendor (LIA-SEC pattern)
+-- Latest event per agent, ordered by the monotone seq (deterministic, I4)
 WITH ranked AS (
     SELECT
-        cve_id,
-        cvss_score,
-        affected_vendors,
+        seq,
+        event_id,
+        agent_id,
+        action_type,
+        policy_decision,
         ROW_NUMBER() OVER (
-            PARTITION BY (affected_vendors->>0)
-            ORDER BY cvss_score DESC, published_date DESC
+            PARTITION BY agent_id
+            ORDER BY seq DESC
         ) AS rn
-    FROM cve_nvd_data
-    WHERE cvss_score >= 9.0
-      AND published_date >= NOW() - INTERVAL '90 days'
+    FROM events
 )
-SELECT cve_id, cvss_score, affected_vendors
+SELECT seq, event_id, agent_id, action_type, policy_decision
 FROM ranked
-WHERE rn <= 5;
+WHERE rn = 1;
 ```
 
 ### 4.5 Aggregation set-based (pas N+1)
 
 ```sql
--- ANTI-PATTERN : N+1 query (1 query par user)
--- SELECT count(*) FROM smsi_assets WHERE owner_id = $1
+-- ANTI-PATTERN : N+1 query (1 query par agent)
+-- SELECT count(*) FROM events WHERE agent_id = $1
 
--- CORRECT : single aggregation
+-- CORRECT : single aggregation -- decisions par agent
 SELECT
-    u.id, u.name,
-    COALESCE(stats.total_assets, 0)    AS total_assets,
-    COALESCE(stats.critical_assets, 0) AS critical_assets
-FROM users u
-LEFT JOIN (
-    SELECT
-        owner_id,
-        COUNT(*)                                          AS total_assets,
-        COUNT(*) FILTER (WHERE criticality = 'critical')  AS critical_assets
-    FROM smsi_assets
-    WHERE status != 'archived'
-    GROUP BY owner_id
-) stats ON stats.owner_id = u.id
-WHERE u.client_id = $1;
+    agent_id,
+    COUNT(*)                                              AS total_events,
+    COUNT(*) FILTER (WHERE policy_decision = 'deny')      AS deny_count,
+    COUNT(*) FILTER (WHERE approval_state = 'pending')    AS pending_count
+FROM events
+GROUP BY agent_id;
 ```
 
 ### 4.6 EXISTS plutot que COUNT (presence check)
 
 ```sql
 -- ANTI-PATTERN : count entire table
-SELECT COUNT(*) > 0 FROM cve_nvd_data WHERE cve_id = $1;
+SELECT COUNT(*) > 0 FROM events WHERE event_id = $1;
 
 -- CORRECT : short-circuit
-SELECT EXISTS (SELECT 1 FROM cve_nvd_data WHERE cve_id = $1);
+SELECT EXISTS (SELECT 1 FROM events WHERE event_id = $1);
 ```
 
-### 4.7 JSONB query + index GIN
+### 4.7 JSON payload query (JSONB + index GIN en Postgres)
 
 ```sql
--- Recherche dans metadata JSONB (necessite index GIN)
--- CREATE INDEX idx_rag_documents_metadata_gin ON rag_documents USING GIN (metadata jsonb_path_ops);
+-- Postgres: filter on the canonical event payload (needs a GIN index)
+-- CREATE INDEX idx_events_payload_gin ON events USING GIN (payload jsonb_path_ops);
 
-SELECT id, content, metadata->>'cvss' AS cvss, metadata->>'vendor' AS vendor
-FROM rag_documents
-WHERE metadata @> '{"severity": "CRITICAL"}'   -- index GIN utilise
-  AND (metadata->>'cvss')::numeric >= 9.0
+SELECT seq, event_id, agent_id, payload->>'resource' AS resource
+FROM events
+WHERE payload @> '{"action_type": "merge_pr"}'   -- GIN index used
+  AND policy_decision = 'escalate'
 LIMIT 10;
+-- SQLite Phase 1 equivalent: json_extract(payload, '$.action_type') = 'merge_pr'
 ```
 
-### 4.8 Recursive CTE (hierarchie ATT&CK)
+### 4.8 Recursive CTE (chaine de compensation)
 
 ```sql
--- Trouver toutes les sub-techniques sous une parent technique
+-- Walk the chain of compensating events that correct a prior one (I1: no mutation)
 WITH RECURSIVE chain AS (
-    SELECT mitre_id, name, parent_technique, 1 AS depth
-    FROM mitre_techniques
-    WHERE mitre_id = $1
+    SELECT event_id, corrects_event_id, 1 AS depth
+    FROM events
+    WHERE event_id = $1
     UNION ALL
-    SELECT mt.mitre_id, mt.name, mt.parent_technique, c.depth + 1
-    FROM mitre_techniques mt
-    JOIN chain c ON mt.parent_technique = c.mitre_id
-    WHERE c.depth < 5  -- garde-fou
+    SELECT e.event_id, e.corrects_event_id, c.depth + 1
+    FROM events e
+    JOIN chain c ON e.corrects_event_id = c.event_id
+    WHERE c.depth < 16  -- garde-fou
 )
-SELECT mitre_id, name, depth FROM chain ORDER BY depth, mitre_id;
+SELECT event_id, corrects_event_id, depth FROM chain ORDER BY depth, event_id;
 ```
 
-### 4.9 Soft-delete et audit
+### 4.9 Correction via evenement compensatoire (JAMAIS d'UPDATE/DELETE, I1)
 
 ```sql
--- Soft delete LIA-SEC (jamais DELETE direct sur table audit-able)
-UPDATE smsi_assessments
-SET status = 'archived',
-    archived_at = NOW(),
-    archived_by = $2
-WHERE id = $1
-  AND status != 'archived'  -- idempotent
-RETURNING id;
+-- WRONG (I1 violation): UPDATE events SET payload = ... WHERE event_id = $1;
+-- RIGHT: append a NEW compensating event that references the one it corrects.
+INSERT INTO events (event_id, timestamp, agent_id, action_type, payload, corrects_event_id, prev_hash, side_effect_hash)
+VALUES ($1, $2, $3, 'compensation', $4, $5, $6, $7)
+RETURNING seq, event_id;
 ```
 
-### 4.10 Transaction avec rollback Go
+### 4.10 Transaction avec rollback Rust (sqlx)
 
-```go
-tx, err := db.BeginTx(ctx, nil)
-if err != nil {
-    LogSystemEvent("ERROR", "DB", "TX_BEGIN_FAILED", err.Error())
-    return err
-}
-defer func() {
-    if p := recover(); p != nil {
-        tx.Rollback() // #nosec G104 -- best effort
-        panic(p)
-    }
-}()
+```rust
+// sqlx transaction: explicit commit; drop without commit rolls back automatically.
+let mut tx = pool.begin().await.map_err(|e| {
+    tracing::error!(error = %e, "TX_BEGIN_FAILED");
+    StoreError::Query(e)
+})?;
 
-if _, err := tx.ExecContext(ctx, queryA, args...); err != nil {
-    tx.Rollback() // #nosec G104
-    LogSystemEvent("ERROR", "DB", "TX_QUERY_A_FAILED", err.Error())
-    return err
-}
-if _, err := tx.ExecContext(ctx, queryB, args...); err != nil {
-    tx.Rollback() // #nosec G104
-    LogSystemEvent("ERROR", "DB", "TX_QUERY_B_FAILED", err.Error())
-    return err
-}
-return tx.Commit()
+sqlx::query("INSERT INTO events (event_id, agent_id, action_type, prev_hash) VALUES ($1, $2, $3, $4)")
+    .bind(&event_id).bind(&agent_id).bind(&action_type).bind(&prev_hash)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| { tracing::error!(error = %e, %event_id, "TX_APPEND_FAILED"); StoreError::Query(e) })?;
+
+sqlx::query("UPDATE projection_approvals SET last_event_seq = $1 WHERE agent_id = $2")
+    .bind(last_seq).bind(&agent_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| { tracing::error!(error = %e, %agent_id, "TX_PROJECTION_FAILED"); StoreError::Query(e) })?;
+
+tx.commit().await.map_err(StoreError::Query)?;
 ```
 
-### 4.11 Vector similarity (pgvector, pour info -- prefer `/rag-architect`)
+### 4.11 Replay : lire le log dans l'ordre (I4)
 
 ```sql
--- Cosine similarity search (HNSW index automatic)
-SELECT id, content, source, 1 - (embedding <=> $1::vector) AS sim
-FROM rag_documents
-WHERE source_type = ANY($2::text[])
-  AND 1 - (embedding <=> $1::vector) >= $3
-ORDER BY embedding <=> $1::vector ASC
-LIMIT $4;
+-- Read the event stream from a checkpoint, in stable monotone seq order.
+-- This ordering is what makes replay deterministic (I4).
+SELECT seq, event_id, timestamp, agent_id, action_type, target_system, payload, policy_decision
+FROM events
+WHERE seq > $1
+ORDER BY seq ASC
+LIMIT $2;
 ```
 
 ---
@@ -398,70 +398,77 @@ LIMIT $4;
 
 | INTERDIT | A la place |
 |----------|-----------|
-| `fmt.Sprintf` avec `%s` interpoler une string user | placeholders `$1, $2` + `db.Query(q, args...)` |
+| `format!` avec `{}` interpolant une string user | bind parameters `$1, $2` + `.bind(arg)` (sqlx) |
+| `UPDATE` / `DELETE` sur la table `events` (viole I1) | evenement compensatoire (`corrects_event_id`), jamais de mutation |
+| `now()` dans le chemin de decision (viole I4) | `timestamp` capture en amont = INPUT de l'evenement |
 | `SELECT *` en code production | nommer les colonnes explicitement |
-| `for { db.Query(...) }` sur ID -- N+1 query | seul `JOIN` ou `IN ($1, $2, ...)` ou `= ANY($1::uuid[])` |
-| `db.Query` sans `defer rows.Close()` | `defer rows.Close()` immediatement apres |
-| `sql.Open` dans un handler | `db := getDB()` (pool partagé) |
-| `DROP TABLE` ou `DELETE FROM` sans `WHERE` | toujours `WHERE id = $1` ou soft-delete |
-| `TRUNCATE` direct | TRUNCATE `WITH RESTART` + transaction + LogSystemEvent |
-| `FLOAT` / `REAL` pour CVSS, EPSS, scores | `NUMERIC(4,2)` / `DECIMAL` |
-| `TIMESTAMP` sans timezone | `TIMESTAMPTZ` |
-| `JSON` (texte seul) | `JSONB` (binaire indexable) |
-| Hardcode `'lia_admin'` ou password | `$LIA_DB_PASS` env / `system_variables` (R5+R8) |
-| `LIKE '%' || search || '%'` (no index) | `pg_trgm` index + `%>` operator OR full-text `to_tsvector` |
-| `OFFSET 100000` (paginate enormous) | keyset pagination `WHERE id > $last_id ORDER BY id LIMIT 50` |
-| `count(*) FROM giant_table` (full scan) | `pg_class.reltuples` estimate ou maintenir compteur |
+| `for { fetch_all(...) }` sur ID -- N+1 query | `JOIN` ou `IN ($1, $2, ...)` ou `= ANY($1::text[])` (Postgres) |
+| connexion `sqlx` ad-hoc dans la logique metier | le `Pool` partage derriere le trait `EventStore` |
+| query SQL directe hors de l'impl du trait `EventStore` | toute query passe par le trait (decouplage, replay) |
+| `DROP TABLE` ou `DELETE FROM` sans `WHERE` | sur les read-models seulement ; jamais sur `events` (I1) |
+| `TIMESTAMP` sans timezone (Postgres) | `TIMESTAMPTZ` |
+| `JSON` (texte seul, Postgres) | `JSONB` (binaire indexable) |
+| Hardcode connection string ou password | `INSPECT_IA_AGENTS_DATABASE_URL` env (R5+R8) |
+| `LIKE '%' || search || '%'` (no index) | `pg_trgm` index + operator OR full-text `to_tsvector` (Postgres) |
+| `OFFSET 100000` (paginate enormous) | keyset pagination `WHERE seq > $last_seq ORDER BY seq LIMIT 50` |
+| `count(*) FROM giant_table` (full scan) | `pg_class.reltuples` estimate (Postgres) ou compteur maintenu |
 | `UNION` (deduplication couteuse) | `UNION ALL` si dedup pas necessaire |
 | Migration SQL sans `IF NOT EXISTS` | `CREATE TABLE IF NOT EXISTS` partout (idempotent) |
-| `ALTER TABLE add column NOT NULL` sans default | risque ACCESS EXCLUSIVE long ; `ADD COLUMN ... DEFAULT` puis `NOT NULL` separe |
-| INSERT massif row-by-row | `COPY FROM STDIN` ou `INSERT ... VALUES (...), (...), ... ($1,$2),(...)` batch |
-| Logs SQL avec emoji ❌ ✅ | `[FAIL]` / `[OK]` (R10) |
+| Query specifique a un seul dialecte sans equivalent | garder la portabilite SQLite <-> PostgreSQL, sinon l'isoler dans l'impl du trait |
+| INSERT massif row-by-row | batch `INSERT ... VALUES ($1,$2),($3,$4),...` (ou `COPY` en Postgres) |
+| Logs SQL avec emoji | `[FAIL]` / `[OK]` (R10) |
 
 ---
 
 ## 6. Checklist avant commit (5 items)
 
-- [ ] **Aucun `fmt.Sprintf` avec `%s` user** (R7) -- ou whitelist documente
-- [ ] **`defer rows.Close()`** apres chaque `db.Query`
-- [ ] **`LogSystemEvent("ERROR", "DB", ...)` sur chaque erreur** (R6)
-- [ ] **HTTP 500 generique** cote utilisateur (jamais leak SQL ou err.Error() complet)
-- [ ] **Test query** localement via `psql` avant compilation (`psql_lia` helper)
+- [ ] **Aucun `format!` interpolant une string user** (R7) -- ou whitelist documente
+- [ ] **Aucun `UPDATE`/`DELETE` sur `events`** (I1) -- correction = evenement compensatoire
+- [ ] **Aucun `now()` dans le chemin de decision** (I4) -- `timestamp` capture en INPUT
+- [ ] **Query derriere le trait `EventStore`** (pas de SQL direct hors de l'impl)
+- [ ] **`tracing::error!(error = %e, ...)` sur chaque erreur** (R6) ; pas de `.unwrap()`/`.expect()` en prod (R7)
+- [ ] **Erreur generique** cote appelant (jamais leak SQL ou message driver complet)
+- [ ] **Test query** localement via `sqlite3` / `psql` avant le code Rust ; `cargo build` propre (sqlx compile-check)
 
 Pour requete > 10K rows ou > 50ms attendue : **ajouter `EXPLAIN ANALYZE`** dans le commit message OU invoquer `/postgres-pro` pour validation.
 
 ---
 
-## 7. Helper psql_lia (pour test local)
+## 7. Test local (avant le code Rust)
 
-Toute query peut etre testee avant le code Go via :
+Toute query peut etre testee avant le code Rust, selon la phase active.
+
+Phase 1 (SQLite) -- via la CLI `sqlite3` sur le fichier de l'event store :
 
 ```bash
-# .claude/CLAUDE.md helper pattern
-LIA_DB_PASS="${LIA_DB_PASS:-${PGPASSWORD:-}}"
-LIA_DB_USER="${LIA_DB_USER:-lia_admin}"
-LIA_DB_NAME="${LIA_DB_NAME:-lia_scan}"
-
-psql_lia() {
-    PGPASSWORD="$LIA_DB_PASS" psql -h localhost -U "$LIA_DB_USER" -d "$LIA_DB_NAME" "$@"
-}
-
 # Tester une query
-psql_lia -c "SELECT count(*) FROM rag_documents WHERE source_type='cve';"
+sqlite3 data/events.db "SELECT count(*) FROM events WHERE policy_decision='deny';"
 
-# Tester un EXPLAIN
-psql_lia -c "EXPLAIN ANALYZE SELECT ... FROM ..."
+# Inspecter le schema d'une table
+sqlite3 data/events.db ".schema events"
 
-# Recuperer le schema d'une table
-psql_lia -c "\d rag_documents"
+# Verifier le plan
+sqlite3 data/events.db "EXPLAIN QUERY PLAN SELECT ... FROM events WHERE seq > 0;"
 ```
+
+Phase 2 (PostgreSQL) -- via `psql` sur la connexion configuree :
+
+```bash
+# Connexion via l'URL configuree (R5/R8), jamais de password en dur
+psql "$INSPECT_IA_AGENTS_DATABASE_URL" -c "SELECT count(*) FROM events WHERE policy_decision='deny';"
+psql "$INSPECT_IA_AGENTS_DATABASE_URL" -c "EXPLAIN ANALYZE SELECT ... FROM events"
+psql "$INSPECT_IA_AGENTS_DATABASE_URL" -c "\d events"
+```
+
+`sqlx` verifie en plus les queries a la compilation : un `cargo build` propre
+attrape un mismatch de colonne/type avant tout run.
 
 ---
 
 ## 8. Output template (sortie d'une session sql-pro)
 
 ```markdown
-## SQL Query : <objectif> -- file.go:line
+## SQL Query : <objectif> -- file.rs:line
 
 ### Context
 - Table(s) : ...
@@ -478,38 +485,43 @@ FROM ...
 WHERE ...
 ```
 
-### Go code
+### Rust code (sqlx, derriere le trait EventStore)
 
-```go
-query := `...`
-rows, err := db.Query(query, args...)
-if err != nil {
-    LogSystemEvent("ERROR", "DB", "ACTION_FAILED", err.Error())
-    ...
-}
-defer rows.Close()
+```rust
+let rows = sqlx::query_as::<_, Row>("...")
+    .bind(arg)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, "ACTION_FAILED");
+        StoreError::Query(e)
+    })?;
 ```
 
 ### Index requis (si query > 10K rows)
 
 ```sql
-CREATE INDEX IF NOT EXISTS idx_table_col ON table (col);
--- Migration : cmd/sigma_web/postgres/migrations/NNN_idx_table_col.sql
+CREATE INDEX IF NOT EXISTS idx_events_col ON events (col);
+-- Migration : migrations/NNN_idx_events_col.sql (sqlx migrate, idempotent)
 ```
 
 ### Test local
 
 ```bash
-psql_lia -c "EXPLAIN ANALYZE <query avec valeurs>"
+# Phase 1 SQLite
+sqlite3 data/events.db "EXPLAIN QUERY PLAN <query>"
+# Phase 2 PostgreSQL
+psql "$INSPECT_IA_AGENTS_DATABASE_URL" -c "EXPLAIN ANALYZE <query avec valeurs>"
 ```
 
 ### Checklist
 
 - [ ] Parameterized (R7)
-- [ ] defer rows.Close()
-- [ ] LogSystemEvent error
-- [ ] HTTP 500 generique
-- [ ] Test psql OK
+- [ ] Pas d'UPDATE/DELETE sur `events` (I1)
+- [ ] Pas de `now()` dans la decision (I4)
+- [ ] tracing::error! structure
+- [ ] Erreur generique cote appelant
+- [ ] Test sqlite3/psql OK
 ```
 
 ---
@@ -519,21 +531,20 @@ psql_lia -c "EXPLAIN ANALYZE <query avec valeurs>"
 | Critere | Min | Comment l'atteindre |
 |---------|-----|---------------------|
 | C1 Decomposition | 8/10 | Workflow 5 phases respecte (CONTEXT -> PATTERN -> WRITE -> WRAP -> VERIFY) |
-| C2 Planification (THINK) | 9/10 | Verifier schema reel via psql AVANT ecriture (pas inventer colonnes) |
-| C3 Replanification | 7/10 | Si EXPLAIN signale Seq Scan -> rewrite query OU pass main a `/postgres-pro` |
-| C4 Outillage | 8/10 | psql_lia + EXPLAIN ANALYZE + grep schema_migrations AVANT code |
-| C5 Tracabilite | 8/10 | Migration NNN si index ajoute, query commentee dans le Go, log d'erreur |
+| C2 Planification (THINK) | 9/10 | Verifier schema reel via sqlite3/psql AVANT ecriture (pas inventer colonnes) |
+| C3 Replanification | 7/10 | Si EXPLAIN signale un scan complet -> rewrite query OU pass main a `/postgres-pro` |
+| C4 Outillage | 8/10 | sqlite3/psql + EXPLAIN + `cargo build` (sqlx compile-check) AVANT code |
+| C5 Tracabilite | 8/10 | Migration NNN si index ajoute, query commentee dans le Rust, log d'erreur structure |
 
 ---
 
-## 10. Cross-references LIA-SEC
+## 10. Cross-references inspect_ia_agents
 
 | Si je dois... | J'invoque... |
 |---------------|--------------|
 | Designer une nouvelle table / migration majeure | `/db-schema-designer` |
 | Optimiser une query lente apres EXPLAIN | `/postgres-pro` |
-| Ajouter un nouveau source_type RAG ou tuner pgvector | `/rag-architect` |
 | Auditer une query existante pour SQL injection | `/security-reviewer` |
-| Wrap la query dans un handler Go propre | `/golang-pro` (interface, contexte, error handling) |
+| Wrap la query dans une impl Rust propre (trait, erreurs) | `/rust-best-practices` (ownership, `Result`, error handling) |
 | Garantir auth + rate-limit autour de la query | `/secure-code-guardian` |
 | Documenter le module qui contient la query | `/doc-code` |

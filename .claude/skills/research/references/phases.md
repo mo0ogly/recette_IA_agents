@@ -11,11 +11,11 @@
 
 **Gate :** Le fichier existe ET a ete presente a l'utilisateur.
 
-Fichiers moteur LIA-Scan a verifier en priorite (via Glob pour confirmer existence) :
-- `pkg/model/functions.go` : 32+ fonctions (version_compare, regex, arrays...)
-- `pkg/model/modifiers.go` : modificateurs sigma
-- `pkg/engine/code/` : moteur de matching (73+ operateurs)
-- `cmd/sigma_web/` : voir INDEX.md du topic pour fichiers actifs
+Zones moteur inspect_ia_agents a verifier en priorite (via Glob pour confirmer existence) :
+- `src/` + `cmd/*` : gateway Axum, Control/Data/Audit Plane (Rust)
+- `src/` : trait `EventStore` + impl (`SqliteEventStore`), modele canonique `AgentActionEvent`
+- `discoveryprobe/` : moteur de discovery Rust + eBPF (common/ebpf/loader/broker)
+- `recette/` : harness Python (corpus, juge 4 dimensions, lab) ; console `console/`
 
 ---
 
@@ -47,11 +47,11 @@ Fichiers moteur LIA-Scan a verifier en priorite (via Glob pour confirmer existen
 1. WebSearch : "{outil} limitations" / "{outil} missing features" / "{outil} feature request"
 2. GitHub Issues : filtrer "enhancement", "feature request"
 3. Forums (Reddit, HackerNews, SO) : retours reels
-4. Croiser avec le besoin specifique (audit CISO, pas pentest)
+4. Croiser avec le besoin specifique du projet (gouvernance/recette d'agents IA, pas le cas d'usage generique de l'outil)
 
 **Livrable :** `{topic}/investigated/YYYY-MM-DD_{sujet}-gaps.md` contenant :
 - Gaps identifies par les utilisateurs (avec sources)
-- Gaps specifiques audit CISO
+- Gaps specifiques au besoin inspect_ia_agents (recette/discovery/audit d'agents)
 - Comment notre solution adresse (ou non) chaque gap
 
 **Gate :** Le fichier existe ET contient au moins 5 gaps documentes avec sources.
@@ -96,7 +96,7 @@ Contenu minimum :
 
 **Quoi :** Coder, tester, valider.
 
-**Regles LIA-SEC (R3) :**
+**Regles inspect_ia_agents (R3) :**
 1. 1 fichier → Test → Validation utilisateur → Generalisation
 2. JAMAIS de modifications en masse sans test individuel prealable
 3. Commit AVANT chaque etape risquee

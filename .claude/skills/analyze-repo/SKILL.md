@@ -164,7 +164,7 @@ FONCTIONNALITE 2 : [nom]
 
 ### Ce que tu fais (uniquement sur les fonctionnalites validees en Phase 2)
 1. Chercher dans inspect_ia_agents si on a deja quelque chose de similaire
-   - Glob + Grep dans `src/`, `cmd/`, `discoveryprobe/`, `recette/`, `inspect_ia_agents-console/src/`
+   - Glob + Grep dans `src/`, `cmd/`, `discoveryprobe/`, `recette/`, `console/src/`
 2. Pour chaque fonctionnalite voulue, classifier :
    - **EXISTE** : on a deja ca (fichier:ligne)
    - **SIMILAIRE** : on a un truc proche qu'on peut etendre
@@ -260,8 +260,8 @@ Seulement apres validation explicite des 4 phases precedentes.
 
 Apres chaque transposition de code vers Rust/React inspect_ia_agents, AVANT de declarer "termine" :
 
-1. **BUILD GATE** : `cargo build` + `cargo clippy --all-targets -- -D warnings` (Rust) + `cd inspect_ia_agents-console && node node_modules/.bin/vite build` (React console)
-2. **TEST GATE** : `cargo test` (Rust) + `python3 -m unittest discover -s tests` (recette Python) + `cd inspect_ia_agents-console && npx vitest run` (tests existants ne cassent pas)
+1. **BUILD GATE** : `cargo build` + `cargo clippy --all-targets -- -D warnings` (Rust) + `cd console && node node_modules/.bin/vite build` (React console)
+2. **TEST GATE** : `cargo test` (Rust) + `python3 -m unittest discover -s tests` (recette Python) + `cd console && npx vitest run` (tests existants ne cassent pas)
 3. **IMPORT GATE** : Verifier imports/usages manquants (modules Rust `use`, hooks React, enveloppe de reponse)
 4. **REGRESSION GATE** : Le code transpose ne doit pas introduire de nouveaux bugs
 5. **SMOKE TEST** : Verifier que les endpoints/pages fonctionnent

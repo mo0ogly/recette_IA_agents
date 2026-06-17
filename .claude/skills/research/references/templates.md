@@ -10,7 +10,7 @@ Utiliser avec `/research update [topic] [etat] [nom]`
 # [VALIDATED] {Nom}
 
 **Date :** {date}
-**Fichier(s) :** {fichier.go ou autre artefact}
+**Fichier(s) :** {fichier.rs / .py / .tsx ou autre artefact}
 **Commit :** {hash complet}
 **Preuve :** {test passe / build OK / endpoint repond / lab valide}
 

@@ -78,7 +78,7 @@ Task Delegation — Explore
 Session:      apex-20260402-remediation-export
 Step:         1 of 6
 Objective:    Map all files and dependencies for remediation export feature
-Input:        crates/gateway/src/remediation_tracking.rs, inspect_ia_agents-console/src/components/RemediationTracking/
+Input:        crates/gateway/src/remediation_tracking.rs, console/src/components/RemediationTracking/
 Constraints:  R6 (structured tracing only), R12 (English comments), R7 (no unwrap in prod)
 Autonomy:     AUTONOMOUS
 Expected out: Dependency map with file paths, function names, route chains

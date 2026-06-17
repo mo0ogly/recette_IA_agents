@@ -31,9 +31,9 @@
 
 | Check ID | Type | Commande | Expected |
 |----------|------|----------|----------|
-| TST-05 | command | `cd inspect_ia_agents-console && npm run build` | exit 0 |
+| TST-05 | command | `cd console && npm run build` | exit 0 |
 | TST-06 | count | `find {scope} -name "*.test.ts" -o -name "*.test.tsx" \| wc -l` | > 10 |
-| TST-07 | command | `cd inspect_ia_agents-console && npm test -- --coverage --watchAll=false` (si tests existent) | PASS |
+| TST-07 | command | `cd console && npm test -- --coverage --watchAll=false` (si tests existent) | PASS |
 
 ## Checks UI Help (C.1 -- BLOQUANT)
 
@@ -51,7 +51,7 @@
 |-------|----------|----------------|
 | Rust build | `cargo build 2>&1 \| tail -1` | exit != 0 (erreur de compilation) |
 | Rust lint | `cargo clippy --all-targets -- -D warnings 2>&1 \| grep -c "warning:"` | > 0 (warnings clippy) |
-| React build | `cd inspect_ia_agents-console && node node_modules/.bin/vite build 2>&1 \| tail -1` | Pas "built in" |
+| React build | `cd console && node node_modules/.bin/vite build 2>&1 \| tail -1` | Pas "built in" |
 | PostgreSQL | `psql -U inspect_ia_agents -d inspect_ia_agents -c "SELECT 1" 2>/dev/null` | exit != 0 |
 | Backend health | `curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health` | != 200 (warning, pas bloquant si audit offline) |
 
@@ -79,11 +79,11 @@ Classification :
 | HYG-01 | grep_count | `grep -rnE "todo!\(\)\|unimplemented!\(\)\|StatusCode::NOT_IMPLEMENTED" src/ --include="*.rs"` | 0 | Backend -- handlers stub / non implementes |
 | HYG-02 | grep_count | `cargo build 2>&1 \| grep -cE "never used\|unused import\|unused variable"` | 0 | Backend -- code/imports morts (compilateur) |
 | HYG-03 | dead_code_ratio | Script triage C.0 ci-dessus | < 10% | Backend -- ratio dead code |
-| HYG-04 | grep_count | `grep -Prn '[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}]' src/ inspect_ia_agents-console/src/` | 0 | Tous -- emoji |
-| HYG-05 | grep_count | `grep -rn '<Grid item \|<Grid.*item ' inspect_ia_agents-console/src/ --include="*.tsx"` | 0 | Frontend -- ancienne syntaxe MUI v5 |
-| HYG-06 | grep_count | `grep -rn "fontFamily:.*'monospace'\|fontFamily:.*'Arial'" inspect_ia_agents-console/src/components/ --include="*.tsx"` | 0 | Frontend -- polices hardcodees |
-| HYG-07 | manual | `grep -rn 'Chip' inspect_ia_agents-console/src/components/{perimetre}/ --include="*.tsx"` -> verifier borderRadius: 1 | Tous Chip = borderRadius: 1 | Frontend -- pas d'ovales |
-| HYG-08 | grep_count | `grep -rn "mockData\|MOCK_\|fakeData\|dummyData\|lorem ipsum\|example\.com" src/ inspect_ia_agents-console/src/` | 0 | Tous -- donnees fictives |
+| HYG-04 | grep_count | `grep -Prn '[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}]' src/ console/src/` | 0 | Tous -- emoji |
+| HYG-05 | grep_count | `grep -rn '<Grid item \|<Grid.*item ' console/src/ --include="*.tsx"` | 0 | Frontend -- ancienne syntaxe MUI v5 |
+| HYG-06 | grep_count | `grep -rn "fontFamily:.*'monospace'\|fontFamily:.*'Arial'" console/src/components/ --include="*.tsx"` | 0 | Frontend -- polices hardcodees |
+| HYG-07 | manual | `grep -rn 'Chip' console/src/components/{perimetre}/ --include="*.tsx"` -> verifier borderRadius: 1 | Tous Chip = borderRadius: 1 | Frontend -- pas d'ovales |
+| HYG-08 | grep_count | `grep -rn "mockData\|MOCK_\|fakeData\|dummyData\|lorem ipsum\|example\.com" src/ console/src/` | 0 | Tous -- donnees fictives |
 
 ## Checks design quality (C.1 -- /frontend-design audit)
 

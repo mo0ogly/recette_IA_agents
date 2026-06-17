@@ -126,7 +126,7 @@ c54 bakes this preventive scan to prevent recurrence.
 3. **Create PLAN immediately**: `docs/tracking/PLAN_APEX_{slug}_{date}.md` (template from agentic-core.md)
 4. **Pre-flight** (BLOCKING):
    - Rust: `cargo build 2>&1 | tail -20` (must compile; `-p <crate>` if multi-crate workspace)
-   - React: `cd inspect_ia_agents-console && node node_modules/.bin/vite build 2>&1 | tail -5` (must pass)
+   - React: `cd console && node node_modules/.bin/vite build 2>&1 | tail -5` (must pass)
    - Backend health: `curl -s http://localhost:8081/api/health | head -1` (WARN only, not BLOCK)
 5. **Test pre-flight** (WARN, not BLOCK):
    - `cargo test --no-run 2>&1 | tail -5` then `cargo test 2>&1 | grep -cE 'FAILED|test result: FAILED'` -- note pre-existing failures for regression baseline
@@ -297,7 +297,7 @@ BEFORE writing fallible paths, invoke the `error-handling-patterns` skill. Then 
 Convention check: `logging` not `print`, no bare `except`, no `eval`/`exec`/`pickle.load`, typed hints.
 
 **React files**: follow [build-pipeline-react.md](../_shared/references/build-pipeline-react.md) after each .tsx/.ts write:
-0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `inspect_ia_agents-console/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Past incidents (component crash on undefined payload + dashboard contract drift requiring multiple correction passes) mandated this pre-build gate.
+0. R17 PRE-BUILD CONTRACT GATE (BLOQUANT, for any *Dashboard/*Tab/*Panel/*Status/*Editor that calls an API): BEFORE writing the first line of the component, capture the live payload with curl and save to `console/src/components/__fixtures__/{component}.fixture.json`. Then draft the render-and-assert test skeleton in `{component}.contract.test.tsx` asserting at least one expected DOM element. The service layer MUST unwrap `{success, data}` -> `.data` explicitly (see `.claude/rules/frontend-contract-gate.md`). Skipping this step = PHASE 3 FAILURE, return to ACT. Past incidents (component crash on undefined payload + dashboard contract drift requiring multiple correction passes) mandated this pre-build gate.
 1. BUILD: `vite build` zero TS errors
 2. IMPORT: fetch with base URL from config (R5, never hardcode the URL)
 3. THEME: fontFamily:'inherit', no hardcoded hex, theme.palette.*

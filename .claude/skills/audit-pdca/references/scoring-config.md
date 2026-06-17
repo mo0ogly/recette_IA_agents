@@ -33,12 +33,12 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
       "weight": 15,
       "checks": [
         {"id": "TST-01", "name": "Rust compiles + clippy clean", "type": "command", "cmd": "cargo build && cargo clippy --all-targets --all-features -- -D warnings", "expect": "exit 0"},
-        {"id": "TST-02", "name": "React compiles (vite build)", "type": "command", "cmd": "cd inspect_ia_agents-console && node node_modules/.bin/vite build", "expect": "exit 0"},
+        {"id": "TST-02", "name": "React compiles (vite build)", "type": "command", "cmd": "cd console && node node_modules/.bin/vite build", "expect": "exit 0"},
         {"id": "TST-03", "name": "Rust test modules exist", "type": "command", "cmd": "grep -rlE '#\\[cfg\\(test\\)\\]|#\\[test\\]|#\\[tokio::test\\]' src/ tests/ --include='*.rs' | wc -l", "target": ">10"},
-        {"id": "TST-04", "name": "React test files exist", "type": "count_files", "pattern": "*.test.ts*", "scope": "inspect_ia_agents-console/", "target": ">10"},
+        {"id": "TST-04", "name": "React test files exist", "type": "count_files", "pattern": "*.test.ts*", "scope": "console/", "target": ">10"},
         {"id": "TST-05", "name": "NATS event bus reachable", "type": "command", "cmd": "curl -s -o /dev/null -w '%{http_code}' http://localhost:8222/healthz 2>/dev/null", "expect": "200"},
-        {"id": "TST-06", "name": "Vitest passes", "type": "command", "cmd": "cd inspect_ia_agents-console && npx vitest run 2>/dev/null", "expect": "exit 0"},
-        {"id": "TST-07", "name": "No null .map() crashes", "type": "grep_count", "pattern": "\\.[a-z]+\\.map\\(", "scope": "inspect_ia_agents-console/src/", "exclude_pattern": "|| \\[\\]", "description": "Every .property.map() must have || [] guard. Incident 2026-04-06: 9 components crashed in prod."},
+        {"id": "TST-06", "name": "Vitest passes", "type": "command", "cmd": "cd console && npx vitest run 2>/dev/null", "expect": "exit 0"},
+        {"id": "TST-07", "name": "No null .map() crashes", "type": "grep_count", "pattern": "\\.[a-z]+\\.map\\(", "scope": "console/src/", "exclude_pattern": "|| \\[\\]", "description": "Every .property.map() must have || [] guard. Incident 2026-04-06: 9 components crashed in prod."},
         {"id": "TST-08", "name": "Runtime smoke test (Playwright)", "type": "manual", "description": "Navigate to 5 main pages with Playwright, verify 0 Component Error in snapshot. Pages: Dashboard, Discovery, Analysis, Admin, Compliance."}
       ]
     },
@@ -59,11 +59,11 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
         {"id": "HYG-01", "name": "No stub handlers", "type": "grep_count", "pattern": "todo!\\(\\)|unimplemented!\\(\\)|StatusCode::NOT_IMPLEMENTED", "scope": "src/", "target": 0, "description": "Aucun handler todo!()/unimplemented!()/501 dans le code actif"},
         {"id": "HYG-02", "name": "No dead code (compiler)", "type": "command", "cmd": "cargo build 2>&1 | grep -cE 'never used|unused import|unused variable'", "expect": "0"},
         {"id": "HYG-03", "name": "Dead code ratio < 10%", "type": "dead_code_ratio", "description": "Symboles publics avec 0 appels externes < 10% du total (voir triage C.0)"},
-        {"id": "HYG-04", "name": "No emoji in code/docs", "type": "grep_count", "pattern": "[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}\\x{2600}-\\x{26FF}]", "scope": "src/,inspect_ia_agents-console/src/", "target": 0},
-        {"id": "HYG-05", "name": "MUI v7 Grid syntax", "type": "grep_count", "pattern": "<Grid item |<Grid.*item ", "scope": "inspect_ia_agents-console/src/", "target": 0, "description": "Ancienne syntaxe MUI v5/v6 interdite"},
-        {"id": "HYG-06", "name": "No hardcoded fontFamily", "type": "grep_count", "pattern": "fontFamily:.*['\"]monospace['\"]|fontFamily:.*['\"]Arial|fontFamily:.*['\"]Fira Code", "scope": "inspect_ia_agents-console/src/components/", "target": 0, "description": "Utiliser fontFamily: 'inherit' ou theme.typography.fontFamily"},
+        {"id": "HYG-04", "name": "No emoji in code/docs", "type": "grep_count", "pattern": "[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}\\x{2600}-\\x{26FF}]", "scope": "src/,console/src/", "target": 0},
+        {"id": "HYG-05", "name": "MUI v7 Grid syntax", "type": "grep_count", "pattern": "<Grid item |<Grid.*item ", "scope": "console/src/", "target": 0, "description": "Ancienne syntaxe MUI v5/v6 interdite"},
+        {"id": "HYG-06", "name": "No hardcoded fontFamily", "type": "grep_count", "pattern": "fontFamily:.*['\"]monospace['\"]|fontFamily:.*['\"]Arial|fontFamily:.*['\"]Fira Code", "scope": "console/src/components/", "target": 0, "description": "Utiliser fontFamily: 'inherit' ou theme.typography.fontFamily"},
         {"id": "HYG-07", "name": "Chip borderRadius: 1", "type": "manual", "description": "Tous les composants Chip MUI ont borderRadius: 1 (pas oval par defaut). Verifier via grep -rn 'Chip' dans le perimetre"},
-        {"id": "HYG-08", "name": "No mock/placeholder data (in production paths)", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,inspect_ia_agents-console/src/", "exclude_pattern": "StubLlm|ReplayLlm|LabForge|mock_server|mock_local|/tests/|__fixtures__|recette/lab/", "target": 0, "description": "Forbids NEW mock/fake data in production paths. EXEMPTS the repo's DECLARED legitimate mock infrastructure -- the recette is mock-first by design (lab simulated on :8082 by default, StubLlm/ReplayLlm for deterministic replay I4). These are not violations, they are the corpus harness. See declared-mock exemption below."}
+        {"id": "HYG-08", "name": "No mock/placeholder data (in production paths)", "type": "grep_count", "pattern": "mock[Dd]ata|MOCK_|fakeDat|dummyDat|lorem ipsum|example\\.com", "scope": "src/,console/src/", "exclude_pattern": "StubLlm|ReplayLlm|LabForge|mock_server|mock_local|/tests/|__fixtures__|recette/lab/", "target": 0, "description": "Forbids NEW mock/fake data in production paths. EXEMPTS the repo's DECLARED legitimate mock infrastructure -- the recette is mock-first by design (lab simulated on :8082 by default, StubLlm/ReplayLlm for deterministic replay I4). These are not violations, they are the corpus harness. See declared-mock exemption below."}
       ]
     },
     "completeness": {
@@ -80,7 +80,7 @@ Il est cree au cycle 1 avec les valeurs par defaut ci-dessous, puis mis a jour a
         {"id": "DOC-01", "name": "Module docs exist", "type": "file_exists", "path": "docs/"},
         {"id": "DOC-02", "name": "API documented", "type": "manual"},
         {"id": "DOC-03", "name": "CLAUDE.md current", "type": "file_exists", "path": "CLAUDE.md"},
-        {"id": "DOC-04", "name": "UI Help content exists", "type": "grep_count", "pattern": "HelpButton|useHelp", "scope": "inspect_ia_agents-console/src/components/{perimetre}*/", "target": ">0", "description": "Les ecrans du perimetre doivent avoir des HelpButton integres et du contenu dans ui_help_content"}
+        {"id": "DOC-04", "name": "UI Help content exists", "type": "grep_count", "pattern": "HelpButton|useHelp", "scope": "console/src/components/{perimetre}*/", "target": ">0", "description": "Les ecrans du perimetre doivent avoir des HelpButton integres et du contenu dans ui_help_content"}
       ]
     },
     "benchmark_parity": {

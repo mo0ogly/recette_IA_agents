@@ -13,33 +13,46 @@ metadata:
   related-skills: fullstack-guardian, playwright-expert, devops-engineer, debugging-wizard, code-reviewer, feature-forge
 ---
 
-# Test Master (LIA-SEC Edition)
+# Test Master (inspect_ia_agents Edition)
 
-## LIA-SEC Adaptations (MANDATORY)
+## inspect_ia_agents Adaptations (MANDATORY)
 
 - **Stack tests** :
-  - Backend Go : `go test -race -cover` via `cd cmd/sigma_web && go test ./...` ou
-    `./cleanup_services.sh test` (JAMAIS `go test ./...` direct -- whitelist `build_secure_lia.sh`)
-  - Frontend : Vitest + React Testing Library dans `sigma-react-frontend/src/**/*.test.tsx`
-  - E2E : Playwright (voir `/playwright-expert`)
-  - Rules engine : `recette/validate_rules_ALL.sh` (145 checks)
-- **R17 Contract Gate (BLOCKING)** : tout composant API doit avoir (1) fixture réelle
+  - Backend Rust : `cargo test` / `cargo nextest run` (gateway Axum dans `cmd/*`,
+    eBPF + broker dans `discoveryprobe/`) -- depuis le crate cible
+  - Harnais Python : `python3 -m unittest discover -s tests` (aussi `./recette.sh test`,
+    `make test`) ; lint/format/type/security via `make gates`
+  - Frontend : Vitest + React Testing Library dans `console/src/**/*.test.tsx` via
+    `npx vitest run` ou `./recette.sh console-test` (JAMAIS `npx vitest` hand-launch hors
+    `./recette.sh` -- single entry point R19)
+  - E2E : Playwright (voir `/playwright-expert`) ; smoke live versionne `scripts/smoke_*.py`
+    via `./recette.sh smoke`
+  - Coverage guard recette : `tests/test_coverage_guard.py` (aussi `make recette`) -- un trou
+    de recette = test rouge, jamais a trouver a la main
+- **R16 Contract Gate (BLOCKING)** : tout composant React appelant une API doit avoir (1) fixture réelle
   `__fixtures__/{component}.fixture.json`, (2) render-and-assert test, (3) Playwright smoke
-  post-deploy. Cycle PDCA / APEX ne peut clôturer sans ces 3 éléments
+  post-build. Cycle PDCA / APEX ne peut clôturer sans ces 3 éléments
 - **Test-first enforcement** : utiliser `/test-first` qui wrap la création de test obligatoire
-  après toute modif handler Go / composant React / hook / service -- AVANT de déclarer "terminé"
-- **Coverage targets** : Go backend ≥ 70% lignes, frontend services ≥ 60%, composants
-  critiques (auth, CVE, compliance) ≥ 80%
-- **Mock policy** : JAMAIS mocker la DB dans les tests d'intégration (feedback mémoire :
-  "on got burned last quarter when mocked tests passed but prod migration failed")
-- **Performance testing** : k6 / Artillery pour endpoints `/api/cve/*`, `/api/mitre/*`
-  (rate-limited 60 req/min/IP via `rate_limiter.go`)
-- **Security testing** : déléguer à `/secure-code-guardian` (prévention) + `/security-reviewer`
+  après toute modif handler Rust / module Python recette / composant React / hook / service --
+  AVANT de déclarer "terminé"
+- **Coverage targets** : harnais Python recette + Rust backend ≥ 70% lignes, frontend services
+  ≥ 60%, chemins critiques (decision policy/risk, identite, approbation) ≥ 80%
+- **Determinisme (I4 / R11)** : pas de `time.time()`/`datetime.now()`/`random` dans l'execution
+  d'un agent, le chemin de decision, ou un juge ; horloge logique injectee
+  (`recette.events.LogicalClock`), `event_id` derive d'une sequence. Tout chemin de
+  decision/juge ajoute embarque un test de replay byte-stable
+- **Mock policy** : les fixtures sont explicites et confinees a `tests/` (Python) /
+  `__fixtures__/` (console) ; elles ne fuient jamais dans `recette/` runtime. Pas de mock du
+  proxy/lab dans un chemin de production (R4)
+- **Performance testing** : k6 / Artillery pour les endpoints de la Gateway gouvernee
+  (ex `/probe/capture`, `/discovery/check`) servis par `./recette.sh platform up`
+- **Security testing** : déléguer à `/secure-code-guardian` (prévention) + `/code-reviewer`
   (audit) ; `/test-master` couvre le fonctionnel / perf / régression
 - **Flaky tests** : interdit -- si un test flake, investiguer (pas de retry en CI sans fix
   sous-jacent)
 - **Companion skills** : `/test-first` (enforcement), `/playwright-expert` (E2E),
-  `/go-recette` (SAST Go), `/react-recette` (SAST React), `/debug-go` + `/debug-react` (fix)
+  `/rust-recette` (SAST Rust), `/react-recette` (SAST React), `/python-recette` (gates Python),
+  `/systematic-debugging` (fix)
 
 ---
 
@@ -123,12 +136,12 @@ When creating test plans, provide:
 
 Au demarrage, decomposer toute strategie de tests en sous-taches independantes :
 
-- [ ] Sous-tache 1 : cartographier les tests existants (Glob `**/*.test.{go,tsx,ts}`, `**/*.spec.ts`)
+- [ ] Sous-tache 1 : cartographier les tests existants (Glob `**/*_test.rs`, `tests/**/*.py`, `**/*.test.{tsx,ts}`, `**/*.spec.ts`)
 - [ ] Sous-tache 2 : identifier les gaps de coverage (backend 70%, frontend 60%, critique 80%)
-- [ ] Sous-tache 3 : verifier les 3 pieces R17 (fixture, render-and-assert, Playwright smoke)
+- [ ] Sous-tache 3 : verifier les 3 pieces R16 (fixture, render-and-assert, Playwright smoke)
 - [ ] Sous-tache 4 : ecrire les tests manquants (unit + integration + E2E selon scope)
-- [ ] Sous-tache 5 : executer `go test -race -cover` (backend) + `vp test run` (frontend)
-- [ ] Sous-tache 6 : verifier absence de flaky + rapport de coverage
+- [ ] Sous-tache 5 : executer `cargo test`/`cargo nextest run` (Rust) + `python3 -m unittest discover -s tests` (harnais) + `./recette.sh console-test` (frontend)
+- [ ] Sous-tache 6 : verifier absence de flaky + determinisme (replay byte-stable) + rapport de coverage
 
 Sous-taches 1-3 parallelisables. Sous-tache 5 depend de 4.
 
@@ -136,8 +149,8 @@ Sous-taches 1-3 parallelisables. Sous-tache 5 depend de 4.
 
 Pour toute strategie de test ou refactor de suite de tests (> 3 fichiers) :
 
-1. Creer `_alire/tracking/PLAN_TEST_MASTER_{MODULE}_{YYYY-MM-DD}.md` avant d'ecrire un test.
-2. Template : `_alire/tracking/PLAN_TEMPLATE.md`.
+1. Creer `docs/tracking/PLAN_TEST_MASTER_{MODULE}_{YYYY-MM-DD}.md` avant d'ecrire un test.
+2. Template : `docs/tracking/PLAN_TEMPLATE.md`.
 3. Cocher chaque sous-tache a la completion.
 4. Si replanification : Status -> REPLANIFIE + lien vers nouveau plan.
 
@@ -154,27 +167,29 @@ Si 2 etapes consecutives echouent (ex: test echoue + fix qui casse un autre test
 Declencheurs typiques :
 - Test flaky detecte -> REPLAN (isoler la cause -- async, ordre, env)
 - Coverage cible non atteinte apres ajout de tests -> REPLAN (revoir le scope)
-- R17 fixture ne matche pas le backend live -> REPLAN (re-capturer via `lia_capture_fixture`)
+- R16 fixture ne matche pas le backend live -> REPLAN (re-capturer la reponse via curl/DevTools)
 
 ## Outils declares
 
 | Outil | Usage | Retry policy |
 |-------|-------|--------------|
-| `Read`, `Grep`, `Glob` | Cartographier tests existants + handler cible avant d'ecrire | N/A |
-| `Write`, `Edit` | Creer/modifier `*_test.go`, `*.test.tsx`, `*.spec.ts` | N/A |
-| `Bash go test -race -cover ./...` | Gate backend (depuis `cmd/sigma_web/`) | 1 retry flakiness env |
-| `Bash vp test run` (vite-plus 0.1.24) | Gate frontend Vitest+RTL -- JAMAIS `npx vitest` direct | 1 retry flakiness |
-| `Bash k6 run` | Load tests endpoints rate-limited | N/A |
-| `lia_capture_fixture` | Capturer fixture R17 live (JWT forge) | N/A |
+| `Read`, `Grep`, `Glob` | Cartographier tests existants + handler/module cible avant d'ecrire | N/A |
+| `Write`, `Edit` | Creer/modifier `*_test.rs`, `tests/**/*.py`, `*.test.tsx`, `*.spec.ts` | N/A |
+| `Bash cargo test` / `cargo nextest run` | Gate backend Rust (depuis le crate cible) | 1 retry flakiness env |
+| `Bash python3 -m unittest discover -s tests` | Gate harnais Python (aussi `./recette.sh test`) | 1 retry flakiness env |
+| `Bash ./recette.sh console-test` | Gate frontend Vitest+RTL -- JAMAIS `npx vitest` hand-launch (R19) | 1 retry flakiness |
+| `Bash make recette` | Coverage guard recette (`tests/test_coverage_guard.py`) | N/A |
+| `Bash k6 run` | Load tests endpoints Gateway gouvernee | N/A |
+| `Bash ./recette.sh smoke` | Preuve live versionnee (`scripts/smoke_*.py`), jamais dans `/tmp` | N/A |
 | `TaskCreate` | Tracking si > 3 sous-taches | N/A |
-| `Skill(playwright-expert)` | E2E smoke tests + R17 E3 | Obligatoire si composant API |
-| `Skill(test-first)` | Enforcement test AVANT merge | Obligatoire sur nouveaux handlers |
+| `Skill(playwright-expert)` | E2E smoke tests + R16 E3 | Obligatoire si composant API |
+| `Skill(test-first)` | Enforcement test AVANT merge | Obligatoire sur nouveaux handlers/modules |
 
 Selection dynamique : outil choisi selon le type de test (unit vs integration vs E2E vs perf).
 
 ## Tracabilite agentique
 
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` chaque decision non triviale :
+Logger dans `docs/tracking/decision_log.jsonl` chaque decision non triviale :
 
 - Choix de strategie de mock (stub vs spy vs real DB) + justification
 - Seuil de coverage choisi pour un composant critique
@@ -185,17 +200,19 @@ Format :
 {"timestamp":"...","session":"test-master-{module}","action":"...","reasoning":"...","alternatives_rejected":["..."],"outcome":"...","confidence":"high","plan_ref":"PLAN_TEST_MASTER_*.md"}
 ```
 
-RETEX en fin de session si score agentique < 40/50 -> `_alire/02_LOGS/Journals/retex/RETEX_TEST_MASTER_YYYY-MM-DD.md`.
+RETEX en fin de session si score agentique < 40/50 -> `docs/tracking/retex/RETEX_TEST_MASTER_YYYY-MM-DD.md`.
 
 ## VERIFICATION GATE (BLOQUANT)
 
 Apres execution, AVANT de declarer termine :
 
-- [ ] `go test -race -cover ./...` passe (depuis `cmd/sigma_web/`) -- zero test en echec
-- [ ] `vp test run` passe (depuis `sigma-react-frontend/`) -- zero test en echec
-- [ ] Coverage backend >= 70% lignes (composants critiques auth/CVE/compliance >= 80%)
+- [ ] `cargo test` / `cargo nextest run` passe (depuis le crate cible) -- zero test en echec
+- [ ] `python3 -m unittest discover -s tests` passe + `make gates` clean -- zero test en echec
+- [ ] `./recette.sh console-test` passe (frontend `console/`) -- zero test en echec
+- [ ] Coverage backend (Rust + harnais Python) >= 70% lignes (chemins critiques decision/identite/approbation >= 80%)
 - [ ] Coverage frontend services >= 60%
-- [ ] R17 3 pieces presentes : fixture reelle + render-and-assert + Playwright smoke
+- [ ] R16 3 pieces presentes : fixture reelle + render-and-assert + Playwright smoke
+- [ ] Determinisme (I4) : chemin de decision/juge ajoute a un test de replay byte-stable
 - [ ] Zero test flaky detecte (executer 2x si doute)
 
 Si un gate echoue : STOP, fix la cause racine, re-gate. JAMAIS retry CI sans fix sous-jacent.
@@ -207,7 +224,7 @@ Si un gate echoue : STOP, fix la cause racine, re-gate. JAMAIS retry CI sans fix
 | C1 Decomposition : sous-taches identifiees + coverage gaps cartographies ? | /10 |
 | C2 Planification : PLAN_*.md cree et suivi ? | /10 |
 | C3 Replanification : /replan declenche sur test flaky ou coverage miss ? | /10 |
-| C4 Outillage : go test -race + vp test run + k6 + playwright-expert invoques selon scope ? | /10 |
+| C4 Outillage : cargo test + unittest/make gates + recette.sh console-test + k6 + playwright-expert invoques selon scope ? | /10 |
 | C5 Tracabilite : decision_log + RETEX produits ? | /10 |
 
 Score total /50 -- >= 40 : Exemplaire | 30-39 : Acceptable | < 30 : RETEX obligatoire

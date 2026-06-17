@@ -154,36 +154,36 @@ qui ne ciblait que `components/reports/`.
 ```bash
 # Pattern A -- dark hex gradients sans useTheme
 grep -rnE "linear-gradient\([^)]*#[0-4][0-9a-fA-F]{3,5}" --include="*.tsx" \
-  inspect_ia_agents-console/src/ | grep -v "/themes/\|/constants/\|_archive/"
+  console/src/ | grep -v "/themes/\|/constants/\|_archive/"
 
 # Pattern B -- color: 'white'/'black' sans theme adjacency
 for f in $(grep -rlE "color: '(white|black)'" --include="*.tsx" \
-  inspect_ia_agents-console/src/ | grep -v "/themes/\|/constants/\|_archive/"); do
+  console/src/ | grep -v "/themes/\|/constants/\|_archive/"); do
   grep -q "useTheme\|contrastText\|theme.palette.getContrastText" "$f" || echo "$f"
 done
 
 # Pattern C -- couleur hex hardcodee hors bg/gradient
-grep -rnE "color: '#[0-9a-fA-F]{3,6}'" --include="*.tsx" inspect_ia_agents-console/src/ | \
+grep -rnE "color: '#[0-9a-fA-F]{3,6}'" --include="*.tsx" console/src/ | \
   grep -v "/themes/\|/constants/\|_archive/"
 
 # Pattern D -- bgcolor hex hardcoded
-grep -rnE "bgcolor: '#[0-9a-fA-F]{3,8}'" --include="*.tsx" inspect_ia_agents-console/src/ | \
+grep -rnE "bgcolor: '#[0-9a-fA-F]{3,8}'" --include="*.tsx" console/src/ | \
   grep -v "/themes/\|/constants/\|_archive/"
 
 # Pattern E -- background property hex direct
-grep -rnE "background: '#[0-9a-fA-F]{3,6}'" --include="*.tsx" inspect_ia_agents-console/src/ | \
+grep -rnE "background: '#[0-9a-fA-F]{3,6}'" --include="*.tsx" console/src/ | \
   grep -v "/themes/\|/constants/\|_archive/"
 
 # Pattern F -- rgba(0,0,0) component backgrounds (not modal backdrop)
-grep -rn "bgcolor: 'rgba(0,0,0" --include="*.tsx" inspect_ia_agents-console/src/ | \
+grep -rn "bgcolor: 'rgba(0,0,0" --include="*.tsx" console/src/ | \
   grep -v "position: 'fixed'" | grep -v "/themes/"
 
 # Pattern G -- R21 Dialogs sans maxHeight 90vh
-grep -rn "<Dialog" --include="*.tsx" inspect_ia_agents-console/src/ | \
+grep -rn "<Dialog" --include="*.tsx" console/src/ | \
   grep -v "maxHeight\|/themes/\|_archive/" | grep -v "//.*<Dialog"
 
 # Pattern H -- R23 radars/charts sans labels externes
-grep -l "Radar\|Bubble\|Scatter" inspect_ia_agents-console/src/components/**/*.tsx 2>/dev/null | \
+grep -l "Radar\|Bubble\|Scatter" console/src/components/**/*.tsx 2>/dev/null | \
   xargs grep -L "angularExternalLabels\|deOverlapLabels" 2>/dev/null
 ```
 
@@ -209,7 +209,7 @@ Reference complete : `.claude/rules/frontend-contract-gate.md`
 ```bash
 # Capturer depuis le vrai backend
 curl -s -H "Authorization: Bearer $TOKEN" https://inspect_ia_agents.example/api/endpoint > \
-  inspect_ia_agents-console/src/components/**/__fixtures__/{Component}.fixture.json
+  console/src/components/**/__fixtures__/{Component}.fixture.json
 ```
 - La fixture DOIT contenir `_captured_from` avec l'URL exacte
 - INTERDIT : payload invente ou genere depuis les types TS

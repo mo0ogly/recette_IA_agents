@@ -15,10 +15,10 @@ automatique des prompts entre cycles.
 ## TRACABILITE AGENTIQUE (OBLIGATOIRE)
 
 ### Plan persistant
-Creer `_alire/tracking/PLAN_RETEX_{CYCLE}_{YYYY-MM-DD}.md` (template: `_alire/tracking/PLAN_TEMPLATE.md`).
+Creer `docs/tracking/PLAN_RETEX_{CYCLE}_{YYYY-MM-DD}.md` (template: `docs/tracking/PLAN_TEMPLATE.md`).
 
 ### Decision log
-Logger dans `_alire/02_LOGS/Journals/decision_log.jsonl` les decisions non-triviales.
+Logger dans `docs/tracking/decision_log.jsonl` les decisions non-triviales.
 Format: `{"timestamp","session","action","reasoning","alternatives_rejected":[],"outcome","confidence","plan_ref"}`
 
 ### Replanification
@@ -280,24 +280,13 @@ AJOUTER metriques DORA
 
 ```bash
 # RETEX cycle 1 (baseline, pas de precedent)
-/retex-analyzer \
-  --cycle-dir=_alire/pdca/grc/cycle_001/ \
-  --config=_alire/pdca/grc/SCORING_CONFIG.json \
-  --dashboard=_alire/pdca/grc/DASHBOARD.md
+/retex-analyzer --cycle-dir=docs/tracking/pdca/gateway/cycle_001/ --config=docs/tracking/pdca/gateway/SCORING_CONFIG.json --dashboard=docs/tracking/pdca/gateway/DASHBOARD.md
 
 # RETEX cycle 2 (avec comparaison cycle 1, auto-apply)
-/retex-analyzer \
-  --cycle-dir=_alire/pdca/grc/cycle_002/ \
-  --config=_alire/pdca/grc/SCORING_CONFIG.json \
-  --dashboard=_alire/pdca/grc/DASHBOARD.md \
-  --prev-cycle=_alire/pdca/grc/cycle_001/ \
-  --auto-apply
+/retex-analyzer --cycle-dir=docs/tracking/pdca/gateway/cycle_002/ --config=docs/tracking/pdca/gateway/SCORING_CONFIG.json --dashboard=docs/tracking/pdca/gateway/DASHBOARD.md --prev-cycle=docs/tracking/pdca/gateway/cycle_001/ --auto-apply
 
 # RETEX sur module Discovery
-/retex-analyzer \
-  --cycle-dir=_alire/pdca/discovery/cycle_001/ \
-  --config=_alire/pdca/discovery/SCORING_CONFIG.json \
-  --dashboard=_alire/pdca/discovery/DASHBOARD.md
+/retex-analyzer --cycle-dir=docs/tracking/pdca/discovery/cycle_001/ --config=docs/tracking/pdca/discovery/SCORING_CONFIG.json --dashboard=docs/tracking/pdca/discovery/DASHBOARD.md
 ```
 
 ---
@@ -312,7 +301,7 @@ Cycle 1:
   A.3 : retex-analyzer ->
          - Evalue prompt v1 efficacite = 3.2/5
          - Identifie : "prompt security trop vague, pas de scope"
-         - Propose : "Ajouter scope cmd/sigma_web/ + sigma-react-frontend/src/services/"
+         - Propose : "Ajouter scope src/ (gateway Axum) + console/src/services/"
          - Ecrit A_IMPROVEMENTS.md
 
 Cycle 2:

@@ -245,7 +245,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/health
 cargo clippy --all-targets --all-features -- -D warnings 2>&1 | grep -c '^warning'
 
 # React build (si frontend dans le scope)
-cd inspect_ia_agents-console && node node_modules/.bin/vite build 2>&1 | tail -1
+cd console && node node_modules/.bin/vite build 2>&1 | tail -1
 
 # PostgreSQL (si DB dans le scope)
 PGPASSWORD="$INSPECT_IA_AGENTS_DB_PASS" psql -h localhost -U inspect_ia_agents -d inspect_ia_agents -c "SELECT 1" 2>/dev/null

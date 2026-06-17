@@ -24,7 +24,7 @@
 
   "context": {
     "objective": "Audit GRC module | Implement export CSV",
-    "scope": "crates/gateway/src/grc/ + inspect_ia_agents-console/src/components/grc/",
+    "scope": "crates/gateway/src/grc/ + console/src/components/grc/",
     "retex_previous": "Score 72/100, gaps: missing tests, 3 SQLi patterns",
     "known_issues": [
       "discovery.rs a 0 tests (RETEX cycle 3)",

@@ -18,10 +18,10 @@ Pas de replanification silencieuse. Le raisonnement est trace.
 ## Phase 1 : OBSERVE (etat actuel)
 
 ### Ce que tu fais
-1. Lire le plan en cours (`_alire/tracking/PLAN_*.md` le plus recent pour ce sujet)
+1. Lire le plan en cours (`docs/tracking/PLAN_*.md` le plus recent pour ce sujet)
 2. Verifier l'etat reel :
    - `git status` + `git diff --stat` (modifications en cours)
-   - Build status (`build_secure_lia.sh` ou `npm run build`)
+   - Build status (`cargo build` ou `npm run build`)
    - Tests en echec (si applicable)
    - Erreurs ou blocages rencontres
 3. Lister les etapes completees vs non completees
@@ -101,7 +101,7 @@ ECART #4 : ...
 ## Phase 4 : AJUSTE (nouveau plan)
 
 ### Ce que tu fais
-1. Creer un nouveau fichier plan : `_alire/tracking/PLAN_{TASK}_REPLAN_{YYYY-MM-DD}.md`
+1. Creer un nouveau fichier plan : `docs/tracking/PLAN_{TASK}_REPLAN_{YYYY-MM-DD}.md`
 2. Lier au plan precedent (champ "Replanifie depuis")
 3. Marquer l'ancien plan comme REPLANIFIE
 4. Ecrire une entree dans `decision_log.jsonl` avec :
@@ -112,7 +112,7 @@ ECART #4 : ...
 5. Presenter le nouveau plan a l'utilisateur
 
 ### Ce que tu livres
-- Nouveau `PLAN_*_REPLAN_*.md` ecrit dans `_alire/tracking/`
+- Nouveau `PLAN_*_REPLAN_*.md` ecrit dans `docs/tracking/`
 - Ancien plan mis a jour (Status: REPLANIFIE)
 - Entree decision_log.jsonl
 - Resume pour l'utilisateur :
@@ -149,6 +149,6 @@ Cette skill DEVRAIT etre invoquee automatiquement quand :
 
 | Fichier | Role |
 |---------|------|
-| `_alire/tracking/PLAN_*.md` | Plans persistants |
-| `_alire/02_LOGS/Journals/decision_log.jsonl` | Journal de decisions |
+| `docs/tracking/PLAN_*.md` | Plans persistants |
+| `docs/tracking/decision_log.jsonl` | Journal de decisions |
 | `.claude/rules/agentic-traceability.md` | Regles de tracabilite |
