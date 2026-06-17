@@ -1,0 +1,10 @@
+[
+  {
+    "trace_id": "57512382f4353390891b7ff851781af6",
+    "recording_id": "rec-1",
+    "agent_id": "gh-pr-bot",
+    "target_system": "github",
+    "provider": "stub",
+    "span_count": 3
+  }
+]

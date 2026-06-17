@@ -13,6 +13,7 @@ import DetectPage from "./pages/detect";
 import DiscoveryPage from "./pages/discovery";
 import FluxPage from "./pages/flux";
 import LivePage from "./pages/live";
+import ObservabilityPage from "./pages/observability";
 import ProbePage from "./pages/probe";
 import ProxyNavBadge from "./components/ProxyNavBadge";
 import ProxyPage from "./pages/proxy";
@@ -91,6 +92,9 @@ export default function App(): JSX.Element {
           <NavLink to="/audit" className={navLinkClass}>
             Audit
           </NavLink>
+          <NavLink to="/observability" className={navLinkClass}>
+            Observabilite
+          </NavLink>
           <NavLink to="/proxy" className={navLinkClass}>
             Proxy
             <ProxyNavBadge />
@@ -121,6 +125,7 @@ export default function App(): JSX.Element {
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/observability" element={<ObservabilityPage />} />
           <Route path="/proxy" element={<ProxyPage />} />
         </Routes>
       </main>

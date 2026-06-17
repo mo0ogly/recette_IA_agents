@@ -792,3 +792,33 @@ export interface DetectMatch {
 export interface DetectScanResult {
   matches: DetectMatch[];
 }
+
+/** WS-C: a single GenAI span in a run's observability trace tree (flat; the
+ *  viewer rebuilds the hierarchy from parent_span_id). Times are logical (I4). */
+export interface ObservabilitySpan {
+  span_id: string;
+  parent_span_id: string;
+  trace_id: string;
+  name: string;
+  start_nano: number;
+  end_nano: number;
+  duration_nano: number;
+  attributes: Record<string, string | number>;
+}
+
+/** One row in the traces list: a persisted run keyed by a deterministic id. */
+export interface ObservabilityTraceSummary {
+  trace_id: string;
+  recording_id: string;
+  agent_id: string | null;
+  target_system: string | null;
+  provider: string | null;
+  span_count: number;
+}
+
+/** The full span tree of one recording. */
+export interface ObservabilityTrace {
+  trace_id: string;
+  recording_id: string;
+  spans: ObservabilitySpan[];
+}

@@ -54,6 +54,7 @@ from .routers import config as config_router
 from .routers import detect as detect_router
 from .routers import discovery as discovery_router
 from .routers import events as events_router
+from .routers import observability as observability_router
 from .routers import policies as policies_router
 from .routers import probe as probe_router
 from .routers import proxy as proxy_router
@@ -339,4 +340,5 @@ def create_app(
     app.include_router(discovery_router.router)
     app.include_router(detect_router.router)
     app.include_router(capture_router.router)
+    app.include_router(observability_router.router)
     return app

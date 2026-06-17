@@ -23,6 +23,8 @@ import type {
   CampaignTemplate,
   ChainReport,
   ContainmentState,
+  ObservabilityTrace,
+  ObservabilityTraceSummary,
   PendingApproval,
   PolicyDocument,
   ProxyDebugStatus,
@@ -1201,4 +1203,19 @@ export function promoteSimScenario(
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+/** WS-C: list the observability traces (one per persisted run). Raw JSON. */
+export function listObservabilityTraces(): Promise<ObservabilityTraceSummary[]> {
+  return request<ObservabilityTraceSummary[]>("/observability/traces", {
+    method: "GET",
+  });
+}
+
+/** WS-C: fetch the full span tree of one trace. Raw JSON, no envelope. */
+export function getObservabilityTrace(traceId: string): Promise<ObservabilityTrace> {
+  return request<ObservabilityTrace>(
+    `/observability/traces/${encodeURIComponent(traceId)}`,
+    { method: "GET" },
+  );
 }

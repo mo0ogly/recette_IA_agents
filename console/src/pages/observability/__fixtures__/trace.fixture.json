@@ -1,0 +1,64 @@
+{
+  "trace_id": "57512382f4353390891b7ff851781af6",
+  "recording_id": "rec-1",
+  "spans": [
+    {
+      "span_id": "f290daca9bc5655c",
+      "parent_span_id": "",
+      "trace_id": "57512382f4353390891b7ff851781af6",
+      "name": "invoke_agent gh-pr-bot",
+      "start_nano": 0,
+      "end_nano": 1000000,
+      "duration_nano": 1000000,
+      "attributes": {
+        "gen_ai.system": "inspect_ia_agents",
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "gh-pr-bot",
+        "gen_ai.agent.id": "gh-pr-bot",
+        "gen_ai.provider.name": "stub"
+      }
+    },
+    {
+      "span_id": "91a63652c4804b96",
+      "parent_span_id": "f290daca9bc5655c",
+      "trace_id": "57512382f4353390891b7ff851781af6",
+      "name": "execute_tool read_repo",
+      "start_nano": 1000000,
+      "end_nano": 2000000,
+      "duration_nano": 1000000,
+      "attributes": {
+        "gen_ai.system": "inspect_ia_agents",
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read_repo",
+        "gen_ai.tool.call.id": "1",
+        "gen_ai.agent.id": "gh-pr-bot",
+        "inspect_ia_agents.target_system": "github",
+        "inspect_ia_agents.principal": "bot@acme",
+        "inspect_ia_agents.mode": "read",
+        "inspect_ia_agents.resource": "acme/x",
+        "inspect_ia_agents.approved": 0
+      }
+    },
+    {
+      "span_id": "3f6d79ff176132f4",
+      "parent_span_id": "f290daca9bc5655c",
+      "trace_id": "57512382f4353390891b7ff851781af6",
+      "name": "execute_tool open_pr",
+      "start_nano": 2000000,
+      "end_nano": 3000000,
+      "duration_nano": 1000000,
+      "attributes": {
+        "gen_ai.system": "inspect_ia_agents",
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "open_pr",
+        "gen_ai.tool.call.id": "2",
+        "gen_ai.agent.id": "gh-pr-bot",
+        "inspect_ia_agents.target_system": "github",
+        "inspect_ia_agents.principal": "bot@acme",
+        "inspect_ia_agents.mode": "bounded_write",
+        "inspect_ia_agents.resource": "acme/x",
+        "inspect_ia_agents.approved": 1
+      }
+    }
+  ]
+}

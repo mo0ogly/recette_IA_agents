@@ -192,6 +192,88 @@ def action_log_spans(action_log: list[AgentAction]) -> list[GenAiSpan]:
     return spans
 
 
+def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
+    """Map a Lane B recording to GenAI spans: a root invoke_agent span for the
+    agent, then one execute_tool span per recorded action (a tool-call step).
+
+    ``seed`` is the unique recording id, so each recording gets a distinct
+    trace id even when two recordings share an agent id. Deterministic (I4):
+    ids derive from the seed + step index, times are logical; read-only (I1).
+    """
+    agent_id = str(getattr(recording, "agent_id", seed))
+    provider = str(getattr(recording, "provider", "") or "")
+    model = str(getattr(recording, "model", "") or "")
+    trace = _trace_id(seed)
+    spans: list[GenAiSpan] = []
+    idx = 0
+
+    def _emit(name: str, parent: str, attrs: dict[str, str | int]) -> str:
+        nonlocal idx
+        sid = _span_id(seed, idx)
+        start = idx * _STEP_NANO
+        spans.append(
+            GenAiSpan(
+                name=name,
+                span_id=sid,
+                parent_span_id=parent,
+                trace_id=trace,
+                start_nano=start,
+                end_nano=start + _STEP_NANO,
+                attributes={SYSTEM: _SYSTEM, **attrs},
+            )
+        )
+        idx += 1
+        return sid
+
+    root_attrs: dict[str, str | int] = {
+        OP: OP_INVOKE_AGENT,
+        AGENT_NAME: agent_id,
+        AGENT_ID: agent_id,
+    }
+    if provider:
+        root_attrs[PROVIDER] = provider
+    if model:
+        root_attrs[REQUEST_MODEL] = model
+    root = _emit(f"{OP_INVOKE_AGENT} {agent_id}", parent="", attrs=root_attrs)
+
+    for step in getattr(recording, "steps", []):
+        action = getattr(step, "action", None)
+        if not isinstance(action, dict):
+            continue  # a final answer carries no tool call -> no execute_tool span
+        action_type = str(action.get("action_type", ""))
+        _emit(
+            f"{OP_EXECUTE_TOOL} {action_type}",
+            parent=root,
+            attrs={
+                OP: OP_EXECUTE_TOOL,
+                TOOL_NAME: action_type,
+                TOOL_CALL_ID: str(action.get("seq", "")),
+                AGENT_ID: str(action.get("agent_id", agent_id)),
+                TARGET_SYSTEM: str(action.get("target_system", "")),
+                PRINCIPAL: str(action.get("principal", "")),
+                ACTION_MODE: str(action.get("mode", "")),
+                RESOURCE: str(action.get("resource", "")),
+                APPROVED: int(bool(action.get("approved", False))),
+            },
+        )
+    return spans
+
+
+def span_to_dict(span: GenAiSpan) -> dict:
+    """Flat JSON view of a span for the console (parent_span_id lets the viewer
+    rebuild the tree; ``duration_nano`` is precomputed for the timeline)."""
+    return {
+        "span_id": span.span_id,
+        "parent_span_id": span.parent_span_id,
+        "trace_id": span.trace_id,
+        "name": span.name,
+        "start_nano": span.start_nano,
+        "end_nano": span.end_nano,
+        "duration_nano": span.end_nano - span.start_nano,
+        "attributes": dict(span.attributes),
+    }
+
+
 def _attr_value(value: str | int) -> dict:
     if isinstance(value, bool):  # bool is an int subclass -- guard first
         return {"boolValue": value}
