@@ -85,6 +85,8 @@ select = ["E", "F", "I", "UP", "B"]
 "scripts/gen_corpus_agents.py" = ["E501"]
 # Diagram generator: mermaid node labels are long unsplittable string literals.
 "scripts/diagrams/architecture.py" = ["E501"]
+# Diagram i18n map: fr->en label lines are long unsplittable string literals.
+"scripts/diagrams/architecture_i18n.py" = ["E501"]
 # Script entrypoint: recette imports follow a sys.path bootstrap (run-as-script).
 "scripts/run_bnp_scenarios.py" = ["E402"]
 

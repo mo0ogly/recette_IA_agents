@@ -27,10 +27,23 @@
 [ ] 8. UI HELP (BLOQUANT) : INSERT ui_help_content + verify SELECT pour CHAQUE composant *Tab/*Panel/*Dashboard/*Editor/*Manager/*Status cree. Contenu 200-800 car., anglais (R8). HelpButton sans contenu DB = PLACEHOLDER INTERDIT (R4). Cycle NE PEUT PAS fermer si manquant.
 [ ] 9. DOCS-SITE (SI DOC MODIFIEE) : Si un .md a ete cree/modifie sous docs/ (hors
                          docs/plans, docs/tracking, docs/screenshots, exclus du site) :
-                         ./recette.sh docs-build  (Docusaurus build du docs-site/)
-                         Sortie REQUISE : "[SUCCESS] Generated static files" + "docs-build OK".
-                         Le site surface docs/ (runbooks + architecture + ADR + provenance) ;
-                         pas de rsync/VPS dans ce repo (corpus + harnais, pas de prod hebergee).
+                         ./recette.sh docs-build  (Docusaurus build des DEUX locales fr+en)
+                         Sortie REQUISE : "[SUCCESS] Generated static files" (build/ = fr,
+                         build/en = en) + "docs-build OK". Le site surface docs/ (runbooks +
+                         architecture + ADR + provenance) ; pas de rsync/VPS dans ce repo.
+                         i18n : docs/ = source fr (defaut) ; le miroir anglais vit dans
+                         docs-site/i18n/en/docusaurus-plugin-content-docs/current/ (1:1).
+                         Une doc fr nouvelle/modifiee doit AUSSI etre repercutee dans le
+                         miroir en (sinon /en/docs sert la version fr ou 404).
+[ ] 9b. DIAGRAMMES (SI MERMAID ARCHITECTURE.md MODIFIE) : les blocs mermaid de
+                         docs/ARCHITECTURE.md sont GENERES (source unique Python). Ne jamais
+                         editer le mermaid a la main (il serait ecrase). Editer
+                         scripts/diagrams/architecture.py (labels fr) ; pour un label
+                         nouveau/modifie, ajouter la paire fr->en dans
+                         scripts/diagrams/architecture_i18n.py ; puis :
+                         python3 scripts/gen_diagrams.py --write   (reinjecte fr + en)
+                         python3 scripts/gen_diagrams.py --check    (gate de drift, exit 0
+                         requis : "in sync: N diagrams x 2 locales (fr, en)").
 [ ] 10. COMMIT PROPRE  : fichiers de session uniquement (pas git add -A)
                          Stager UNIQUEMENT les fichiers de la session
 [ ] 11. PUSH           : max 5 commits non pushes

@@ -30,6 +30,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOC = REPO_ROOT / "docs" / "ARCHITECTURE.md"
+# English mirror of the same document (Docusaurus i18n). Generated from the SAME
+# Python source via the fr->en label map, so the .py stays authoritative for
+# both locales (no hand-editing generated mermaid).
+EN_DOC = (
+    REPO_ROOT
+    / "docs-site"
+    / "i18n"
+    / "en"
+    / "docusaurus-plugin-content-docs"
+    / "current"
+    / "ARCHITECTURE.md"
+)
 MARKER = re.compile(
     r"<!-- mermaid:(?P<name>[a-z0-9-]+) \(generated: [^)]+\) -->\n```mermaid\n(?P<body>.*?)```",
     re.S,
@@ -37,6 +49,14 @@ MARKER = re.compile(
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from diagrams.architecture import DIAGRAMS  # noqa: E402
+from diagrams.architecture_i18n import translate as _translate_en  # noqa: E402
+
+
+def _bodies(locale: str) -> dict[str, str]:
+    """Diagram bodies for a locale: 'fr' = source, 'en' = label-translated."""
+    if locale == "en":
+        return {name: _translate_en(body) for name, body in DIAGRAMS.items()}
+    return dict(DIAGRAMS)
 
 
 def _sub_block(text: str, name: str, body: str) -> tuple[str, bool]:
@@ -54,36 +74,54 @@ def _sub_block(text: str, name: str, body: str) -> tuple[str, bool]:
     return MARKER.sub(repl, text), found
 
 
-def cmd_write() -> int:
-    text = DOC.read_text(encoding="utf-8")
-    for name, body in DIAGRAMS.items():
+def _write_doc(doc: Path, bodies: dict[str, str]) -> int:
+    if not doc.exists():
+        print(f"SKIP (absent): {doc}")
+        return 0
+    text = doc.read_text(encoding="utf-8")
+    for name, body in bodies.items():
         text, found = _sub_block(text, name, body)
         if not found:
-            print(f"ERROR: marker 'mermaid:{name}' not found in {DOC}")
+            print(f"ERROR: marker 'mermaid:{name}' not found in {doc}")
             return 1
-    DOC.write_text(text, encoding="utf-8")
-    print(f"wrote {len(DIAGRAMS)} diagrams into {DOC}")
+    doc.write_text(text, encoding="utf-8")
+    print(f"wrote {len(bodies)} diagrams into {doc}")
     return 0
 
 
-def cmd_check() -> int:
-    text = DOC.read_text(encoding="utf-8")
+def _check_doc(doc: Path, bodies: dict[str, str], src_hint: str) -> int:
+    if not doc.exists():
+        print(f"SKIP (absent): {doc}")
+        return 0
+    text = doc.read_text(encoding="utf-8")
     in_doc = {m.group("name"): m.group("body").rstrip() for m in MARKER.finditer(text)}
     status = 0
-    for name, body in DIAGRAMS.items():
+    for name, body in bodies.items():
         if name not in in_doc:
-            print(f"MISSING in markdown: {name}")
+            print(f"MISSING in {doc.name}: {name}")
             status = 1
         elif in_doc[name] != body.rstrip():
-            print(f"DRIFT: {name} (markdown differs from scripts/diagrams/architecture.py)")
+            print(f"DRIFT: {name} ({doc.name} differs from {src_hint})")
             status = 1
     for name in in_doc:
-        if name not in DIAGRAMS:
-            print(f"UNKNOWN marker in markdown (no python source): {name}")
+        if name not in bodies:
+            print(f"UNKNOWN marker in {doc.name} (no python source): {name}")
             status = 1
-    if status == 0:
-        print(f"in sync: {len(DIAGRAMS)} diagrams")
     return status
+
+
+def cmd_write() -> int:
+    rc = _write_doc(DOC, _bodies("fr"))
+    rc |= _write_doc(EN_DOC, _bodies("en"))
+    return rc
+
+
+def cmd_check() -> int:
+    rc = _check_doc(DOC, _bodies("fr"), "scripts/diagrams/architecture.py")
+    rc |= _check_doc(EN_DOC, _bodies("en"), "architecture.py + architecture_i18n.py (en map)")
+    if rc == 0:
+        print(f"in sync: {len(DIAGRAMS)} diagrams x 2 locales (fr, en)")
+    return rc
 
 
 def cmd_render() -> int:

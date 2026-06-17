@@ -144,9 +144,19 @@ Any `.md` created/modified under `docs/` (except `docs/plans`, `docs/tracking`,
 `docs/screenshots`, which the site excludes) must keep the Docusaurus site building.
 Gate: `./recette.sh docs-build` -- output must show "[SUCCESS] Generated static files"
 + "docs-build OK". The site surfaces runbooks + architecture + ADR + migration-provenance
-from the existing `docs/` tree (no copy, no VPS deploy). Also enforced at cycle close by
+from the existing `docs/` tree (no copy, no VPS deploy). `docs-build` builds BOTH
+locales (fr default -> `build/`, en -> `build/en`). Also enforced at cycle close by
 librarian-gate item 9. NOTE: the `doc-librarian` skill targets the archived LIA-SEC layout
 (`_alire/`, VPS rsync) and does NOT apply to this repo -- use `./recette.sh docs-build`.
+
+i18n + diagrams (keep the Python authoritative, never hand-edit generated output):
+- `docs/` is the fr source; the English mirror is
+  `docs-site/i18n/en/docusaurus-plugin-content-docs/current/` (1:1). A fr doc change
+  must be mirrored to en or `/en/docs` drifts.
+- ARCHITECTURE.md mermaid is GENERATED from `scripts/diagrams/architecture.py`
+  (fr labels) + `scripts/diagrams/architecture_i18n.py` (fr->en map). Edit the
+  Python, then `python3 scripts/gen_diagrams.py --write` (regenerates fr + en) and
+  `--check` is the drift gate ("in sync: N diagrams x 2 locales").
 
 ### Routing
 
@@ -194,12 +204,6 @@ affected bloc N/A, never invent its result).
 - Cycle > 1: READ `DASHBOARD.md`, `C_SCORECARD.json`, `A_RETEX.md`, `A_IMPROVEMENTS.md` from previous cycle. Extract: per-domain scores, unresolved gaps, identified improvements. Load `swarm_memory.json` if it exists.
 - Cycle 1: baseline. Create `SCORING_CONFIG.json` from default in `references/scoring-config.md`.
 - **DO NOT repeat errors documented in previous RETEX.**
-- **Konrad-Kurze directive load.** Check for a recent KD targeting LemanRuss for this scope:
-  ```bash
-  ls -t docs/tracking/directives/KD-*.json 2>/dev/null | head -5
-  ```
-  For each directive whose `primary_target` is in {LemanRuss, both} AND `scope.module` matches the current scope: extract `expected_impact.domains_affected` and use it to seed the cycle's domain priorities. If `requires_approval = true` and the lifecycle state is still `PENDING_APPROVAL`: surface the directive in `P_PLAN.md` under "Pending Konrad directives" and proceed without applying it. If state is `APPROVED`: apply during DO phase.
-- **Konrad-Kurze auto-trigger.** If cycle >= 3 AND score_delta(N-1, N-2) < +10 AND no APPROVED KD already addresses this stall: INVOKE `/konrad-kurze` via the Skill tool (model: **sonnet**) with scope = `{module}/cycle_{N-1}`. The directive returned is loaded as above before P.2.
 
 ### P.2 : Scope detection
 

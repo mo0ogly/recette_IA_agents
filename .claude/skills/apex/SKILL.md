@@ -420,7 +420,12 @@ Invoke via Skill tool (mandatory delegation):
   `docs/screenshots`, which the site excludes) -> the gate is `./recette.sh docs-build`
   (Docusaurus build of `docs-site/`). Output must show "[SUCCESS] Generated static files"
   + "docs-build OK". A doc that breaks the site build is a FAILURE (return to BUILD).
-  Also enforced at cycle close by librarian-gate item 9.
+  Also enforced at cycle close by librarian-gate item 9. i18n: `docs/` is the fr
+  source; mirror any fr change into `docs-site/i18n/en/docusaurus-plugin-content-docs/current/`.
+  ARCHITECTURE.md mermaid is GENERATED (never hand-edit): edit
+  `scripts/diagrams/architecture.py` (+ `architecture_i18n.py` for new labels),
+  then `python3 scripts/gen_diagrams.py --write && --check` (must report
+  "in sync: N diagrams x 2 locales").
 - Touched **discoveryprobe** (separate Rust workspace) -> `cd discoveryprobe` before any cargo;
   the `discoveryprobe-ebpf` crate is EXCLUDED from the host workspace (`bpfel-unknown-none`
   target) -- if its toolchain/CAP_BPF is absent, mark that bloc N/A (R18), never a FAILURE.
