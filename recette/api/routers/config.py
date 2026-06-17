@@ -170,6 +170,16 @@ def list_agents(request: Request) -> list[dict]:
     return _store(request).read()["agents"]
 
 
+@router.get("/agents/{agent_id}")
+def get_agent(request: Request, agent_id: str) -> dict:
+    # Single-agent fetch for the console detail/edit view: scanning the list
+    # client-side is not a contract. Strict 404 on unknown id (delete route).
+    agent = _store(request).get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"no agent {agent_id!r}")
+    return agent
+
+
 @router.post("/agents", status_code=201)
 def create_agent(request: Request, agent: dict[str, Any]) -> dict:
     try:

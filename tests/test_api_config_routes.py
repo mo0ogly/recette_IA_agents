@@ -114,6 +114,26 @@ class TestConfigRoutes(unittest.TestCase):
         # Strict 404 on unknown id, mirroring the server delete route.
         self.assertEqual(self.client.delete("/config/agents/nope").status_code, 404)
 
+    def test_agent_detail_roundtrip_and_404(self) -> None:
+        # Detail-by-id: the console needs a single-agent fetch (a list scan is
+        # not a contract). Strict 404 on unknown id, like the delete route.
+        self.client.post(
+            "/config/agents",
+            json={
+                "id": "a1",
+                "principal": "p",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": ["read_repo"],
+                "runtime": "lab",
+            },
+        )
+        r = self.client.get("/config/agents/a1")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["id"], "a1")
+        self.assertEqual(r.json()["goal"], "g")
+        self.assertEqual(self.client.get("/config/agents/nope").status_code, 404)
+
     def test_servers_list_empty(self) -> None:
         self.assertEqual(self.client.get("/config/servers").json(), [])
 
