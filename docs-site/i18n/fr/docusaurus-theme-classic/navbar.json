@@ -1,0 +1,14 @@
+{
+  "title": {
+    "message": "inspect_ia_agents",
+    "description": "The title in the navbar"
+  },
+  "item.label.Docs": {
+    "message": "Docs",
+    "description": "Navbar item with label Docs"
+  },
+  "item.label.Architecture": {
+    "message": "Architecture",
+    "description": "Navbar item with label Architecture"
+  }
+}

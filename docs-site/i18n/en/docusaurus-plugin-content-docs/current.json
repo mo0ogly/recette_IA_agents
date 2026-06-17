@@ -1,0 +1,14 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docsSidebar.category.decisions": {
+    "message": "decisions",
+    "description": "The label for category 'decisions' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.runbooks": {
+    "message": "runbooks",
+    "description": "The label for category 'runbooks' in sidebar 'docsSidebar'"
+  }
+}

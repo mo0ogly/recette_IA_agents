@@ -36,13 +36,20 @@ const config = {
     format: 'md',
     hooks: {
       onBrokenMarkdownLinks: 'warn',
+      // i18n/en mirror docs keep relative ../screenshots paths that only resolve
+      // from the default-locale docs/ tree; warn instead of failing the build.
+      onBrokenMarkdownImages: 'warn',
     },
   },
   themes: ['@docusaurus/theme-mermaid'],
 
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: 'fr',
+    locales: ['fr', 'en'],
+    localeConfigs: {
+      fr: {label: 'Francais', htmlLang: 'fr-FR'},
+      en: {label: 'English', htmlLang: 'en-US'},
+    },
   },
 
   presets: [
@@ -95,6 +102,10 @@ const config = {
             to: '/docs/ARCHITECTURE',
             label: 'Architecture',
             position: 'left',
+          },
+          {
+            type: 'localeDropdown',
+            position: 'right',
           },
         ],
       },
