@@ -34,6 +34,13 @@ run_local() {
         run)       ( cd "${REPO_ROOT}" && "$(py)" -m recette run ) ;;
         discovery) ( cd "${REPO_ROOT}" \
                      && "$(py)" -m recette discovery --adapter reference ) ;;
+        discovery-build) # Build the native Rust discovery engines (host workspace;
+                         # the discoveryprobe-ebpf crate is excluded -- different
+                         # target). Produces target/release/discoveryprobe-catalog,
+                         # the binary GET /catalog/rust-summary invokes.
+                         ( cd "${REPO_ROOT}/discoveryprobe" \
+                           && { [ -f "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"; } \
+                           && cargo build --release ) ;;
         console-build) ( cd "${REPO_ROOT}/console" \
                          && node node_modules/.bin/tsc --noEmit \
                          && node node_modules/.bin/vite build ) ;;

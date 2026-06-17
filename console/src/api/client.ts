@@ -901,6 +901,36 @@ export function getRecetteScorecard(): Promise<RecetteScorecard> {
   return request<RecetteScorecard>("/subjects/scorecard");
 }
 
+/** One repo's discovery verdict: detected vs expected, pass/fail, and the
+ *  human-readable failure reasons (empty when it passed). */
+export interface DiscoveryRepoDetail {
+  repo: string;
+  detected: boolean;
+  expected: boolean;
+  passed: boolean;
+  false_positive: boolean;
+  false_negative: boolean;
+  detail: string[];
+}
+
+/** GET /discovery/check: the per-repo discovery detail behind the aggregate. */
+export interface DiscoveryCheck {
+  all_passed: boolean;
+  total: number;
+  passed: number;
+  detection_rate: number;
+  false_positives: number;
+  false_negatives: number;
+  ordering_ok: boolean;
+  repos: DiscoveryRepoDetail[];
+}
+
+/** GET /discovery/check: the drill-down behind the discovery scorecard -- every
+ *  repo with its detected/expected verdict and failure reasons. Raw JSON. */
+export function getDiscoveryCheck(): Promise<DiscoveryCheck> {
+  return request<DiscoveryCheck>("/discovery/check");
+}
+
 // ---------------------------------------------------------------------------
 // Probe (/probe/*): the discoveryprobe eBPF reference capture (design 12.5/12.6)
 // ---------------------------------------------------------------------------

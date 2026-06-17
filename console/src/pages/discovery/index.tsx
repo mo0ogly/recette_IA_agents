@@ -8,8 +8,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { getRecetteScorecard } from "../../api/client";
-import type { RecetteScorecard } from "../../api/client";
+import { getDiscoveryCheck, getRecetteScorecard } from "../../api/client";
+import type { DiscoveryCheck, RecetteScorecard } from "../../api/client";
 import BenchmarkPanel from "./BenchmarkPanel";
 import "./discovery.css";
 
@@ -17,6 +17,7 @@ const SURFACE_ORDER = ["github", "gitlab", "temporal", "openapi", "mcp"] as cons
 
 export default function DiscoveryPage(): JSX.Element {
   const [card, setCard] = useState<RecetteScorecard | null>(null);
+  const [check, setCheck] = useState<DiscoveryCheck | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +36,11 @@ export default function DiscoveryPage(): JSX.Element {
           setLoading(false);
         }
       });
+    // Per-repo drill-down behind the github surface aggregate; best-effort so a
+    // failure never blanks the page.
+    getDiscoveryCheck()
+      .then((d) => alive && setCheck(d))
+      .catch(() => alive && setCheck(null));
     return () => {
       alive = false;
     };
@@ -109,6 +115,50 @@ export default function DiscoveryPage(): JSX.Element {
               })}
             </tbody>
           </table>
+
+          {check && (
+            <section className="discovery-drill" data-testid="discovery-drill">
+              <h2 className="discovery-drill-title">
+                Detail par repo (github){" "}
+                <span className="discovery-drill-rate" data-testid="discovery-drill-rate">
+                  detection {Math.round(check.detection_rate * 100)}% -- {check.passed}/
+                  {check.total}
+                </span>
+              </h2>
+              <table className="discovery-table">
+                <thead>
+                  <tr>
+                    <th>Repo</th>
+                    <th>Detecte</th>
+                    <th>Attendu</th>
+                    <th>Verdict</th>
+                    <th>Raisons</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {check.repos.map((r) => (
+                    <tr key={r.repo} data-testid={`discovery-repo-${r.repo}`}>
+                      <td>{r.repo}</td>
+                      <td>{r.detected ? "oui" : "non"}</td>
+                      <td>{r.expected ? "oui" : "non"}</td>
+                      <td className={r.passed ? "ok" : "fail"}>
+                        {r.passed
+                          ? "PASS"
+                          : r.false_positive
+                            ? "FAUX POSITIF"
+                            : r.false_negative
+                              ? "FAUX NEGATIF"
+                              : "FAIL"}
+                      </td>
+                      <td className="discovery-repo-detail">
+                        {r.detail.length > 0 ? r.detail.join("; ") : "--"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           <BenchmarkPanel />
         </>

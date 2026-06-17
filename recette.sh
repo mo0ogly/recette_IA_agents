@@ -16,6 +16,7 @@ set -euo pipefail
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery [--docker]
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
+#   ./recette.sh discovery-build               # native Rust discovery engines (cargo, discoveryprobe/)
 #   ./recette.sh docs-build|docs-serve         # Docusaurus doc site build / serve fr+en (docs-site/)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
 #   ./recette.sh wire up|down|status|logs|ca           # optional mitmproxy wire-interception overlay (Docker)
@@ -126,7 +127,7 @@ case "${cmd}" in
     platform)                          "${PLATFORM_SH}" "$@" ;;
     console)                           "${PLATFORM_SH}" console "$@" ;;
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
-    test|gates|report|validate|run|discovery|console-build|console-test|docs-build|docs-serve)
+    test|gates|report|validate|run|discovery|discovery-build|console-build|console-test|docs-build|docs-serve)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     wire)                              "${WIRE_SH}" "$@" ;;
