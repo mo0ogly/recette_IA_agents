@@ -1,0 +1,17 @@
+# discoveryprobe-detect -- static "reperage" of agent-observability tooling.
+#
+# Given the text of a source file, detect which agent/LLM observability tools
+# (tracing / replay / audit / eval / gateway) it uses, by matching a bundled
+# signature table of PUBLIC identifiers (package names, imports, env vars, call
+# markers). The table is the recette's own data -- public matchable strings, not
+# third-party repo content. Pure + deterministic (I4). Native (R22).
+[package]
+name = "discoveryprobe-detect"
+version = "0.1.0"
+edition = "2021"
+description = "Static detection of agent-observability tooling (tracing/replay/audit) by signature."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
