@@ -12,6 +12,8 @@ import type {
   ActionSpec,
   AgentAction,
   AgentConfig,
+  CatalogSummary,
+  CatalogSummaryEnvelope,
   AiBackend,
   AiProviderInfo,
   AuditEvent,
@@ -494,6 +496,23 @@ export function executeAction(req: ExecuteActionRequest): Promise<ActionOutcome>
     method: "POST",
     body: JSON.stringify(req),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Agent catalog registry (/catalog/summary): the discovery catalog view
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /catalog/summary: the registry of published agents plus aggregate counts.
+ *
+ * Unlike the rest of the platform API, this endpoint answers with the standard
+ * { success, data } envelope, so the inner CatalogSummary is unwrapped from
+ * .data here -- callers receive the bare payload (R16 service-unwrap).
+ */
+export function getCatalogSummary(): Promise<CatalogSummary> {
+  return request<CatalogSummaryEnvelope>("/catalog/summary", { method: "GET" }).then(
+    (res) => res.data,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -728,3 +728,42 @@ export interface RagScorecard {
   mean_recall: number;
   results: RagQueryResult[];
 }
+
+// ---------------------------------------------------------------------------
+// Agent catalog registry (GET /catalog/summary): the discovery catalog view.
+// This endpoint wraps its payload in the standard { success, data } envelope;
+// the client unwraps .data before returning these types (R16).
+// ---------------------------------------------------------------------------
+
+/** One registry agent as listed by the catalog summary. */
+export interface CatalogAgentSummary {
+  name: string;
+  version: string;
+  publisher_name: string;
+  description: string;
+  tags: string[];
+  /** Declared tool count; 0 marks a tool-less agent (a discovery edge case). */
+  tool_count: number;
+}
+
+/** Aggregate counts over the registered agents. */
+export interface CatalogSummaryCounts {
+  total: number;
+  unique: number;
+  with_tools: number;
+  /** The deduplicated union of every agent's tags, sorted. */
+  tags: string[];
+}
+
+/** The unwrapped payload of GET /catalog/summary (post-envelope). */
+export interface CatalogSummary {
+  version: string;
+  summary: CatalogSummaryCounts;
+  agents: CatalogAgentSummary[];
+}
+
+/** The raw GET /catalog/summary envelope, before the client unwraps .data. */
+export interface CatalogSummaryEnvelope {
+  success: boolean;
+  data: CatalogSummary;
+}

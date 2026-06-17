@@ -17,6 +17,7 @@ import ProxyNavBadge from "./components/ProxyNavBadge";
 import ProxyPage from "./pages/proxy";
 import RagPage from "./pages/rag";
 import RecettePage from "./pages/recette";
+import RegistryPage from "./pages/registry";
 import RecetteCampaignsPage from "./pages/recette-campaigns";
 import ServersPage from "./pages/servers";
 import VerdictsPage from "./pages/verdicts";
@@ -57,6 +58,9 @@ export default function App(): JSX.Element {
           </NavLink>
           <NavLink to="/discovery" className={navLinkClass}>
             Discovery
+          </NavLink>
+          <NavLink to="/registry" className={navLinkClass}>
+            Catalogue
           </NavLink>
           <NavLink to="/probe" className={navLinkClass}>
             Probe
@@ -102,6 +106,7 @@ export default function App(): JSX.Element {
           <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/rag" element={<RagPage />} />
           <Route path="/discovery" element={<DiscoveryPage />} />
+          <Route path="/registry" element={<RegistryPage />} />
           <Route path="/probe" element={<ProbePage />} />
           <Route path="/corpus" element={<CorpusPage />} />
           <Route path="/sim" element={<SimPage />} />

@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "data": {
+    "version": "1.0",
+    "summary": {
+      "total": 5,
+      "unique": 5,
+      "with_tools": 4,
+      "tags": [
+        "finance",
+        "github",
+        "handoff",
+        "identity",
+        "okta",
+        "pr",
+        "read",
+        "support",
+        "write"
+      ]
+    },
+    "agents": [
+      {
+        "name": "github-pr-bot",
+        "version": "1.0.0",
+        "publisher_name": "recette",
+        "description": "Opens and comments pull requests within its declared repos.",
+        "tags": ["github", "pr", "write"],
+        "tool_count": 2
+      },
+      {
+        "name": "okta-provisioner",
+        "version": "2.1.0",
+        "publisher_name": "recette",
+        "description": "Provisions and deprovisions identities.",
+        "tags": ["identity", "okta"],
+        "tool_count": 2
+      },
+      {
+        "name": "finance-reconciler",
+        "version": "1.3.0",
+        "publisher_name": "recette",
+        "description": "Reconciles ledger entries read-only.",
+        "tags": ["finance", "read"],
+        "tool_count": 1
+      },
+      {
+        "name": "support-triage",
+        "version": "0.9.0",
+        "publisher_name": "recette",
+        "description": "Triages support tickets and hands off to specialists.",
+        "tags": ["handoff", "support"],
+        "tool_count": 2
+      },
+      {
+        "name": "silent-scanner",
+        "version": "0.1.0",
+        "publisher_name": "recette",
+        "description": "Declares no tools -- a discovery edge case.",
+        "tags": [],
+        "tool_count": 0
+      }
+    ]
+  }
+}
