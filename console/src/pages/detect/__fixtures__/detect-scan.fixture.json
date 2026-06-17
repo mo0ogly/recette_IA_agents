@@ -1,0 +1,14 @@
+{
+  "matches": [
+    {
+      "tool": "AgentOps",
+      "category": "tracing",
+      "matched": "agentops"
+    },
+    {
+      "tool": "Langfuse",
+      "category": "tracing",
+      "matched": "langfuse"
+    }
+  ]
+}

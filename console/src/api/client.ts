@@ -13,6 +13,8 @@ import type {
   AgentAction,
   AgentConfig,
   CatalogSummary,
+  DetectScanResult,
+  DetectSignatures,
   AiBackend,
   AiProviderInfo,
   AuditEvent,
@@ -510,6 +512,35 @@ export function executeAction(req: ExecuteActionRequest): Promise<ActionOutcome>
  */
 export function getCatalogSummary(): Promise<CatalogSummary> {
   return request<CatalogSummary>("/catalog/summary", { method: "GET" });
+}
+
+// ---------------------------------------------------------------------------
+// Reperage (/detect/*): observability-tool detection
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /detect/signatures: the catalog of detectable observability tools (each
+ * with its category and the literal needles that betray it) plus the sorted
+ * union of categories.
+ *
+ * The endpoint answers with the raw object (like the other routes in this API),
+ * so callers receive the bare DetectSignatures directly -- there is no
+ * { success, data } envelope to unwrap.
+ */
+export function getDetectSignatures(): Promise<DetectSignatures> {
+  return request<DetectSignatures>("/detect/signatures", { method: "GET" });
+}
+
+/**
+ * POST /detect/scan: scan a free-form text for observability-tool needles.
+ * Resolves with the raw match list (no envelope to unwrap); an empty
+ * `matches` array means no tool was detected.
+ */
+export function scanForObservability(text: string): Promise<DetectScanResult> {
+  return request<DetectScanResult>("/detect/scan", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,262 @@
+/* Page-scoped styles for the Reperage observability-detection view. Reuses global tokens. */
+
+.detect-page {
+  max-width: 1100px;
+}
+
+.detect-note {
+  color: var(--color-text-muted);
+  max-width: 72ch;
+  margin: 0.25rem 0 1.25rem;
+}
+
+.detect-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.9rem;
+  margin: 1rem 0;
+}
+
+.detect-loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Category union row. */
+.detect-cats {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.detect-cats-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Category badge -- one distinct token mapping per category. */
+.detect-cat {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.detect-cat-tracing {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.detect-cat-gateway {
+  background-color: var(--badge-orange-bg);
+  color: var(--badge-orange-fg);
+}
+
+.detect-cat-eval {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.detect-cat-audit {
+  background-color: var(--badge-dark-bg);
+  color: var(--badge-dark-fg);
+}
+
+.detect-cat-replay {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+/* Catalog: one group per category. */
+.detect-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.detect-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+}
+
+.detect-group-count {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.detect-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.detect-tool {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.detect-tool:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.detect-tool-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.detect-tool-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.detect-tool-needles {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.detect-needle {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--color-text);
+}
+
+/* Scan box. */
+.detect-scan {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.2rem;
+}
+
+.detect-scan-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+}
+
+.detect-scan-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.detect-scan-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.detect-scan-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.detect-scan-button {
+  background-color: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.45rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.detect-scan-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.detect-scan-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Empty state -- a scan with no matches is a valid, non-crashing view. */
+.detect-empty {
+  background-color: var(--color-surface-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-top: 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* Scan matches: tool + category badge + the matched needle as evidence. */
+.detect-matches {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detect-match {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+}
+
+.detect-match-tool {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.detect-match-evidence {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text);
+}
