@@ -63,11 +63,12 @@ export default function DiscoveryPage(): JSX.Element {
         <PageHelp topic="discovery" />
       </div>
       <p className="discovery-note">
-        Unified verdict over the test corpus: identification (the four dimensions),
-        the standard-aligned MAF subjects, and every discovery surface. The mcp
-        surface scans MCP server manifests just like github scans repositories,
-        asserting invariant properties only (detection, count, action coverage,
-        relative risk ordering), never opaque scores.
+        Verdict unifie sur le corpus de test : identification (les quatre
+        dimensions), les sujets MAF alignes sur le standard, et chaque surface
+        discovery. La surface mcp scanne les manifests de serveurs MCP comme
+        github scanne les depots, en verifiant uniquement des proprietes
+        invariantes (detection, comptage, couverture des actions, ordre de
+        risque relatif), jamais des scores opaques.
       </p>
 
       {loading && <p className="discovery-loading">Loading scorecard...</p>}
