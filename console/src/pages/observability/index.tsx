@@ -1,22 +1,28 @@
 /**
  * Observability page (WS-C): a span-tree view of persisted runs.
  *
- * Lists the available traces (one per recording) and, on selection, renders
- * the run as a hierarchy of GenAI spans -- a root agent invocation with one
- * tool-execution span per action -- with logical durations. The tree is a
- * read-only projection of the audit recordings (I1); the backend renders it
- * deterministically (I4). The exchange request/response of each tool lives in
- * the cockpit network log (correlated by the action event id).
+ * Lists the available traces (one per recording) and, on selection, renders the
+ * run as a hierarchy of GenAI spans -- a root agent invocation with one
+ * tool-execution span per action. Each tool span surfaces what the agent
+ * actually DID: the action (tool), the target system + resource, the access
+ * mode (read/write), the bound principal (I3) and whether the action was
+ * approval-gated (I6). This is the legibility-first contract: a third party who
+ * did not write the agent must understand, from the trace alone, what it asked.
+ * The tree is a read-only projection of the audit recordings (I1), rendered
+ * deterministically by the backend (I4). The request/response payload of each
+ * tool lives in the cockpit network log (correlated by the action event id).
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import { getObservabilityTrace, listObservabilityTraces } from "../../api/client";
+import PageHelp from "../../components/help/PageHelp";
 import type {
   ObservabilitySpan,
   ObservabilityTrace,
   ObservabilityTraceSummary,
 } from "../../types/platform";
+import "./observability.css";
 
 /** Depth of a span = number of ancestors, walked through parent_span_id. */
 function spanDepth(span: ObservabilitySpan, byId: Map<string, ObservabilitySpan>): number {
@@ -36,6 +42,59 @@ function attr(span: ObservabilitySpan, key: string): string {
   return value === undefined ? "" : String(value);
 }
 
+/** us when sub-millisecond, else ms -- a readable logical duration (I4). */
+function humanDuration(nano: number): string {
+  const us = nano / 1000;
+  if (us < 1000) return `${Math.round(us)} us`;
+  return `${(us / 1000).toFixed(us < 10000 ? 1 : 0)} ms`;
+}
+
+/** The decoded, display-ready shape of a span (what the agent did at this step). */
+interface SpanView {
+  span: ObservabilitySpan;
+  depth: number;
+  operation: string; // invoke_agent | execute_tool | ...
+  /** Headline: the tool name for a tool call, else the agent name. */
+  title: string;
+  target: string;
+  resource: string;
+  mode: string; // read | write | ""
+  principal: string;
+  /** approval-gated? null = not a gated action, true/false = gated + outcome (I6). */
+  approved: boolean | null;
+}
+
+function decode(span: ObservabilitySpan, depth: number): SpanView {
+  const operation = attr(span, "gen_ai.operation.name");
+  const tool = attr(span, "gen_ai.tool.name");
+  const agent = attr(span, "gen_ai.agent.name") || attr(span, "gen_ai.agent.id");
+  const mode = attr(span, "inspect_ia_agents.mode");
+  const approvedRaw = span.attributes["inspect_ia_agents.approved"];
+  // The approved attribute is present on gated (write) actions in the recording.
+  const isGated = mode === "write" || approvedRaw !== undefined;
+  return {
+    span,
+    depth,
+    operation,
+    title: tool || agent || span.name,
+    target: attr(span, "inspect_ia_agents.target_system"),
+    resource: attr(span, "inspect_ia_agents.resource"),
+    mode,
+    principal: attr(span, "inspect_ia_agents.principal"),
+    approved: isGated ? Number(approvedRaw) === 1 : null,
+  };
+}
+
+function OperationTag({ operation }: { operation: string }): JSX.Element {
+  const label =
+    operation === "invoke_agent"
+      ? "agent"
+      : operation === "execute_tool"
+        ? "tool"
+        : operation || "span";
+  return <span className={`obs-op obs-op-${operation || "node"}`}>{label}</span>;
+}
+
 export default function ObservabilityPage(): JSX.Element {
   const [traces, setTraces] = useState<ObservabilityTraceSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -50,6 +109,7 @@ export default function ObservabilityPage(): JSX.Element {
 
   useEffect(() => {
     if (selected === null) return;
+    setTrace(null);
     getObservabilityTrace(selected)
       .then(setTrace)
       .catch((e: unknown) => setError(String(e)));
@@ -61,13 +121,30 @@ export default function ObservabilityPage(): JSX.Element {
     return map;
   }, [trace]);
 
+  const views: SpanView[] = useMemo(
+    () => (trace?.spans ?? []).map((s) => decode(s, spanDepth(s, byId))),
+    [trace, byId],
+  );
+
+  const selectedSummary = traces.find((t) => t.trace_id === selected) ?? null;
+
   return (
     <section className="page observability-page">
-      <h1>Observabilite -- traces</h1>
-      {error && <p className="error">{error}</p>}
+      <div className="page-head">
+        <h1>Observabilite -- traces</h1>
+        <PageHelp topic="observability" />
+      </div>
+      <p className="obs-note">
+        Arbre de spans de chaque run persiste (projection read-only de l'audit, I1). Chaque appel
+        d'outil montre ce que l'agent a fait : l'action, le systeme cible, la ressource, le mode
+        d'acces, le principal (I3) et l'etat d'approbation (I6).
+      </p>
+      {error && <p className="obs-error">{error}</p>}
       <div className="observability-layout">
         <ul className="trace-list">
-          {traces.length === 0 && <li className="empty">Aucune trace (lance un agent).</li>}
+          {traces.length === 0 && (
+            <li className="obs-empty">Aucune trace -- lance un agent depuis le cockpit.</li>
+          )}
           {traces.map((t) => (
             <li key={t.trace_id}>
               <button
@@ -77,28 +154,72 @@ export default function ObservabilityPage(): JSX.Element {
               >
                 <span className="trace-agent">{t.agent_id ?? t.recording_id}</span>
                 <span className="trace-meta">
-                  {t.target_system ?? ""} -- {t.span_count} span(s)
+                  {t.target_system && (
+                    <span className="obs-badge obs-badge-target">{t.target_system}</span>
+                  )}
+                  {t.provider && <span className="obs-badge obs-badge-provider">{t.provider}</span>}
+                  <span className="obs-spancount">{t.span_count} span(s)</span>
                 </span>
               </button>
             </li>
           ))}
         </ul>
+
         <div className="span-tree">
           {trace === null ? (
-            <p className="hint">Selectionne une trace pour voir l'arbre de spans.</p>
+            <p className="obs-hint">Selectionne une trace pour voir ce que l'agent a fait.</p>
           ) : (
-            <ol>
-              {trace.spans.map((s) => (
-                <li
-                  key={s.span_id}
-                  className={`span span-${attr(s, "gen_ai.operation.name") || "node"}`}
-                  style={{ paddingLeft: `${spanDepth(s, byId) * 1.5}rem` }}
-                >
-                  <span className="span-name">{s.name}</span>
-                  <span className="span-duration">{Math.round(s.duration_nano / 1000)} us</span>
-                </li>
-              ))}
-            </ol>
+            <>
+              {selectedSummary && (
+                <header className="obs-trace-head">
+                  <span className="obs-trace-agent">
+                    {selectedSummary.agent_id ?? selectedSummary.recording_id}
+                  </span>
+                  <code className="obs-trace-rec">{selectedSummary.recording_id}</code>
+                </header>
+              )}
+              <ol className="obs-spans">
+                {views.map((v) => (
+                  <li
+                    key={v.span.span_id}
+                    className="obs-span"
+                    style={{ paddingLeft: `${v.depth * 1.4}rem` }}
+                  >
+                    <div className="obs-span-line">
+                      <OperationTag operation={v.operation} />
+                      <span className="obs-span-title">{v.title}</span>
+                      {v.target && <span className="obs-badge obs-badge-target">{v.target}</span>}
+                      {v.mode && (
+                        <span className={`obs-badge obs-badge-mode obs-mode-${v.mode}`}>{v.mode}</span>
+                      )}
+                      {v.approved === true && (
+                        <span className="obs-badge obs-badge-approved">approuve</span>
+                      )}
+                      {v.approved === false && (
+                        <span className="obs-badge obs-badge-denied">non approuve</span>
+                      )}
+                      <span className="obs-span-dur">{humanDuration(v.span.duration_nano)}</span>
+                    </div>
+                    {(v.resource || v.principal) && (
+                      <div className="obs-span-sub">
+                        {v.resource && (
+                          <span className="obs-kv">
+                            <span className="obs-k">ressource</span>
+                            <code className="obs-v">{v.resource}</code>
+                          </span>
+                        )}
+                        {v.principal && (
+                          <span className="obs-kv">
+                            <span className="obs-k">principal</span>
+                            <code className="obs-v">{v.principal}</code>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
         </div>
       </div>

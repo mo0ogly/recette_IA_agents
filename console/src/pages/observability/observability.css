@@ -1,0 +1,234 @@
+/* Page-scoped styles for the Observability span-tree view. Reuses global tokens. */
+
+.observability-page {
+  max-width: 1200px;
+}
+
+.obs-note {
+  color: var(--color-text-muted);
+  max-width: 80ch;
+  margin: 0.25rem 0 1.25rem;
+}
+
+.obs-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.9rem;
+  margin: 1rem 0;
+}
+
+.observability-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* --- Trace list (left) --- */
+.trace-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.obs-empty,
+.obs-hint {
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 0.6rem 0.2rem;
+}
+
+.trace-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.trace-row:hover {
+  border-color: var(--color-border-strong);
+}
+
+.trace-row-active {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+}
+
+.trace-agent {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.trace-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.obs-spancount {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+/* --- Span tree (right) --- */
+.span-tree {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.1rem;
+  min-height: 8rem;
+}
+
+.obs-trace-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.obs-trace-agent {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.obs-trace-rec {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.obs-spans {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.obs-span {
+  border-left: 2px solid var(--color-border);
+  margin-left: 0.2rem;
+}
+
+.obs-span-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.15rem 0 0.15rem 0.6rem;
+}
+
+.obs-span-title {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.obs-span-dur {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.obs-span-sub {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0 0 0.15rem 0.6rem;
+}
+
+.obs-kv {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.obs-k {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.66rem;
+}
+
+.obs-v {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+}
+
+/* --- Operation tag + badges (theme-aware tokens, R25) --- */
+.obs-op {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.4rem;
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.obs-op-invoke_agent {
+  background-color: var(--badge-dark-bg);
+  color: var(--badge-dark-fg);
+}
+
+.obs-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.45rem;
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.obs-badge-target,
+.obs-badge-provider {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+  font-family: var(--font-mono);
+}
+
+.obs-badge-mode.obs-mode-write {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.obs-badge-mode.obs-mode-read {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.obs-badge-approved {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.obs-badge-denied {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+@media (max-width: 760px) {
+  .observability-layout {
+    grid-template-columns: 1fr;
+  }
+}

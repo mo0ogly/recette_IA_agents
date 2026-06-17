@@ -1,10 +1,250 @@
 [
-  {
-    "trace_id": "57512382f4353390891b7ff851781af6",
-    "recording_id": "rec-1",
-    "agent_id": "gh-pr-bot",
-    "target_system": "github",
-    "provider": "stub",
-    "span_count": 3
-  }
+    {
+        "trace_id": "e99b6de7035b6a2de37434c808db19b3",
+        "recording_id": "camp-pr.00.gh-pr-bot",
+        "agent_id": "gh-pr-bot",
+        "target_system": "github",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "d89296ea8d26fddbb897a241f4afae50",
+        "recording_id": "collab-content-day.00.slack-comms-bot",
+        "agent_id": "slack-comms-bot",
+        "target_system": "slack",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "f2aeef687a10bf0963e9a51742cc3b82",
+        "recording_id": "collab-content-day.01.product-editor-bot",
+        "agent_id": "product-editor-bot",
+        "target_system": "product_cms",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "131ce2117dff8768ff8ca4415664c730",
+        "recording_id": "collab-content-day.02.mcp-tool-bot",
+        "agent_id": "mcp-tool-bot",
+        "target_system": "mcp",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "7762bb8dcd420aef57dad33e58e595a6",
+        "recording_id": "collab-content-day.03.legal-policy-bot",
+        "agent_id": "legal-policy-bot",
+        "target_system": "legal_dms",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "1c97ef5ac90318cb7c91a098a8f502dc",
+        "recording_id": "demo-camp.00.demo-gh-bot",
+        "agent_id": "demo-gh-bot",
+        "target_system": "github",
+        "provider": "groq",
+        "span_count": 3
+    },
+    {
+        "trace_id": "73c7b0b2903210d69e1c97f025569bf5",
+        "recording_id": "demo-camp2.00.demo-gh-bot",
+        "agent_id": "demo-gh-bot",
+        "target_system": "github",
+        "provider": "groq",
+        "span_count": 3
+    },
+    {
+        "trace_id": "d137f0b763a396be5771ac56b50cb85b",
+        "recording_id": "finance-payment-run.00.finance-payment-run-agent",
+        "agent_id": "finance-payment-run-agent",
+        "target_system": "finance",
+        "provider": "groq",
+        "span_count": 1
+    },
+    {
+        "trace_id": "3d7b5759e25a9981e4af6048715a3319",
+        "recording_id": "finance-wire-fraud.00.finance-wire-fraud-agent",
+        "agent_id": "finance-wire-fraud-agent",
+        "target_system": "finance",
+        "provider": "groq",
+        "span_count": 3
+    },
+    {
+        "trace_id": "db689e90bba6b856ec214070169bbee6",
+        "recording_id": "identity-offboarding-clean.00.identity-offboarding-clean-agent",
+        "agent_id": "identity-offboarding-clean-agent",
+        "target_system": "okta",
+        "provider": "groq",
+        "span_count": 3
+    },
+    {
+        "trace_id": "66c7a2581bd9f9ac6bd137c1a40a0c03",
+        "recording_id": "identity-privilege-escalation.00.identity-privilege-escalation-agent",
+        "agent_id": "identity-privilege-escalation-agent",
+        "target_system": "okta",
+        "provider": "groq",
+        "span_count": 4
+    },
+    {
+        "trace_id": "17c45aec29935a927a5e9f7bfa3cb7ea",
+        "recording_id": "insider-exfil-chain.00.hris-insider-bot",
+        "agent_id": "hris-insider-bot",
+        "target_system": "hris",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "9e504d16dd22ff5cd1024540246b44bb",
+        "recording_id": "insider-exfil-chain.01.legal-leak-bot",
+        "agent_id": "legal-leak-bot",
+        "target_system": "legal_dms",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "f80e74c30044ad6ebdf8844a831e1eae",
+        "recording_id": "insider-exfil-chain.02.support-exfil-bot",
+        "agent_id": "support-exfil-bot",
+        "target_system": "support_desk",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "629d98580a5730d9c97595f9e0899943",
+        "recording_id": "insider-exfil-chain.03.slack-exfil-bot",
+        "agent_id": "slack-exfil-bot",
+        "target_system": "slack",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "de9e1d9a1421fd2817aa949f7dbe7c4d",
+        "recording_id": "insider-exfil-chain.04.kb-wrecker-bot",
+        "agent_id": "kb-wrecker-bot",
+        "target_system": "knowledge_base",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "a39aa5df1584309a91050ef0ea75ee0e",
+        "recording_id": "live-proof-mock.00.finance-payment-run-agent",
+        "agent_id": "finance-payment-run-agent",
+        "target_system": "finance",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "e468cf4bc12aaeb00bb090a3ad907fce",
+        "recording_id": "ops-readonly-sweep.00.gitlab-readonly-bot",
+        "agent_id": "gitlab-readonly-bot",
+        "target_system": "gitlab",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "b591367ca536d769d798cc68cadbbac6",
+        "recording_id": "ops-readonly-sweep.01.cloud-inventory-bot",
+        "agent_id": "cloud-inventory-bot",
+        "target_system": "cloud",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "0de4a74bb18f9f22babd78715fcb1ef6",
+        "recording_id": "ops-readonly-sweep.02.hris-directory-bot",
+        "agent_id": "hris-directory-bot",
+        "target_system": "hris",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "4256e0fca41fa4d541dfd0045c066119",
+        "recording_id": "ops-readonly-sweep.03.support-triage-bot",
+        "agent_id": "support-triage-bot",
+        "target_system": "support_desk",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "a95c4a03638c9cfc9cd072547004de59",
+        "recording_id": "ops-readonly-sweep.04.kb-search-bot",
+        "agent_id": "kb-search-bot",
+        "target_system": "knowledge_base",
+        "provider": "stub",
+        "span_count": 2
+    },
+    {
+        "trace_id": "ed507be894da521f2bd5304367546182",
+        "recording_id": "ops-readonly-sweep.05.slack-comms-bot",
+        "agent_id": "slack-comms-bot",
+        "target_system": "slack",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "38b5b96b633e926928b3305d784055d3",
+        "recording_id": "prod-sabotage.00.cloud-saboteur-bot",
+        "agent_id": "cloud-saboteur-bot",
+        "target_system": "cloud",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "04343b27c9140ba2bf5e466dc2b1945a",
+        "recording_id": "prod-sabotage.01.product-sabotage-bot",
+        "agent_id": "product-sabotage-bot",
+        "target_system": "product_cms",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "1c1c8e4315e57a2a3714a1281b5124c9",
+        "recording_id": "prod-sabotage.02.gitlab-mr-spammer",
+        "agent_id": "gitlab-mr-spammer",
+        "target_system": "gitlab",
+        "provider": "stub",
+        "span_count": 4
+    },
+    {
+        "trace_id": "0d4f3e8a9958d4f8cb4c4eb873715042",
+        "recording_id": "smoke-console-camp.00.smoke-console-bot",
+        "agent_id": "smoke-console-bot",
+        "target_system": "github",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "4c2fdc56d01ba6aa943030b65177a221",
+        "recording_id": "smoke-console-gov-camp.00.smoke-console-gov-bot",
+        "agent_id": "smoke-console-gov-bot",
+        "target_system": "github",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "95e8154bc94210a5212d3bba6c83d90d",
+        "recording_id": "smoke-e2e-camp.00.smoke-e2e-bot",
+        "agent_id": "smoke-e2e-bot",
+        "target_system": "github",
+        "provider": "stub",
+        "span_count": 3
+    },
+    {
+        "trace_id": "aa68164965d51b17b67eefe4ac293012",
+        "recording_id": "smoke-groq-camp.00.smoke-groq-bot",
+        "agent_id": "smoke-groq-bot",
+        "target_system": "github",
+        "provider": "groq",
+        "span_count": 11
+    },
+    {
+        "trace_id": "5025f05a9d97d117d1a5d3c1236f8771",
+        "recording_id": "verif-live.00.finance-payment-run-agent",
+        "agent_id": "finance-payment-run-agent",
+        "target_system": "finance",
+        "provider": "stub",
+        "span_count": 3
+    }
 ]
