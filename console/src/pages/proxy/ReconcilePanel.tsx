@@ -17,10 +17,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getReconcile, raiseReconcile } from "../../api/client";
 import type { ReconcileReport } from "../../types/platform";
+import type { SourcePanelProps } from "./proxyMenu";
 
 const POLL_INTERVAL_MS = 2000;
 
-export default function ReconcilePanel(): JSX.Element {
+export default function ReconcilePanel({ onStatus }: SourcePanelProps): JSX.Element {
   const [report, setReport] = useState<ReconcileReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [raising, setRaising] = useState(false);
@@ -31,12 +32,14 @@ export default function ReconcilePanel(): JSX.Element {
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      setReport(await getReconcile(undefined, strict));
+      const res = await getReconcile(undefined, strict);
+      setReport(res);
       setError(null);
+      onStatus?.({ count: res.bypass_flows.length, failed: res.bypass_flows.length });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [strict]);
+  }, [strict, onStatus]);
 
   useEffect(() => {
     void refresh();

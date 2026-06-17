@@ -170,10 +170,70 @@
   font-size: 0.85rem;
 }
 
-/* Source toggle (app traces vs wire overlay) and the wire panel. */
-.proxy-source {
-  display: inline-flex;
+/* Source menu (registry-driven switcher: app traces / wire overlay /
+   reconciliation). A segmented group of toggle buttons, each with a hint and a
+   live badge fed by the mounted panel's reported status. */
+.proxy-source-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+}
+
+.proxy-source-item {
+  display: flex;
+  flex-direction: column;
   gap: 0.25rem;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.proxy-source-item:hover {
+  border-color: var(--color-accent);
+}
+
+.proxy-source-item[data-active="true"] {
+  border-color: var(--color-accent);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+  background: var(--color-bg);
+}
+
+.proxy-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.proxy-source-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.proxy-source-hint {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.proxy-source-badge {
+  flex: 0 0 auto;
+}
+
+.proxy-badge[data-outcome="off"] {
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+/* Self-header of a source panel (its own actions: viewer mode, export, clear). */
+.proxy-subheader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .proxy-wire-proxy {

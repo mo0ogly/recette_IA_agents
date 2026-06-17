@@ -1260,9 +1260,16 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             touche jamais le journal d'audit immuable (I1), qui reste la verite.
           </li>
         </ul>
-        <h3>Deux altitudes : traces app vs wire (mitmproxy)</h3>
+        <h3>Le menu des sources : trois altitudes</h3>
         <p>
-          Le selecteur en haut bascule la <strong>source</strong> :
+          Le <strong>menu</strong> en haut bascule la <strong>source</strong> —
+          trois vues lecture seule du meme effet de bord gouverne (I5). Chaque
+          entree porte un libelle, un indice d'une ligne et une{" "}
+          <strong>pastille live</strong> alimentee par le panneau monte (nombre de
+          traces / flux / bypass, ou <code>off</code> quand la fonctionnalite
+          backend est desactivee). Le menu est <strong>declaratif</strong> :
+          ajouter une source = une entree de registre (<code>sources.tsx</code>),
+          sans toucher a l'orchestrateur.
         </p>
         <ul>
           <li>
@@ -1279,6 +1286,16 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             <code>INSPECT_IA_AGENTS_WIRE_PROXY</code> et relancer l'API). Pour le HTTPS
             des systemes reels, faire confiance au CA mitmproxy
             (<code>./recette.sh wire ca</code> {"->"} <code>INSPECT_IA_AGENTS_WIRE_CA</code>).
+          </li>
+          <li>
+            <strong>reconciliation</strong> : le <strong>join</strong> wire {"<->"}{" "}
+            audit. Un flux reseau vers une cible non-mediee n'a aucun evenement
+            d'audit correspondant : c'est le signal d'un{" "}
+            <strong>agent fantome</strong> (ecriture directe, hors proxy gouverne).
+            Le panneau rend le verdict (ok / bypass detecte) et permet de{" "}
+            <strong>consigner</strong> chaque bypass au journal d'audit comme
+            evenement compensatoire (I1, jamais une mutation). Le lab l'OBSERVE,
+            il ne le bloque pas.
           </li>
         </ul>
         <h3>Champ par champ d'une trace</h3>

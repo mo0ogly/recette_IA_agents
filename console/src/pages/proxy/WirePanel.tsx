@@ -18,11 +18,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { clearWireFlows, getWireFlows } from "../../api/client";
 import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
+import type { SourcePanelProps } from "./proxyMenu";
 import { wireFailureCount, wireFlowToLine } from "./wireFlowModel";
 
 const POLL_INTERVAL_MS = 2000;
 
-export default function WirePanel(): JSX.Element {
+export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
   const [flows, setFlows] = useState<WireFlow[]>([]);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
@@ -36,10 +37,15 @@ export default function WirePanel(): JSX.Element {
       setEnabled(res.enabled);
       setProxyUrl(res.proxy_url);
       setError(null);
+      onStatus?.({
+        count: res.flows.length,
+        failed: wireFailureCount(res.flows),
+        disabled: !res.enabled,
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [onStatus]);
 
   useEffect(() => {
     void refresh();
