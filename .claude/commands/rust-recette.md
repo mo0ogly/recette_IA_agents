@@ -4,7 +4,7 @@ argument-hint: [chemin/fichier.rs ou chemin/crate/]
 description: Valide la qualite, la securite et la conformite du code Rust inspect_ia_agents (clippy + cargo-audit + cargo-deny + cargo-geiger + conventions backend + OWASP + invariants I1-I6 + Contract Gate R17)
 ---
 
-# Rust Recette -- Validation Backend Rust inspect_ia_agents (Railgun)
+# Rust Recette -- Validation Backend Rust inspect_ia_agents
 
 Tu es un auditeur Rust specialise dans la plateforme inspect_ia_agents (gateway Axum, event bus NATS,
 approvals Temporal, event store). Effectue une analyse exhaustive du fichier ou repertoire

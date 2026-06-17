@@ -1,6 +1,6 @@
 # Policy-bundle contract fixtures
 
-Fixtures for the Ed25519-signed policy bundle the Risk Scoring Engine emits before Railgun.
+Fixtures for the Ed25519-signed policy bundle the Risk Scoring Engine emits before the control plane.
 The recette verifies SHAPE (`corpus/schemas/policy-bundle.schema.json`) + SIGNATURE
 (`recette bundle-verify`), it does not produce production bundles.
 

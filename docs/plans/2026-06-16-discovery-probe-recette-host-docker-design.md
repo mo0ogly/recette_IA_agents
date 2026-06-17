@@ -106,7 +106,7 @@ flowchart TB
 
 > Consequence directe : **la sonde discovery doit etre native.** Les hooks inline et surtout l'eBPF
 > exigent le noyau de l'hote et l'espace de process. Une sonde discovery dans un conteneur serait
-> aveugle a l'hote. Docker peut heberger les *services* centraux (Railgun, Discovery,
+> aveugle a l'hote. Docker peut heberger les *services* centraux (le control plane, Discovery,
 > Audit), jamais la sonde discovery.
 
 ---
@@ -235,15 +235,15 @@ flowchart TB
     end
 
     subgraph CENTRAL["SERVICES CENTRAUX (conteneurs ou distant)"]
-        RAILGUN["Railgun -- Control<br/>HTTP :8080 / gRPC mTLS :50051<br/>Rego/Regorus, BundleStore, Temporal"]
+        CONTROL["Control Plane<br/>HTTP :8080 / gRPC mTLS :50051<br/>Rego/Regorus, BundleStore, Temporal"]
         DISCOVERY["Discovery -- Enrichment<br/>:8081, scanners, bundles signes Ed25519"]
         NATS["NATS JetStream<br/>(events async)"]
         AUDIT["Audit<br/>Ledger hash-chaine PostgreSQL"]
     end
 
-    PROBE ==>|"gRPC/mTLS :50051<br/>(uplink: escalade, fetch bundle, heartbeat)"| RAILGUN
-    DISCOVERY -->|"bundle signe"| RAILGUN
-    RAILGUN -->|"event"| NATS
+    PROBE ==>|"gRPC/mTLS :50051<br/>(uplink: escalade, fetch bundle, heartbeat)"| CONTROL
+    DISCOVERY -->|"bundle signe"| CONTROL
+    CONTROL -->|"event"| NATS
     NATS -->|"persiste"| AUDIT
     PROBE -. "WAL -> rejeu a la reconnexion" .-> AUDIT
 ```

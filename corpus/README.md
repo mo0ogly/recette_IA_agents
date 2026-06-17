@@ -5,7 +5,7 @@ Ground-truth corpus of **test agents** used to validate two product tools:
 - **discovery** -- must detect/spot each agent.
 - **identification / evaluation** -- must judge whether each agent is *correct*.
 
-This repo is the **recette** side of Railgun/inspect_ia_agents. It produces the test subjects and
+This repo is the **recette** side of inspect_ia_agents. It produces the test subjects and
 the validation harness, NOT the governance platform. See `.claude/rules/recette-corpus.md`
 and the `PERIMETRE COURANT` section of `.claude/CLAUDE.md`.
 

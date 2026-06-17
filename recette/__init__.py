@@ -1,7 +1,7 @@
 """inspect_ia_agents recette: ground-truth corpus + validation harness for the discovery
 and identification tools.
 
-This is the recette side of Railgun/inspect_ia_agents. It produces deterministic test
+This is the recette side of inspect_ia_agents. It produces deterministic test
 agents (GitHub/GitLab) and scores the tools against per-agent ground-truth.
 """
 

@@ -1,6 +1,6 @@
 # python_recette
 
-Static recette scorer for inspect_ia_agents (Railgun) Python code. Python counterpart of
+Static recette scorer for inspect_ia_agents Python code. Python counterpart of
 the Rust `inspect_ia_agents_recette` binary and the executable backend of the
 `/python-recette` command.
 

@@ -4,7 +4,7 @@ argument-hint: [chemin/fichier.py ou chemin/package/]
 description: Valide la qualite, la securite et la conformite du code Python inspect_ia_agents (ruff + mypy + bandit + pip-audit + conventions + OWASP + invariants I1-I6 + Contract Gate R17)
 ---
 
-# Python Recette -- Validation Backend Python inspect_ia_agents (Railgun)
+# Python Recette -- Validation Backend Python inspect_ia_agents
 
 Tu es un auditeur Python specialise dans la plateforme inspect_ia_agents. Python est le
 langage backend secondaire (Rust primaire, voir `/rust-recette`). Analyse le

@@ -1,5 +1,5 @@
 // @ts-check
-// Docusaurus config for the inspect_ia_agents (Railgun) documentation site.
+// Docusaurus config for the inspect_ia_agents documentation site.
 // Surfaces the existing product docs under ../docs (runbooks, architecture,
 // ADRs, migration provenance). Internal design plans (docs/plans), the
 // gitignored tracking dir, and screenshots are excluded from the doc tree.

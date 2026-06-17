@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install_rust_audit.sh -- Install the Rust toolchain + audit/SAST tooling used by /rust-recette.
 #
-# This is the inspect_ia_agents (Railgun) equivalent of what gosec/govulncheck/golangci-lint
+# This is the inspect_ia_agents equivalent of what gosec/govulncheck/golangci-lint
 # provided for the Go /go-recette pipeline. It installs:
 #   - rustup + stable toolchain (rustc, cargo)        (if absent)
 #   - clippy + rustfmt components                     (go vet / gofmt equivalents)

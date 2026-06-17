@@ -1,4 +1,4 @@
-# cargo-deny policy for inspect_ia_agents (Railgun)
+# cargo-deny policy for inspect_ia_agents
 # Supply-chain gate used by /rust-recette Bloc D4 and the pre-commit hook.
 # Format: cargo-deny v2 schema (graph/output + version = 2 sections).
 # Run: cargo deny check advisories bans licenses sources

@@ -1,7 +1,7 @@
 """Ed25519-signed policy bundle contract recette (M5).
 
 The Risk Scoring Engine emits a policy bundle (per-agent decisions + policy version)
-signed with Ed25519 before it reaches Railgun. This module verifies a bundle's canonical
+signed with Ed25519 before it reaches the control plane. This module verifies a bundle's canonical
 payload + signature. We verify, we never produce production bundles.
 
 `cryptography` is an optional extra ([bundle]); the import is lazy so the core recette

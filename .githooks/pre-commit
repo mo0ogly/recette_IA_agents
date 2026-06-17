@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-commit -- Rust + Python static gate for inspect_ia_agents (Railgun).
+# pre-commit -- Rust + Python static gate for inspect_ia_agents.
 #
 # Acts only on STAGED files, per language, and is crate/venv-aware so it works in
 # a monorepo where crates live under cmd/<name>/ (no Cargo.toml at the repo root).

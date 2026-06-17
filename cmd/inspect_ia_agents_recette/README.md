@@ -1,6 +1,6 @@
 # inspect_ia_agents_recette
 
-Static recette scorer for inspect_ia_agents (Railgun) Rust code. The Rust counterpart of
+Static recette scorer for inspect_ia_agents Rust code. The Rust counterpart of
 the Go `lia_recette` CLI and the executable backend of the `/rust-recette`
 command.
 

@@ -8,7 +8,7 @@
 **Maintainer:** fabricepizzi@gmail.com
 **Scope:** Build the corpus + validation harness that proves the colleague's tools work.
 We build the test subjects + the oracle + the scorecards. We do NOT build the tools
-under test (Discovery/Enrichment Plane, Identification, Risk Engine, Railgun gateway).
+under test (Discovery/Enrichment Plane, Identification, Risk Engine, the control plane gateway).
 
 ---
 
@@ -32,7 +32,7 @@ Two tools consume the corpus:
   capabilities declared-vs-real, policy conformance, behavior) + global verdict.
 
 Plus a downstream contract: Risk Scoring Engine -> **Ed25519-signed policy bundle**
--> Railgun. The recette must be able to assert the bundle is well-formed and signed.
+-> the control plane. The recette must be able to assert the bundle is well-formed and signed.
 
 ---
 
