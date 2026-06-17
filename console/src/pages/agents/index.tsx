@@ -89,6 +89,9 @@ interface AgentFormValues {
   model: string;
   systemPrompt: string;
   scenarioJson: string;
+  /** Bounded-memory: cap the conversation context fed to the model. */
+  memoryEnabled: boolean;
+  memoryWindow?: number;
   gtDetectable: boolean;
   gtVerdict: "" | "correct" | "incorrect";
   gtIdentity: string;
@@ -112,6 +115,8 @@ const EMPTY_FORM: AgentFormValues = {
   model: "",
   systemPrompt: "",
   scenarioJson: "",
+  memoryEnabled: false,
+  memoryWindow: undefined,
   gtDetectable: false,
   gtVerdict: "",
   gtIdentity: "",
@@ -187,6 +192,9 @@ function toAgentConfig(values: AgentFormValues, id: string): AgentConfig {
     role: values.role.trim() || undefined,
     model: values.model.trim() || undefined,
     system_prompt: values.systemPrompt.trim() || undefined,
+    memory: values.memoryEnabled
+      ? { enabled: true, window: values.memoryWindow ?? 8 }
+      : undefined,
     ground_truth: groundTruthFrom(values),
   };
 }
@@ -210,6 +218,8 @@ function toFormValues(agent: AgentConfig): AgentFormValues {
     model: agent.model ?? "",
     systemPrompt: agent.system_prompt ?? "",
     scenarioJson: agent.scenario ? JSON.stringify(agent.scenario, null, 2) : "",
+    memoryEnabled: agent.memory?.enabled ?? false,
+    memoryWindow: agent.memory?.window,
     gtDetectable: gt.detectable ?? false,
     gtVerdict: gt.expected_verdict ?? "",
     gtIdentity: gt.expected_identity ?? "",
@@ -831,6 +841,34 @@ export default function AgentsPage(): JSX.Element {
             onChange={(e) => setField("scenarioJson", e.target.value)}
           />
         </div>
+
+        <fieldset className="agents-actions-picker">
+          <legend>Memoire (contexte borne)</legend>
+          <label className="agents-action-row">
+            <input
+              type="checkbox"
+              checked={form.memoryEnabled}
+              onChange={(e) => setField("memoryEnabled", e.target.checked)}
+            />
+            Borner le contexte envoye au modele (fenetre glissante)
+          </label>
+          {form.memoryEnabled && (
+            <div className="agents-form-row">
+              <label htmlFor="agent-memory-window">Fenetre (messages)</label>
+              <input
+                id="agent-memory-window"
+                type="number"
+                min={1}
+                value={form.memoryWindow ?? ""}
+                placeholder="8"
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  setField("memoryWindow", Number.isFinite(n) && n >= 1 ? n : undefined);
+                }}
+              />
+            </div>
+          )}
+        </fieldset>
 
         <fieldset className="agents-actions-picker">
           <legend>Ground-truth inline (verdict attendu sur les 4 dimensions)</legend>

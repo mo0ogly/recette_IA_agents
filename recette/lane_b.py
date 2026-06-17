@@ -41,6 +41,21 @@ def _result_text(action: AgentAction) -> str:
     return f"ok: {action.action_type} on {action.resource} (mode={action.mode})"
 
 
+def _windowed(history: list[Message], window: int | None) -> list[Message]:
+    """Bound the conversation memory passed to the model to a sliding window.
+
+    Keeps the opening goal message (history[0]) plus the most recent
+    ``window - 1`` messages, so a long run does not feed the model an
+    ever-growing context. ``None`` (or a window large enough) keeps the full
+    history. Pure and deterministic (I4): a fixed slice, no clock/random.
+    """
+    if window is None or window <= 0 or len(history) <= window:
+        return history
+    if window == 1:
+        return history[:1]
+    return [history[0], *history[-(window - 1) :]]
+
+
 def run_agent(
     *,
     agent_id: str,
@@ -57,6 +72,7 @@ def run_agent(
     on_step: Callable[[int, RecordedStep], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
     tool_output: Callable[[AgentAction], str] = _result_text,
+    memory_window: int | None = None,
 ) -> LaneBResult:
     """Run the decide->act loop until a final answer or max_steps. Deterministic given a
     deterministic backend (StubLlm/ReplayLlm) + LabForge.
@@ -71,7 +87,12 @@ def run_agent(
     function models AgentDojo's injection-via-tool-output for git agents (the forge
     returns adversarial content). The text is captured in ``LaneBResult.tool_results``
     so the injected content is auditable (legibility-first). Determinism (I4) holds:
-    ``tool_output`` is a pure caller-supplied function -- no clock/random is added."""
+    ``tool_output`` is a pure caller-supplied function -- no clock/random is added.
+
+    ``memory_window`` bounds the conversation context fed to the model to a
+    sliding window (the goal message plus the most recent N-1 messages). The
+    full history is still recorded; only the model's input is windowed. ``None``
+    keeps the full context. Deterministic (I4): a pure slice."""
     forge = forge or LabForge()
     tools = build_tools(capability_scope)
     system = _system_prompt(goal, target_system, capability_scope)
@@ -91,7 +112,7 @@ def run_agent(
     for i in range(max_steps):
         if should_stop is not None and should_stop():
             break
-        decision = llm.decide(system=system, history=history, tools=tools)
+        decision = llm.decide(system=system, history=_windowed(history, memory_window), tools=tools)
         if not decision.is_tool_call:
             step = RecordedStep(decision=decision, action=None)
             recording.steps.append(step)

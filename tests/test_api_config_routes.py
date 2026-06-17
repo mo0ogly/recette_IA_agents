@@ -134,6 +134,37 @@ class TestConfigRoutes(unittest.TestCase):
         self.assertEqual(r.json()["goal"], "g")
         self.assertEqual(self.client.get("/config/agents/nope").status_code, 404)
 
+    def test_agent_memory_block_validated(self) -> None:
+        # A well-formed bounded-memory block is accepted and round-trips.
+        r = self.client.post(
+            "/config/agents",
+            json={
+                "id": "am",
+                "principal": "p",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": ["read_repo"],
+                "runtime": "lab",
+                "memory": {"enabled": True, "window": 4},
+            },
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(self.client.get("/config/agents/am").json()["memory"]["window"], 4)
+        # A bad window is rejected (400), not silently stored.
+        bad = self.client.post(
+            "/config/agents",
+            json={
+                "id": "am2",
+                "principal": "p",
+                "target_system": "github",
+                "goal": "g",
+                "capability_scope": ["read_repo"],
+                "runtime": "lab",
+                "memory": {"enabled": True, "window": 0},
+            },
+        )
+        self.assertEqual(bad.status_code, 400)
+
     def test_servers_list_empty(self) -> None:
         self.assertEqual(self.client.get("/config/servers").json(), [])
 

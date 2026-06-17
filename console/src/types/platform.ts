@@ -173,6 +173,12 @@ export interface AgentConfig {
    * never sent as 0/NaN from an empty input.
    */
   pace_ms?: number;
+  /**
+   * Optional bounded memory: cap the conversation context fed to the model to
+   * a sliding window (the goal message plus the most recent window-1 messages).
+   * Absent or disabled = the agent runs with the full context.
+   */
+  memory?: { enabled: boolean; window: number };
 }
 
 /** The four correctness dimensions judged by the identification recette. */

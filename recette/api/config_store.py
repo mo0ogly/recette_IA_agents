@@ -84,6 +84,30 @@ def _check_ground_truth(ground_truth: object) -> None:
                 raise ValueError(f"ground_truth dimension {dim!r} must be a boolean")
 
 
+_MEMORY_KEYS = {"enabled", "window"}
+
+
+def _check_memory(memory: object) -> None:
+    """Validate an optional agent bounded-memory block.
+
+    Shape: ``{enabled: bool, window: int >= 1}``. A disabled or absent memory
+    means the agent runs with the full conversation context; an enabled memory
+    bounds the model's input to a sliding window (the goal + last window-1
+    messages). Both fields optional; an empty dict is valid (= disabled).
+    """
+    if not isinstance(memory, dict):
+        raise ValueError("memory must be a dict")
+    unknown = set(memory) - _MEMORY_KEYS
+    if unknown:
+        raise ValueError(f"memory has unknown keys: {sorted(unknown)}")
+    if "enabled" in memory and not isinstance(memory["enabled"], bool):
+        raise ValueError("memory 'enabled' must be a boolean")
+    if "window" in memory:
+        window = memory["window"]
+        if not isinstance(window, int) or isinstance(window, bool) or window < 1:
+            raise ValueError("memory 'window' must be an integer >= 1")
+
+
 _HOSTNAME_RE = re.compile(
     r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 )
@@ -185,6 +209,8 @@ class ConfigStore:
         _check_runtime(agent.get("runtime"))
         if "ground_truth" in agent:
             _check_ground_truth(agent["ground_truth"])
+        if "memory" in agent:
+            _check_memory(agent["memory"])
         cfg = self.read()
         if any(a["id"] == agent["id"] for a in cfg["agents"]):
             raise ValueError(f"agent id {agent['id']!r} already exists")
@@ -199,6 +225,8 @@ class ConfigStore:
             # Validate the patch value alone, not the merged entry -- update_agent
             # has always worked patch-only (update_server is the stricter one).
             _check_ground_truth(patch["ground_truth"])
+        if "memory" in patch:
+            _check_memory(patch["memory"])
         cfg = self.read()
         for a in cfg["agents"]:
             if a["id"] == agent_id:

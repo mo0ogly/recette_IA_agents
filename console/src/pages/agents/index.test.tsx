@@ -172,6 +172,49 @@ describe("AgentsPage", () => {
     ]);
   });
 
+  it("composes a bounded-memory block from the memory fields", async () => {
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listAiBackends).mockResolvedValue([]);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(createAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+
+    await screen.findByRole("option", { name: "github" });
+    fireEvent.change(screen.getByLabelText("Target system (en face)"), {
+      target: { value: "github" },
+    });
+    fireEvent.change(screen.getAllByLabelText("Id")[0], { target: { value: "mem-bot" } });
+
+    // Enable bounded memory and set the sliding-window size.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Borner le contexte/ }),
+    );
+    fireEvent.change(screen.getByLabelText("Fenetre (messages)"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(createAgent).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(createAgent).mock.calls[0][0];
+    expect(payload.memory).toEqual({ enabled: true, window: 5 });
+  });
+
+  it("omits memory when the bounded-memory toggle is off", async () => {
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listAiBackends).mockResolvedValue([]);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(createAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+    await screen.findByRole("option", { name: "github" });
+    fireEvent.change(screen.getAllByLabelText("Id")[0], { target: { value: "no-mem" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    const payload = vi.mocked(createAgent).mock.calls[0][0];
+    expect(payload.memory).toBeUndefined();
+  });
+
   it("edit form exposes role/model/system_prompt/ground_truth and preserves them on save", async () => {
     const rich: AgentConfig = {
       ...agents[0],

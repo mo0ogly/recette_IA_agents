@@ -452,6 +452,7 @@ def make_lane_b_runner(
             # console can show WHY each side effect happened (decide -> act).
             on_step=_paced_on_step(base_on_step, pace_ms, should_stop),
             should_stop=should_stop,
+            memory_window=_memory_window(agent_cfg),
         )
         emit(
             "result",
@@ -462,6 +463,18 @@ def make_lane_b_runner(
         )
 
     return runner
+
+
+def _memory_window(agent_cfg: dict) -> int | None:
+    """Resolve the bounded-memory window from an agent config, or None for the
+    full context. Shape: ``memory: {enabled: bool, window: int}`` (a disabled
+    or absent memory means unbounded). Operational config, never a decision
+    input, so reading it here keeps the loop deterministic (I4)."""
+    memory = agent_cfg.get("memory")
+    if not isinstance(memory, dict) or not memory.get("enabled"):
+        return None
+    window = memory.get("window")
+    return window if isinstance(window, int) and window > 0 else None
 
 
 def _lane_b_step_emit(emit: Emit, agent_id: str) -> Callable[[int, object], None]:
