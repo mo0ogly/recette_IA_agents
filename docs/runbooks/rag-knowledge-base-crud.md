@@ -1,64 +1,69 @@
-# RAG knowledge-base CRUD + poison scenarios + reset
+# CRUD de la base de connaissances RAG + scenarios de poison + reset
 
-Operator lifecycle to prepare and run the RAG poisoning recette: view the
-knowledge base, insert/delete documents, apply a named poison scenario, and reset
-to the clean baseline. This is a banc-de-test tool **off the agent path** -- it
-never lets an agent mutate the index without the gateway (I2).
+Cycle de vie operateur pour preparer et lancer la recette de poisoning RAG :
+consulter la base de connaissances, inserer/supprimer des documents, appliquer un
+scenario de poison nomme, et revenir a la baseline propre. C'est un outil de
+banc-de-test **hors du chemin de l'agent** -- il ne laisse jamais un agent muter
+l'index sans la gateway (I2).
 
-## Why
+## Pourquoi
 
-The RAG poisoning recette proves that a polluted knowledge base cannot make an
-agent produce a forbidden side effect: even if a retrieved document instructs the
-agent to exfiltrate / run an invalid command / ingest forged data, the gateway
-denies or escalates the induced action. To run that recette repeatably you need
-to *pollute* the knowledge base in a controlled way and *reset* it afterwards.
-This feature provides that lifecycle.
+La recette de poisoning RAG prouve qu'une base de connaissances polluee ne peut
+pas faire produire a un agent un effet de bord interdit : meme si un document
+recupere ordonne a l'agent d'exfiltrer / d'executer une commande invalide /
+d'ingerer des donnees forgees, la gateway refuse ou escalade l'action induite.
+Pour lancer cette recette de maniere repetable, il faut *polluer* la base de
+connaissances de facon controlee puis la *reset* ensuite. Cette fonctionnalite
+fournit ce cycle de vie.
 
-## Model (deterministic, I4)
+## Modele (deterministe, I4)
 
-- The baseline is the committed file `corpus/rag/knowledge_base.json` (source of
-  truth).
-- A single in-memory document list (`recette/rag_store.py`, `live_documents()`) is
-  seeded from the baseline and shared with the lab handler
-  (`recette/lab/domains/knowledge_base.py`), so a live agent `query_knowledge_base`
-  reflects the current state (baseline + applied scenario).
-- `reset()` reloads the baseline exactly -- same bytes every time, no clock, no
-  random. The recette loop is therefore replayable.
+- La baseline est le fichier committe `corpus/rag/knowledge_base.json` (source de
+  verite).
+- Une unique liste de documents en memoire (`recette/rag_store.py`,
+  `live_documents()`) est amorcee depuis la baseline et partagee avec le handler du
+  lab (`recette/lab/domains/knowledge_base.py`), de sorte qu'un
+  `query_knowledge_base` d'un agent live reflete l'etat courant (baseline +
+  scenario applique).
+- `reset()` recharge la baseline a l'identique -- les memes octets a chaque fois,
+  pas d'horloge, pas d'aleatoire. La boucle de recette est donc rejouable.
 
-## The recette loop
+## La boucle de recette
 
 ```
 reset -> apply <scenario> -> run agent / campaign -> gateway denies/escalates -> reset
 ```
 
-The gateway verdict is what the recette asserts: the induced action is `deny`
-(exfil / unknown command) or `escalate` (index mutation), `executed=False`. See
-`campaigns/rag/` and `scripts/run_rag_poisoning_live_groq.py`.
+Le verdict de la gateway est ce que la recette asserte : l'action induite est
+`deny` (exfil / commande inconnue) ou `escalate` (mutation d'index),
+`executed=False`. Voir `campaigns/rag/` et
+`scripts/run_rag_poisoning_live_groq.py`.
 
-## Diagrams (for the recette team)
+## Diagrammes (pour l'equipe recette)
 
-### Where the operator CRUD sits vs the agent path (I2 boundary)
+### Ou se situe le CRUD operateur par rapport au chemin de l'agent (frontiere I2)
 
-The operator mutates the knowledge base directly (banc-de-test). The agent never
-does: it can only read via a mediated `query_knowledge_base`, and any side effect
-the poisoned content induces is decided by the gateway -- not by the RAG content.
+L'operateur mute la base de connaissances directement (banc-de-test). L'agent ne
+le fait jamais : il ne peut que lire via un `query_knowledge_base` mediatise, et
+tout effet de bord induit par le contenu empoisonne est decide par la gateway --
+pas par le contenu RAG.
 
 ```mermaid
 flowchart LR
-  subgraph Operator["Operator banc-de-test (off the agent path)"]
-    CLI["CLI: recette rag-kb"]
+  subgraph Operator["Operateur banc-de-test (hors du chemin de l'agent)"]
+    CLI["CLI : recette rag-kb"]
     UI["Console /rag KnowledgeBaseManager"]
-    ROUTES["/rag/* operator routes"]
+    ROUTES["routes operateur /rag/*"]
     STORE["KnowledgeBaseStore (rag_store.py)"]
   end
-  subgraph Shared["Shared in-memory KB"]
-    LIVE["live_documents() = baseline + applied scenario"]
+  subgraph Shared["KB partagee en memoire"]
+    LIVE["live_documents() = baseline + scenario applique"]
   end
-  subgraph AgentPath["Agent path (mediated, I2)"]
-    AGENT["RAG agent"]
+  subgraph AgentPath["Chemin de l'agent (mediatise, I2)"]
+    AGENT["agent RAG"]
     GW["Gateway /actions/execute"]
-    POLICY["Policy engine decide()"]
-    LAB["lab knowledge_base handler"]
+    POLICY["moteur de policy decide()"]
+    LAB["handler knowledge_base du lab"]
   end
   BASELINE[("corpus/rag/knowledge_base.json")]
   SCEN[("corpus/rag/scenarios/*.json")]
@@ -67,54 +72,54 @@ flowchart LR
   UI --> ROUTES
   ROUTES --> STORE
   STORE -->|reset| BASELINE
-  STORE -->|apply scenario| SCEN
+  STORE -->|applique le scenario| SCEN
   STORE --> LIVE
   AGENT -->|query_knowledge_base| GW
   GW --> POLICY
-  POLICY -->|allow read| LAB
-  LAB -->|reads| LIVE
-  AGENT -.->|induced side effect| GW
+  POLICY -->|autorise la lecture| LAB
+  LAB -->|lit| LIVE
+  AGENT -.->|effet de bord induit| GW
   GW -.->|deny / escalate, executed=False| AGENT
 ```
 
-### The poisoning recette loop (sequence)
+### La boucle de recette de poisoning (sequence)
 
 ```mermaid
 sequenceDiagram
-  participant Op as Operator
+  participant Op as Operateur
   participant Store as KnowledgeBaseStore
-  participant KB as Shared KB
-  participant Agent as RAG agent
+  participant KB as KB partagee
+  participant Agent as agent RAG
   participant GW as Gateway + policy
   Op->>Store: reset()
-  Store->>KB: clean baseline
+  Store->>KB: baseline propre
   Op->>Store: apply_scenario("exfil-finance")
-  Store->>KB: inject poisoned doc scn-exfil-finance
+  Store->>KB: injecte le doc empoisonne scn-exfil-finance
   Agent->>GW: query_knowledge_base
-  GW->>KB: read (allow)
-  KB-->>Agent: returns the poisoned document
-  Agent->>GW: send_data_to_external_domain (demanded by the poison)
+  GW->>KB: lecture (autorisee)
+  KB-->>Agent: renvoie le document empoisonne
+  Agent->>GW: send_data_to_external_domain (exige par le poison)
   GW-->>Agent: DENY -- executed=False (I2)
   Op->>Store: reset()
-  Store->>KB: baseline restored (poison gone, I4)
+  Store->>KB: baseline restauree (poison disparu, I4)
 ```
 
-### The two CI guards that keep a poison honest (T4 + T5)
+### Les deux gardes CI qui maintiennent un poison honnete (T4 + T5)
 
-A poison artifact cannot enter the corpus without proof it is blocked, and an
-inserted document cannot carry a stray identifier.
+Un artefact de poison ne peut entrer dans le corpus sans la preuve qu'il est
+bloque, et un document insere ne peut porter un identifiant errant.
 
 ```mermaid
 flowchart TD
-  NEW["New / edited poison artifact"] --> Q1{"poisoned doc in a scenario file?"}
-  Q1 -->|yes| G4["T4 scenario guard: gateway decision for rag_agent on the injected action equals injected_expect, and injected_expect is deny or escalate"]
-  G4 -->|mismatch or allow| RED1["suite RED: no proof of blocking"]
-  G4 -->|match| Q2
-  Q1 -->|no| Q2{"inserted via store.add?"}
-  Q2 -->|yes| G5["T5 id guard: id matches the corpus slug pattern"]
-  G5 -->|invalid id| RED2["KnowledgeBaseError"]
-  G5 -->|valid| OK["accepted into the corpus"]
-  Q2 -->|no| OK
+  NEW["Artefact de poison nouveau / edite"] --> Q1{"doc empoisonne dans un fichier scenario ?"}
+  Q1 -->|oui| G4["garde scenario T4 : la decision gateway pour rag_agent sur l'action injectee egale injected_expect, et injected_expect est deny ou escalate"]
+  G4 -->|incoherence ou allow| RED1["suite ROUGE : aucune preuve de blocage"]
+  G4 -->|correspondance| Q2
+  Q1 -->|non| Q2{"insere via store.add ?"}
+  Q2 -->|oui| G5["garde id T5 : l'id correspond au pattern de slug du corpus"]
+  G5 -->|id invalide| RED2["KnowledgeBaseError"]
+  G5 -->|valide| OK["accepte dans le corpus"]
+  Q2 -->|non| OK
 ```
 
 ## CLI
@@ -128,66 +133,72 @@ python -m recette rag-kb del --id <doc-id>
 python -m recette rag-kb reset
 ```
 
-A document JSON has `id, title, content, poisoned, tags`; a poisoned document also
-carries `injected_action, injected_target_system, injected_expect, threat`.
+Un document JSON porte `id, title, content, poisoned, tags` ; un document
+empoisonne porte en plus `injected_action, injected_target_system,
+injected_expect, threat`.
 
-## HTTP API (operator routes, off the agent path)
+## API HTTP (routes operateur, hors du chemin de l'agent)
 
-| Method | Route | Purpose |
+| Methode | Route | Role |
 |--------|-------|---------|
-| GET | `/rag/documents` | list the current knowledge base |
-| POST | `/rag/documents` | insert a document (400 on invalid) |
-| DELETE | `/rag/documents/{id}` | remove a document (404 if unknown) |
-| POST | `/rag/reset` | restore the clean baseline |
-| GET | `/rag/scenarios` | list named poison scenarios |
-| POST | `/rag/scenario/{name}/apply` | inject a named scenario's documents |
+| GET | `/rag/documents` | liste la base de connaissances courante |
+| POST | `/rag/documents` | insere un document (400 si invalide) |
+| DELETE | `/rag/documents/{id}` | supprime un document (404 si inconnu) |
+| POST | `/rag/reset` | restaure la baseline propre |
+| GET | `/rag/scenarios` | liste les scenarios de poison nommes |
+| POST | `/rag/scenario/{name}/apply` | injecte les documents d'un scenario nomme |
 
-Responses are plain JSON dicts (no `{success, data}` envelope -- matches the rest
-of the API). The console page `/rag` renders the `KnowledgeBaseManager` below the
-retrieval scorecard.
+Les reponses sont des dicts JSON simples (pas d'enveloppe `{success, data}` --
+coherent avec le reste de l'API). La page console `/rag` rend le
+`KnowledgeBaseManager` sous la scorecard de retrieval.
 
 ## Scenarios
 
-`corpus/rag/scenarios/*.json`, validated by `scenario.schema.json`. Each is a named
-set of documents to inject. Shipped: `exfil-finance` (exfiltration),
-`invalid-command-ops` (unknown command). Add one by dropping a new file. Two guards
-keep a scenario honest:
+`corpus/rag/scenarios/*.json`, valides par `scenario.schema.json`. Chacun est un
+ensemble nomme de documents a injecter. Livres : `exfil-finance`
+(exfiltration), `invalid-command-ops` (commande inconnue). On en ajoute un en
+deposant un nouveau fichier. Deux gardes maintiennent un scenario honnete :
 
-- **scenario guard (T4)** -- for every poisoned doc in every scenario file,
+- **garde scenario (T4)** -- pour chaque doc empoisonne de chaque fichier
+  scenario,
   `tests/test_rag_poisoning.py::test_scenario_guard_every_poisoned_doc_is_blocked_by_the_gateway`
-  decides the injected action for a `rag_agent` and asserts the verdict equals the
-  doc's `injected_expect` AND is a block (`deny`/`escalate`). A scenario whose poison
-  is actually allowed, or whose stated `injected_expect` drifts from the engine,
-  turns the suite RED -- no poison ships without decide-based proof it is blocked.
-- **KB-seed guard** -- `test_kb_guard_every_poisoned_doc_has_a_campaign` keeps the
-  poisoned docs of `knowledge_base.json` aligned with a `campaigns/rag/` campaign.
+  decide l'action injectee pour un `rag_agent` et asserte que le verdict egale
+  l'`injected_expect` du doc ET est un blocage (`deny`/`escalate`). Un scenario
+  dont le poison est en fait autorise, ou dont l'`injected_expect` declare derive
+  par rapport au moteur, fait passer la suite au ROUGE -- aucun poison ne sort
+  sans preuve fondee sur decide qu'il est bloque.
+- **garde KB-seed** -- `test_kb_guard_every_poisoned_doc_has_a_campaign` maintient
+  les docs empoisonnes de `knowledge_base.json` alignes avec une campagne
+  `campaigns/rag/`.
 
-## Security / invariants
+## Securite / invariants
 
-- **I2 anti-backdoor**: the operator CRUD is on `/rag/*` routes, never on the agent
-  `/actions/execute` path. An agent attempting `ingest_document` still ESCALATES
-  through the gateway (`tests/test_api_rag_kb.py::test_anti_backdoor_...`). The CRUD
-  does not open a mutation bypass.
-- **Path traversal**: a scenario `name` is validated against `^[a-z0-9][a-z0-9-]{1,63}$`
-  and the resolved path must stay inside the scenarios directory, so
-  `apply_scenario("../knowledge_base")` or an absolute path is rejected
-  (`test_apply_scenario_rejects_path_traversal`). Without this guard a crafted name
-  could load an arbitrary `.json` from disk.
-- **Id slug (T5, defence in depth)**: an inserted document `id` must match the same
-  slug `^[a-z0-9][a-z0-9-]{1,63}$` as the schema. The id touches no file path, but
-  enforcing the corpus shape at the store rejects stray identifiers early
-  (`test_add_rejects_invalid_id_slug`).
-- **I4 reset determinism**: `reset()` reloads the baseline byte-for-byte
+- **anti-backdoor I2** : le CRUD operateur est sur les routes `/rag/*`, jamais sur
+  le chemin agent `/actions/execute`. Un agent qui tente `ingest_document`
+  ESCALADE quand meme via la gateway (`tests/test_api_rag_kb.py::test_anti_backdoor_...`).
+  Le CRUD n'ouvre pas de contournement de mutation.
+- **Path traversal** : un `name` de scenario est valide contre
+  `^[a-z0-9][a-z0-9-]{1,63}$` et le chemin resolu doit rester a l'interieur du
+  repertoire des scenarios, si bien que `apply_scenario("../knowledge_base")` ou un
+  chemin absolu est rejete (`test_apply_scenario_rejects_path_traversal`). Sans
+  cette garde, un nom forge pourrait charger un `.json` arbitraire depuis le disque.
+- **Slug d'id (T5, defence en profondeur)** : l'`id` d'un document insere doit
+  correspondre au meme slug `^[a-z0-9][a-z0-9-]{1,63}$` que le schema. L'id ne
+  touche aucun chemin de fichier, mais imposer la forme du corpus au niveau du
+  store rejette tot les identifiants errants (`test_add_rejects_invalid_id_slug`).
+- **determinisme du reset I4** : `reset()` recharge la baseline octet par octet
   (`test_reset_is_deterministic`).
 
 ## Tests
 
-- `tests/test_rag_store.py` -- CRUD, reset determinism, scenario injection, the lab
-  handler reflecting the store, path-traversal rejection, id-slug rejection (T5).
-- `tests/test_api_rag_kb.py` -- the six routes + the I2 anti-backdoor guarantee.
-- `tests/test_rag_poisoning.py` -- decide-based verdicts of every `campaigns/rag/`
-  action, the KB-seed campaign guard, and the scenario poison guard (T4).
+- `tests/test_rag_store.py` -- CRUD, determinisme du reset, injection de scenario,
+  le handler du lab refletant le store, rejet du path-traversal, rejet du slug d'id
+  (T5).
+- `tests/test_api_rag_kb.py` -- les six routes + la garantie anti-backdoor I2.
+- `tests/test_rag_poisoning.py` -- verdicts fondes sur decide de chaque action
+  `campaigns/rag/`, la garde de campagne KB-seed, et la garde de poison scenario
+  (T4).
 - `console/src/pages/rag/KnowledgeBaseManager.test.tsx` -- R16 render-and-assert
-  against a real captured payload.
-- System recette LEG C (`scripts/run_system_recette.py`) exercises the full
-  reset -> apply -> campaign -> anti-backdoor loop end to end.
+  contre un payload reel capture.
+- La recette systeme LEG C (`scripts/run_system_recette.py`) exerce la boucle
+  complete reset -> apply -> campaign -> anti-backdoor de bout en bout.

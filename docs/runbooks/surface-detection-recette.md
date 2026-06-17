@@ -1,48 +1,49 @@
-# Surface-detection recette -- does RailNode SEE the agent?
+# Recette de detection de surface -- RailNode VOIT-il l'agent ?
 
-> The recette that proves the thesis: **si l'outil ne voit pas les agents, c'est
-> un echec**. It scores, per observation surface, whether a discovery tool
-> (RailNode) detects a simulated agent. An agent detected on NO surface turns the
-> scorecard RED. Founding design:
+> La recette qui prouve la these : **si l'outil ne voit pas les agents, c'est
+> un echec**. Elle evalue, surface d'observation par surface d'observation, si un
+> outil de discovery (RailNode) detecte un agent simule. Un agent detecte sur
+> AUCUNE surface fait passer la scorecard au ROUGE. Conception fondatrice :
 > `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
-> Implementation plan: `docs/plans/2026-06-16-railnode-surface-detection.md`.
+> Plan d'implementation : `docs/plans/2026-06-16-railnode-surface-detection.md`.
 
-## The four surfaces
+## Les quatre surfaces
 
-RailNode observes an agent through several interception surfaces (AgentRail RFC):
+RailNode observe un agent a travers plusieurs surfaces d'interception (RFC AgentRail) :
 
-- `hook_subprocess`, `hook_mcp`, `hook_sdk` -- the inline **hook** family: a shim
-  in the agent process sees the structured tool-call (the bench's `ProxyTrace`
-  view).
-- `ebpf_wire` -- the **eBPF/syscall** family: a kernel probe sees the raw network
-  flow (the bench's `WireFlow` view), even across the Docker boundary (one kernel).
+- `hook_subprocess`, `hook_mcp`, `hook_sdk` -- la famille **hook** inline : un shim
+  dans le processus de l'agent voit le tool-call structure (la vue `ProxyTrace` du
+  banc d'essai).
+- `ebpf_wire` -- la famille **eBPF/syscall** : une sonde noyau voit le flux reseau
+  brut (la vue `WireFlow` du banc d'essai), meme au travers de la frontiere Docker (un seul noyau).
 
-## The two views the bench already has
+## Les deux vues que le banc d'essai possede deja
 
-A simulated run yields two deterministic views, reused as-is:
+Un run simule produit deux vues deterministes, reutilisees telles quelles :
 
-- `proxy_traces` (`recette/platform/proxy/tracing.py::ProxyTrace`) -> the hook view.
-- `wire_flows` (`recette/platform/proxy/wire.py::WireFlow`) -> the eBPF/wire view.
+- `proxy_traces` (`recette/platform/proxy/tracing.py::ProxyTrace`) -> la vue hook.
+- `wire_flows` (`recette/platform/proxy/wire.py::WireFlow`) -> la vue eBPF/wire.
 
-`recette/surface/surfaces.py::project_surfaces` maps a run onto every surface
-(pure, sorted, I4).
+`recette/surface/surfaces.py::project_surfaces` projette un run sur chaque surface
+(pur, trie, I4).
 
-## The ghost keystone
+## Le ghost, pierre angulaire
 
-`corpus/surface/ghost-direct-db` is an agent whose native egress bypasses the
-SDK: it produces a `wire_flow` but NO `proxy_trace`. So it is **invisible on the
-hook surfaces** and **caught only on the wire/eBPF surface**. This is why
-per-surface coverage matters: a hook-only detector would miss it. Same
-wire-vs-audit duality as `recette/platform/proxy/reconcile.py::reconcile_run`.
+`corpus/surface/ghost-direct-db` est un agent dont l'egress natif contourne le
+SDK : il produit un `wire_flow` mais AUCUN `proxy_trace`. Il est donc **invisible
+sur les surfaces hook** et **capture uniquement sur la surface wire/eBPF**. C'est
+pour cela que la couverture par surface est importante : un detecteur uniquement
+hook le manquerait. Meme dualite wire-vs-audit que
+`recette/platform/proxy/reconcile.py::reconcile_run`.
 
-## Run it
+## Le lancer
 
 ```
 python -m recette surface
 ```
 
-Prints the detection scorecard (JSON) and exits 0 iff every agent is detected on
-at least one surface. Example output (2 subjects):
+Affiche la scorecard de detection (JSON) et sort avec le code 0 si et seulement si
+chaque agent est detecte sur au moins une surface. Exemple de sortie (2 sujets) :
 
 ```
 {
@@ -53,42 +54,46 @@ at least one surface. Example output (2 subjects):
 }
 ```
 
-`ebpf_wire` detects both; the hook surfaces detect only the well-behaved PR bot
-(1/2) -- the ghost is the hook blind spot. `false_negatives` lists any agent seen
-nowhere (the thesis failure); a non-empty list exits 1.
+`ebpf_wire` detecte les deux ; les surfaces hook ne detectent que le PR bot
+conforme (1/2) -- le ghost est l'angle mort des hooks. `false_negatives` liste tout
+agent vu nulle part (l'echec de la these) ; une liste non vide sort avec le code 1.
 
-This gate runs inside `make recette` (it is a dep of the `recette` target): a
-simulated agent that RailNode would see on NO surface turns the whole recette
-RED, in CI, automatically -- never something to catch by hand.
+Ce gate tourne a l'interieur de `make recette` (c'est une dependance de la cible
+`recette`) : un agent simule que RailNode ne verrait sur AUCUNE surface fait passer
+toute la recette au ROUGE, en CI, automatiquement -- jamais quelque chose a
+attraper a la main.
 
-## The red gate -- the `vanished` negative subject
+## Le gate rouge -- le sujet negatif `vanished`
 
-`corpus/surface/_negative/vanished` is a committed NEGATIVE subject: an agent
-that produced nothing observable (empty `proxy_traces` AND empty `wire_flows`),
-so it is detected on NO surface. Its ground-truth is `detected_anywhere: false`.
+`corpus/surface/_negative/vanished` est un sujet NEGATIF committe : un agent
+qui n'a rien produit d'observable (`proxy_traces` vide ET `wire_flows` vide),
+il n'est donc detecte sur AUCUNE surface. Son ground-truth est `detected_anywhere: false`.
 
-It lives under `_negative/` so the green `recette surface` run does NOT score it
-(the loader `load_surface_subjects` skips `_`-prefixed dirs). It is loaded
-separately by `load_surface_negatives()` and exercised by
-`tests/test_surface_negative.py`, which asserts the scorecard turns RED on it
-(`ok == false`, `false_negatives == ("vanished",)`). This proves the thesis gate
-fires from a committed corpus subject, not just a unit-test literal.
+Il vit sous `_negative/` pour que le run vert `recette surface` ne l'evalue PAS
+(le loader `load_surface_subjects` ignore les repertoires prefixes par `_`). Il est
+charge separement par `load_surface_negatives()` et exerce par
+`tests/test_surface_negative.py`, qui assert que la scorecard passe au ROUGE sur lui
+(`ok == false`, `false_negatives == ("vanished",)`). Cela prouve que le gate de la
+these se declenche depuis un sujet de corpus committe, pas seulement depuis un
+literal de test unitaire.
 
-## Wiring the real RailNode
+## Brancher le vrai RailNode
 
-The reference oracle (`ReferenceSurfaceDiscoveryAdapter`) is the template. A real
-RailNode plugs in by implementing the `SurfaceDiscoveryAdapter` protocol
-(`recette/surface/detect.py`) -- given a `SurfaceObservation`, return a
+L'oracle de reference (`ReferenceSurfaceDiscoveryAdapter`) est le gabarit. Un vrai
+RailNode se branche en implementant le protocol `SurfaceDiscoveryAdapter`
+(`recette/surface/detect.py`) -- a partir d'une `SurfaceObservation`, renvoyer un
 `DiscoveryResult`.
 
-`recette/surface/http_adapter.py::HttpSurfaceDiscoveryAdapter` is the ready HTTP
-implementation (mirrors `recette/http_adapter.py`): it POSTs each observation
-(`{surface, visible}`) to the RailNode detection route (`/v1/detect`, ASSUMED
-pending the RailNode API), unwraps a `{success, data}` envelope, and returns a
-`DiscoveryResult`. Config (R5/R8): base URL from `INSPECT_IA_AGENTS_RAILNODE_URL`
-(default `http://127.0.0.1:8085`), bearer token from `INSPECT_IA_AGENTS_RAILNODE_TOKEN`,
-tenant from `INSPECT_IA_AGENTS_TENANT`. httpx is imported lazily with a
-zero-dependency stdlib fallback, so the package needs no network to import.
+`recette/surface/http_adapter.py::HttpSurfaceDiscoveryAdapter` est l'implementation
+HTTP prete a l'emploi (calquee sur `recette/http_adapter.py`) : elle envoie en POST
+chaque observation (`{surface, visible}`) vers la route de detection de RailNode
+(`/v1/detect`, SUPPOSEE en attendant l'API RailNode), deballe une enveloppe
+`{success, data}`, et renvoie un `DiscoveryResult`. Config (R5/R8) : URL de base
+depuis `INSPECT_IA_AGENTS_RAILNODE_URL` (defaut `http://127.0.0.1:8085`), bearer
+token depuis `INSPECT_IA_AGENTS_RAILNODE_TOKEN`, tenant depuis
+`INSPECT_IA_AGENTS_TENANT`. httpx est importe paresseusement avec un fallback
+stdlib sans dependance, de sorte que le package n'a besoin d'aucun reseau pour
+s'importer.
 
 ## Gates
 
@@ -98,8 +103,8 @@ make recette        # includes the `surface` detection gate
 .venv-pyaudit/bin/ruff check recette/ tests/ && .venv-pyaudit/bin/mypy recette/
 ```
 
-## Related
+## Voir aussi
 
-- `.claude/rules/determinism-replay.md` (I4) -- projection/detection/scorecard pure + replay-tested.
-- `docs/runbooks/private-dns.md` -- the lab servers the simulated comms route to.
-- `recette/adapters.py` -- the `DiscoveryAdapter` / `IdentificationAdapter` family this extends.
+- `.claude/rules/determinism-replay.md` (I4) -- projection/detection/scorecard pure + testee en replay.
+- `docs/runbooks/private-dns.md` -- les serveurs du lab vers lesquels les comms simulees sont routees.
+- `recette/adapters.py` -- la famille `DiscoveryAdapter` / `IdentificationAdapter` que ceci etend.

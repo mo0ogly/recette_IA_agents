@@ -1,83 +1,84 @@
-# Migration provenance -- what was taken from the source repos (verifiable)
+# Provenance de migration -- ce qui a ete repris des repos sources (verifiable)
 
-> Proof that the capture layer adapts REAL code from the upstream repos (read via
-> `gh api`), not invented. Each row cites a verifiable upstream symbol/path and
-> the local code that adapts it. Honest distinction: PATTERN + FIELD SET are
-> reused; the LAYER and STORE are re-homed into this project's seams (the upstream
-> code does not drop in unchanged because it targets a different layer/runtime).
-> Licenses: agentwatch Apache-2.0, agenttrace MIT (see NOTICE).
+> Preuve que la couche de capture adapte du VRAI code issu des repos upstream (lu via
+> `gh api`), pas du code invente. Chaque ligne cite un symbole/chemin upstream verifiable
+> et le code local qui l'adapte. Distinction honnete : le PATTERN et le JEU DE CHAMPS
+> sont reutilises ; la COUCHE et le STORE sont reimplantes dans les coutures propres a ce
+> projet (le code upstream ne s'integre pas tel quel car il vise une couche/un runtime
+> different).
+> Licences : agentwatch Apache-2.0, agenttrace MIT (voir NOTICE).
 
-## cyberark/agentwatch (Apache-2.0) -- the hook MECHANISM
+## cyberark/agentwatch (Apache-2.0) -- le MECANISME de hook
 
-Source read: `src/agentwatch/hooks/base.py`, `src/agentwatch/llm/models.py`,
+Source lue : `src/agentwatch/hooks/base.py`, `src/agentwatch/llm/models.py`,
 `src/agentwatch/hooks/http/*`.
 
-| Upstream (real symbol) | Local adaptation | Reuse vs adapt |
+| Upstream (symbole reel) | Adaptation locale | Reutilise vs adapte |
 |------------------------|------------------|----------------|
-| `BaseHook.apply_hook()` / `should_intercept(*args)` (`hooks/base.py`) | `CapturingLlm` wraps an `LlmBackend`; the wrap IS the applied hook, `should_intercept` is implicit (every `decide()`) | PATTERN reused |
-| `HookCallbackProto.on_hook_callback(hook, obj)` (`hooks/base.py`) | `CapturingLlm(sink=...)` -- the sink callback receiving each `LlmCallTrace` | PATTERN reused |
-| `ToolUse` / `Message` / `Tool` LLM wire models (`llm/models.py`) | `LlmCallTrace.intent = {tool}:{resource}` captured from the decision's tool call | DATA SHAPE reused |
-| `hooks/http/httpcore_hook.py` (interception at the **httpcore/HTTP** layer) | NOT used at httpcore: we hook the `LlmBackend.decide()` seam (we own it). In our stack, HTTP-transport interception IS the wire surface (eBPF `discoveryprobe` / `ProxyTrace`) | LAYER ADAPTED (deliberate) |
+| `BaseHook.apply_hook()` / `should_intercept(*args)` (`hooks/base.py`) | `CapturingLlm` enveloppe un `LlmBackend` ; l'enveloppe EST le hook applique, `should_intercept` est implicite (chaque `decide()`) | PATTERN reutilise |
+| `HookCallbackProto.on_hook_callback(hook, obj)` (`hooks/base.py`) | `CapturingLlm(sink=...)` -- le callback sink recevant chaque `LlmCallTrace` | PATTERN reutilise |
+| modeles wire LLM `ToolUse` / `Message` / `Tool` (`llm/models.py`) | `LlmCallTrace.intent = {tool}:{resource}` capture depuis l'appel d'outil de la decision | FORME DE DONNEES reutilisee |
+| `hooks/http/httpcore_hook.py` (interception a la couche **httpcore/HTTP**) | NON utilise au niveau httpcore : on hooke la couture `LlmBackend.decide()` (on en est proprietaire). Dans notre stack, l'interception du transport HTTP EST la surface wire (eBPF `discoveryprobe` / `ProxyTrace`) | COUCHE ADAPTEE (deliberement) |
 
-Honest statement: agentwatch intercepts the HTTP transport (httpcore) and parses
-provider wire formats. We do not replicate httpcore hooking in-process; we wrap
-the higher-level `LlmBackend` interface. The MECHANISM (hook object + callback
-sink + capture tool-call intent) is faithfully reused; the LAYER differs by
-design (sync-first to our existing `CachingLlm` idiom).
+Enonce honnete : agentwatch intercepte le transport HTTP (httpcore) et parse les
+formats wire des providers. Nous ne repliquons pas le hooking httpcore in-process ;
+nous enveloppons l'interface `LlmBackend` de plus haut niveau. Le MECANISME (objet hook
++ callback sink + capture de l'intention de l'appel d'outil) est fidelement reutilise ;
+la COUCHE differe par conception (sync-first vers notre idiome `CachingLlm` existant).
 
-## tensorstax/agenttrace (MIT) -- the trace SCHEMA
+## tensorstax/agenttrace (MIT) -- le SCHEMA de trace
 
-Source read: `src/agenttrace/agenttrace.py`.
+Source lue : `src/agenttrace/agenttrace.py`.
 
-| Upstream (real symbol) | Local adaptation | Reuse vs adapt |
+| Upstream (symbole reel) | Adaptation locale | Reutilise vs adapte |
 |------------------------|------------------|----------------|
-| `TraceManager._log_trace_end(func_name, session_id, duration_ms, success)` | `LlmCallTrace{intent (~func_name), agent_id/run_id (~session_id), latency_ms (~duration_ms), error (~not success)}` | FIELD SET reused |
-| `traces` table columns `id, trace_type, timestamp, ...` (`CREATE TABLE traces`) | `LlmCallTrace{seq/event_id, kind (~trace_type)}` + ops fields | FIELD SET reused |
-| `TraceManager` SQLite `traces.db` + `save_traces` | NOT used: re-homed into `CaptureStore` (bounded ring) + the audit log (I1 truth) -- no parallel SQLite | STORE RE-HOMED |
-| `@tracer.trace()` decorator | NOT used: the wrap is the `LlmBackend` wrapper, not a per-function decorator | MECHANISM ADAPTED |
+| `TraceManager._log_trace_end(func_name, session_id, duration_ms, success)` | `LlmCallTrace{intent (~func_name), agent_id/run_id (~session_id), latency_ms (~duration_ms), error (~not success)}` | JEU DE CHAMPS reutilise |
+| colonnes de la table `traces` `id, trace_type, timestamp, ...` (`CREATE TABLE traces`) | `LlmCallTrace{seq/event_id, kind (~trace_type)}` + champs ops | JEU DE CHAMPS reutilise |
+| `TraceManager` SQLite `traces.db` + `save_traces` | NON utilise : reimplante dans `CaptureStore` (ring borne) + le log d'audit (verite I1) -- pas de SQLite parallele | STORE REIMPLANTE |
+| decorateur `@tracer.trace()` | NON utilise : l'enveloppe est le wrapper `LlmBackend`, pas un decorateur par fonction | MECANISME ADAPTE |
 
-Honest statement: agenttrace persists to its own SQLite and decorates functions.
-We reuse its enriched per-call FIELD SET (intent + duration/latency + success/error
-+ session/run) but store into this project's existing capture/audit seams, not a
-parallel database.
+Enonce honnete : agenttrace persiste dans son propre SQLite et decore des fonctions.
+Nous reutilisons son JEU DE CHAMPS enrichi par appel (intent + duration/latency +
+success/error + session/run) mais stockons dans les coutures capture/audit existantes
+de ce projet, pas une base de donnees parallele.
 
-## Verify it yourself
+## Verifiez-le vous-meme
 
 ```
 gh api repos/cyberark/agentwatch/contents/src/agentwatch/hooks/base.py --jq '.content' | base64 -d
 gh api repos/tensorstax/agenttrace/contents/src/agenttrace/agenttrace.py --jq '.content' | base64 -d
 ```
-Compare with `recette/capture/capturing_llm.py` and `recette/capture/llm_trace.py`.
+Comparez avec `recette/capture/capturing_llm.py` et `recette/capture/llm_trace.py`.
 
-## Rust parts (different skill)
+## Parties Rust (skill different)
 
-The native eBPF wire surface (`discoveryprobe/`) is Rust, built under the
-`rust-best-practices` skill (idiomatic borrowing, clippy `-D warnings`, fmt). The
-trace schema + sink (`discoveryprobe-capture`, GR1-GR3) migrate the agenttrace
-FIELD SET and the agentwatch callback MECHANISM (see the tables above) into Rust.
-See `docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md`.
+La surface wire eBPF native (`discoveryprobe/`) est en Rust, construite sous le skill
+`rust-best-practices` (borrowing idiomatique, clippy `-D warnings`, fmt). Le schema de
+trace + le sink (`discoveryprobe-capture`, GR1-GR3) migrent le JEU DE CHAMPS d'agenttrace
+et le MECANISME de callback d'agentwatch (voir les tables ci-dessus) vers Rust.
+Voir `docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md`.
 
-### GR4 -- agentwatch egress observation, relocated to the kernel
+### GR4 -- observation d'egress agentwatch, relocalisee dans le noyau
 
-agentwatch observes an agent's LLM traffic IN-PROCESS at the `httpcore`/HTTP
-transport layer (`BaseHook` over the HTTP client). The eBPF connect program
-(`discoveryprobe-ebpf::discoveryprobe_connect`) observes the SAME egress -- the
-agent's outbound TCP dial to the provider -- but at the KERNEL
-(`syscalls:sys_enter_connect`), so it needs NO cooperation from the agent and
-catches a hook-blind ghost.
+agentwatch observe le trafic LLM d'un agent IN-PROCESS a la couche de transport
+`httpcore`/HTTP (`BaseHook` au-dessus du client HTTP). Le programme connect eBPF
+(`discoveryprobe-ebpf::discoveryprobe_connect`) observe le MEME egress -- l'appel TCP
+sortant de l'agent vers le provider -- mais au NOYAU
+(`syscalls:sys_enter_connect`), donc il n'a besoin d'AUCUNE cooperation de l'agent et
+attrape un fantome aveugle au hook.
 
-| Upstream (real mechanism) | Local adaptation | Reuse vs adapt |
+| Upstream (mecanisme reel) | Adaptation locale | Reutilise vs adapte |
 |---------------------------|------------------|----------------|
-| agentwatch `BaseHook` over `httpcore` HTTP transport (in-process egress observation) | `discoveryprobe_connect` reads the `connect(2)` `sockaddr_in` at the kernel -> `ConnectEvent{daddr:dport}` | OBSERVATION POINT relocated (in-process httpcore -> kernel syscall) |
-| agentwatch sees host+port from the HTTP request | kernel sees dest `a.b.c.d:port` from the socket | SAME signal, different layer |
+| agentwatch `BaseHook` au-dessus du transport HTTP `httpcore` (observation d'egress in-process) | `discoveryprobe_connect` lit le `sockaddr_in` du `connect(2)` au noyau -> `ConnectEvent{daddr:dport}` | POINT D'OBSERVATION relocalise (httpcore in-process -> syscall noyau) |
+| agentwatch voit host+port depuis la requete HTTP | le noyau voit la destination `a.b.c.d:port` depuis le socket | MEME signal, couche differente |
 
-This is an ADAPTATION of WHERE agentwatch observes (layer relocated for
-no-cooperation capture), not a line-by-line port of its Python. The syscall
-tracepoint ABI used (`uservaddr` at offset 24; `sockaddr_in` `sin_family`@0 /
-`sin_port`@2 BE / `sin_addr`@4 BE; `AF_INET=2`) is the stable Linux
-syscall-enter format, cross-checked against the kernel tracepoint `format` file
-(root-gated) and public references; never invented (R13).
+Il s'agit d'une ADAPTATION de l'ENDROIT ou agentwatch observe (couche relocalisee pour
+une capture sans cooperation), pas d'un portage ligne a ligne de son Python. L'ABI du
+tracepoint syscall utilisee (`uservaddr` a l'offset 24 ; `sockaddr_in` `sin_family`@0 /
+`sin_port`@2 BE / `sin_addr`@4 BE ; `AF_INET=2`) est le format syscall-enter stable de
+Linux, recoupe avec le fichier `format` du tracepoint noyau (root-gated) et des
+references publiques ; jamais invente (R13).
 
-Compile-verified: the eBPF crate builds a real `Linux BPF` object carrying both
-tracepoint programs + both maps (readelf). Live attach/capture needs CAP_BPF
-(the broker) and is NOT proven outside a privileged run (R14 boundary).
+Compile-verifie : la crate eBPF construit un vrai objet `Linux BPF` portant les deux
+programmes tracepoint + les deux maps (readelf). L'attach/capture en live necessite
+CAP_BPF (le broker) et n'est PAS prouve hors d'une execution privilegiee (frontiere R14).

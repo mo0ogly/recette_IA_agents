@@ -1,11 +1,12 @@
-# Runbook -- gateway middleware pipeline (I2)
+# Runbook -- pipeline de middleware de la gateway (I2)
 
-A reference pattern (agent-framework `_middleware.py`) adapted to inspect_ia_agents's
-control-plane discipline. A middleware wraps the gateway submission with two
-hooks; it can **observe** every submission and can force a **deny**, but it can
-**never grant** -- only the Policy Engine produces an allow (I2 preserved).
+Un patron de reference (le `_middleware.py` d'agent-framework) adapte a la
+discipline de plan Control d'inspect_ia_agents. Un middleware enveloppe la
+soumission a la gateway avec deux hooks ; il peut **observer** chaque soumission
+et peut forcer un **deny**, mais il ne peut **jamais accorder** -- seul le Policy
+Engine produit un allow (I2 preserve).
 
-## Contract (`recette/platform/middleware.py`)
+## Contrat (`recette/platform/middleware.py`)
 
 ```python
 class Middleware(Protocol):
@@ -13,14 +14,15 @@ class Middleware(Protocol):
     def after(self, request, outcome) -> None: ...  # observe-only
 ```
 
-- `before` returns a deny reason -> the action is denied and audited (proxy never
-  called), exactly like a policy deny.
-- A `before` that **raises** -> deny (fail-safe, never fail-open).
-- `after` observes the produced outcome; an exception there is swallowed so
-  observation can never change an outcome.
-- Middlewares must be **deterministic** (no clock/random) to preserve replay (I4).
+- `before` renvoie une raison de deny -> l'action est refusee et auditee (le proxy
+  n'est jamais appele), exactement comme un deny de policy.
+- Un `before` qui **leve une exception** -> deny (fail-safe, jamais fail-open).
+- `after` observe l'outcome produit ; une exception a ce niveau est avalee afin que
+  l'observation ne puisse jamais changer un outcome.
+- Les middlewares doivent etre **deterministes** (pas d'horloge/random) pour
+  preserver le replay (I4).
 
-## Wiring (additive, default unchanged)
+## Cablage (additif, comportement par defaut inchange)
 
 ```python
 from recette.platform.middleware import MiddlewarePipeline, RecordingMiddleware, DenyListMiddleware
@@ -32,22 +34,22 @@ gateway = Gateway(
 )
 ```
 
-A Gateway built without `middleware=` behaves exactly as before.
+Une Gateway construite sans `middleware=` se comporte exactement comme avant.
 
 ```mermaid
 flowchart TD
-  REQ["ActionRequest"] --> RA["resolve agent (I3)"]
+  REQ["ActionRequest"] --> RA["resolution de l'agent (I3)"]
   RA --> MB["middleware.before"]
-  MB -- "deny reason" --> DEN["action_denied (audited) - proxy NOT called"]
-  MB -- "None" --> POL["Policy Engine decide (the ONLY allow path, I2)"]
+  MB -- "raison de deny" --> DEN["action_denied (audite) - proxy NON appele"]
+  MB -- "None" --> POL["Policy Engine decide (le SEUL chemin d'allow, I2)"]
   POL --> OUT["allow / deny / escalate"]
-  DEN --> AFT["middleware.after (observe-only)"]
+  DEN --> AFT["middleware.after (observation seule)"]
   OUT --> AFT
 ```
 
-## Provided middlewares
+## Middlewares fournis
 
-- `RecordingMiddleware` -- observability: records `(agent, target, action)` before
-  and `(action, verdict)` after.
-- `DenyListMiddleware(targets)` -- a fail-safe guard that denies any submission to
-  a listed `target_system` before policy evaluation.
+- `RecordingMiddleware` -- observabilite : enregistre `(agent, target, action)` avant
+  et `(action, verdict)` apres.
+- `DenyListMiddleware(targets)` -- un garde fail-safe qui refuse toute soumission
+  vers un `target_system` liste avant l'evaluation de policy.

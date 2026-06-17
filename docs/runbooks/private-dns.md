@@ -1,60 +1,61 @@
-# Private DNS resolver -- runbook
+# Resolveur DNS prive -- runbook
 
-> Lab servers carry stable internal names (`fqdn` + `aliases`) instead of raw
-> `127.0.0.1:port`. The proxy resolves a name to a server entry deterministically
-> (I4), records it as `ProxyTrace.target` (trace realism), and -- when global
-> **containment** is on -- denies any undeclared name with an audited
-> `resolution_denied` event and NO network call (fail-safe, an exfil signal).
+> Les serveurs du lab portent des noms internes stables (`fqdn` + `aliases`) au
+> lieu de `127.0.0.1:port` brut. Le proxy resout un nom vers une entree de serveur
+> de maniere deterministe (I4), l'enregistre comme `ProxyTrace.target` (realisme de
+> la trace) et -- quand le **containment** global est actif -- refuse tout nom non
+> declare avec un evenement audite `resolution_denied` et SANS appel reseau
+> (fail-safe, un signal d'exfiltration).
 >
-> Design: `docs/plans/2026-06-15-private-dns-resolver-design.md`.
-> Code: `recette/platform/netname/resolver.py` (pure), proxy gate in
-> `recette/api/runners.py`, config in `recette/api/config_store.py`.
+> Conception : `docs/plans/2026-06-15-private-dns-resolver-design.md`.
+> Code : `recette/platform/netname/resolver.py` (pur), gate du proxy dans
+> `recette/api/runners.py`, config dans `recette/api/config_store.py`.
 
-## The name model
+## Le modele de noms
 
-Each server entry in `config/inspect_ia_agents.config.json` may declare:
+Chaque entree de serveur dans `config/inspect_ia_agents.config.json` peut declarer :
 
-- `fqdn` -- canonical internal name (e.g. `api.github.com`). Optional and
-  back-compatible: a server without `fqdn` still resolves by its `id`.
-- `aliases` -- alternative names that resolve to the same server.
+- `fqdn` -- nom interne canonique (par ex. `api.github.com`). Optionnel et
+  retrocompatible : un serveur sans `fqdn` se resout toujours par son `id`.
+- `aliases` -- noms alternatifs qui se resolvent vers le meme serveur.
 
-A name resolves by `fqdn` -> `alias` -> `id`, in that order. Resolution is a
-pure function of `(name, servers, containment)` -- no socket, no clock, no
-random -- so it is replay-stable (I4) and never enters `decide()`.
+Un nom se resout par `fqdn` -> `alias` -> `id`, dans cet ordre. La resolution est une
+fonction pure de `(name, servers, containment)` -- pas de socket, pas d'horloge, pas
+d'aleatoire -- donc elle est stable au replay (I4) et n'entre jamais dans `decide()`.
 
-## Containment (the allowlist gate)
+## Containment (la gate d'allowlist)
 
-A single global flag `containment` (top-level in the config) switches behavior:
+Un unique drapeau global `containment` (au niveau racine de la config) bascule le comportement :
 
-- **off (default)** -- realism only: an unknown name falls back to the legacy
-  `id` path. Nothing is denied.
-- **on** -- the resolver is an allowlist: an undeclared name raises
-  `ResolutionDenied`, the proxy emits an audited `resolution_denied` event, and
-  makes NO call (fail-safe deny-by-default; defense-in-depth on top of proxy
-  mediation, never a replacement for it).
+- **off (par defaut)** -- realisme uniquement : un nom inconnu retombe sur le chemin
+  `id` legacy. Rien n'est refuse.
+- **on** -- le resolveur est une allowlist : un nom non declare leve
+  `ResolutionDenied`, le proxy emet un evenement audite `resolution_denied` et
+  n'effectue AUCUN appel (deny-by-default fail-safe ; defense en profondeur par-dessus
+  la mediation par proxy, jamais un remplacement de celle-ci).
 
-## Operating from the console
+## Pilotage depuis la console
 
-Servers page (`/servers`):
+Page Serveurs (`/servers`) :
 
-- **Config tab** -- each server form has `FQDN (private DNS, optional)` and
-  `Aliases (comma-separated)` fields, plus a global
-  **Private-DNS containment** toggle (reads/writes `GET/PUT /config/containment`).
-- **Test panel** (`ServerTestPanel`) -- a **Resolve name** probe hits
-  `POST /config/resolve` and shows either the resolved endpoint
-  (`name -> server_id (fqdn)`) or a `denied` badge with the reason. A denied
-  probe is a successful diagnostic (HTTP 200, `resolved: false`), not an error,
-  and appends no event.
+- **Onglet Config** -- chaque formulaire de serveur dispose des champs
+  `FQDN (private DNS, optional)` et `Aliases (comma-separated)`, plus un bascule
+  global **Private-DNS containment** (lit/ecrit `GET/PUT /config/containment`).
+- **Panneau de test** (`ServerTestPanel`) -- une sonde **Resolve name** appelle
+  `POST /config/resolve` et affiche soit l'endpoint resolu
+  (`name -> server_id (fqdn)`), soit un badge `denied` avec la raison. Une sonde
+  refusee est un diagnostic reussi (HTTP 200, `resolved: false`), pas une erreur,
+  et n'ajoute aucun evenement.
 
 ## API
 
-| Verb | Route | Body | Returns |
+| Verbe | Route | Corps | Retourne |
 |------|-------|------|---------|
 | GET  | `/config/containment` | -- | `{"containment": bool}` |
 | PUT  | `/config/containment` | `{"enabled": bool}` | `{"containment": bool}` |
-| POST | `/config/resolve` | `{"name": str, "containment"?: bool}` | resolved / denied dict |
+| POST | `/config/resolve` | `{"name": str, "containment"?: bool}` | dict resolved / denied |
 
-`/config/resolve` outcomes (raw dict, no envelope):
+Resultats de `/config/resolve` (dict brut, pas d'enveloppe) :
 
 ```
 resolved : {"name": "api.github.com", "resolved": true, "server_id": "gh-mock", "fqdn": "api.github.com"}
@@ -62,9 +63,9 @@ denied   : {"name": "evil.example.com", "resolved": false, "reason": "not_in_all
 legacy   : {"name": "<unknown>", "resolved": false, "reason": "unknown_legacy"}   # containment off
 ```
 
-## Live proof (R14)
+## Preuve live (R14)
 
-With the platform up (`./recette.sh platform up`, API on `:8090`):
+Avec la plateforme demarree (`./recette.sh platform up`, API sur `:8090`) :
 
 ```
 curl -s -X POST http://localhost:8090/config/resolve -H 'content-type: application/json' -d '{"name":"api.github.com","containment":true}'
@@ -72,9 +73,9 @@ curl -s -X POST http://localhost:8090/config/resolve -H 'content-type: applicati
 curl -s -X POST http://localhost:8090/config/resolve -H 'content-type: application/json' -d '{"name":"evil.example.com","containment":true}'
 ```
 
-Observed (2026-06-15): `api.github.com` and the alias `github.lab.internal` both
-resolve to `gh-mock`; `evil.example.com` returns `resolved: false`,
-`reason: not_in_allowlist` -- denied, no call.
+Observe (2026-06-15) : `api.github.com` et l'alias `github.lab.internal` se
+resolvent tous deux vers `gh-mock` ; `evil.example.com` retourne `resolved: false`,
+`reason: not_in_allowlist` -- refuse, aucun appel.
 
 ## Gates
 
@@ -85,8 +86,8 @@ make recette
 ./recette.sh console-build
 ```
 
-## Related
+## Liens connexes
 
-- `.claude/rules/determinism-replay.md` (I4) -- resolver is pure + replay-tested.
-- `.claude/rules/frontend-contract-gate.md` (R16) -- console fixtures captured live.
-- `docs/runbooks/lab-realistic-doubles.md` -- the lab doubles the names point at.
+- `.claude/rules/determinism-replay.md` (I4) -- le resolveur est pur + teste au replay.
+- `.claude/rules/frontend-contract-gate.md` (R16) -- fixtures de la console capturees en live.
+- `docs/runbooks/lab-realistic-doubles.md` -- le lab double les noms vises.

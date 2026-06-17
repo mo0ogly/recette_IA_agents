@@ -1,19 +1,20 @@
-# Runbook -- Track U Recette API (U1)
+# Runbook -- API de recette Track U (U1)
 
-The U1 API (`recette/api/`) exposes every CLI capability -- identification /
-discovery / Lane B runs, config, catalog -- over HTTP plus a WebSocket live event
-stream. It reuses the `recette` package directly (no business logic duplicated) and
-the core `recette` package never imports `recette.api` -- FastAPI is an optional extra.
+L'API U1 (`recette/api/`) expose chaque capacite de la CLI -- runs identification /
+discovery / Lane B, config, catalogue -- via HTTP, plus un flux d'evenements live en
+WebSocket. Elle reutilise directement le package `recette` (aucune logique metier
+dupliquee) et le package coeur `recette` n'importe jamais `recette.api` -- FastAPI est
+un extra optionnel.
 
-## Install
+## Installation
 
 ```bash
 pip install -e '.[api]'
 ```
 
-(or use the project `.venv`, which already has the `[api]` extra installed).
+(ou utiliser le `.venv` du projet, qui a deja l'extra `[api]` installe).
 
-## Run
+## Lancement
 
 ```bash
 make api
@@ -21,56 +22,59 @@ make api
 python -m recette.api
 ```
 
-Host/port via env (defaults `127.0.0.1:8090`):
+Hote/port via env (valeurs par defaut `127.0.0.1:8090`) :
 
-| Env var | Default |
+| Variable d'env | Defaut |
 |---------|---------|
 | `INSPECT_IA_AGENTS_API_HOST` | `127.0.0.1` |
 | `INSPECT_IA_AGENTS_API_PORT` | `8090` |
 
 ## Endpoints
 
-| Method | Path | Purpose |
+| Methode | Chemin | Role |
 |--------|------|---------|
 | GET | `/health` | liveness |
-| GET | `/agents` | catalog (identification corpus, discovery surfaces, registered lane_b agents) |
-| POST | `/agents/register` | register a Lane B agent into config |
-| GET/POST/PUT/DELETE | `/config/agents[/{id}]` | Lane B agent config CRUD |
-| GET/POST/DELETE | `/config/ai-backends[/{id}]` | AI backend config CRUD (no secrets stored) |
-| POST | `/runs` | launch a run `{kind: identification\|discovery\|lane_b, params}` |
-| GET | `/runs/{id}` | run status |
-| GET | `/runs/{id}/events` | buffered event frames (polling fallback) |
-| POST | `/runs/{id}/stop` | request cooperative stop |
-| WS | `/runs/{id}/ws` | live event-frame stream (WebSocket transport) |
+| GET | `/agents` | catalogue (corpus d'identification, surfaces de discovery, agents lane_b enregistres) |
+| POST | `/agents/register` | enregistre un agent Lane B dans la config |
+| GET/POST/PUT/DELETE | `/config/agents[/{id}]` | CRUD de la config des agents Lane B |
+| GET/POST/DELETE | `/config/ai-backends[/{id}]` | CRUD de la config des backends IA (aucun secret stocke) |
+| POST | `/runs` | lance un run `{kind: identification\|discovery\|lane_b, params}` |
+| GET | `/runs/{id}` | statut du run |
+| GET | `/runs/{id}/events` | trames d'evenements bufferisees (repli par polling) |
+| POST | `/runs/{id}/stop` | demande un arret cooperatif |
+| WS | `/runs/{id}/ws` | flux de trames d'evenements live (transport WebSocket) |
 
-## WebSocket usage
+## Utilisation du WebSocket
 
-Connect to `ws://host:port/runs/{id}/ws`. The server pushes JSON frames of the form
-`{seq, type, data}`. The stream ends with a terminal frame:
+Se connecter a `ws://host:port/runs/{id}/ws`. Le serveur pousse des trames JSON de la
+forme `{seq, type, data}`. Le flux se termine par une trame terminale :
 
 ```json
 {"type": "end", "data": {"status": "..."}}
 ```
 
-## Lane B run example
+## Exemple de run Lane B
 
-Deterministic / offline (provide a `stub_script`):
+Deterministe / hors ligne (fournir un `stub_script`) :
 
 ```json
 POST /runs
 {"kind": "lane_b", "params": {"agent_id": "a1", "stub_script": [...]}}
 ```
 
-Without `stub_script`, the agent's `ai_backend_id` resolves to a live provider
-(provider key supplied via env -- R8).
+Sans `stub_script`, l'`ai_backend_id` de l'agent se resout vers un provider live
+(cle du provider fournie via env -- R8).
 
-## Real-mode guard
+## Garde-fou du mode reel
 
-Lab is the default forge (no side effects). Real-mode forge is **not** enabled in U1
-unless a future task wires `params.real` plus `INSPECT_IA_AGENTS_REAL_ALLOWLIST` (env).
+Le lab est la forge par defaut (aucun effet de bord). La forge en mode reel n'est
+**pas** activee en U1 tant qu'une tache future ne cable pas `params.real` plus
+`INSPECT_IA_AGENTS_REAL_ALLOWLIST` (env).
 
-Secrets (provider keys, tokens) are never stored in config -- always via env (R8).
+Les secrets (cles de provider, tokens) ne sont jamais stockes dans la config --
+toujours via env (R8).
 
-## Follow-up note
+## Note de suivi
 
-The API assumes a single-user lab; authentication is a later Track U follow-up.
+L'API suppose un lab mono-utilisateur ; l'authentification est un suivi ulterieur du
+Track U.

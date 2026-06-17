@@ -1,93 +1,98 @@
-# Runbook -- Precise agent launch (instance) on the dashboard
+# Runbook -- Lancement precis d'un agent (instance) sur le dashboard
 
-> Design: `docs/plans/2026-06-14-precise-agent-launch-design.md`.
-> Plan: `docs/plans/2026-06-14-precise-agent-launch.md`.
+> Design : `docs/plans/2026-06-14-precise-agent-launch-design.md`.
+> Plan : `docs/plans/2026-06-14-precise-agent-launch.md`.
 
-## What it is
+## Ce que c'est
 
-The dashboard distinguishes an **agent** (its definition: identity +
-`capability_scope` + goal) from an **instance**: one precise, scripted run that
-exercises chosen actions against chosen resources, with an expected profile.
+Le dashboard distingue un **agent** (sa definition : identite +
+`capability_scope` + objectif) d'une **instance** : un run precis et scripte qui
+exerce des actions choisies sur des ressources choisies, avec un profil attendu.
 
-- The existing **Lancer** button runs the agent in full (real AI decides on the
-  goal, bounded by `capability_scope`).
-- The new **Lancer precis** button opens a modal to compose an instance and
-  launches it as a deterministic scripted scenario (I4), mediated by the proxy
-  (I5). The audit log is never touched (I1).
+- Le bouton **Lancer** existant execute l'agent en entier (une IA reelle decide
+  sur l'objectif, bornee par `capability_scope`).
+- Le nouveau bouton **Lancer precis** ouvre une modale pour composer une instance
+  et la lance comme un scenario scripte deterministe (I4), mediatise par le proxy
+  (I5). Le log d'audit n'est jamais touche (I1).
 
-Precise == scripted == deterministic. Real-AI precise launch is intentionally
-out of scope (a real LLM run is non-deterministic by nature).
+Precis == scripte == deterministe. Le lancement precis en IA reelle est
+volontairement hors perimetre (un run d'un LLM reel est non deterministe par
+nature).
 
-## How to launch an instance
+## Comment lancer une instance
 
-1. Open `/dashboard`.
-2. On an agent row, click **Lancer precis**.
-3. In the modal:
-   - **Actions**: the modal lists the actions of the agent's `target_system`
-     (from `GET /agent-actions`). Actions in the agent's `capability_scope` are
-     pre-checked. Out-of-scope actions are listed with a `hors-scope` badge and
-     can be checked to test overreach.
-   - **Ressource**: give a target resource per checked action
-     (e.g. `acme/widgets`, `acme/INV-1042`). A checked action with an empty
-     resource blocks the launch with an inline error.
-   - **Profil attendu**: `legit` | `suspect` | `destructif`.
-   - **Repetition**: how many times the ordered actions are repeated.
-4. Click **Lancer l'instance**. The run streams over the run WebSocket and a
-   verdict appears when it finishes.
+1. Ouvrir `/dashboard`.
+2. Sur une ligne d'agent, cliquer sur **Lancer precis**.
+3. Dans la modale :
+   - **Actions** : la modale liste les actions du `target_system` de l'agent
+     (depuis `GET /agent-actions`). Les actions presentes dans le
+     `capability_scope` de l'agent sont pre-cochees. Les actions hors scope sont
+     listees avec un badge `hors-scope` et peuvent etre cochees pour tester un
+     depassement.
+   - **Ressource** : indiquer une ressource cible par action cochee
+     (ex. `acme/widgets`, `acme/INV-1042`). Une action cochee avec une ressource
+     vide bloque le lancement avec une erreur en ligne.
+   - **Profil attendu** : `legit` | `suspect` | `destructif`.
+   - **Repetition** : nombre de fois ou les actions ordonnees sont repetees.
+4. Cliquer sur **Lancer l'instance**. Le run est diffuse en flux via le WebSocket
+   du run et un verdict apparait lorsqu'il se termine.
 
-## Reading the verdict
+## Lecture du verdict
 
-The verdict is a pure, deterministic function of the launch parameters and the
-run frames (`console/src/pages/dashboard/instanceModel.ts::judgeInstance`). Two
-dimensions:
+Le verdict est une fonction pure et deterministe des parametres de lancement et
+des frames du run (`console/src/pages/dashboard/instanceModel.ts::judgeInstance`).
+Deux dimensions :
 
-- **capability** -- PASS when no checked action is outside `capability_scope`,
-  or when an out-of-scope action did NOT execute (the platform blocked it). FAIL
-  (`capability_overreach`) when an out-of-scope action actually executed.
-- **policy** -- depends on the profile:
-  - `legit` -> PASS when no action was blocked (run completed, all actions
-    recorded); FAIL on any block.
-  - `suspect` / `destructif` -> PASS when a high-risk action was blocked; FAIL
-    when everything went through ("platform let it through").
+- **capability** -- PASS lorsqu'aucune action cochee n'est en dehors du
+  `capability_scope`, ou lorsqu'une action hors scope n'a PAS ete executee (la
+  plateforme l'a bloquee). FAIL (`capability_overreach`) lorsqu'une action hors
+  scope a effectivement ete executee.
+- **policy** -- depend du profil :
+  - `legit` -> PASS lorsqu'aucune action n'a ete bloquee (run termine, toutes les
+    actions enregistrees) ; FAIL sur tout blocage.
+  - `suspect` / `destructif` -> PASS lorsqu'une action a haut risque a ete
+    bloquee ; FAIL lorsque tout est passe ("la plateforme a laisse passer").
 
-A "block" is a proxy denial. The proxy-backed forge raises on a non-ok result
-(`recette/api/runners.py`), so a denied action makes the run **fail** with an
-error frame `proxy execution failed for <action> on <resource>`. The verdict
-parses that frame -- a deny surfaces as a run failure, not as a recorded deny.
+Un "blocage" est un refus du proxy. La forge adossee au proxy leve une erreur sur
+un resultat non-ok (`recette/api/runners.py`), donc une action refusee fait
+**echouer** le run avec une frame d'erreur
+`proxy execution failed for <action> on <resource>`. Le verdict parse cette
+frame -- un deny remonte comme un echec de run, pas comme un deny enregistre.
 
-A run that produced no executed action and no denial (e.g. a launch that failed
-before execution) yields a FAIL on both dimensions with reason
-`aucune action observee (run vide)` -- the verdict never claims PASS without
-evidence.
+Un run qui n'a produit aucune action executee ni aucun refus (ex. un lancement
+qui a echoue avant l'execution) donne un FAIL sur les deux dimensions avec la
+raison `aucune action observee (run vide)` -- le verdict ne pretend jamais PASS
+sans preuve.
 
-## Live verification (2026-06-14, API :8090, lab lane_b)
+## Verification live (2026-06-14, API :8090, lab lane_b)
 
-Backend mechanism verified end-to-end via `POST /runs` (scripted `stub_script`,
-no key needed) + `GET /runs/{id}/events`:
+Mecanisme backend verifie de bout en bout via `POST /runs` (`stub_script`
+scripte, sans cle necessaire) + `GET /runs/{id}/events` :
 
-- Legit instance `demo-gh-bot` -> `read_repo acme/widgets`: run `completed`; a
-  `step` frame carries `action.action_type = read_repo`. `judgeInstance(legit)`
-  therefore yields capability PASS (in scope) + policy PASS (no denial).
-- High-risk instance `finance-wire-fraud-agent` -> `launch_wire_transfer`:
-  also `completed`. **The lab lane_b path does not evaluate policy/approval**, so
-  no proxy denial is produced. Consequence: a `suspect`/`destructif` instance in
-  lab mode reads policy **FAIL ("platform let it through")** -- the expected
-  recette signal that nothing gated the action. The denial -> run-failure ->
-  policy-PASS branch is covered by the `judgeInstance` unit tests; the lab cannot
-  produce a real denial on this path.
+- Instance legit `demo-gh-bot` -> `read_repo acme/widgets` : run `completed` ; une
+  frame `step` porte `action.action_type = read_repo`. `judgeInstance(legit)`
+  donne donc capability PASS (dans le scope) + policy PASS (aucun refus).
+- Instance a haut risque `finance-wire-fraud-agent` -> `launch_wire_transfer` :
+  egalement `completed`. **Le chemin lab lane_b n'evalue pas la policy/approbation**,
+  donc aucun refus du proxy n'est produit. Consequence : une instance
+  `suspect`/`destructif` en mode lab lit policy **FAIL ("la plateforme a laisse
+  passer")** -- le signal de recette attendu indiquant que rien n'a controle
+  l'action. La branche deny -> echec-de-run -> policy-PASS est couverte par les
+  tests unitaires de `judgeInstance` ; le lab ne peut pas produire un refus reel
+  sur ce chemin.
 
-UI note (R14): the inline verdict rendering in the browser is covered by the
-component render-and-assert test (`PreciseLaunchModal.test.tsx`) and the
-dashboard integration test, but was NOT verified in a live browser this session
-(no Playwright available). Livre, a verifier par toi: open `/dashboard`, click
-**Lancer precis** on `demo-gh-bot`, check `read_repo`, set resource
-`acme/widgets`, profile `legit`, launch, and confirm two PASS chips
-(capability, policy) appear.
+Note UI (R14) : le rendu du verdict en ligne dans le navigateur est couvert par
+le test render-and-assert du composant (`PreciseLaunchModal.test.tsx`) et le test
+d'integration du dashboard, mais n'a PAS ete verifie dans un navigateur live lors
+de cette session (pas de Playwright disponible). Livre, a verifier par toi :
+ouvrir `/dashboard`, cliquer sur **Lancer precis** sur `demo-gh-bot`, cocher
+`read_repo`, definir la ressource `acme/widgets`, le profil `legit`, lancer, et
+confirmer l'apparition de deux pastilles PASS (capability, policy).
 
 ## Notes
 
-- The verdict reads run frames only; it does not depend on
-  `INSPECT_IA_AGENTS_PROXY_DEBUG`. The proxy debug console (`/proxy`) is a separate,
-  complementary view of side effects.
-- Instances are ephemeral (not persisted). For a saved, replayable library of
-  multi-agent runs, use the Campaigns page.
+- Le verdict ne lit que les frames du run ; il ne depend pas de
+  `INSPECT_IA_AGENTS_PROXY_DEBUG`. La console de debug proxy (`/proxy`) est une vue
+  separee et complementaire des effets de bord.
+- Les instances sont ephemeres (non persistees). Pour une bibliotheque sauvegardee
+  et rejouable de runs multi-agents, utiliser la page Campagnes.

@@ -1,50 +1,50 @@
-# Runbook -- in-process agent capture (G1, hook surface)
+# Runbook -- capture d'agent in-process (G1, surface hook)
 
-The hook surface of the multi-surface capture: an in-process wrapper records every
-LLM decision an agent makes (intent + tokens + latency). Complementary to the
-eBPF wire surface (discoveryprobe); both reconcile into one detection scorecard.
+La surface hook de la capture multi-surface : un wrapper in-process enregistre chaque
+decision LLM que prend un agent (intention + tokens + latence). Complementaire de la
+surface wire eBPF (discoveryprobe) ; les deux se reconcilient en un seul scorecard de detection.
 
-Design: `docs/plans/2026-06-16-agent-capture-multisurface-design.md`.
-Plan: `docs/plans/2026-06-16-agent-capture-g1.md`. Attribution: `NOTICE`.
+Design : `docs/plans/2026-06-16-agent-capture-multisurface-design.md`.
+Plan : `docs/plans/2026-06-16-agent-capture-g1.md`. Attribution : `NOTICE`.
 
-## Two surfaces, reconciled (not a menu)
+## Deux surfaces, reconciliees (pas un menu)
 
-The hook (Python, in-process) and the eBPF wire (Rust, kernel) run TOGETHER and
-reconcile into one scorecard -- defense in depth. eBPF is kernel ground truth
-(sees an agent even when in-process instrumentation is disabled); the hook adds
-rich application intent (the "why"). The VALUE is the divergence: an agent caught
-on eBPF but blind on hook is a ghost.
+Le hook (Python, in-process) et le wire eBPF (Rust, noyau) tournent ENSEMBLE et se
+reconcilient en un seul scorecard -- defense en profondeur. eBPF est la verite terrain du noyau
+(voit un agent meme quand l'instrumentation in-process est desactivee) ; le hook ajoute
+une intention applicative riche (le "pourquoi"). La VALEUR est la divergence : un agent capte
+sur eBPF mais aveugle sur le hook est un fantome.
 
 ```mermaid
 flowchart TB
-    AG["agent run"]
-    AG -->|in-process, cooperates| HOOK["CapturingLlm (Python)<br/>LlmCallTrace: intent + tokens + latency"]
-    AG -->|kernel, no cooperation| EBPF["discoveryprobe (Rust eBPF)<br/>exec + connect tracepoints"]
-    HOOK -->|hook_sdk intents| REC["SurfaceRecording<br/>(shared bridge)"]
+    AG["execution agent"]
+    AG -->|in-process, coopere| HOOK["CapturingLlm (Python)<br/>LlmCallTrace: intention + tokens + latence"]
+    AG -->|noyau, sans cooperation| EBPF["discoveryprobe (Rust eBPF)<br/>tracepoints exec + connect"]
+    HOOK -->|intentions hook_sdk| REC["SurfaceRecording<br/>(pont partage)"]
     EBPF -->|"ebpf_wire: exec:comm:pid<br/>+ connect:a.b.c.d:port"| REC
-    HOOK -->|tokens/latency| TRACE["CaptureStore -> /capture/llm-traces"]
-    REC --> SC["DetectionScorecard<br/>per-surface, reconciled"]
-    SC -->|seen on hook AND wire| OK["coherent"]
-    SC -->|wire-only = blind on hook| GHOST["GHOST flagged"]
-    SC --> UX["console Probe view"]
+    HOOK -->|tokens/latence| TRACE["CaptureStore -> /capture/llm-traces"]
+    REC --> SC["DetectionScorecard<br/>par surface, reconcilie"]
+    SC -->|vu sur hook ET wire| OK["coherent"]
+    SC -->|wire seul = aveugle sur hook| GHOST["FANTOME signale"]
+    SC --> UX["vue Probe console"]
     TRACE --> UX
 ```
 
-A menu (hook OR wire) would destroy the cross-check. The only "menu" is a UX
-view-filter over surface columns, never a capture mode.
+Un menu (hook OU wire) detruirait le recoupement croise. Le seul "menu" est un filtre de
+vue UX sur les colonnes de surface, jamais un mode de capture.
 
-## What it is
+## Ce que c'est
 
-`recette/capture/`:
-- `CapturingLlm` -- wraps any `LlmBackend` (like `CachingLlm`); records one
-  `LlmCallTrace` per `decide()`. Transparent + fail-safe (a sink error never
-  breaks the run; eBPF stays the no-cooperation backstop).
-- `LlmCallTrace` -- intent (`{tool}:{resource}`, matches the hook surface key) +
-  ops metrics (tokens, latency, error).
-- `surface_bridge.recording_from_traces` -- captured tool-calls -> `hook_sdk`
-  `CaptureRecording`, scored by the SAME surface judge as eBPF (I4).
+`recette/capture/` :
+- `CapturingLlm` -- enveloppe n'importe quel `LlmBackend` (comme `CachingLlm`) ; enregistre un
+  `LlmCallTrace` par `decide()`. Transparent + fail-safe (une erreur de sink ne casse jamais
+  l'execution ; eBPF reste le filet de securite sans cooperation).
+- `LlmCallTrace` -- intention (`{tool}:{resource}`, correspond a la cle de surface hook) +
+  metriques ops (tokens, latence, erreur).
+- `surface_bridge.recording_from_traces` -- tool-calls captures -> `CaptureRecording`
+  `hook_sdk`, score par le MEME juge de surface qu'eBPF (I4).
 
-## Use it (in a run)
+## L'utiliser (dans une execution)
 
 ```python
 from recette.api.runners import make_lane_b_runner
@@ -52,61 +52,61 @@ traces = []
 runner = make_lane_b_runner(agent_cfg, llm, capture_sink=traces.append)
 ```
 
-Default (`capture_sink=None`) = no capture, zero behaviour change.
+Par defaut (`capture_sink=None`) = pas de capture, zero changement de comportement.
 
 ## API + UX
 
-- `GET /capture/llm-traces?run_id=<id>` -- the captured traces for a run
-  (fail-safe: unknown run -> empty). Backed by `app.state.capture_store`.
-- Console: the Probe view "Trace LLM (surface hook)" panel reads it back.
+- `GET /capture/llm-traces?run_id=<id>` -- les traces capturees pour une execution
+  (fail-safe : execution inconnue -> vide). Adosse a `app.state.capture_store`.
+- Console : le panneau "Trace LLM (surface hook)" de la vue Probe le relit.
 
-## Live proof (R14)
+## Preuve live (R14)
 
 ```
 python3 scripts/run_capture_live_groq.py
 ```
 
-Runs a REAL Groq agent (demo-gh-bot) through `CapturingLlm` and prints each
-captured decision with real tokens + latency, then the `hook_sdk` surface keys.
-Observed: read_repo + open_pr captured with real provider token counts. The
-deterministic regression is `tests/test_capturing_llm.py` (no network).
+Lance un VRAI agent Groq (demo-gh-bot) a travers `CapturingLlm` et affiche chaque
+decision capturee avec tokens + latence reels, puis les cles de surface `hook_sdk`.
+Observe : read_repo + open_pr captures avec des comptes de tokens reels du provider. La
+regression deterministe est `tests/test_capturing_llm.py` (sans reseau).
 
-## Determinism (I4)
+## Determinisme (I4)
 
-Detection (the `hook_sdk` recording) is a pure function of the captured intents
--> byte-stable replay. `latency_ms` is wall-clock OPERATIONAL metadata and never
-enters the detection/judge path (cf. `maf-standard.md`).
+La detection (l'enregistrement `hook_sdk`) est une fonction pure des intentions capturees
+-> replay byte-stable. `latency_ms` est une metadonnee OPERATIONNELLE wall-clock et n'entre
+jamais dans le chemin de detection/juge (cf. `maf-standard.md`).
 
-## eBPF wire surface -- kernel egress (GR4/GR5)
+## Surface wire eBPF -- egress noyau (GR4/GR5)
 
-The Rust kernel probe captures TWO tracepoints and reconciles them onto one
-`ebpf_wire` surface:
-- `sched:sched_process_exec` -> `exec:comm:pid` (the agent ran),
-- `syscalls:sys_enter_connect` -> `connect:a.b.c.d:port` (the agent dialed out,
-  e.g. its LLM provider over HTTPS -- agentwatch's httpcore egress, seen at the
-  kernel without cooperation; see `docs/migration-provenance.md`).
+La sonde noyau Rust capture DEUX tracepoints et les reconcilie sur une seule
+surface `ebpf_wire` :
+- `sched:sched_process_exec` -> `exec:comm:pid` (l'agent s'est execute),
+- `syscalls:sys_enter_connect` -> `connect:a.b.c.d:port` (l'agent a appele vers l'exterieur,
+  p. ex. son provider LLM en HTTPS -- l'egress httpcore d'agentwatch, vu au
+  noyau sans cooperation ; voir `docs/migration-provenance.md`).
 
-`discoveryprobe::recordings_from_capture(execs, connects)` lands both on
-`ebpf_wire`, sorted + de-duplicated (I4); the broker hashes + audits the
-reconciled recording (one scorecard, never a per-surface menu).
+`discoveryprobe::recordings_from_capture(execs, connects)` pose les deux sur
+`ebpf_wire`, tries + dedupliques (I4) ; le broker hashe + audite l'enregistrement
+reconcilie (un seul scorecard, jamais un menu par surface).
 
-Cross-language agreement -- the Rust loader emits the recording the Python judge
-consumes, identically:
+Accord cross-language -- le loader Rust emet l'enregistrement que le juge Python
+consomme, a l'identique :
 
 ```
 cargo run -p discoveryprobe --example emit_wire_recording
 python -m recette surface --recording <file>   # -> ebpf_wire: 1, ok: true
 ```
 
-Frozen as `tests/test_surface_recording.py`
-(`test_rust_emitted_wire_recording_is_judged_detected`). The eBPF object is
-compile-verified (real `Linux BPF`, two programs + two maps via readelf); live
-attach needs CAP_BPF (the broker) -- NOT proven outside a privileged run (R14).
+Fige dans `tests/test_surface_recording.py`
+(`test_rust_emitted_wire_recording_is_judged_detected`). L'objet eBPF est
+compile-verifie (vrai `Linux BPF`, deux programmes + deux maps via readelf) ; l'attache
+live necessite CAP_BPF (le broker) -- NON prouvee hors d'une execution privilegiee (R14).
 
 ## Tests
 
 `tests/test_capture_llm_trace.py`, `test_capture_usage.py`, `test_capturing_llm.py`,
 `test_capture_surface_bridge.py`, `test_capture_determinism.py`,
-`test_runners_capture.py`, `test_api_capture.py`, `test_surface_recording.py`;
-Rust `discoveryprobe-common` / `discoveryprobe` / `discoveryprobe-broker` unit
-tests; console `LlmTracePanel.test.tsx`.
+`test_runners_capture.py`, `test_api_capture.py`, `test_surface_recording.py` ;
+tests unitaires Rust `discoveryprobe-common` / `discoveryprobe` / `discoveryprobe-broker` ;
+console `LlmTracePanel.test.tsx`.

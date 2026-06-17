@@ -1,70 +1,71 @@
-# Autonomous maintenance scheduler (G8)
+# Ordonnanceur de maintenance autonome (G8)
 
-The scheduler is the ops heartbeat that fires periodic platform maintenance without a
-manual trigger. It closes two residuals of the same class left by the platform-gaps
-campaign:
+L'ordonnanceur est le battement de coeur ops qui declenche la maintenance periodique de la
+plateforme sans declencheur manuel. Il ferme deux residus de la meme classe laisses par la
+campagne platform-gaps :
 
-- **G2** -- approval timeout sweep (`Gateway.sweep_timeouts`) had no autonomous driver.
-- **G4** -- realtime degraded-bus flush (`BoundedRetryBuffer.flush`) drained only on the
-  next publish, not on a heartbeat.
+- **G2** -- le balayage des timeouts d'approbation (`Gateway.sweep_timeouts`) n'avait aucun
+  pilote autonome.
+- **G4** -- le flush du bus degrade temps reel (`BoundedRetryBuffer.flush`) ne se vidait qu'au
+  prochain publish, pas sur un battement de coeur.
 
-It lives OUTSIDE the decision path (I4): it never calls `decide()`. The sweep takes its
-clock as a captured input and only appends TIMEOUT events (never auto-approves, I6); the
-flush drains an already-persisted derived copy (I1). The wall clock read at a tick boundary
-is operational metadata, not a decision input.
+Il vit EN DEHORS du chemin de decision (I4) : il n'appelle jamais `decide()`. Le balayage prend
+son horloge comme un input capture et n'ajoute que des evenements TIMEOUT (n'auto-approuve
+jamais, I6) ; le flush vide une copie derivee deja persistee (I1). L'horloge murale lue a la
+frontiere d'un tick est une metadonnee operationnelle, pas un input de decision.
 
 ## Configuration
 
-| Env | Default | Effect |
-|-----|---------|--------|
-| `INSPECT_IA_AGENTS_SCHEDULER` | `off` | `off` -> `NullScheduler` (no timer). `inproc` -> real asyncio heartbeat. |
-| `INSPECT_IA_AGENTS_SCHEDULER_INTERVAL_SECONDS` | `30` | Heartbeat period (floor `1`). Malformed/sub-floor -> `SchedulerConfigError` (fail-safe, no silent default). |
+| Env | Defaut | Effet |
+|-----|--------|-------|
+| `INSPECT_IA_AGENTS_SCHEDULER` | `off` | `off` -> `NullScheduler` (aucun timer). `inproc` -> vrai battement de coeur asyncio. |
+| `INSPECT_IA_AGENTS_SCHEDULER_INTERVAL_SECONDS` | `30` | Periode du battement de coeur (plancher `1`). Mal forme/sous le plancher -> `SchedulerConfigError` (fail-safe, pas de defaut silencieux). |
 
-**Default is OFF on purpose.** A self-firing clock that mutates state (appends TIMEOUT)
-must be enabled deliberately per deployment so tests and replay stay deterministic (I4).
-A production deployment sets `INSPECT_IA_AGENTS_SCHEDULER=inproc`.
+**Le defaut est OFF a dessein.** Une horloge auto-declenchante qui mute l'etat (ajoute TIMEOUT)
+doit etre activee deliberement par deploiement pour que les tests et le replay restent
+deterministes (I4). Un deploiement de production pose `INSPECT_IA_AGENTS_SCHEDULER=inproc`.
 
 ```
 INSPECT_IA_AGENTS_SCHEDULER=inproc INSPECT_IA_AGENTS_SCHEDULER_INTERVAL_SECONDS=30 python -m recette.api
 ```
 
-The heartbeat starts in the FastAPI lifespan and is cancelled and awaited on shutdown.
+Le battement de coeur demarre dans le lifespan FastAPI et est annule puis attendu a l'arret.
 
-## Tasks registered
+## Taches enregistrees
 
-- `approval-timeout-sweep` -- always registered.
-- `realtime-buffer-flush` -- registered only when the transport exposes `flush()` (the
-  degraded-bus buffer, i.e. `INSPECT_IA_AGENTS_REALTIME=nats`). The in-process transport has no
-  backlog, so no flush task is added.
+- `approval-timeout-sweep` -- toujours enregistree.
+- `realtime-buffer-flush` -- enregistree uniquement quand le transport expose `flush()` (le
+  buffer du bus degrade, c.-a-d. `INSPECT_IA_AGENTS_REALTIME=nats`). Le transport in-process n'a aucun
+  backlog, donc aucune tache de flush n'est ajoutee.
 
-A failing task is isolated: logged via the structured `inspect_ia_agents.scheduler` logger and
-skipped, never killing the loop or the app (fail-safe, failure-modes.md).
+Une tache en echec est isolee : journalisee via le logger structure `inspect_ia_agents.scheduler` et
+sautee, sans jamais tuer la boucle ni l'application (fail-safe, failure-modes.md).
 
-## Failure mode
+## Mode de defaillance
 
-The scheduler is itself fail-safe. A tick that raises is caught at two levels (per-task in
-`run_once`, and the whole tick in the loop). The sweep can only resolve to TIMEOUT, never
-approve or execute (I6). The flush only retries an already-durable backlog (I1) and never
-triggers an external side effect.
+L'ordonnanceur est lui-meme fail-safe. Un tick qui leve une exception est rattrape a deux
+niveaux (par-tache dans `run_once`, et le tick entier dans la boucle). Le balayage ne peut se
+resoudre qu'en TIMEOUT, jamais approuver ni executer (I6). Le flush ne retente qu'un backlog
+deja durable (I1) et ne declenche jamais d'effet de bord externe.
 
-## Alternatives considered
+## Alternatives considerees
 
-- External cron/systemd hitting `POST /approvals/sweep-timeouts`: still possible with
-  `INSPECT_IA_AGENTS_SCHEDULER=off`, but it cannot drive `flush()` (not an HTTP endpoint).
-- Temporal workflow: native fit, deferred -- no Temporal server, a stub would be forbidden
-  (same reason the G2 timer was deferred).
+- Un cron/systemd externe frappant `POST /approvals/sweep-timeouts` : toujours possible avec
+  `INSPECT_IA_AGENTS_SCHEDULER=off`, mais il ne peut pas piloter `flush()` (ce n'est pas un endpoint HTTP).
+- Workflow Temporal : adequation native, differe -- pas de serveur Temporal, un stub serait
+  interdit (meme raison pour laquelle le timer G2 a ete differe).
 
-## Flow
+## Flux
 
 ```mermaid
 flowchart TD
-    L[FastAPI lifespan start] --> S{INSPECT_IA_AGENTS_SCHEDULER}
-    S -->|off| N[NullScheduler -- inert]
-    S -->|inproc| H[InProcessScheduler heartbeat]
-    H -->|every interval| T[run_once: capture now_iso]
-    T --> SW[approval-timeout-sweep -> TIMEOUT only, I6]
-    T --> FL[realtime-buffer-flush -> drain backlog, I1]
-    SW -.task raises.-> ISO[log + isolate, loop survives]
-    FL -.task raises.-> ISO
-    SD[lifespan shutdown] --> ST[cancel + await heartbeat]
+    L[Demarrage lifespan FastAPI] --> S{INSPECT_IA_AGENTS_SCHEDULER}
+    S -->|off| N[NullScheduler -- inerte]
+    S -->|inproc| H[Battement de coeur InProcessScheduler]
+    H -->|chaque intervalle| T[run_once: capture now_iso]
+    T --> SW[approval-timeout-sweep -> TIMEOUT seulement, I6]
+    T --> FL[realtime-buffer-flush -> vidange backlog, I1]
+    SW -.la tache leve.-> ISO[journalise + isole, la boucle survit]
+    FL -.la tache leve.-> ISO
+    SD[arret lifespan] --> ST[annule + attend le battement de coeur]
 ```

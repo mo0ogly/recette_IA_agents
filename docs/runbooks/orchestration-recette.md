@@ -1,64 +1,64 @@
-# Runbook -- multi-agent orchestration recette (end-to-end, replayable)
+# Runbook -- recette d'orchestration multi-agents (de bout en bout, rejouable)
 
-> Diagrams (mermaid) of the record / replay / freeze model across agents, teams
-> and campaigns: see [`replay-model.md`](replay-model.md).
+> Diagrammes (mermaid) du modele record / replay / freeze a travers les agents,
+> les equipes et les campagnes : voir [`replay-model.md`](replay-model.md).
 
-The judged unit is a **team**: a set of participants with a declared structure.
-Four orchestration styles, each grounded on a real microsoft/agent-framework
-builder:
+L'unite jugee est une **equipe** : un ensemble de participants avec une structure
+declaree. Quatre styles d'orchestration, chacun fonde sur un builder reel
+microsoft/agent-framework :
 
-| style | builder | run shape | correctness (behavior axis) |
+| style | builder | forme du run | conformite (axe behavior) |
 |-------|---------|-----------|------------------------------|
-| `handoff` | `HandoffBuilder` | `hops` | starts at the start agent, within the termination bound, no loop |
-| `sequential` | `SequentialBuilder` | `order` | executed order == declared participant order, each once |
-| `concurrent` | `ConcurrentBuilder` | `order` | each declared participant runs exactly once |
-| `group_chat` | `GroupChatBuilder` | `order` | bounded turns, no participant monopolises |
-| `magentic` | `MagenticBuilder` | `order` | bounded rounds, no stall (same speaker selected >= 3 in a row) |
+| `handoff` | `HandoffBuilder` | `hops` | demarre sur l'agent de depart, dans la borne de terminaison, sans boucle |
+| `sequential` | `SequentialBuilder` | `order` | ordre execute == ordre des participants declares, chacun une fois |
+| `concurrent` | `ConcurrentBuilder` | `order` | chaque participant declare s'execute exactement une fois |
+| `group_chat` | `GroupChatBuilder` | `order` | tours bornes, aucun participant ne monopolise |
+| `magentic` | `MagenticBuilder` | `order` | rounds bornes, pas de blocage (meme orateur selectionne >= 3 fois de suite) |
 
-The four dimensions are judged by `recette.maf_orchestration.judge_orchestration`,
-a pure function of `(team, run)` -- identical input replays to an identical
-verdict (I4).
+Les quatre dimensions sont jugees par `recette.maf_orchestration.judge_orchestration`,
+une fonction pure de `(team, run)` -- un input identique se rejoue en un verdict
+identique (I4).
 
-## Offline corpus (deterministic, CI)
+## Corpus hors-ligne (deterministe, CI)
 
 ```
 python3 -m recette validate
 python3 -m recette report
 ```
 
-`report` scores `corpus/maf_orchestration/{correct,incorrect}/<slug>/`
-(team.json + run.json + ground-truth.json) as the `orchestration` area of the
-aggregate verdict. Each negative breaks exactly one dimension (its
+`report` evalue `corpus/maf_orchestration/{correct,incorrect}/<slug>/`
+(team.json + run.json + ground-truth.json) comme l'aire `orchestration` du
+verdict agrege. Chaque negatif casse exactement une dimension (son
 `violation_type`).
 
 ## Live -> record -> replay -> freeze (Groq)
 
-A live LLM drives `handoff` and `group_chat` teams (it chooses the route via
-`handoff_to_<target>` / `speak_<participant>` tools and the agents' own tools).
-The run is recorded, replayed deterministically, and judged.
+Un LLM en live pilote les equipes `handoff` et `group_chat` (il choisit la route
+via les outils `handoff_to_<target>` / `speak_<participant>` et les propres
+outils des agents). Le run est enregistre, rejoue de maniere deterministe, et juge.
 
 ```
 export GROQ_API_KEY=...                                  # R8: key via env, never hardcoded
 python3 scripts/run_orchestration_live_groq.py --model llama-3.3-70b-versatile
 ```
 
-Per team it prints `decisions=<n> verdict=<correct|incorrect>` and asserts the
-replay reproduces the recorded run.
+Pour chaque equipe il affiche `decisions=<n> verdict=<correct|incorrect>` et
+verifie que le replay reproduit le run enregistre.
 
-### Cheap + reproducible live runs (cache)
+### Runs live peu couteux + reproductibles (cache)
 
 ```
 python3 -m recette orchestrate run <team.json> --provider groq --model llama-3.3-70b-versatile --cache /tmp/llm-cache.json
 ```
 
-`--cache` wraps the backend in a content-addressed `CachingLlm` (recette/llm_cache.py):
-each decision is keyed by a digest of (provider:model, system, history, tools) and
-stored in the JSON file. The first run pays the live calls; any later run with the
-same inputs is served from the cache with zero network (verified: run 1 = N misses,
-run 2 = N hits). Unlike `ReplayLlm` (positional replay of one exact run), the cache
-is input-keyed, so it is shared across runs and survives reordering.
+`--cache` enveloppe le backend dans un `CachingLlm` adresse par contenu (recette/llm_cache.py) :
+chaque decision est indexee par un digest de (provider:model, system, history, tools) et
+stockee dans le fichier JSON. Le premier run paie les appels live ; tout run ulterieur avec
+les memes inputs est servi depuis le cache sans aucun reseau (verifie : run 1 = N misses,
+run 2 = N hits). Contrairement a `ReplayLlm` (replay positionnel d'un run exact unique), le
+cache est indexe par input, donc il est partage entre les runs et survit a une reorganisation.
 
-### Single team, by hand
+### Une seule equipe, a la main
 
 ```
 python3 -m recette orchestrate run corpus/maf_orchestration/correct/support-handoff-correct/team.json --provider groq --model llama-3.3-70b-versatile --out /tmp/run.json
@@ -66,43 +66,43 @@ python3 -m recette orchestrate replay /tmp/run.json
 python3 -m recette orchestrate freeze /tmp/run.json --slug live-support-handoff --category correct --out corpus/maf_orchestration/correct
 ```
 
-- `run` drives the team and writes an `OrchestrationRecording` (the team + the
-  ordered LLM decisions + the produced run). Persistent and self-contained.
-- `replay` re-drives the recording with a `ReplayLlm`: it reproduces the exact
-  recorded run (a divergence is an error) and prints the verdict. Deterministic.
-- `freeze` turns the recording into a corpus subject whose ground-truth is
-  derived from the judge -- the dynamic run becomes a permanent deterministic
-  recette case. Re-run `python3 -m recette validate` afterwards.
+- `run` pilote l'equipe et ecrit un `OrchestrationRecording` (l'equipe + les
+  decisions LLM ordonnees + le run produit). Persistant et autonome.
+- `replay` repilote l'enregistrement avec un `ReplayLlm` : il reproduit le run
+  enregistre exact (une divergence est une erreur) et affiche le verdict. Deterministe.
+- `freeze` transforme l'enregistrement en sujet de corpus dont le ground-truth est
+  derive du juge -- le run dynamique devient un cas de recette permanent et
+  deterministe. Relancer `python3 -m recette validate` ensuite.
 
-`sequential`/`concurrent` topologies are structural (no model needed to route);
-they live in the offline corpus and `tests/test_orchestrate.py`.
+Les topologies `sequential`/`concurrent` sont structurelles (aucun modele requis pour router) ;
+elles vivent dans le corpus hors-ligne et `tests/test_orchestrate.py`.
 
-### Visualize a team or a run
+### Visualiser une equipe ou un run
 
 ```
 python3 -m recette orchestrate viz corpus/maf_orchestration/correct/support-handoff-correct/team.json
 python3 -m recette orchestrate viz /tmp/run.json --run
 ```
 
-`viz` prints a Mermaid `flowchart TD`: the team's declared structure per style
-(handoff edges / sequential chain / concurrent fan-in / manager dotted edges for
-group_chat & magentic), or, with `--run`, the actual routed path (numbered hops
-or order, plus tool calls). Pure + deterministic (recette/viz.py), conventions
-from agent-framework `_viz.py`.
+`viz` affiche un Mermaid `flowchart TD` : la structure declaree de l'equipe par style
+(aretes de handoff / chaine sequentielle / fan-in concurrent / aretes pointillees du manager pour
+group_chat & magentic), ou, avec `--run`, le chemin reellement route (hops numerotes
+ou order, plus les appels d'outils). Pur + deterministe (recette/viz.py), conventions
+issues de agent-framework `_viz.py`.
 
-## How it integrates with the defined recette + campaigns
+## Comment cela s'integre a la recette + aux campagnes definies
 
-- The orchestration corpus is part of the single release gate
-  `python3 -m recette report` (alongside identification, MAF subjects and every
-  discovery surface).
-- The console **Corpus** page lists every subject across families
-  (`git_agent` / `maf_agent` / `maf_orchestration`) from `GET /subjects`.
-- The live runner sits in the existing `scripts/run_*_live_groq.py` family: a
-  non-deterministic live demo whose deterministic proof is the offline corpus
-  plus `tests/test_orchestrate.py` (record -> replay -> identical verdict).
+- Le corpus d'orchestration fait partie de la gate de release unique
+  `python3 -m recette report` (aux cotes de l'identification, des sujets MAF et de chaque
+  surface de discovery).
+- La page **Corpus** de la console liste chaque sujet de toutes les familles
+  (`git_agent` / `maf_agent` / `maf_orchestration`) depuis `GET /subjects`.
+- Le runner live s'inscrit dans la famille existante `scripts/run_*_live_groq.py` : une
+  demo live non-deterministe dont la preuve deterministe est le corpus hors-ligne
+  plus `tests/test_orchestrate.py` (record -> replay -> verdict identique).
 
 ## Invariants
 
-- I3: a participant's tool call must use its declared `provider`/`model`.
-- I4: the judge is pure; recordings replay identically.
-- I6: an approval-gated tool (`approval: always`) must be approved before use.
+- I3 : l'appel d'outil d'un participant doit utiliser son `provider`/`model` declare.
+- I4 : le juge est pur ; les enregistrements se rejouent a l'identique.
+- I6 : un outil sous controle d'approbation (`approval: always`) doit etre approuve avant usage.

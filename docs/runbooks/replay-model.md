@@ -1,214 +1,218 @@
-# The unified replay model -- agents, teams, campaigns
+# Le modele de replay unifie -- agents, equipes, campagnes
 
-Every recette subject in inspect_ia_agents follows the same record / replay / freeze
-shape, so a non-deterministic live run (a real LLM, real verdicts) becomes a
-deterministic, persistent artifact you can replay "pour voir ce que ca fait" and,
-once vetted, freeze into the corpus. The judge / gateway stays deterministic
-(I4); all non-determinism is captured once, at record time.
+Chaque sujet de recette dans inspect_ia_agents suit la meme forme record / replay /
+freeze, de sorte qu'une execution live non deterministe (un vrai LLM, de vrais
+verdicts) devient un artefact deterministe et persistant que l'on peut rejouer
+"pour voir ce que ca fait" puis, une fois valide, figer dans le corpus. Le juge /
+la gateway reste deterministe (I4) ; tout le non-determinisme est capture une seule
+fois, au moment de l'enregistrement.
 
-## Three subject kinds, one pattern
+## Trois sortes de sujets, un seul pattern
 
 ```mermaid
 flowchart LR
-  subgraph LIVE["Live run (non-deterministic)"]
-    L1["Lane B agent\nrun_agent + LlmBackend"]
-    L2["Orchestration team\ndrive(team, LlmBackend)"]
-    L3["Campaign\nCampaignRunner.run(doc)"]
+  subgraph LIVE["Execution live (non deterministe)"]
+    L1["Agent Lane B\nrun_agent + LlmBackend"]
+    L2["Equipe d'orchestration\ndrive(team, LlmBackend)"]
+    L3["Campagne\nCampaignRunner.run(doc)"]
   end
-  subgraph REC["Record (persistent artifact, gitignorable)"]
+  subgraph REC["Record (artefact persistant, gitignorable)"]
     R1["recette/recording.py\nRecording (decisions + actions)"]
     R2["recette/orchestrate.py\nOrchestrationRecording (decisions + run)"]
     R3["recette/campaign.py\nCampaignRecording (doc + verdicts)"]
   end
-  subgraph REPLAY["Replay (deterministic, I4)"]
-    P1["ReplayLlm -> same action log"]
-    P2["ReplayLlm -> same run -> judge"]
-    P3["re-submit doc -> same verdicts"]
+  subgraph REPLAY["Replay (deterministe, I4)"]
+    P1["ReplayLlm -> meme journal d'actions"]
+    P2["ReplayLlm -> meme run -> juge"]
+    P3["resoumettre le doc -> memes verdicts"]
   end
-  subgraph FREEZE["Freeze (corpus subject)"]
+  subgraph FREEZE["Freeze (sujet du corpus)"]
     F1["promote.freeze_recording\ncorpus/agents/correct"]
     F2["orchestrate.freeze_to_corpus\ncorpus/maf_orchestration"]
-    F3["the campaign JSON is already\nits own deterministic record"]
+    F3["le JSON de la campagne est deja\nson propre enregistrement deterministe"]
   end
   L1 --> R1 --> P1 --> F1
   L2 --> R2 --> P2 --> F2
   L3 --> R3 --> P3 --> F3
 ```
 
-## Where the non-determinism lives, and how it is captured
+## Ou vit le non-determinisme, et comment il est capture
 
 ```mermaid
 flowchart TD
-  subgraph PURE["Deterministic core (I4) -- pure functions"]
+  subgraph PURE["Coeur deterministe (I4) -- fonctions pures"]
     J1["judge_orchestration(team, run)"]
     J2["gateway decide(event, policy, catalog)"]
   end
-  subgraph CAPTURED["Captured at record time"]
-    C1["LLM decisions (tool_call / final)"]
+  subgraph CAPTURED["Capture au moment de l'enregistrement"]
+    C1["Decisions LLM (tool_call / final)"]
   end
-  LLM["Live LLM (Groq, ...)"] -- "non-deterministic" --> C1
-  C1 -- "stored in the recording" --> RPL["ReplayLlm replays decisions in order"]
+  LLM["LLM live (Groq, ...)"] -- "non deterministe" --> C1
+  C1 -- "stocke dans l'enregistrement" --> RPL["ReplayLlm rejoue les decisions dans l'ordre"]
   RPL --> J1
   RPL --> J2
-  J1 --> V["verdict (always identical on replay)"]
+  J1 --> V["verdict (toujours identique au replay)"]
   J2 --> V
 ```
 
-## Orchestration: drive -> record -> replay -> freeze
+## Orchestration : drive -> record -> replay -> freeze
 
 ```mermaid
 sequenceDiagram
-  participant Op as Operator
+  participant Op as Operateur
   participant Drv as drive(team, backend)
   participant LLM as LlmBackend (Groq/Stub)
   participant Rec as OrchestrationRecording
-  participant Judge as judge_orchestration (pure)
+  participant Judge as judge_orchestration (pur)
 
   Op->>Drv: record(team, GroqLlm)
-  loop until final / max_steps
+  loop jusqu'a final / max_steps
     Drv->>LLM: decide(system, history, tools)
     LLM-->>Drv: LlmDecision (handoff_to_X / use_tool / speak_Y / final)
-    Drv->>Drv: emit hop / order-entry / tool call
+    Drv->>Drv: emet hop / order-entry / appel d'outil
   end
-  Drv-->>Rec: team + ordered decisions + run
-  Op->>Rec: save(path)  %% persistent
+  Drv-->>Rec: team + decisions ordonnees + run
+  Op->>Rec: save(path)  %% persistant
 
   Op->>Drv: replay(recording)
   Drv->>LLM: ReplayLlm(decisions).decide(...)
-  LLM-->>Drv: the recorded decision (in order)
-  Drv->>Drv: reproduce the EXACT run (integrity guard)
+  LLM-->>Drv: la decision enregistree (dans l'ordre)
+  Drv->>Drv: reproduit le run EXACT (garde d'integrite)
   Drv->>Judge: judge_orchestration(team, run)
-  Judge-->>Op: verdict (identical every replay, I4)
+  Judge-->>Op: verdict (identique a chaque replay, I4)
 ```
 
-## The four orchestration styles (grounded on the real MAF builders)
+## Les quatre styles d'orchestration (ancres sur les vrais builders MAF)
 
 ```mermaid
 flowchart TB
   subgraph handoff["handoff -- HandoffBuilder"]
     H0["start_agent"] --> H1["agent A"]
-    H1 -- "handoff_to (declared edge)" --> H2["agent B"]
+    H1 -- "handoff_to (arete declaree)" --> H2["agent B"]
     H2 -- "handoff_to" --> H1
   end
   subgraph sequential["sequential -- SequentialBuilder"]
-    S1["p1"] --> S2["p2"] --> S3["p3 (terminator)"]
+    S1["p1"] --> S2["p2"] --> S3["p3 (terminateur)"]
   end
   subgraph concurrent["concurrent -- ConcurrentBuilder"]
     D["dispatch"] --> N1["p1"]
     D --> N2["p2"]
     D --> N3["p3"]
-    N1 --> AG["aggregate (participant order)"]
+    N1 --> AG["agregation (ordre des participants)"]
     N2 --> AG
     N3 --> AG
   end
   subgraph group_chat["group_chat -- GroupChatBuilder"]
-    M["manager"] -- "speak_X" --> T1["turn: responder"]
-    M -- "speak_Y" --> T2["turn: analyst"]
-    M -- "speak_X" --> T3["turn: responder"]
+    M["manager"] -- "speak_X" --> T1["tour : responder"]
+    M -- "speak_Y" --> T2["tour : analyst"]
+    M -- "speak_X" --> T3["tour : responder"]
   end
   subgraph magentic["magentic -- MagenticBuilder"]
-    MM["manager + progress ledger"] -- "next_speaker" --> R1["round: planner"]
-    MM -- "next_speaker" --> R2["round: researcher"]
-    MM -- "next_speaker" --> R3["round: writer"]
+    MM["manager + registre de progression"] -- "next_speaker" --> R1["round : planner"]
+    MM -- "next_speaker" --> R2["round : researcher"]
+    MM -- "next_speaker" --> R3["round : writer"]
   end
 ```
 
-Behavior axis per style: handoff = start at start_agent, within the termination
-bound, no loop; sequential = executed order == declared order, each once;
-concurrent = each declared participant once; group_chat = bounded turns, no
-participant monopolises; magentic = bounded rounds, no stall (same speaker
-selected three rounds in a row).
+Axe comportement par style : handoff = demarrer a start_agent, dans la borne de
+terminaison, sans boucle ; sequential = ordre d'execution == ordre declare,
+chacun une fois ; concurrent = chaque participant declare une fois ; group_chat =
+tours bornes, aucun participant ne monopolise ; magentic = rounds bornes, pas de
+blocage (le meme locuteur selectionne trois rounds d'affilee).
 
-## Campaign record -> replay (I4 at the campaign level)
+## Enregistrement de campagne -> replay (I4 au niveau campagne)
 
-A campaign of scripted actions is already deterministic (the gateway decision is
-a pure function of event + policy + catalog). Recording captures the verdict
-sequence; replay re-submits the same document and asserts the verdicts reproduce.
+Une campagne d'actions scriptees est deja deterministe (la decision de la gateway
+est une fonction pure de event + policy + catalog). L'enregistrement capture la
+sequence de verdicts ; le replay resoumet le meme document et asserte que les
+verdicts se reproduisent.
 
 ```mermaid
 sequenceDiagram
-  participant Op as Operator
+  participant Op as Operateur
   participant Run as CampaignRunner
-  participant GW as Gateway API (deterministic)
+  participant GW as API Gateway (deterministe)
   participant Rec as CampaignRecording
 
   Op->>Run: record_campaign(doc)
-  loop each action
+  loop chaque action
     Run->>GW: POST /actions/execute
     GW-->>Run: verdict (allow/deny/escalate)
   end
-  Run-->>Rec: doc + verdict sequence
+  Run-->>Rec: doc + sequence de verdicts
   Op->>Rec: save(rec.json)
 
   Op->>Run: replay_campaign(recording)
-  loop each action
-    Run->>GW: POST /actions/execute (same doc)
+  loop chaque action
+    Run->>GW: POST /actions/execute (meme doc)
     GW-->>Run: verdict
   end
-  Run->>Run: compare to recorded verdicts
-  Run-->>Op: deterministic = True/False
+  Run->>Run: compare aux verdicts enregistres
+  Run-->>Op: deterministe = True/False
 ```
 
-CLI:
+CLI :
 
 ```
 python3 -m recette.campaign record campaigns/identity-offboarding.campaign.json --out /tmp/c.json
 python3 -m recette.campaign replay /tmp/c.json
 ```
 
-Live, LLM-driven campaign demos (`scripts/run_*_live_groq.py`) are the
-non-deterministic counterpart: to make one replayable, record the live LLM
-decisions exactly as `recette/orchestrate.py` does and replay them through the
-same governed gateway -- the same record / replay / freeze pattern as above.
+Les demos de campagne live pilotees par LLM (`scripts/run_*_live_groq.py`) sont la
+contrepartie non deterministe : pour rendre l'une d'elles rejouable, enregistrer
+les decisions du LLM live exactement comme le fait `recette/orchestrate.py` et les
+rejouer a travers la meme gateway gouvernee -- le meme pattern record / replay /
+freeze que ci-dessus.
 
-## Secrets at record time (R18)
+## Secrets au moment de l'enregistrement (R18)
 
 ```mermaid
 flowchart LR
-  A["build_llm('groq', model)"] --> B{key resolved?}
-  B -- "per-backend store" --> S1["data/backend_secrets.json"]
-  B -- "env fallback" --> S2[".env -> GROQ_API_KEY"]
-  S1 --> OK["LLM call"]
+  A["build_llm('groq', model)"] --> B{cle resolue ?}
+  B -- "store par backend" --> S1["data/backend_secrets.json"]
+  B -- "fallback env" --> S2[".env -> GROQ_API_KEY"]
+  S1 --> OK["appel LLM"]
   S2 --> OK
-  B -- "none found" --> ERR["error: ask operator to fill .env\n(never paste in chat, never hardcode)"]
+  B -- "aucune trouvee" --> ERR["erreur : demander a l'operateur de remplir .env\n(ne jamais coller dans le chat, ne jamais coder en dur)"]
 ```
 
-See `.claude/rules/secrets-source-of-truth.md` (R18) and
+Voir `.claude/rules/secrets-source-of-truth.md` (R18) et
 `docs/runbooks/orchestration-recette.md`.
 
-## Checkpoint / time-travel (I4)
+## Checkpoint / voyage dans le temps (I4)
 
-Because `drive` is a pure function of the decision stream, a run can be frozen at
-any step and resumed -- to reproduce the original path or to branch a different
-one. `recette/checkpoint.py`: `checkpoint(recording, after=k)` freezes the first
-k decisions; `resume(cp, tail)` replays the prefix then continues with `tail`
-(a `ReplayLlm` of the original tail reproduces the run; a live or different
-backend branches); `partial_run(cp)` is the run truncated at the checkpoint.
-Mirrors the agent-framework `_workflows/_checkpoint.py` concept, kept
-dependency-free and deterministic.
+Parce que `drive` est une fonction pure du flux de decisions, un run peut etre fige
+a n'importe quelle etape et repris -- pour reproduire le chemin original ou pour
+bifurquer vers un autre. `recette/checkpoint.py` : `checkpoint(recording, after=k)`
+fige les k premieres decisions ; `resume(cp, tail)` rejoue le prefixe puis continue
+avec `tail` (un `ReplayLlm` du tail original reproduit le run ; un backend live ou
+different bifurque) ; `partial_run(cp)` est le run tronque au checkpoint. Reflete
+le concept de `_workflows/_checkpoint.py` de l'agent-framework, garde sans
+dependance et deterministe.
 
 ```mermaid
 flowchart LR
-  REC["recording (decisions 0..N)"] --> CP["checkpoint(after=k)\nprefix 0..k"]
-  CP --> R1["resume(cp, ReplayLlm(tail)) -> original path"]
-  CP --> R2["resume(cp, live/other) -> branched path"]
-  CP --> PR["partial_run(cp) -> prefix only"]
+  REC["recording (decisions 0..N)"] --> CP["checkpoint(after=k)\nprefixe 0..k"]
+  CP --> R1["resume(cp, ReplayLlm(tail)) -> chemin original"]
+  CP --> R2["resume(cp, live/autre) -> chemin bifurque"]
+  CP --> PR["partial_run(cp) -> prefixe seulement"]
 ```
 
-## OpenTelemetry GenAI export (audit interop, I1/I4)
+## Export OpenTelemetry GenAI (interop d'audit, I1/I4)
 
-A recording exports to OpenTelemetry GenAI spans so an inspect_ia_agents audit trail
-interoperates with any OTel backend. The attribute/operation names are the
-canonical GenAI semantic conventions taken from the real
-`agent_framework/observability.py` (`invoke_agent` / `execute_tool`,
+Un enregistrement s'exporte vers des spans OpenTelemetry GenAI afin qu'une piste
+d'audit inspect_ia_agents interopere avec n'importe quel backend OTel. Les noms
+d'attributs/operations sont les conventions semantiques GenAI canoniques tirees du
+veritable `agent_framework/observability.py` (`invoke_agent` / `execute_tool`,
 `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.agent.name`,
-`gen_ai.tool.name`). Dependency-free and deterministic (I4): span/trace ids are a
-stable digest of the run, timestamps are logical (no wall clock), so the same run
-exports byte-identical spans; the recording is read-only (I1).
+`gen_ai.tool.name`). Sans dependance et deterministe (I4) : les ids de span/trace
+sont un digest stable du run, les timestamps sont logiques (pas d'horloge murale),
+de sorte que le meme run exporte des spans byte-identiques ; l'enregistrement est
+en lecture seule (I1).
 
 ```mermaid
 flowchart TD
-  REC["OrchestrationRecording (team + run)"] --> RT["root span: invoke_agent {team}"]
+  REC["OrchestrationRecording (team + run)"] --> RT["span racine : invoke_agent {team}"]
   RT --> A1["invoke_agent {participant}\ngen_ai.agent.name / .provider.name / .request.model"]
   RT --> A2["invoke_agent {participant}"]
   RT --> T1["execute_tool {tool}\ngen_ai.tool.name / .tool.call.id"]
@@ -216,13 +220,13 @@ flowchart TD
   A1 --> OTLP
   A2 --> OTLP
   T1 --> OTLP
-  OTLP --> BE["any OTel backend / collector"]
+  OTLP --> BE["n'importe quel backend / collecteur OTel"]
 ```
 
 ```
 python3 -m recette orchestrate otel /tmp/run.json --out spans.json
 ```
 
-`recette/otel.py`: `orchestration_spans(team, run)` -> `to_otlp(spans)`. A real
-OTel exporter (optional `[otel]` extra) re-stamps wall-clock times at emit; the
-recette only guarantees the structure is reproducible.
+`recette/otel.py` : `orchestration_spans(team, run)` -> `to_otlp(spans)`. Un vrai
+exporteur OTel (extra optionnel `[otel]`) reestampille les temps d'horloge murale a
+l'emission ; la recette garantit seulement que la structure est reproductible.

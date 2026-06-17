@@ -1,102 +1,104 @@
-# ADR-0001 -- Runtime language phasing (Python reference now, Rust on trigger)
+# ADR-0001 -- Phasage du langage runtime (Python comme reference maintenant, Rust sur declencheur)
 
-- Status: ACCEPTED (2026-06-13)
-- Scope: the governance core (Control / Data / Audit planes). NOT the discovery
-  scanner, which stays Rust.
-- Decision owner: gabrielhociel@gmail.com (ratified the phased direction).
-- Supersedes: nothing. Complements the phased event-store decision
-  (`.claude/rules/event-store-decision.md`), same "defer until a trigger fires" shape.
+- Statut : ACCEPTE (2026-06-13)
+- Perimetre : le coeur de gouvernance (plans Control / Data / Audit). PAS le scanner
+  de discovery, qui reste en Rust.
+- Proprietaire de la decision : gabrielhociel@gmail.com (a ratifie la direction phasee).
+- Remplace : rien. Complete la decision phasee sur l'event-store
+  (`.claude/rules/event-store-decision.md`), meme forme « differer jusqu'a ce qu'un declencheur se produise ».
 
-## Context (verified facts, not assumptions -- R13/R18)
+## Contexte (faits verifies, pas des hypotheses -- R13/R18)
 
-- `CLAUDE.md` names the TARGET stack as Rust (Axum gateway + planes). The working
-  reality today is Python.
-- Rust footprint measured: `cmd/inspect_ia_agents_recette` only (the discovery scanner,
-  7 `.rs` files). There is **zero Rust in the governance core**.
-- The governance core is Python: `recette/platform/` = **4229 LOC** (gateway,
+- `CLAUDE.md` designe la stack CIBLE comme Rust (gateway Axum + plans). La realite
+  de travail aujourd'hui est Python.
+- Empreinte Rust mesuree : `cmd/inspect_ia_agents_recette` uniquement (le scanner de discovery,
+  7 fichiers `.rs`). Il y a **zero Rust dans le coeur de gouvernance**.
+- Le coeur de gouvernance est en Python : `recette/platform/` = **4229 LOC** (gateway,
   policy `decide()`, risk, eventstore, proxy, approvals, realtime, observability,
-  catalog), with 800+ tests green.
-- The decision path is a **pure function**:
+  catalog), avec 800+ tests verts.
+- Le chemin de decision est une **fonction pure** :
   `decide(event, policy, catalog) -> Decision` (`recette/platform/policy/engine.py`).
-  No clock, no randomness, no I/O in the decision (I4). This makes it the cleanest
-  possible thing to port AND to prove equivalent by replay.
-- **No measured performance pressure**: there is no gateway latency/throughput
-  SLO, p99 target, or RPS benchmark anywhere. `recette/benchmark.py` is a
-  judge-accuracy eval, not a perf bench. Nothing today demands the speed or
-  memory profile a Rust port would buy.
+  Pas d'horloge, pas d'aleatoire, pas d'I/O dans la decision (I4). Cela en fait la
+  chose la plus propre possible a porter ET a prouver equivalente par replay.
+- **Aucune pression de performance mesuree** : il n'existe nulle part de SLO de
+  latence/debit sur la gateway, de cible p99, ni de benchmark RPS. `recette/benchmark.py`
+  est une evaluation de la justesse du juge, pas un bench de perf. Rien aujourd'hui
+  n'exige la vitesse ou le profil memoire qu'un portage Rust apporterait.
 
 ## Decision
 
-**Python stays the production reference of the governance core now. A Rust/Axum
-port of the critical planes (gateway / policy / risk) is DEFERRED until an
-explicit trigger fires.** No port is started before then; the decision path's
-behavior must be allowed to stabilize in Python first (the corpus, catalog, and
-policy model are still evolving fast).
+**Python reste la reference de production du coeur de gouvernance maintenant. Un
+portage Rust/Axum des plans critiques (gateway / policy / risk) est DIFFERE jusqu'a
+ce qu'un declencheur explicite se produise.** Aucun portage n'est entame avant ce
+moment ; le comportement du chemin de decision doit pouvoir se stabiliser d'abord
+en Python (le corpus, le catalog et le modele de policy evoluent encore vite).
 
-This is a phased decision, not a punt: it commits to Python-now AND fixes the
-exact conditions under which the port begins AND the safety net that will prove
-the port correct.
+C'est une decision phasee, pas un report : elle engage Python-maintenant ET fixe
+les conditions exactes dans lesquelles le portage commence ET le filet de securite
+qui prouvera la correction du portage.
 
-## Triggers (any ONE flips to "begin the Rust port")
+## Declencheurs (UN SEUL bascule vers « commencer le portage Rust »)
 
-Record the date + which trigger fired in `decision_log.jsonl`, then open the port
-as its own tracked effort:
+Consigner la date + quel declencheur s'est produit dans `decision_log.jsonl`, puis
+ouvrir le portage comme un effort suivi a part entiere :
 
-1. **Perf SLO miss** -- a real latency/throughput SLO is set on the gateway and
-   the Python implementation cannot meet it after reasonable tuning (measured,
-   not assumed).
-2. **Scale** -- sustained decision throughput beyond what a single Python process
-   (GIL-bound) serves, with horizontal Python scaling already exhausted.
-3. **Hard real-time / safety** -- a deployment requires bounded, predictable
-   latency or a memory-safety guarantee a managed-runtime cannot give.
-4. **Security mandate** -- a customer/regulator requires the memory-safety /
-   supply-chain posture of a Rust core.
+1. **Echec de SLO de perf** -- un vrai SLO de latence/debit est fixe sur la gateway
+   et l'implementation Python ne peut pas l'atteindre apres un tuning raisonnable
+   (mesure, pas suppose).
+2. **Echelle** -- un debit de decision soutenu au-dela de ce qu'un seul processus
+   Python (lie au GIL) sert, avec le scaling horizontal Python deja epuise.
+3. **Temps reel dur / surete** -- un deploiement requiert une latence bornee et
+   previsible ou une garantie de surete memoire qu'un runtime manage ne peut pas
+   offrir.
+4. **Mandat de securite** -- un client/regulateur exige la posture de surete memoire
+   / supply-chain d'un coeur Rust.
 
-Absent any trigger, Python remains prod and this ADR stays in force.
+En l'absence de tout declencheur, Python reste en prod et cet ADR reste en vigueur.
 
-## Parity-proof harness (REQUIRED before any Rust plane replaces Python)
+## Harnais de preuve de parite (REQUIS avant qu'un plan Rust ne remplace Python)
 
-A port may only replace a Python plane once behavior parity is PROVEN, not
-assumed. The pure decision path makes this exact:
+Un portage ne peut remplacer un plan Python qu'une fois la parite de comportement
+PROUVEE, pas supposee. Le chemin de decision pur rend cela exact :
 
 ```mermaid
 flowchart LR
-  STREAM[golden event stream JSONL] --> PY[Python decide]
+  STREAM[flux d'evenements golden JSONL] --> PY[Python decide]
   STREAM --> RS[Rust decide]
-  POL[pinned policy version] --> PY
+  POL[version de policy epinglee] --> PY
   POL --> RS
   PY --> A[decisions A]
   RS --> B[decisions B]
-  A --> EQ{byte-identical?}
+  A --> EQ{identique au byte ?}
   B --> EQ
-  EQ -->|yes| GO[plane may switch]
-  EQ -->|no| STOP[block: not at parity]
+  EQ -->|oui| GO[le plan peut basculer]
+  EQ -->|non| STOP[blocage : pas a la parite]
 ```
 
-- A shared, committed **golden stream** (`AgentActionEvent` JSONL) + a **pinned
-  policy version** are fed to BOTH engines.
-- Both must emit **byte-identical** `policy_decision` (verdict + policy_version +
-  rule_id) and the same `approval_state` transitions and `side_effect_hash`
-  inputs, for every event (I4 determinism is the contract that makes this
-  possible).
-- The harness runs in CI as a blocking gate; a single divergence blocks the
-  switch. Invariants I1-I6 are checked against the Rust output exactly as they
-  are against Python.
+- Un **golden stream** partage et committe (`AgentActionEvent` JSONL) + une
+  **version de policy epinglee** sont fournis aux DEUX moteurs.
+- Les deux doivent emettre des `policy_decision` **identiques au byte** (verdict +
+  policy_version + rule_id) ainsi que les memes transitions d'`approval_state` et
+  les memes entrees de `side_effect_hash`, pour chaque evenement (le determinisme
+  I4 est le contrat qui rend cela possible).
+- Le harnais tourne en CI comme une gate bloquante ; une seule divergence bloque
+  la bascule. Les invariants I1-I6 sont verifies contre la sortie Rust exactement
+  comme ils le sont contre Python.
 
 ## Consequences
 
-- **Now**: no new Rust core code; effort stays on closing platform gaps in Python
-  (G1-G6 done) and stabilizing the policy/catalog model.
-- **The discovery scanner stays Rust** -- it is already shipped, isolated, and
-  unaffected by this decision.
-- **When a trigger fires**: the port is incremental, plane by plane, each gated by
-  the parity harness above; Python remains the oracle until each plane proves
-  equivalent. No big-bang rewrite.
-- **Risk avoided**: freezing a still-moving target into Rust prematurely (the
-  policy model, catalog, and corpus are evolving), paying a large rewrite cost
-  with no measured benefit.
+- **Maintenant** : pas de nouveau code de coeur Rust ; l'effort reste sur la
+  fermeture des trous de la plateforme en Python (G1-G6 faits) et la stabilisation
+  du modele policy/catalog.
+- **Le scanner de discovery reste en Rust** -- il est deja livre, isole, et non
+  affecte par cette decision.
+- **Quand un declencheur se produit** : le portage est incremental, plan par plan,
+  chacun protege par le harnais de parite ci-dessus ; Python reste l'oracle jusqu'a
+  ce que chaque plan se prouve equivalent. Pas de reecriture big-bang.
+- **Risque evite** : figer prematurement une cible encore mouvante dans Rust (le
+  modele de policy, le catalog et le corpus evoluent), en payant un cout de
+  reecriture eleve sans benefice mesure.
 
-## Revisit
+## Reexamen
 
-Re-evaluate this ADR when any trigger fires, or at the next architecture review.
-Update Status and link a follow-up ADR if the direction changes.
+Reevaluer cet ADR quand un declencheur se produit, ou a la prochaine revue
+d'architecture. Mettre a jour le Statut et lier un ADR de suivi si la direction change.

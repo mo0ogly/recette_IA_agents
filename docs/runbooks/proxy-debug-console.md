@@ -1,59 +1,65 @@
-# Runbook -- Proxy debug console (side-effect tracing, I5)
+# Runbook -- Console de debug du proxy (tracage des effets de bord, I5)
 
-The side-effect proxy is the only path from agent logic to an external system
-(invariant I5). This runbook covers the **debug tracing** layer that records each
-proxy `execute()` and the **Monaco console** that displays it, plus the
-**real_saas** wiring that lets a run execute through an allowlisted real forge.
+Le proxy d'effets de bord est le seul chemin de la logique d'un agent vers un
+systeme externe (invariant I5). Ce runbook couvre la couche de **tracage de
+debug** qui enregistre chaque `execute()` du proxy et la **console Monaco** qui
+l'affiche, ainsi que le cablage **real_saas** qui permet a un run de s'executer
+contre une forge reelle allowlistee.
 
-## What it does
+## Ce que ca fait
 
-- A `TracingProxy` decorates ANY `ExternalSystemProxy` (lab or real) and records
-  one `ProxyTrace` per `execute()`: the request intent (event id, agent, action,
-  target system, resource, payload) and the outcome (`ok`, status code,
-  `side_effect_hash`, error).
-- Traces live in a bounded in-memory ring (`RingTraceRecorder`). The ring is a
-  **jettable view** -- the durable truth stays in the append-only audit log (I1).
-- The console (`/proxy`) renders traces read-only in Monaco: a list on the left,
-  a JSON inspector / JSONL stream on the right.
+- Un `TracingProxy` decore N'IMPORTE QUEL `ExternalSystemProxy` (lab ou reel) et
+  enregistre un `ProxyTrace` par `execute()` : l'intention de la requete (event
+  id, agent, action, systeme cible, ressource, payload) et le resultat (`ok`,
+  code de statut, `side_effect_hash`, erreur).
+- Les traces vivent dans un ring borne en memoire (`RingTraceRecorder`). Le ring
+  est une **vue jetable** -- la verite durable reste dans le log d'audit
+  append-only (I1).
+- La console (`/proxy`) affiche les traces en lecture seule dans Monaco : une
+  liste a gauche, un inspecteur JSON / flux JSONL a droite.
 
-Determinism (I4): a trace carries no wall-clock value of its own. Ordering comes
-from a monotone `seq`; `timestamp` is the event's already-captured logical clock.
+Determinisme (I4) : une trace ne porte aucune valeur d'horloge murale propre.
+L'ordre vient d'un `seq` monotone ; `timestamp` est l'horloge logique deja
+capturee de l'evenement.
 
-## Enable it (parametrable, R5)
+## L'activer (parametrable, R5)
 
-Tracing is off by default (zero overhead). Turn it on with an environment
-variable read at app startup:
+Le tracage est desactive par defaut (zero surcout). Activez-le avec une variable
+d'environnement lue au demarrage de l'app :
 
 ```
 INSPECT_IA_AGENTS_PROXY_DEBUG=on
 ```
 
-Truthy values: `1`, `true`, `yes`, `on` (case-insensitive). Anything else is off.
-When off, the proxy executes normally and **nothing is recorded** -- the console
-shows a banner saying so rather than an empty list that looks like steady state.
+Valeurs truthy : `1`, `true`, `yes`, `on` (insensible a la casse). Toute autre
+valeur est consideree comme desactivee. Lorsque c'est desactive, le proxy
+s'execute normalement et **rien n'est enregistre** -- la console affiche une
+banniere le signalant plutot qu'une liste vide qui ressemblerait a un etat
+stable.
 
-## What gets traced
+## Ce qui est trace
 
-Two paths feed the same shared recorder:
+Deux chemins alimentent le meme recorder partage :
 
-1. **Gateway path** -- `POST /actions/execute` (and approval-driven execution).
-   The gateway's side-effect proxy is wrapped at app construction.
-2. **Lane B agent path** -- a registered agent bound to a `server` entry runs its
-   tool calls through `ProxyForge`; that resolved proxy is wrapped too. So a real
-   agent's side effects show up in the console.
+1. **Chemin gateway** -- `POST /actions/execute` (et l'execution pilotee par
+   approbation). Le proxy d'effets de bord de la gateway est wrappe a la
+   construction de l'app.
+2. **Chemin agent Lane B** -- un agent enregistre lie a une entree `server`
+   execute ses tool calls via `ProxyForge` ; ce proxy resolu est wrappe lui
+   aussi. Ainsi les effets de bord d'un agent reel apparaissent dans la console.
 
-An agent with **no** `server` binding uses the in-memory `LabForge`, which
-produces no external side effect and is therefore not traced.
+Un agent **sans** liaison `server` utilise le `LabForge` en memoire, qui ne
+produit aucun effet de bord externe et n'est donc pas trace.
 
 ## API
 
-| Method | Path | Purpose |
+| Methode | Chemin | Role |
 |--------|------|---------|
 | GET | `/proxy/debug` | `{debug_enabled, trace_count}` |
-| GET | `/proxy/traces?tail=N` | recorded traces (oldest first; `tail` keeps last N) |
-| DELETE | `/proxy/traces` | discard the buffer (the audit log is untouched, I1) |
+| GET | `/proxy/traces?tail=N` | traces enregistrees (les plus anciennes d'abord ; `tail` conserve les N dernieres) |
+| DELETE | `/proxy/traces` | vide le buffer (le log d'audit est intact, I1) |
 
-Example:
+Exemple :
 
 ```
 curl -s http://127.0.0.1:8080/proxy/debug
@@ -61,24 +67,28 @@ curl -s "http://127.0.0.1:8080/proxy/traces?tail=50"
 curl -s -X DELETE http://127.0.0.1:8080/proxy/traces
 ```
 
-## real_saas wiring
+## Cablage real_saas
 
-The proxy `router` (`resolve_proxy`) is pure: it reads no env and holds no
-credentials, so a `real_saas` server entry raised `ValueError` by default. It now
-accepts an injected `real_proxy_factory`:
+Le `router` du proxy (`resolve_proxy`) est pur : il ne lit aucune variable
+d'environnement et ne detient aucun credential, donc une entree de serveur
+`real_saas` levait une `ValueError` par defaut. Il accepte desormais un
+`real_proxy_factory` injecte :
 
-- `recette/platform/proxy/real_proxy.py` provides `RealForgeProxy` (adapts a forge
-  to `ExternalSystemProxy.execute`) and `build_real_proxy_factory(*, enable_writes=False)`.
-- The factory builds an **allowlisted** real forge from the environment
-  (`recette.realmode.build_real_forge`): token via `INSPECT_IA_AGENTS_<SYSTEM>_TOKEN`,
-  allowlist via `INSPECT_IA_AGENTS_REAL_ALLOWLIST`, writes disabled unless explicitly
-  enabled (R8).
+- `recette/platform/proxy/real_proxy.py` fournit `RealForgeProxy` (adapte une
+  forge a `ExternalSystemProxy.execute`) et
+  `build_real_proxy_factory(*, enable_writes=False)`.
+- La factory construit une forge reelle **allowlistee** a partir de
+  l'environnement (`recette.realmode.build_real_forge`) : token via
+  `INSPECT_IA_AGENTS_<SYSTEM>_TOKEN`, allowlist via
+  `INSPECT_IA_AGENTS_REAL_ALLOWLIST`, ecritures desactivees sauf activation
+  explicite (R8).
 
-Fail-safe (failure-modes): an allowlist rejection, a blocked write, a missing SDK
-or any forge error is mapped to `ExecutionResult(ok=False, ...)` -- the proxy never
-raises through the gateway and never falls back to the wrong target (I5).
+Fail-safe (failure-modes) : un rejet d'allowlist, une ecriture bloquee, un SDK
+manquant ou toute erreur de forge est mappe sur `ExecutionResult(ok=False, ...)`
+-- le proxy ne leve jamais a travers la gateway et ne se rabat jamais sur la
+mauvaise cible (I5).
 
-Wire it at an impure call-site:
+Cablez-le sur un call-site impur :
 
 ```python
 from recette.platform.proxy.router import resolve_proxy
@@ -90,63 +100,66 @@ proxy = resolve_proxy(
 )
 ```
 
-Lab stays the default everywhere; real mode is opt-in and only ever touches
-allowlisted test orgs.
+Le lab reste le defaut partout ; le mode reel est opt-in et ne touche jamais que
+des orgs de test allowlistees.
 
 ## Tests
 
-| Test | Proves |
+| Test | Prouve |
 |------|--------|
-| `tests/test_proxy_tracing.py` | decorator records/returns verbatim, fail-safe, bounded ring, env toggle |
-| `tests/test_real_proxy.py` | success -> hash; allowlist/write/forge errors -> fail-safe |
-| `tests/test_proxy_router.py` | real_saas uses the injected factory; no factory -> error (backward compat) |
-| `tests/test_api_proxy_traces.py` | `/proxy/*` endpoints; debug on/off; tail; clear |
-| `tests/test_api_proxy_traces_lane_b.py` | a REAL Lane B agent's side effects are traced (debug on) / not (off) |
-| `console/src/pages/proxy/*.test.{ts,tsx}` | model helpers + R16 page contract against a real fixture |
+| `tests/test_proxy_tracing.py` | le decorateur enregistre/retourne verbatim, fail-safe, ring borne, bascule par env |
+| `tests/test_real_proxy.py` | succes -> hash ; erreurs allowlist/ecriture/forge -> fail-safe |
+| `tests/test_proxy_router.py` | real_saas utilise la factory injectee ; pas de factory -> erreur (compat ascendante) |
+| `tests/test_api_proxy_traces.py` | endpoints `/proxy/*` ; debug on/off ; tail ; clear |
+| `tests/test_api_proxy_traces_lane_b.py` | les effets de bord d'un agent Lane B REEL sont traces (debug on) / pas (off) |
+| `console/src/pages/proxy/*.test.{ts,tsx}` | helpers de modele + contrat de page R16 contre une fixture reelle |
 
-## Failure modes
+## Modes de defaillance
 
-- Recording exception -> swallowed; `execute()` always returns the wrapped result
-  (observability must never break the I5 path).
-- Debug off -> no recording, no console data, banner shown.
-- Buffer full -> oldest traces drop (bounded ring); `seq` stays monotone; the
-  audit log remains complete.
+- Exception d'enregistrement -> avalee ; `execute()` retourne toujours le
+  resultat wrappe (l'observabilite ne doit jamais casser le chemin I5).
+- Debug desactive -> aucun enregistrement, aucune donnee dans la console,
+  banniere affichee.
+- Buffer plein -> les traces les plus anciennes sont supprimees (ring borne) ;
+  `seq` reste monotone ; le log d'audit reste complet.
 
-## Wire interception overlay (mitmproxy) -- the network-level view
+## Overlay d'interception du fil (mitmproxy) -- la vue au niveau reseau
 
-The `ProxyTrace` above is the **application-level** view (the agent's intent at
-the `ExternalSystemProxy` boundary). The **wire overlay** adds the
-**network-level** view: the bytes actually on the wire of the agent -> target
-traffic, captured by a real interception proxy (**mitmproxy**) running as an
-OPTIONAL Docker overlay. Two altitudes of the same I5 side effect.
+Le `ProxyTrace` ci-dessus est la vue **au niveau applicatif** (l'intention de
+l'agent a la frontiere `ExternalSystemProxy`). L'**overlay du fil** ajoute la vue
+**au niveau reseau** : les octets reellement sur le fil du trafic agent -> cible,
+captures par un vrai proxy d'interception (**mitmproxy**) tournant comme overlay
+Docker OPTIONNEL. Deux altitudes du meme effet de bord I5.
 
-It is **off by default** and a SURCHARGE, never a replacement: the deterministic
-recette never routes through it (I4 unchanged), the home-grown `TracingProxy`
-stays the default.
+Il est **desactive par defaut** et constitue une SURCHARGE, jamais un
+remplacement : la recette deterministe ne passe jamais par lui (I4 inchange), le
+`TracingProxy` maison reste le defaut.
 
-### In the UX
+### Dans l'UX
 
-The `/proxy` page has a source toggle: **traces app** (the `ProxyTrace` list) and
-**wire (mitmproxy)** (`WirePanel`: status, flow list, request/response detail,
-clear). When the overlay is not configured the panel shows how to enable it
-rather than an empty list.
+La page `/proxy` a une bascule de source : **traces app** (la liste des
+`ProxyTrace`) et **wire (mitmproxy)** (`WirePanel` : statut, liste de flows,
+detail requete/reponse, clear). Lorsque l'overlay n'est pas configure, le panneau
+montre comment l'activer plutot qu'une liste vide.
 
-### Choosing the transport route (proxy selector)
+### Choisir la route de transport (selecteur de proxy)
 
-A shared **`ProxySelector`** lets an operator pick the transport agent side
-effects take -- **Direct (sans proxy)** or **Wire (mitmproxy)** -- from the
-windows that have a network console: the `/proxy` wire panel and the per-run
-**Logs reseau** (cockpit `AgentRunModal`). It is backed by `GET`/`POST
-/proxy/route`; the selection is held server-side (so every console reflects the
-same active route) and applies to runs started afterwards. Transport only: the
-route never changes the decision (allow/deny/escalate) or the recorded action
-log (I4). Backed by `recette/platform/proxy/route.py` (`ProxyRouteRegistry`);
-the run routers pass the active route's `wire_proxy_url` into the runner. The
-initial route is `wire` when `INSPECT_IA_AGENTS_WIRE_PROXY` is set, else `direct`.
+Un **`ProxySelector`** partage permet a un operateur de choisir le transport que
+prennent les effets de bord d'un agent -- **Direct (sans proxy)** ou **Wire
+(mitmproxy)** -- depuis les fenetres qui ont une console reseau : le panneau wire
+de `/proxy` et les **Logs reseau** par run (cockpit `AgentRunModal`). Il s'appuie
+sur `GET`/`POST /proxy/route` ; la selection est conservee cote serveur (afin que
+chaque console reflete la meme route active) et s'applique aux runs demarres
+ensuite. Transport uniquement : la route ne change jamais la decision
+(allow/deny/escalate) ni le log d'action enregistre (I4). S'appuie sur
+`recette/platform/proxy/route.py` (`ProxyRouteRegistry`) ; les routeurs de run
+transmettent le `wire_proxy_url` de la route active au runner. La route initiale
+est `wire` lorsque `INSPECT_IA_AGENTS_WIRE_PROXY` est defini, sinon `direct`.
 
-The console **AI backends** form (Agents tab) also carries a **LiteLLM gateway
-(local)** preset that one-clicks an `openai_compat` backend pointing at the
-LiteLLM overlay (`http://127.0.0.1:4000`); see `llm-gateway-litellm.md`.
+Le formulaire **AI backends** de la console (onglet Agents) porte egalement un
+preset **LiteLLM gateway (local)** qui cree en un clic un backend
+`openai_compat` pointant vers l'overlay LiteLLM (`http://127.0.0.1:4000`) ; voir
+`llm-gateway-litellm.md`.
 
 ### Architecture
 
@@ -159,14 +172,14 @@ agent --(HTTP proxy)--> [mitmproxy container] --> lab / real system
                 Proxy page <--GET /proxy/wire (status + flows)
 ```
 
-- `recette/platform/proxy/wire.py` -- `WireFlow` + `WireFlowRecorder` (mirrors
-  the trace ring: bounded, monotone `seq`, jettable) + pure `normalize_flow`.
-- `scripts/mitm_wire_addon.py` -- mitmdump addon: normalizes each flow and POSTs
-  it to the API ingest (fail-safe, never alters traffic).
-- Endpoints: `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`, `run_id`),
-  `DELETE /proxy/wire`, `GET /proxy/wire/status`.
+- `recette/platform/proxy/wire.py` -- `WireFlow` + `WireFlowRecorder` (reflete le
+  ring de traces : borne, `seq` monotone, jetable) + `normalize_flow` pur.
+- `scripts/mitm_wire_addon.py` -- addon mitmdump : normalise chaque flow et le
+  POST vers l'ingest de l'API (fail-safe, n'altere jamais le trafic).
+- Endpoints : `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`,
+  `run_id`), `DELETE /proxy/wire`, `GET /proxy/wire/status`.
 
-### Bring it up (R19, never hand-launch)
+### Le demarrer (R19, jamais de lancement manuel)
 
 ```
 ./recette.sh wire up
@@ -174,13 +187,13 @@ export INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:8083
 ./recette.sh api restart
 ```
 
-The agent's lab-mode side effects (mock_local / declared_url) then route through
-mitmproxy and show up in the wire panel. `./recette.sh wire down|status|logs`
-manage the container; `wire ca` prints the CA path.
+Les effets de bord de l'agent en mode lab (mock_local / declared_url) passent
+alors par mitmproxy et apparaissent dans le panneau wire. `./recette.sh wire
+down|status|logs` gerent le conteneur ; `wire ca` affiche le chemin de la CA.
 
-### HTTPS to real systems (real_saas)
+### HTTPS vers des systemes reels (real_saas)
 
-mitmproxy decrypts HTTPS only if the client trusts its CA:
+mitmproxy dechiffre le HTTPS uniquement si le client fait confiance a sa CA :
 
 ```
 export INSPECT_IA_AGENTS_WIRE_CA="$(./recette.sh wire ca)"
@@ -189,61 +202,66 @@ export HTTPS_PROXY=http://127.0.0.1:8083 REQUESTS_CA_BUNDLE="$(./recette.sh wire
 ./recette.sh api restart
 ```
 
-- `StdlibHttpClient` gained a `ca_bundle` seam; `RealSlackProxy` (Slack over
-  StdlibHttpClient) routes through the overlay + CA from `INSPECT_IA_AGENTS_WIRE_*`.
-- TLS verification stays ON -- the CA is **added**, never disabled.
+- `StdlibHttpClient` a gagne une couture `ca_bundle` ; `RealSlackProxy` (Slack
+  via StdlibHttpClient) passe par l'overlay + la CA depuis
+  `INSPECT_IA_AGENTS_WIRE_*`.
+- La verification TLS reste ACTIVEE -- la CA est **ajoutee**, jamais desactivee.
 
-### Determinism (I4)
+### Determinisme (I4)
 
-The overlay is OFF in every deterministic recette and never sits in the
-decision/replay path. A `WireFlow` carries no wall-clock value; ordering is the
-recorder's monotone `seq`, exactly like `ProxyTrace`.
+L'overlay est DESACTIVE dans toute recette deterministe et ne se trouve jamais
+dans le chemin de decision/replay. Un `WireFlow` ne porte aucune valeur
+d'horloge murale ; l'ordre est le `seq` monotone du recorder, exactement comme
+`ProxyTrace`.
 
-### Live proof
+### Preuve live
 
-`scripts/smoke_wire.py` -- self-skips without Docker; otherwise brings the
-overlay up, drives a request through it to the lab, and asserts the flow reaches
+`scripts/smoke_wire.py` -- s'auto-skip sans Docker ; sinon il demarre l'overlay,
+pilote une requete a travers lui vers le lab, et asserte que le flow atteint
 `GET /proxy/wire`.
 
-### Wire tests
+### Tests wire
 
-| Test | Proves |
+| Test | Prouve |
 |------|--------|
-| `tests/test_wire_proxy.py` | WireFlow normalize/clamp, bounded ring, monotone seq, immutability |
-| `tests/test_api_wire.py` | `/proxy/wire*` endpoints; ingest/list/clear/status; tail; run_id; 422 |
+| `tests/test_wire_proxy.py` | normalize/clamp de WireFlow, ring borne, seq monotone, immutabilite |
+| `tests/test_api_wire.py` | endpoints `/proxy/wire*` ; ingest/list/clear/status ; tail ; run_id ; 422 |
 
-### Wire-vs-audit reconciliation -- detecting an unmediated (ghost-agent) path
+### Reconciliation wire-vs-audit -- detecter un chemin non mediatise (ghost-agent)
 
-Holding the two altitudes side by side turns the overlay into a detector for the
-"ghost agent" / shadow-AI threat: an unregistered agent that talks straight to an
-external system via native code, bypassing the `ExternalSystemProxy` (and thus the
-Control Plane). Such a call produces a **network side effect with no audit event**.
+Mettre les deux altitudes cote a cote transforme l'overlay en detecteur de la
+menace "ghost agent" / shadow-AI : un agent non enregistre qui parle directement
+a un systeme externe via du code natif, contournant l'`ExternalSystemProxy` (et
+donc le plan Control). Un tel appel produit un **effet de bord reseau sans
+evenement d'audit**.
 
-The two views make it visible:
+Les deux vues le rendent visible :
 
-- the **audit chain** (append-only log, fed by the mediated `ProxyTrace`, I1/I5)
-  is what went *through* the gateway;
-- the **mitmproxy wire** is what was actually *on the network*.
+- la **chaine d'audit** (log append-only, alimente par le `ProxyTrace`
+  mediatise, I1/I5) est ce qui est passe *par* la gateway ;
+- le **fil mitmproxy** est ce qui etait reellement *sur le reseau*.
 
-So every flow seen on the wire should have a matching mediated event in the audit
-log. A wire flow with **no audit counterpart** (a non-mediated target within its
-run) is an **unmediated path** -- the loophole -- and is the signal to raise to the
-Control Plane.
+Ainsi, chaque flow vu sur le fil devrait avoir un evenement mediatise
+correspondant dans le log d'audit. Un flow wire **sans contrepartie d'audit**
+(une cible non mediatisee au sein de son run) est un **chemin non mediatise** --
+la faille -- et c'est le signal a remonter au plan Control.
 
-Status (implemented, allowlist + run-scoped join): `recette/platform/proxy/reconcile.py`
-joins the wire view (`WireFlow`) with the audit view (`ProxyTrace`) by `run_id`
-(`reconcile_run`); a flow to a non-mediated target (e.g. the `shadow-db-sink`
-honeypot on `:9113`) is flagged as a bypass. Surfaced at `GET /proxy/reconcile` and
-in the console (Proxy page, "reconciliation" tab). Proven end to end by the live
-smoke `scripts/smoke_reconcile.py` (mitmproxy overlay up -> ghost probe writes
-directly to `:9113` -> reconcile reports `ok:false` with the `:9113` bypass) and by
-the deterministic unit/contract suites (`tests/test_reconcile.py`,
+Statut (implemente, allowlist + jointure scopee au run) :
+`recette/platform/proxy/reconcile.py` joint la vue wire (`WireFlow`) avec la vue
+d'audit (`ProxyTrace`) par `run_id` (`reconcile_run`) ; un flow vers une cible
+non mediatisee (p. ex. le honeypot `shadow-db-sink` sur `:9113`) est signale
+comme un bypass. Surface a `GET /proxy/reconcile` et dans la console (page Proxy,
+onglet "reconciliation"). Prouve de bout en bout par le smoke live
+`scripts/smoke_reconcile.py` (overlay mitmproxy actif -> la sonde ghost ecrit
+directement sur `:9113` -> reconcile rapporte `ok:false` avec le bypass `:9113`)
+et par les suites unitaires/contrat deterministes (`tests/test_reconcile.py`,
 `test_api_reconcile.py`, `test_ghost_probe.py`, `ReconcilePanel.contract.test.tsx`).
-A per-flow `side_effect_hash` join (ghost via an *allowlisted* target) is phase 3.
-This stays a recette LAB: it *observes* the unmediated path, it does not *enforce* a
-network block. Hard-blocking the direct outbound path (pod network isolation, plus
-the boot-time identity handshake of I3) is the platform's job, not the simulation's.
-The lab prepares and scores; enforcement is a separate layer.
-| `tests/test_wire_routing.py` | proxy_url + ca_bundle seam; resolve_proxy threading; Slack wire env |
-| `tests/test_mitm_addon.py` | addon flow normalization + fail-safe guards (no mitmproxy runtime) |
-| `console/src/pages/proxy/WirePanel.contract.test.tsx` | R16 panel contract (real fixture, enabled/disabled) |
+Une jointure par `side_effect_hash` au niveau du flow (ghost via une cible
+*allowlistee*) est la phase 3. Cela reste un LAB de recette : il *observe* le
+chemin non mediatise, il n'*applique* pas de blocage reseau. Bloquer en dur le
+chemin sortant direct (isolation reseau du pod, plus le handshake d'identite au
+boot de I3) est le travail de la plateforme, pas de la simulation. Le lab prepare
+et score ; l'enforcement est une couche separee.
+| `tests/test_wire_routing.py` | couture proxy_url + ca_bundle ; threading de resolve_proxy ; env wire Slack |
+| `tests/test_mitm_addon.py` | normalisation de flow de l'addon + gardes fail-safe (sans runtime mitmproxy) |
+| `console/src/pages/proxy/WirePanel.contract.test.tsx` | contrat de panneau R16 (fixture reelle, active/desactive) |

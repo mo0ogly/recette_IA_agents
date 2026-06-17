@@ -1,14 +1,14 @@
-# Platform lab runbook -- governed execution (gateway + lab mock + e2e)
+# Runbook du lab plateforme -- execution gouvernee (gateway + lab mock + e2e)
 
-Operates the L1 docker lab: the inspect_ia_agents API (Gateway, Control/Audit
-Plane) wired to the simulated external-systems lab, plus the end-to-end
-governed-flow recette that proves the whole path.
+Exploite le lab docker L1 : l'API inspect_ia_agents (Gateway, plan
+Control/Audit) cablee au lab d'external-systems simules, plus la recette
+end-to-end du flux gouverne qui prouve l'ensemble du chemin.
 
 ## Architecture
 
-Three planes, one governed path. No action reaches an external system without
-a policy decision (I2), side effects only flow through the proxy (I5), every
-step is an append-only audit event (I1).
+Trois plans, un seul chemin gouverne. Aucune action n'atteint un external
+system sans decision de policy (I2), les effets de bord ne transitent que par
+le proxy (I5), chaque etape est un evenement d'audit append-only (I1).
 
 ```
         agent / console / curl
@@ -44,128 +44,131 @@ step is an append-only audit event (I1).
   +---------------------------------------------+
 ```
 
-Docker services (docker-compose.yml):
+Services Docker (docker-compose.yml) :
 
-| Service | Image target | Role |
+| Service | Cible d'image | Role |
 |---------|--------------|------|
-| `platform-init` | runtime (as root, one-shot) | chown the fresh `platform-data` volume to the non-root `recette` user |
-| `lab-mock` | runtime | lab double of the 16 external systems, `:8082` |
-| `api` | runtime | gateway + control/audit API, `:8090`, state on `platform-data` |
-| `e2e` | audit | runs `tests/e2e/test_governed_flow.py` against `api` |
+| `platform-init` | runtime (en root, one-shot) | chown du volume `platform-data` fraichement cree vers l'utilisateur non-root `recette` |
+| `lab-mock` | runtime | double lab des 16 external systems, `:8082` |
+| `api` | runtime | gateway + API control/audit, `:8090`, etat sur `platform-data` |
+| `e2e` | audit | execute `tests/e2e/test_governed_flow.py` contre `api` |
 
 ## Endpoints
 
-| Method | Path | Purpose |
+| Methode | Chemin | Objet |
 |--------|------|---------|
 | GET | `/health` | liveness |
-| POST | `/actions/execute` | submit a governed action; `202` when escalated to pending |
-| GET | `/actions/{event_id}` | stored event; `resolution` set once pending is resolved |
-| GET | `/approvals?state=pending` | approval inbox (fold over the event log) |
-| POST | `/approvals/{event_id}/approve` | resolve pending -> approved, executes via proxy |
-| POST | `/approvals/{event_id}/deny` | resolve pending -> denied, never executed |
-| POST | `/approvals/sweep-timeouts` | expire pendings; optional `{"now": ISO-8601}` (I4 input) |
-| GET | `/audit/events` | event log query (`from_seq`, `agent_id`, `target_system`, `kind`, `limit`) |
-| GET | `/audit/verify` | hash-chain verification report |
-| GET | `/policies` | list policy versions |
-| GET | `/policies/active` | active policy document |
-| PUT | `/policies/active` | switch the active version (never mutates a document) |
-| GET | `/policies/{version}` | one immutable version |
-| POST | `/policies` | publish a new version |
-| GET / POST | `/config/agents` | agent registry (identity source, see limitations) |
-| PUT / DELETE | `/config/agents/{id}` | update / remove an agent |
-| GET / POST / DELETE | `/config/ai-backends` | AI backend registry (no secrets stored, R8); 8 providers: anthropic, openai, gemini, groq, mistral, deepseek, xai, openai_compat (`base_url`) |
-| POST | `/config/ai-backends/{id}/test` | connectivity probe (one minimal real call); always 200 with `{ok, latency_ms, error?}` -- fail-safe diagnostic, never a 500 |
-| GET / POST | `/config/servers` | server registry: `mock_local` (port), `declared_url` (base_url, lab wire contract), `real_saas` (no proxy yet) |
-| PUT / DELETE | `/config/servers/{id}` | update / remove a server entry |
-| POST | `/config/servers/{id}/start`, `/stop` | lifecycle of a `mock_local` lab server (ServerManager); `{"status": "down", "error": ...}` is a domain result, not a transport error |
-| GET | `/config/servers/{id}/status` | live status: process poll (`mock_local`), URL probe (`declared_url`), `n/a` (`real_saas`) |
-| GET | `/config/servers/{id}/log?after=N` | incremental tail of the server's JSONL access log (cursor `next`) |
-| POST | `/config/servers/{id}/test` | fire one action (`{action_type, resource?, payload?}`) at the server through the run proxy (I5); returns `{ok, latency_ms, status_code, response, side_effect_hash, error?}` -- fail-safe (server down / bad action -> `ok:false`, never a 500); unknown id 404, `real_saas` 400 |
-| GET | `/catalog/actions` | high-risk action catalog (verdicts + risk levels) |
-| GET | `/agents`, POST `/agents/register` | Lane B agent catalog |
-| POST | `/runs` | launch a run; `kind` = `lane_b` \| `discovery` \| `identification` \| `campaign` \| `replay` |
-| GET | `/runs/{id}`, `/runs/{id}/events`, WS `/runs/{id}/ws` | run status, buffered frames, live frame stream |
-| POST | `/runs/{id}/stop` | cooperative stop |
-| GET / POST | `/campaigns` | list / create a persisted campaign (ordered agent launches) |
-| GET / DELETE | `/campaigns/{id}` | one campaign / remove it |
-| POST | `/campaigns/{id}/run` | run the campaign; streams via the run WebSocket, persists one recording per step |
-| GET | `/recordings`, `/recordings/{id}` | list / fetch replayable recordings |
-| POST | `/recordings/{id}/replay` | deterministically replay a recording (I4); the `replay_result` frame reports `matches_original` |
+| POST | `/actions/execute` | soumettre une action gouvernee ; `202` quand escaladee en pending |
+| GET | `/actions/{event_id}` | evenement stocke ; `resolution` renseigne une fois le pending resolu |
+| GET | `/approvals?state=pending` | boite de reception d'approbation (fold sur le log d'evenements) |
+| POST | `/approvals/{event_id}/approve` | resout pending -> approved, execute via le proxy |
+| POST | `/approvals/{event_id}/deny` | resout pending -> denied, jamais execute |
+| POST | `/approvals/sweep-timeouts` | expire les pendings ; `{"now": ISO-8601}` optionnel (I4 input) |
+| GET | `/audit/events` | requete sur le log d'evenements (`from_seq`, `agent_id`, `target_system`, `kind`, `limit`) |
+| GET | `/audit/verify` | rapport de verification de la hash-chain |
+| GET | `/policies` | liste des versions de policy |
+| GET | `/policies/active` | document de policy actif |
+| PUT | `/policies/active` | bascule la version active (ne mute jamais un document) |
+| GET | `/policies/{version}` | une version immuable |
+| POST | `/policies` | publie une nouvelle version |
+| GET / POST | `/config/agents` | registre des agents (source d'identite, voir limitations) |
+| PUT / DELETE | `/config/agents/{id}` | met a jour / supprime un agent |
+| GET / POST / DELETE | `/config/ai-backends` | registre des backends IA (aucun secret stocke, R8) ; 8 providers : anthropic, openai, gemini, groq, mistral, deepseek, xai, openai_compat (`base_url`) |
+| POST | `/config/ai-backends/{id}/test` | sonde de connectivite (un appel reel minimal) ; toujours 200 avec `{ok, latency_ms, error?}` -- diagnostic fail-safe, jamais un 500 |
+| GET / POST | `/config/servers` | registre des serveurs : `mock_local` (port), `declared_url` (base_url, contrat wire du lab), `real_saas` (pas encore de proxy) |
+| PUT / DELETE | `/config/servers/{id}` | met a jour / supprime une entree serveur |
+| POST | `/config/servers/{id}/start`, `/stop` | cycle de vie d'un serveur lab `mock_local` (ServerManager) ; `{"status": "down", "error": ...}` est un resultat metier, pas une erreur de transport |
+| GET | `/config/servers/{id}/status` | statut live : poll de process (`mock_local`), sonde d'URL (`declared_url`), `n/a` (`real_saas`) |
+| GET | `/config/servers/{id}/log?after=N` | tail incremental du log d'acces JSONL du serveur (curseur `next`) |
+| POST | `/config/servers/{id}/test` | declenche une action (`{action_type, resource?, payload?}`) vers le serveur via le proxy de run (I5) ; renvoie `{ok, latency_ms, status_code, response, side_effect_hash, error?}` -- fail-safe (serveur down / action invalide -> `ok:false`, jamais un 500) ; id inconnu 404, `real_saas` 400 |
+| GET | `/catalog/actions` | catalogue des actions a haut risque (verdicts + niveaux de risque) |
+| GET | `/agents`, POST `/agents/register` | catalogue des agents Lane B |
+| POST | `/runs` | lance un run ; `kind` = `lane_b` \| `discovery` \| `identification` \| `campaign` \| `replay` |
+| GET | `/runs/{id}`, `/runs/{id}/events`, WS `/runs/{id}/ws` | statut du run, frames bufferisees, flux live de frames |
+| POST | `/runs/{id}/stop` | arret cooperatif |
+| GET / POST | `/campaigns` | liste / cree une campagne persistee (lancements d'agents ordonnes) |
+| GET / DELETE | `/campaigns/{id}` | une campagne / la supprime |
+| POST | `/campaigns/{id}/run` | execute la campagne ; streame via le WebSocket de run, persiste un recording par etape |
+| GET | `/recordings`, `/recordings/{id}` | liste / recupere les recordings rejouables |
+| POST | `/recordings/{id}/replay` | rejoue deterministiquement un recording (I4) ; la frame `replay_result` reporte `matches_original` |
 
-## Run kinds and frames
+## Types de run et frames
 
-Every run is executed in a worker thread by the RunManager and emits frames
-`{seq, type, data}` buffered on the run and pushed live to WebSocket
-subscribers. First frame is always `start`, last is `end` with the final status.
+Chaque run est execute dans un thread worker par le RunManager et emet des
+frames `{seq, type, data}` bufferisees sur le run et poussees en live aux
+abonnes WebSocket. La premiere frame est toujours `start`, la derniere est `end`
+avec le statut final.
 
-| Kind | Body params | Domain frames |
+| Kind | Params du body | Frames metier |
 |------|-------------|---------------|
-| `lane_b` | `agent_id`, optional `stub_script` (mock; else the agent's `ai_backend` drives a live LLM, key from env, R8) | `step` (per agent action), `result` (recorded actions) |
-| `discovery` | optional `surface` (default all) | `scorecard` per surface (total/passed/false_positives/false_negatives/all_passed) |
-| `identification` | none | `agent_result` per agent (predicted vs expected verdict), final `scorecard` (+ detection_rate) |
-| `campaign` | (via `/campaigns/{id}/run`) | `agent_start` / `step` / `agent_done` per step, final `campaign_done`; one recording persisted per step |
-| `replay` | (via `/recordings/{id}/replay`) | `step` per replayed decision, `replay_result` with `matches_original` (I4) |
+| `lane_b` | `agent_id`, `stub_script` optionnel (mock ; sinon l'`ai_backend` de l'agent pilote un LLM live, cle depuis l'env, R8) | `step` (par action de l'agent), `result` (actions enregistrees) |
+| `discovery` | `surface` optionnel (par defaut toutes) | `scorecard` par surface (total/passed/false_positives/false_negatives/all_passed) |
+| `identification` | aucun | `agent_result` par agent (verdict predit vs attendu), `scorecard` final (+ detection_rate) |
+| `campaign` | (via `/campaigns/{id}/run`) | `agent_start` / `step` / `agent_done` par etape, `campaign_done` final ; un recording persiste par etape |
+| `replay` | (via `/recordings/{id}/replay`) | `step` par decision rejouee, `replay_result` avec `matches_original` (I4) |
 
-`capability_scope` is the set of catalog actions an agent may call (152
-actions across 16 systems, `GET /agent-actions`), not a system name. The 11
-canonical git actions (`read_repo` ... `trigger_ci`) are the github/gitlab
-subset.
+`capability_scope` est l'ensemble des actions du catalogue qu'un agent peut
+appeler (152 actions reparties sur 16 systemes, `GET /agent-actions`), pas un nom
+de systeme. Les 11 actions git canoniques (`read_repo` ... `trigger_ci`) sont le
+sous-ensemble github/gitlab.
 
-Per-agent target routing: an agent with a `server` binding executes through
-a `ProxyForge` (real HTTP to the resolved server, I5); without one it keeps
-the in-memory `LabForge`. A dangling or unsupported server reference fails
-the run -- never a silent fallback.
+Routage de cible par agent : un agent avec un binding `server` execute via un
+`ProxyForge` (HTTP reel vers le serveur resolu, I5) ; sans binding il conserve le
+`LabForge` en memoire. Une reference de serveur pendante ou non supportee fait
+echouer le run -- jamais un fallback silencieux.
 
-## Environment variables (R5)
+## Variables d'environnement (R5)
 
-| Variable | Used by | Default | Docker lab value |
+| Variable | Utilisee par | Defaut | Valeur du lab Docker |
 |----------|---------|---------|------------------|
 | `INSPECT_IA_AGENTS_API_HOST` | api | `127.0.0.1` | `0.0.0.0` |
 | `INSPECT_IA_AGENTS_API_PORT` | api | `8090` | `8090` |
 | `INSPECT_IA_AGENTS_LAB_URL` | api (proxy) | `http://localhost:8082` | `http://lab-mock:8082` |
 | `INSPECT_IA_AGENTS_EVENT_STORE_PATH` | api (audit) | `data/inspect_ia_agents.events.db` | `/data/events.db` |
 | `INSPECT_IA_AGENTS_POLICIES_DIR` | api (policy store) | `config/policies` | `/data/policies` |
-| `INSPECT_IA_AGENTS_CONFIG_PATH` | api (agent/backend config) | `config/inspect_ia_agents.config.json` | `/data/config.json` |
-| `INSPECT_IA_AGENTS_CAMPAIGNS_PATH` | api (campaign catalogue) | `config/campaigns.json` | `/data/campaigns.json` |
-| `INSPECT_IA_AGENTS_RECORDINGS_DIR` | api (replayable recordings) | `data/recordings` | `/data/recordings` |
-| `INSPECT_IA_AGENTS_CORS_ORIGINS` | api (console cross-origin) | `http://localhost:5173,http://127.0.0.1:5173` | console origin(s) |
+| `INSPECT_IA_AGENTS_CONFIG_PATH` | api (config agent/backend) | `config/inspect_ia_agents.config.json` | `/data/config.json` |
+| `INSPECT_IA_AGENTS_CAMPAIGNS_PATH` | api (catalogue de campagnes) | `config/campaigns.json` | `/data/campaigns.json` |
+| `INSPECT_IA_AGENTS_RECORDINGS_DIR` | api (recordings rejouables) | `data/recordings` | `/data/recordings` |
+| `INSPECT_IA_AGENTS_CORS_ORIGINS` | api (console cross-origin) | `http://localhost:5173,http://127.0.0.1:5173` | origine(s) de la console |
 | `INSPECT_IA_AGENTS_LAB_PORT` | lab-mock | `8082` | `8082` |
-| `INSPECT_IA_AGENTS_LAB_ACCESS_LOG` | lab-mock | unset (no log) | set by the ServerManager per managed server (`data/lab/{id}.access.jsonl`); one JSONL line `{event_id, target_system, action_type, resource, status}` per request -- the runtime capture surface for discovery |
-| `INSPECT_IA_AGENTS_E2E_API_URL` | e2e tests | unset (suite skipped) | `http://api:8090` |
-| `LAB_HOST_PORT` | compose port mapping | `8082` | host port for lab-mock |
-| `API_HOST_PORT` | compose port mapping | `8090` | host port for api |
-| `VITE_INSPECT_IA_AGENTS_API_URL` | console (Vite) | `http://localhost:8090` | set to the api URL |
+| `INSPECT_IA_AGENTS_LAB_ACCESS_LOG` | lab-mock | non defini (pas de log) | defini par le ServerManager par serveur gere (`data/lab/{id}.access.jsonl`) ; une ligne JSONL `{event_id, target_system, action_type, resource, status}` par requete -- la surface de capture runtime pour la discovery |
+| `INSPECT_IA_AGENTS_E2E_API_URL` | tests e2e | non defini (suite skippee) | `http://api:8090` |
+| `LAB_HOST_PORT` | mapping de port compose | `8082` | port hote pour lab-mock |
+| `API_HOST_PORT` | mapping de port compose | `8090` | port hote pour api |
+| `VITE_INSPECT_IA_AGENTS_API_URL` | console (Vite) | `http://localhost:8090` | mis a l'URL de l'api |
 
-## Failure modes (fail-safe, never fail-open)
+## Modes de defaillance (fail-safe, jamais fail-open)
 
-| Failure | Behavior |
+| Defaillance | Comportement |
 |---------|----------|
-| Policy evaluation raises | default DENY + audited `platform_error` event; the action never executes |
-| Unknown agent identity | DENY, audited (`deny_reason: unknown agent identity`) |
-| Lab proxy down / non-2xx | audited `platform_error` event, `executed: false`, no bypass, no retry-around |
-| Event store write fails on the deny/pending path | the action is not executed: an unaudited action must not run |
-| Approval timeout | explicit `timeout` resolution via the sweep, never auto-approve (I6) |
-| No active policy version | hard error -> DENY; the gateway never guesses a policy |
+| L'evaluation de policy leve une exception | DENY par defaut + evenement `platform_error` audite ; l'action ne s'execute jamais |
+| Identite d'agent inconnue | DENY, audite (`deny_reason: unknown agent identity`) |
+| Proxy lab down / non-2xx | evenement `platform_error` audite, `executed: false`, pas de bypass, pas de retry-around |
+| L'ecriture dans l'event store echoue sur le chemin deny/pending | l'action n'est pas executee : une action non auditee ne doit pas tourner |
+| Timeout d'approbation | resolution explicite `timeout` via le sweep, jamais d'auto-approve (I6) |
+| Aucune version de policy active | erreur dure -> DENY ; la gateway ne devine jamais une policy |
 
-## Known limitations
+## Limitations connues
 
-- I3 is partial: agent identity is resolved from the config store by id. There
-  is no cryptographic binding (no signed requests, no mTLS). Documented
-  Phase-2 work.
-- The approval service is a Temporal placeholder: pendings are a fold over the
-  event log and timeouts are resolved by an explicit sweep endpoint, not by a
-  durable workflow.
-- `risk_score` is a static mapping from the catalog risk level
-  (low/medium/high/critical), not a computed Risk Engine output.
-- The lab mock is deterministic and stateless; it does not simulate external
-  system failures (use the proxy failure mode tests for that).
+- I3 est partiel : l'identite de l'agent est resolue depuis le config store par
+  id. Il n'y a pas de liaison cryptographique (pas de requetes signees, pas de
+  mTLS). Travail de Phase 2 documente.
+- Le service d'approbation est un placeholder Temporal : les pendings sont un
+  fold sur le log d'evenements et les timeouts sont resolus par un endpoint de
+  sweep explicite, pas par un workflow durable.
+- `risk_score` est un mapping statique depuis le niveau de risque du catalogue
+  (low/medium/high/critical), pas une sortie calculee d'un Risk Engine.
+- Le mock du lab est deterministe et stateless ; il ne simule pas les
+  defaillances des external systems (utiliser les tests de mode de defaillance
+  du proxy pour cela).
 
-## How to run
+## Comment lancer
 
-### Via `recette.sh` (recommended for local dev)
+### Via `recette.sh` (recommande pour le dev local)
 
-The simplest path -- starts the lab mock + API with the full platform wiring,
-auto-picks a free port if 8090 is taken, and exposes the console and campaigns:
+Le chemin le plus simple -- demarre le mock du lab + l'API avec le cablage
+complet de la plateforme, choisit automatiquement un port libre si 8090 est pris,
+et expose la console et les campagnes :
 
 ```
 ./recette.sh platform up
@@ -176,11 +179,11 @@ auto-picks a free port if 8090 is taken, and exposes the console and campaigns:
 ./recette.sh platform purge
 ```
 
-The resolved API port is persisted in `.run/api.port`; console and campaign
-commands read it automatically. See
-[recette-sh.md](recette-sh.md) for the full menu and command reference.
+Le port d'API resolu est persiste dans `.run/api.port` ; les commandes console et
+campaign le lisent automatiquement. Voir
+[recette-sh.md](recette-sh.md) pour le menu complet et la reference des commandes.
 
-### Docker lab (build happens on first use)
+### Lab Docker (le build a lieu a la premiere utilisation)
 
 ```
 make platform-lab
@@ -188,7 +191,7 @@ make platform-e2e
 make platform-down
 ```
 
-Manual smoke against the dockerized API (one command per line, R24):
+Smoke manuel contre l'API dockerisee (une commande par ligne, R24) :
 
 ```
 curl -s http://localhost:8090/health
@@ -199,9 +202,10 @@ curl -s -X POST http://localhost:8090/approvals/EV000000000000000001000001/appro
 curl -s http://localhost:8090/audit/verify
 ```
 
-Replace the `EV...` id with the `event_id` returned by the execute call.
+Remplacer l'id `EV...` par l'`event_id` renvoye par l'appel execute.
 
-Local run without docker (three terminals, or background the first two):
+Lancement local sans docker (trois terminaux, ou mettre les deux premiers en
+arriere-plan) :
 
 ```
 INSPECT_IA_AGENTS_LAB_PORT=8082 python3 -m recette.lab.mock_server
@@ -209,77 +213,81 @@ INSPECT_IA_AGENTS_LAB_URL=http://127.0.0.1:8082 INSPECT_IA_AGENTS_EVENT_STORE_PA
 INSPECT_IA_AGENTS_E2E_API_URL=http://127.0.0.1:8090 python3 -m unittest tests.e2e.test_governed_flow -v
 ```
 
-The e2e suite is opt-in: without `INSPECT_IA_AGENTS_E2E_API_URL` all of its tests are
-skipped, so the normal `make test` suite stays offline-green.
+La suite e2e est opt-in : sans `INSPECT_IA_AGENTS_E2E_API_URL` tous ses tests sont
+skippes, de sorte que la suite normale `make test` reste offline-green.
 
-Agent+server e2e smoke (managed mock server, bound agent, campaign, access-log
-capture, deterministic replay) against any running API:
+Smoke e2e agent+serveur (serveur mock gere, agent lie, campagne, capture de
+l'access-log, replay deterministe) contre n'importe quelle API en cours :
 
 ```
 python3 scripts/smoke_lab.py --api http://127.0.0.1:8090 --server-port 9111
 ```
 
-Exit 0 = `SMOKE PASS` (all six steps asserted). Re-runnable back to back: the
-script deletes its own fixture entities (`smoke-*`) up front and reads the
-access log from a cursor, so prior runs never pollute the assertions.
+Exit 0 = `SMOKE PASS` (les six etapes assertees). Re-executable de suite : le
+script supprime ses propres entites de fixture (`smoke-*`) en amont et lit
+l'access log depuis un curseur, de sorte que les runs precedents ne polluent
+jamais les assertions.
 
-Shorthand (starts the API if needed, then runs the lab smoke):
+Raccourci (demarre l'API si necessaire, puis lance le smoke du lab) :
 
 ```
 ./recette.sh smoke
 make smoke
 ```
 
-Browser smoke (closes the chain console -> API -> mock server -> replay in a
-real Chromium): drives the actual UI -- /servers Start->up, /campaigns
+Smoke navigateur (boucle la chaine console -> API -> serveur mock -> replay dans
+un vrai Chromium) : pilote l'UI reelle -- /servers Start->up, /campaigns
 Lancer->completed, /servers Stop->down, recording visible, Replay->completed
-(I4). Needs a running console pointed at the API and the chromium browser
-(`python3.11 -m playwright install chromium`):
+(I4). Necessite une console en cours pointee sur l'API et le navigateur chromium
+(`python3.11 -m playwright install chromium`) :
 
 ```
 VITE_INSPECT_IA_AGENTS_API_URL=http://127.0.0.1:8090 npm --prefix console run dev -- --port 5173 --strictPort
 python3.11 scripts/smoke_console.py --console http://localhost:5173 --api http://127.0.0.1:8090 --server-port 9131
 ```
 
-The console origin must be in the API CORS allow-list (`INSPECT_IA_AGENTS_CORS_ORIGINS`,
-default `localhost:5173` + `127.0.0.1:5173`); a non-default console port needs
-that port added or the browser fetch is blocked. Uses the Python Playwright
-bindings (system python3.11 here; the [api] venv has fastapi but not
-playwright).
+L'origine de la console doit etre dans l'allow-list CORS de l'API
+(`INSPECT_IA_AGENTS_CORS_ORIGINS`, par defaut `localhost:5173` + `127.0.0.1:5173`) ;
+un port de console non-defaut necessite l'ajout de ce port, sinon le fetch du
+navigateur est bloque. Utilise les bindings Python Playwright (python3.11 systeme
+ici ; le venv [api] a fastapi mais pas playwright).
 
-State persistence: the docker lab keeps the event store, policies and agent
-config on the `platform-data` named volume. `make platform-down` keeps it;
-`docker compose down -v` wipes it (fresh hash chain, empty inbox).
+Persistance d'etat : le lab docker conserve l'event store, les policies et la
+config d'agent sur le volume nomme `platform-data`. `make platform-down` le
+conserve ; `docker compose down -v` l'efface (hash chain fraiche, inbox vide).
 
 ## Console
 
-The approval console (React/Vite) talks to the API directly:
+La console d'approbation (React/Vite) parle directement a l'API :
 
 ```
 cd console
 VITE_INSPECT_IA_AGENTS_API_URL=http://localhost:8090 npm run dev
 ```
 
-Or `make console` from the repo root (uses the console's own env defaults;
-set `VITE_INSPECT_IA_AGENTS_API_URL` in `console/.env.local` to point at the lab API).
+Ou `make console` depuis la racine du repo (utilise les valeurs d'env par defaut
+propres a la console ; positionner `VITE_INSPECT_IA_AGENTS_API_URL` dans
+`console/.env.local` pour pointer sur l'API du lab).
 
-## Server registry (mock_local / declared_url / real_saas)
+## Registre des serveurs (mock_local / declared_url / real_saas)
 
-Servers are CRUD entities in `config/inspect_ia_agents.config.json` (`servers` section)
-and in the console Servers tab. Three modes:
+Les serveurs sont des entites CRUD dans `config/inspect_ia_agents.config.json`
+(section `servers`) et dans l'onglet Servers de la console. Trois modes :
 
-- `mock_local`: the platform launches a real local HTTP process
-  (`python -m recette.lab.mock_server`) on the configured port. Start/stop from
-  the console or `POST /config/servers/{id}/start|stop`. `GET /health` probes it.
-  Every request received is appended to `data/lab/{id}.access.jsonl` and served
-  back by `GET /config/servers/{id}/log?after=N` (the console log panel tails it).
-- `declared_url`: any external server speaking the lab wire format
-  (`POST /{target_system}/execute`, `{"success","data"}` envelope).
-- `real_saas`: reserved; execution fails explicitly until realmode proxy wiring lands.
+- `mock_local` : la plateforme lance un vrai process HTTP local
+  (`python -m recette.lab.mock_server`) sur le port configure. Start/stop depuis
+  la console ou `POST /config/servers/{id}/start|stop`. `GET /health` le sonde.
+  Chaque requete recue est ajoutee a `data/lab/{id}.access.jsonl` et restituee
+  par `GET /config/servers/{id}/log?after=N` (le panneau de log de la console en
+  fait le tail).
+- `declared_url` : tout serveur externe parlant le format wire du lab
+  (`POST /{target_system}/execute`, enveloppe `{"success","data"}`).
+- `real_saas` : reserve ; l'execution echoue explicitement jusqu'a ce que le
+  cablage du proxy realmode arrive.
 
-An agent carrying `"server": "<id>"` executes through the proxy resolved from the
-registry (I5). A dangling reference fails the run explicitly -- never a silent
-fallback. Demo flow verified live:
+Un agent portant `"server": "<id>"` execute via le proxy resolu depuis le
+registre (I5). Une reference pendante fait echouer le run explicitement -- jamais
+un fallback silencieux. Flux de demo verifie en live :
 
 ```bash
 curl -X POST localhost:8090/config/servers -d '{"id":"okta-mock","system":"okta","mode":"mock_local","port":9122}' -H 'Content-Type: application/json'
@@ -289,18 +297,19 @@ curl -X POST localhost:8090/runs -H 'Content-Type: application/json' -d '{"kind"
 curl "localhost:8090/config/servers/okta-mock/log?after=0"
 ```
 
-Note: lab domain handlers simulate the catalog risk-action set; canonical
-read-style actions (`read_repo`, `open_pr`) are not simulated by the github
-domain and return 404 (the run then fails explicitly, by design).
+Note : les handlers de domaine du lab simulent l'ensemble des actions a risque du
+catalogue ; les actions canoniques de type lecture (`read_repo`, `open_pr`) ne
+sont pas simulees par le domaine github et renvoient 404 (le run echoue alors
+explicitement, par conception).
 
-### The lab servers (config-driven, one per target system)
+### Les serveurs du lab (pilotes par la config, un par target system)
 
-The `servers` section of the config ships one `mock_local` server per
-`target_system` an agent can face. The set is CONFIG-DRIVEN and grows with the
-corpus (do not hardcode a count); ports run 9101+. As of 2026-06-17 there are 13
-(12 `mock_local` + 1 `honeypot`):
+La section `servers` de la config livre un serveur `mock_local` par
+`target_system` qu'un agent peut affronter. L'ensemble est PILOTE PAR LA CONFIG
+et grossit avec le corpus (ne pas coder en dur un nombre) ; les ports vont de
+9101+. Au 2026-06-17 il y en a 13 (12 `mock_local` + 1 `honeypot`) :
 
-| Server id | `system` | port |
+| Id du serveur | `system` | port |
 |-----------|----------|------|
 | `gh-mock` | github | 9101 |
 | `okta-mock` | okta | 9102 |
@@ -316,124 +325,128 @@ corpus (do not hardcode a count); ports run 9101+. As of 2026-06-17 there are 13
 | `gitlab-mock` | gitlab | 9112 |
 | `shadow-db-sink` (honeypot) | - | 9113 |
 
-An agent that hits a real HTTP target binds it through its `server` field (an
-agent with no `server` falls back to the in-process LabForge). All servers run
-the SAME `recette.lab.mock_server` (it serves every domain); the `system`/port
-pair just gives each agent family its own endpoint. An unstarted server makes a
-bound run fail with `target server ... unreachable` (fail-safe, no fallback, I5).
+Un agent qui vise une cible HTTP reelle la lie via son champ `server` (un agent
+sans `server` retombe sur le LabForge in-process). Tous les serveurs executent le
+MEME `recette.lab.mock_server` (il sert chaque domaine) ; le couple `system`/port
+donne juste a chaque famille d'agents son propre endpoint. Un serveur non demarre
+fait echouer un run lie avec `target server ... unreachable` (fail-safe, pas de
+fallback, I5).
 
-`./recette.sh platform up` starts every `mock_local` server automatically (once
-the API is healthy, `cicd/platform.sh::_lab_servers_start` reads the `servers`
-list and POSTs `/config/servers/{id}/start` for each -- so a new server needs no
-script change). They are owned by the API's ServerManager, so `platform down`
-(API shutdown) tears them down; `platform status` lists each with its live
-up/down. To (re)start one by hand:
+`./recette.sh platform up` demarre automatiquement chaque serveur `mock_local`
+(une fois l'API saine, `cicd/platform.sh::_lab_servers_start` lit la liste
+`servers` et POST `/config/servers/{id}/start` pour chacun -- un nouveau serveur
+ne necessite donc aucune modif de script). Ils appartiennent au ServerManager de
+l'API, donc `platform down` (arret de l'API) les demonte ; `platform status`
+liste chacun avec son etat live up/down. Pour en (re)demarrer un a la main :
 
 ```bash
 curl -X POST localhost:8090/config/servers/support-desk-mock/start
 ```
 
-### Editing a lab domain: hot-reload (no restart)
+### Editer un domaine du lab : hot-reload (sans redemarrage)
 
-The mock_local servers are long-lived and load each domain once. With
-`INSPECT_IA_AGENTS_LAB_RELOAD` on (R5; `platform up` sets it, OFF by default for
-test/replay determinism, I4), `mock_server` reloads a `recette/lab/domains/*.py`
-module whose source changed, so an edited handler is served WITHOUT a restart.
-Only servers STARTED with the flag self-reload; one started before it keeps
-serving stale code (symptom: a thin `status: simulated` body in the cockpit
-exchange) until it is restarted.
+Les serveurs mock_local sont longue-duree et chargent chaque domaine une fois.
+Avec `INSPECT_IA_AGENTS_LAB_RELOAD` actif (R5 ; `platform up` le pose, OFF par
+defaut pour le determinisme test/replay, I4), `mock_server` recharge un module
+`recette/lab/domains/*.py` dont la source a change, de sorte qu'un handler edite
+est servi SANS redemarrage. Seuls les serveurs DEMARRES avec le flag
+s'auto-rechargent ; un serveur demarre avant lui continue de servir du code
+perime (symptome : un corps fin `status: simulated` dans l'echange du cockpit)
+jusqu'a son redemarrage.
 
-### Agents page: four tabs
+### Page Agents : quatre onglets
 
-The Agents page has four tabs:
+La page Agents a quatre onglets :
 
-- **Configuration** -- the agent CRUD table + form; the per-row *Run* button
-  fires a quick run of the stored scenario.
-- **Corpus** -- read-only browser of the ground-truth subjects (`GET /subjects`,
-  the `CorpusPage` component reused here; the standalone `/corpus` route still
-  deep-links). Every test subject across families (git_agent, maf_agent,
-  maf_orchestration) with its category, broken axis (violation_type) and
-  expected verdict.
-- **Cockpit -- lancer & debug** -- the detailed launcher + live flux + network
-  log.
-- **Run log** -- the live frame journal (start/step/result/end) of the last run
-  started from the Configuration table's *Run* button.
+- **Configuration** -- la table CRUD d'agents + formulaire ; le bouton *Run* par
+  ligne declenche un run rapide du scenario stocke.
+- **Corpus** -- navigateur en lecture seule des sujets ground-truth
+  (`GET /subjects`, le composant `CorpusPage` reutilise ici ; la route autonome
+  `/corpus` continue de deep-linker). Chaque sujet de test, toutes familles
+  confondues (git_agent, maf_agent, maf_orchestration) avec sa categorie, son axe
+  casse (violation_type) et son verdict attendu.
+- **Cockpit -- lancer & debug** -- le lanceur detaille + flux live + log reseau.
+- **Run log** -- le journal de frames live (start/step/result/end) du dernier run
+  demarre depuis le bouton *Run* de la table Configuration.
 
-#### Corpus vs Cockpit -- the answer key vs the exam
+#### Corpus vs Cockpit -- le corrige vs l'examen
 
-The single most-confused distinction, stated as a school exam so the recette
-team never mixes them up:
+La distinction la plus souvent confondue, enoncee comme un examen scolaire pour
+que l'equipe recette ne les melange jamais :
 
-- **Corpus = the marked answer key.** For each agent, the expected verdict
-  (correct or not, and why). Frozen, read-only -- you launch nothing here. It is
-  the ground truth an external tool is judged against.
-- **Cockpit = sitting the exam.** You launch an agent; it acts for real against
-  the lab and produces its paper (the action-log: what it *did*).
-- **The recette = marking the paper against the key.** Compare what the agent
-  did (Cockpit) to the expected answer (Corpus). Match = pass.
+- **Corpus = le corrige note.** Pour chaque agent, le verdict attendu (correct ou
+  non, et pourquoi). Fige, en lecture seule -- on ne lance rien ici. C'est la
+  verite terrain contre laquelle un outil externe est juge.
+- **Cockpit = passer l'examen.** On lance un agent ; il agit pour de vrai contre
+  le lab et produit sa copie (l'action-log : ce qu'il a *fait*).
+- **La recette = corriger la copie contre le corrige.** Comparer ce que l'agent a
+  fait (Cockpit) a la reponse attendue (Corpus). Concordance = pass.
 
-Key point: an agent is never judged on what it *declares* (its manifest/code)
-but on what it *does* -- the network exchange in the log. The declaration can
-lie; the act cannot. Each tab carries a one-line plain-language reminder of its
-role (`TAB_NOTES` in `console/src/pages/agents/index.tsx`).
+Point cle : un agent n'est jamais juge sur ce qu'il *declare* (son manifest/code)
+mais sur ce qu'il *fait* -- l'echange reseau dans le log. La declaration peut
+mentir ; l'acte non. Chaque onglet porte un rappel d'une ligne en langage clair
+de son role (`TAB_NOTES` dans `console/src/pages/agents/index.tsx`).
 
-### Cockpit network log (proxy traces)
+### Log reseau du Cockpit (traces de proxy)
 
-The Cockpit (a tab of the Agents page) shows, under the launch panel, the
-side-effect PROXY traces (I5) for the active run -- the real network calls the
-agent made to its bound server (`action target/resource -> status`), failures
-included. This is the debug view; the governed audit log never sees lane_b runs.
-It is gated by `INSPECT_IA_AGENTS_PROXY_DEBUG` (R5, off by default; `platform up`
-sets it on): otherwise `/proxy` and this panel record nothing (the panel says so
-instead of showing a silent empty box).
+Le Cockpit (un onglet de la page Agents) montre, sous le panneau de lancement,
+les traces PROXY d'effets de bord (I5) du run actif -- les appels reseau reels
+que l'agent a faits a son serveur lie (`action target/resource -> status`),
+echecs inclus. C'est la vue de debug ; le log d'audit gouverne ne voit jamais les
+runs lane_b. Elle est gatee par `INSPECT_IA_AGENTS_PROXY_DEBUG` (R5, off par
+defaut ; `platform up` le pose on) : sinon `/proxy` et ce panneau n'enregistrent
+rien (le panneau le dit au lieu d'afficher une boite vide silencieuse).
 
-Clicking a trace line (or the auto-selected latest) opens the **agent <-> server
-exchange** in the Monaco viewer: the `request_payload` the agent sent and the
-server `response` it got back. An **Afficher** select narrows it to the agent
-request only, the server response only, or both. Two more selects (**Agent** /
-**Serveur**, default **Tous**) filter the displayed lines to the values present
-in the run. Only agents bound to a `server` (HTTP proxy) trace; a `server`-less
-agent runs in in-process LabForge and produces no network call.
+Cliquer une ligne de trace (ou la derniere auto-selectionnee) ouvre l'**echange
+agent <-> serveur** dans le viewer Monaco : le `request_payload` que l'agent a
+envoye et le `response` serveur qu'il a recu en retour. Un select **Afficher** le
+restreint a la requete agent seule, la reponse serveur seule, ou les deux. Deux
+autres selects (**Agent** / **Serveur**, par defaut **Tous**) filtrent les lignes
+affichees aux valeurs presentes dans le run. Seuls les agents lies a un `server`
+(proxy HTTP) tracent ; un agent sans `server` tourne en LabForge in-process et ne
+produit aucun appel reseau.
 
-The trace carries the server `response` body (`ProxyTrace.response`, from
-`ExecutionResult.response`); a thin `status: simulated` body usually means the
-mock_local server is serving stale domain code -- see the hot-reload note above.
+La trace porte le corps `response` du serveur (`ProxyTrace.response`, depuis
+`ExecutionResult.response`) ; un corps fin `status: simulated` signifie
+generalement que le serveur mock_local sert du code de domaine perime -- voir la
+note hot-reload ci-dessus.
 
-## AI providers
+## Providers IA
 
-`recette/llm.py` backends: anthropic, openai, gemini, groq, mistral, deepseek,
-xai, plus `openai_compat` (any OpenAI-wire vendor via `base_url` -- Ollama,
-OpenRouter, vLLM...). Keys via env only: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`,
-`XAI_API_KEY`. `POST /config/ai-backends/{id}/test` makes one minimal live call
-and returns `{ok, latency_ms, kind|error}` -- wired to the Test button in the
-console AI Backends panel.
+Backends de `recette/llm.py` : anthropic, openai, gemini, groq, mistral,
+deepseek, xai, plus `openai_compat` (tout vendor OpenAI-wire via `base_url` --
+Ollama, OpenRouter, vLLM...). Cles via env uniquement : `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`,
+`DEEPSEEK_API_KEY`, `XAI_API_KEY`. `POST /config/ai-backends/{id}/test` fait un
+appel live minimal et renvoie `{ok, latency_ms, kind|error}` -- cable au bouton
+Test du panneau AI Backends de la console.
 
-## Verdict scoring (recette of the external tool)
+## Scoring de verdict (recette de l'outil externe)
 
-Agents may carry a `ground_truth` block (`detectable`, `expected_identity`,
-4 `dimensions`, `expected_verdict`). The external discovery/identification tool
-pushes its results:
+Les agents peuvent porter un bloc `ground_truth` (`detectable`,
+`expected_identity`, 4 `dimensions`, `expected_verdict`). L'outil externe de
+discovery/identification pousse ses resultats :
 
 ```bash
 curl -X POST localhost:8090/verdicts -H 'Content-Type: application/json' -d '{"tool":"discovery-v1","results":[{"agent_id":"demo-gh-bot","detected":true,"verdict":"correct","identity":"bot@acme","dimensions":{"identity":true,"capabilities":true,"policy":true,"behavior":true}}]}'
 curl localhost:8090/verdicts/scorecard
 ```
 
-Each result is judged against the agent ground truth (PASS/FAIL/SKIP + per-check
-detail + evidence event ids from the audit log). `GET /verdicts/scorecard`
-aggregates detection rate, per-dimension accuracy, false positives/negatives.
-The console Verdicts tab renders the banner, the per-agent table (expandable
-evidence) and accepts a JSON upload as an alternative to the HTTP push.
+Chaque resultat est juge contre le ground truth de l'agent (PASS/FAIL/SKIP +
+detail par check + ids d'evenements de preuve depuis le log d'audit).
+`GET /verdicts/scorecard` agrege le taux de detection, l'accuracy par dimension,
+les faux positifs/negatifs. L'onglet Verdicts de la console rend le banner, la
+table par agent (preuve depliable) et accepte un upload JSON comme alternative au
+push HTTP.
 
-### Submit a finished run as a verdict (internal loop)
+### Soumettre un run termine comme verdict (boucle interne)
 
-Beyond the external tool, a run launched in the console can be pushed onto the
-same board without any external tool. `POST /runs/{id}/submit-verdict` judges
-the run's real action log (`judge_run`, pure/deterministic I4), shapes it as a
-`/verdicts` result entry (`detected:true`, `identity=principal`, the run verdict
-+ 4 dimensions) and stores it through the shared judge path under the tool name
-`run:<id>`:
+Au-dela de l'outil externe, un run lance dans la console peut etre pousse sur le
+meme board sans aucun outil externe. `POST /runs/{id}/submit-verdict` juge
+l'action-log reel du run (`judge_run`, pur/deterministe I4), le forme en entree de
+resultat `/verdicts` (`detected:true`, `identity=principal`, le verdict du run +
+4 dimensions) et le stocke via le chemin de juge partage sous le nom d'outil
+`run:<id>` :
 
 ```bash
 RUN=$(curl -sX POST localhost:8090/runs -H 'Content-Type: application/json' -d '{"kind":"lane_b","params":{"agent_id":"demo-gh-bot","stub_script":[{"kind":"tool_call","tool_name":"read_repo","tool_args":{"resource":"acme/x"}},{"kind":"final","text":"done"}]}}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["run_id"])')
@@ -441,16 +454,16 @@ curl -sX POST localhost:8090/runs/$RUN/submit-verdict
 curl -s localhost:8090/verdicts
 ```
 
-It is judged against the same `ground_truth`, so an agent without ground truth
-yields SKIP (never a vacuous PASS). In the console this is the "Soumettre aux
-Verdicts" button (agent eye -> Verdict tab) and the dashboard's auto-submit at
-run end -- closing the launch -> act -> judge -> Verdicts loop. `GET
-/verdicts/history` lists every submission (tool/run, seq, PASS/FAIL/SKIP), shown
-in the console "Historique des soumissions" panel.
+Il est juge contre le meme `ground_truth`, donc un agent sans ground truth donne
+SKIP (jamais un PASS vide). Dans la console c'est le bouton "Soumettre aux
+Verdicts" (oeil de l'agent -> onglet Verdict) et l'auto-submit du dashboard en fin
+de run -- bouclant la boucle launch -> act -> judge -> Verdicts.
+`GET /verdicts/history` liste chaque soumission (tool/run, seq, PASS/FAIL/SKIP),
+affichee dans le panneau "Historique des soumissions" de la console.
 
-## Observability surfaces for the external tool
+## Surfaces d'observabilite pour l'outil externe
 
-1. Real HTTP traffic against mock_local servers (sniff/scan the ports).
-2. `GET /audit/events` (filterable) and `GET /audit/export.jsonl` (full NDJSON
-   stream of the append-only event log, hash-chained).
-3. The REST API itself (agents, servers, runs, campaigns, verdicts).
+1. Trafic HTTP reel contre les serveurs mock_local (sniff/scan des ports).
+2. `GET /audit/events` (filtrable) et `GET /audit/export.jsonl` (flux NDJSON
+   complet du log d'evenements append-only, hash-chaine).
+3. L'API REST elle-meme (agents, servers, runs, campaigns, verdicts).

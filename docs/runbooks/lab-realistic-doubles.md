@@ -1,195 +1,195 @@
-# Lab realistic doubles -- runbook
+# Doublures realistes du lab -- runbook
 
-The lab (`recette/lab/`, served on `:8082` and as `mock_local` servers on
-`9101`-`9112`) is the simulated side of the 16 governed systems an agent acts against.
-Each system is a domain double in `recette/lab/domains/<system>.py` with a single
-`handle(action_type, resource, payload) -> dict | None` entry point, dispatched
-by `recette/lab/mock_server.py` on `POST /{target_system}/execute`.
+Le lab (`recette/lab/`, servi sur `:8082` et sous forme de serveurs `mock_local` sur
+`9101`-`9112`) est le pendant simule des 16 systemes gouvernes contre lesquels un agent agit.
+Chaque systeme est une doublure de domaine dans `recette/lab/domains/<system>.py` avec un unique
+point d'entree `handle(action_type, resource, payload) -> dict | None`, dispatche
+par `recette/lab/mock_server.py` sur `POST /{target_system}/execute`.
 
-A double is NOT a stub. For every catalogued action it returns realistic,
-business-shaped fields, validates its input the way the real system would, and
-stays byte-deterministic so replay (I4) holds.
+Une doublure n'est PAS un stub. Pour chaque action cataloguee elle retourne des champs
+realistes, a la forme metier, valide son entree comme le ferait le vrai systeme, et
+reste deterministe au byte pres pour que le replay (I4) tienne.
 
-## The three realism dimensions (every domain honours all three)
+## Les trois dimensions de realisme (chaque domaine honore les trois)
 
-1. **Business-shaped success** -- per-action fields a real API returns (a wire
-   transfer returns a `transfer_id` + `value_date` + `status`, a bucket policy
-   returns `bucket` + `acl` + `exposed`), not `{"status": "simulated"}`.
-2. **Input validation -> 422** -- a KNOWN action called with INVALID input (a
-   negative amount, malformed IBAN, unknown payee ref, bad currency) raises
-   `LabActionError(422, msg, code=..., detail={...})`. The mock server maps it to
-   that HTTP status + an error envelope `{"success": false, "error": msg, "code":
-   ..., "detail": {...}}`. `code`/`detail` are optional and back-compatible: a
-   message-only raise still works and the envelope omits the absent keys.
-3. **Deterministic coherence** -- all derived values come from a SHA-256 digest
-   of `(domain, action_type, resource, payload)`; no clock, no random, no state.
-   The same call always yields the same response (I4).
+1. **Succes a la forme metier** -- des champs par action que retourne une vraie API (un virement
+   bancaire retourne un `transfer_id` + `value_date` + `status`, une policy de bucket
+   retourne `bucket` + `acl` + `exposed`), pas `{"status": "simulated"}`.
+2. **Validation d'entree -> 422** -- une action CONNUE appelee avec une entree INVALIDE (un
+   montant negatif, un IBAN malforme, une reference de beneficiaire inconnue, une mauvaise devise) leve
+   `LabActionError(422, msg, code=..., detail={...})`. Le mock server la mappe vers
+   ce statut HTTP + une enveloppe d'erreur `{"success": false, "error": msg, "code":
+   ..., "detail": {...}}`. `code`/`detail` sont optionnels et retrocompatibles : un
+   raise message-seul fonctionne toujours et l'enveloppe omet les cles absentes.
+3. **Coherence deterministe** -- toutes les valeurs derivees viennent d'un digest SHA-256
+   de `(domain, action_type, resource, payload)` ; pas d'horloge, pas d'aleatoire, pas d'etat.
+   Le meme appel produit toujours la meme reponse (I4).
 
-## The entity model (cross-call coherence with no state)
+## Le modele d'entite (coherence inter-appels sans etat)
 
-`recette/lab/domains/_entities.py` is the deterministic entity layer. An entity
-(an invoice, account, supplier) is a PURE function of its id:
-`derive_invoice("inv/9")` returns the same `Invoice` for every action that
-touches `inv/9`, this run and every replay. Cross-call coherence therefore needs
-NO mutable state (I4): two actions on the same id observe the same entity because
-both recompute it from the id alone.
+`recette/lab/domains/_entities.py` est la couche d'entite deterministe. Une entite
+(une facture, un compte, un fournisseur) est une fonction PURE de son id :
+`derive_invoice("inv/9")` retourne la meme `Invoice` pour chaque action qui
+touche `inv/9`, sur ce run et sur chaque replay. La coherence inter-appels ne necessite donc
+AUCUN etat mutable (I4) : deux actions sur le meme id observent la meme entite parce que
+toutes deux la recalculent depuis l'id seul.
 
-Twelve domains adopt it: **finance, crm, hris, legal_dms, support_desk, cloud,
-slack, product_cms, data_platform, github, gitlab, mcp**. Each gets richer
-responses, cross-call coherence, a seed-discovery listing on its read action
-(empty/`"all"`/`"*"` resource), structured errors (`code` + `detail`), and ONE
-state-machine rejection. The blocking state is assigned ONLY to ids in an
-explicit "blocking seed" set, so an arbitrary id (a probe, a fresh scenario id)
-is always actionable -- the rejection is demonstrated through the seed id.
+Douze domaines l'adoptent : **finance, crm, hris, legal_dms, support_desk, cloud,
+slack, product_cms, data_platform, github, gitlab, mcp**. Chacun obtient des reponses
+plus riches, une coherence inter-appels, un listing de seed-discovery sur son action de lecture
+(resource vide/`"all"`/`"*"`), des erreurs structurees (`code` + `detail`), et UN
+rejet de machine a etats. L'etat bloquant est attribue UNIQUEMENT aux ids d'un
+ensemble explicite de "blocking seed", de sorte qu'un id arbitraire (une sonde, un id de scenario frais)
+reste toujours actionnable -- le rejet est demontre via l'id de seed.
 
-| Domain | Read entity | Coherent across | Blocking-seed rejection (422) |
+| Domaine | Entite lue | Coherent a travers | Rejet blocking-seed (422) |
 |---|---|---|---|
-| finance | invoice | read/refund/validate/credit_note | `invoice_paid` -- refund a PAID invoice (use credit_note) |
-| crm | contact | change_opportunity_amounts / change_account_owner | `opportunity_closed` -- change a closed_won opportunity's amount |
-| hris | department / employee | salary/leave/contract/access on one employee | `employee_terminated` -- modify_salary/modify_leave on a terminated employee |
-| legal_dms | policy / document | delete/share on one document | `legal_hold` -- delete a document under legal hold |
-| support_desk | ticket | modify/reply/delete on one ticket | `ticket_closed` -- modify_critical_ticket_status on a closed ticket |
-| cloud | resource | delete/modify on one resource | `instance_terminated` -- delete/modify a terminated resource |
-| slack | channel | read/post/delete on one channel | `channel_archived` -- post to/delete an archived channel |
-| product_cms | content | read/publish/edit/delete on one content | `content_archived` -- publish/edit/delete archived content |
-| data_platform | dataset | query/export/download on one dataset | `dataset_frozen` -- query/export a frozen dataset |
-| github | repository | read/deploy/merge/delete on one repo | `repo_archived` -- deploy/merge/delete an archived repo |
-| gitlab | project | read/push/merge on one project | `project_archived` -- push/merge to an archived project |
-| mcp | tool | invoke one tool | `tool_disabled` -- invoke an unregistered/disabled tool |
+| finance | invoice | read/refund/validate/credit_note | `invoice_paid` -- rembourser une facture PAID (utiliser credit_note) |
+| crm | contact | change_opportunity_amounts / change_account_owner | `opportunity_closed` -- changer le montant d'une opportunite closed_won |
+| hris | department / employee | salary/leave/contract/access sur un employe | `employee_terminated` -- modify_salary/modify_leave sur un employe licencie |
+| legal_dms | policy / document | delete/share sur un document | `legal_hold` -- supprimer un document sous legal hold |
+| support_desk | ticket | modify/reply/delete sur un ticket | `ticket_closed` -- modify_critical_ticket_status sur un ticket ferme |
+| cloud | resource | delete/modify sur une ressource | `instance_terminated` -- delete/modify une ressource terminee |
+| slack | channel | read/post/delete sur un channel | `channel_archived` -- poster vers/supprimer un channel archive |
+| product_cms | content | read/publish/edit/delete sur un contenu | `content_archived` -- publish/edit/delete un contenu archive |
+| data_platform | dataset | query/export/download sur un dataset | `dataset_frozen` -- query/export un dataset gele |
+| github | repository | read/deploy/merge/delete sur un repo | `repo_archived` -- deploy/merge/delete un repo archive |
+| gitlab | project | read/push/merge sur un projet | `project_archived` -- push/merge vers un projet archive |
+| mcp | tool | invoke un tool | `tool_disabled` -- invoke un tool non enregistre/desactive |
 
-Notes:
-- `result_id` keeps its per-action `sha256("<domain>:<action>:<resource>:<payload>")[:12]`
-  recipe; the entity model uses a SEPARATE id-keyed digest, so coherence does not
-  perturb `result_id` (the test suite asserts the recipe).
-- Time is a relative ordinal (e.g. `due_in_days`), never a wall-clock date, so
-  the model stays byte-stable under replay.
-- An arbitrary id still derives a valid entity (any id works); seed ids derive a
-  richer / blocking one. Discovery never adds a NEW governed action (a new action
-  would need a catalog entry -> gateway-denied).
-- The coverage guard's D2 treats a raised `LabActionError` as HANDLED (the
-  three-outcome contract: dict / None / raise).
+Notes :
+- `result_id` garde sa recette par action `sha256("<domain>:<action>:<resource>:<payload>")[:12]` ;
+  le modele d'entite utilise un digest SEPARE indexe sur l'id, donc la coherence ne
+  perturbe pas `result_id` (la suite de tests asserte la recette).
+- Le temps est un ordinal relatif (par ex. `due_in_days`), jamais une date d'horloge murale, donc
+  le modele reste byte-stable au replay.
+- Un id arbitraire derive quand meme une entite valide (n'importe quel id fonctionne) ; les ids de seed derivent
+  une entite plus riche / bloquante. La discovery n'ajoute jamais une NOUVELLE action gouvernee (une nouvelle action
+  necessiterait une entree au catalogue -> refusee par la gateway).
+- Le D2 du coverage guard traite une `LabActionError` levee comme GEREE (le
+  contrat a trois issues : dict / None / raise).
 
-## The toolkit (do not reinvent per domain)
+## La boite a outils (ne pas reinventer par domaine)
 
-- `recette/lab/errors.py` -- `LabActionError(status_code, message)`. The third
-  handler outcome (beside dict=success and None=unknown action -> 404).
-- `recette/lab/domains/_realism.py` -- shared deterministic helpers:
-  - `digest(domain, action_type, resource, payload)` -> sha256 hex (the seed).
-  - `ref(prefix, dig)` -> stable id like `TRF-1a2b3c4d`.
-  - `pick(dig, choices)` -> deterministic choice from a tuple.
-  - `derived_int(dig, lo, hi)` -> deterministic int in `[lo, hi]`.
-  - `coerce_positive_number(raw)` -> float or None (accepts numeric strings,
-    rejects garbage like `"payment_amount"`); use for amount validation.
+- `recette/lab/errors.py` -- `LabActionError(status_code, message)`. La troisieme
+  issue du handler (a cote de dict=succes et None=action inconnue -> 404).
+- `recette/lab/domains/_realism.py` -- helpers deterministes partages :
+  - `digest(domain, action_type, resource, payload)` -> sha256 hex (le seed).
+  - `ref(prefix, dig)` -> id stable comme `TRF-1a2b3c4d`.
+  - `pick(dig, choices)` -> choix deterministe dans un tuple.
+  - `derived_int(dig, lo, hi)` -> int deterministe dans `[lo, hi]`.
+  - `coerce_positive_number(raw)` -> float ou None (accepte les chaines numeriques,
+    rejette les ordures comme `"payment_amount"`) ; a utiliser pour la validation de montant.
   - `valid_email(value)` -> bool.
-  - `envelope(action_type, resource, dig)` -> the common `{action, resource,
-    result_id}` base every success extends.
+  - `envelope(action_type, resource, dig)` -> la base commune `{action, resource,
+    result_id}` que chaque succes etend.
 
-## The three handler outcomes
+## Les trois issues du handler
 
-| Outcome | Handler returns | Mock server -> |
+| Issue | Le handler retourne | Mock server -> |
 |---|---|---|
-| Success | `dict` (business fields) | `200` + `{"success": true, "data": ...}` |
-| Known action, bad input | `raise LabActionError(422, msg)` | `422` + `{"success": false, "error": msg}` |
-| Unknown action | `None` | `404` |
+| Succes | `dict` (champs metier) | `200` + `{"success": true, "data": ...}` |
+| Action connue, mauvaise entree | `raise LabActionError(422, msg)` | `422` + `{"success": false, "error": msg}` |
+| Action inconnue | `None` | `404` |
 
-## The 16 domains
+## Les 16 domaines
 
-`recette/lab/domains/__init__.py::HANDLER_MODULES` is the registry:
+`recette/lab/domains/__init__.py::HANDLER_MODULES` est le registre :
 `cloud, comms, compliance, crm, data_platform, finance, github, gitlab, hris,
 knowledge_base, legal_dms, mcp, okta, product_cms, slack, support_desk`.
 
-These 16 match the 16 governed systems in the catalog. Twelve carry a dedicated
-`mock_local` server (`:9101`-`:9112`): cloud, finance, github, gitlab, hris,
-knowledge_base, legal_dms, mcp, okta, product_cms, slack, support_desk. The
-other four (comms, compliance, crm, data_platform) are lab doubles served only
-by the in-process `LabForge` / the shared lab `:8082`, without a standalone
-mock_local server.
+Ces 16 correspondent aux 16 systemes gouvernes du catalogue. Douze portent un serveur
+`mock_local` dedie (`:9101`-`:9112`) : cloud, finance, github, gitlab, hris,
+knowledge_base, legal_dms, mcp, okta, product_cms, slack, support_desk. Les
+quatre autres (comms, compliance, crm, data_platform) sont des doublures de lab servies uniquement
+par le `LabForge` in-process / le lab partage `:8082`, sans serveur
+mock_local autonome.
 
-`github`/`gitlab` keep the canonical git read handlers (`read_repo`,
-`list_repos`, ...) and enrich the risky write actions. `knowledge_base`
-preserves the poisoned-doc query path used by the RAG recette
+`github`/`gitlab` gardent les handlers de lecture git canoniques (`read_repo`,
+`list_repos`, ...) et enrichissent les actions d'ecriture risquees. `knowledge_base`
+preserve le chemin de query de doc empoisonne utilise par la recette RAG
 (`rag-knowledge-base-crud.md`).
 
-## Reload after a domain change (operational gotcha)
+## Reload apres un changement de domaine (gotcha operationnel)
 
-A `mock_local` server is a subprocess started once. Editing a domain handler
-does NOT hot-reload it -- a stale subprocess keeps serving the old code. After
-any domain change, reload the server:
+Un serveur `mock_local` est un sous-processus demarre une fois. Editer un handler de domaine
+ne le hot-reload PAS -- un sous-processus perime continue de servir l'ancien code. Apres
+tout changement de domaine, reload le serveur :
 
 ```
 curl -s -X POST http://localhost:8090/config/servers/<id>/stop
 curl -s -X POST http://localhost:8090/config/servers/<id>/start
 ```
 
-`./recette.sh platform up` starts a fresh set, so a full restart also picks up
-changes. Never hand-launch a server (R19).
+`./recette.sh platform up` demarre un ensemble frais, donc un redemarrage complet recupere aussi
+les changements. Ne jamais hand-launch un serveur (R19).
 
-## Test one action by hand
+## Tester une action a la main
 
 ```
 curl -s -X POST http://localhost:8082/finance/execute -H 'content-type: application/json' -d '{"action_type":"launch_wire_transfer","resource":"acct/ops","payload":{"amount":"4200","currency":"EUR","payee":"ACME Ltd"}}'
 ```
 
-A bad input returns 422, e.g. `payload.amount = "payment_amount"` ->
-`{"success": false, "error": "..."}`. From the console this is the Servers ->
-Test panel (`ServerTestPanel.tsx`).
+Une mauvaise entree retourne 422, par ex. `payload.amount = "payment_amount"` ->
+`{"success": false, "error": "..."}`. Depuis la console c'est le panneau Servers ->
+Test (`ServerTestPanel.tsx`).
 
-## Composed campaigns over these doubles
+## Campagnes composees sur ces doublures
 
-`campaigns/multidomain/*.campaign.json` compose the per-domain agents into
-governed multi-agent scenarios: `ops-readonly-sweep` (allow-path reads),
-`insider-exfil-chain` (escalate + deny on evidence deletion), `prod-sabotage`
+`campaigns/multidomain/*.campaign.json` composent les agents par domaine en
+scenarios multi-agents gouvernes : `ops-readonly-sweep` (lectures sur chemin allow),
+`insider-exfil-chain` (escalate + deny sur suppression de preuve), `prod-sabotage`
 (deny-by-default), `collab-content-day` (allow + escalate), `incident-response-
-bridge` (SOC reads + escalate containment), `release-train` (devops reads +
-escalate deploys + deny backup-delete), `finance-approval-bridge`. They run
-through the real gateway and assert per-action verdicts:
+bridge` (lectures SOC + escalate du containment), `release-train` (lectures devops +
+escalate des deploys + deny du backup-delete), `finance-approval-bridge`. Ils s'executent
+a travers la vraie gateway et assertent les verdicts par action :
 
 ```
 .venv/bin/python scripts/run_multidomain_scenarios.py     # ALL PASS -- 7 campaigns
 ```
 
-The harness layers the gitlab git-family read actions in memory ONLY if the
-committed catalog does not already define them (it defers to a committed gitlab
-domain when one exists), and grants them ALLOW for `devops_admin`; everything
-else uses the committed catalog baseline. The verdict is ground truth -- a
-mismatch means the policy mapping is wrong, never weaken the `expect`.
+Le harnais superpose en memoire les actions de lecture de la famille git gitlab UNIQUEMENT si le
+catalogue committe ne les definit pas deja (il defere a un domaine gitlab committe quand il en
+existe un), et leur accorde ALLOW pour `devops_admin` ; tout le
+reste utilise la baseline du catalogue committe. Le verdict est la ground truth -- un
+mismatch signifie que le mapping de policy est faux, ne jamais affaiblir l'`expect`.
 
-## Macro orchestration campaign (campaign <-> MAF team link)
+## Campagne d'orchestration macro (lien campagne <-> equipe MAF)
 
-A campaign may carry a `links` block binding it to a MAF orchestration team
-(`corpus/maf_orchestration/`) on a `shared_action` whose human gate (I6) both
-sides must honour -- a **macro orchestration campaign**. The team PLANS the gate
-(an `approval=always` tool it approves before use); the gateway ENFORCES it (the
-same action escalates to pending). `finance-approval-bridge` links to
-`finance-approval-handoff-correct` on `launch_wire_transfer`.
+Une campagne peut porter un bloc `links` qui la lie a une equipe d'orchestration MAF
+(`corpus/maf_orchestration/`) sur une `shared_action` dont le human gate (I6) doit etre
+honore des deux cotes -- une **campagne d'orchestration macro**. L'equipe PLANIFIE le gate
+(un tool `approval=always` qu'elle approuve avant usage) ; la gateway l'IMPOSE (la
+meme action escalate vers pending). `finance-approval-bridge` se lie a
+`finance-approval-handoff-correct` sur `launch_wire_transfer`.
 
 ```json
 "links": [{ "kind": "maf_orchestration", "team": "finance-approval-handoff-correct",
             "shared_action": "launch_wire_transfer", "invariant": "I6", "note": "..." }]
 ```
 
-The link is data, not code: the harness discovers it from the campaign files,
-judges the team, runs the campaign, and asserts the shared action escalates:
+Le lien est de la donnee, pas du code : le harnais le decouvre depuis les fichiers de campagne,
+juge l'equipe, lance la campagne, et asserte que l'action partagee escalate :
 
 ```
 .venv/bin/python scripts/run_orchestrated_campaign.py     # ALL PASS -- N macro orchestration campaigns
 ```
 
-On the console it surfaces on the recette-campaigns page (an `orchestration`
-badge on the row, an Orchestration tab in the Expliquer modal). Both harnesses
-are also guarded by `tests/test_orchestrated_campaigns.py` so a verdict
-regression fails `./recette.sh test`, not just the CLI.
+Sur la console cela apparait sur la page recette-campaigns (un badge `orchestration`
+sur la ligne, un onglet Orchestration dans la modal Expliquer). Les deux harnais
+sont aussi gardes par `tests/test_orchestrated_campaigns.py` pour qu'une regression de verdict
+fasse echouer `./recette.sh test`, pas seulement la CLI.
 
-## Determinism gate
+## Gate de determinisme
 
-Every handler is a pure function of its inputs (I4). No `time`/`datetime.now`/
-`random` in any domain double. The error path is deterministic too: the same
-invalid call always raises the same status + message. See
+Chaque handler est une fonction pure de ses entrees (I4). Pas de `time`/`datetime.now`/
+`random` dans aucune doublure de domaine. Le chemin d'erreur est deterministe lui aussi : le meme
+appel invalide leve toujours le meme statut + message. Voir
 `.claude/rules/determinism-replay.md`.
 
-## Related
+## Liens connexes
 
-- `docs/ARCHITECTURE.md` -- lab topology + governed path diagrams.
-- `docs/runbooks/platform.md` -- gateway + lab lifecycle.
-- `docs/runbooks/recette-sh.md` -- the single launcher (R19).
-- `.claude/skills/recette-campaign-builder/` -- how a campaign verdict is decided.
+- `docs/ARCHITECTURE.md` -- topologie du lab + diagrammes du chemin gouverne.
+- `docs/runbooks/platform.md` -- cycle de vie gateway + lab.
+- `docs/runbooks/recette-sh.md` -- le lanceur unique (R19).
+- `.claude/skills/recette-campaign-builder/` -- comment un verdict de campagne est decide.

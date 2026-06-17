@@ -1,9 +1,9 @@
-# MCP discovery recette -- runbook
+# Recette de discovery MCP -- runbook
 
-The `mcp` discovery surface validates that the Manifest/MCP scanner detects an agent
-described by an MCP server manifest and scores it on the same invariant properties as
-the github surface (detection, count/dedup, action coverage, target, relative risk
-ordering, policy presence) -- never opaque scores (I4 determinism).
+La surface de discovery `mcp` valide que le scanner Manifest/MCP detecte un agent
+decrit par un manifest de serveur MCP et le note sur les memes proprietes invariantes
+que la surface github (detection, count/dedup, couverture d'action, target, ordre relatif
+de risque, presence de policy) -- jamais les scores opaques (determinisme I4).
 
 ## Corpus
 
@@ -15,15 +15,15 @@ corpus/manifests/<slug>/
     mcp.json                    # plain MCP server descriptor (true-negative decoy)
 ```
 
-A subject is detected when `repo/.inspect_ia_agents/manifest.json` declares an agent with
-`target_system: "mcp"` and git-canonical capabilities (e.g. `read_repo`, `open_pr`).
-A plain `mcp.json` with arithmetic tools and no inspect_ia_agents manifest is a TRUE NEGATIVE:
-the scanner must not flag it (false-positive guard, see `mcp-no-agent`).
+Un sujet est detecte quand `repo/.inspect_ia_agents/manifest.json` declare un agent avec
+`target_system: "mcp"` et des capabilities git-canoniques (par exemple `read_repo`, `open_pr`).
+Un `mcp.json` simple avec des outils arithmetiques et sans manifest inspect_ia_agents est un VRAI NEGATIF :
+le scanner ne doit pas le signaler (garde anti faux-positif, voir `mcp-no-agent`).
 
-Existing subjects: `mcp-pr-bot`, `mcp-readonly-reporter`, `mcp-admin-overreach`
-(detected) and `mcp-no-agent` (true negative).
+Sujets existants : `mcp-pr-bot`, `mcp-readonly-reporter`, `mcp-admin-overreach`
+(detectes) et `mcp-no-agent` (vrai negatif).
 
-## Run
+## Lancement
 
 ```
 python3 -m recette validate                       # schema-validate every corpus incl mcp
@@ -32,14 +32,14 @@ python3 -m recette discovery --adapter http       # against a live scanner on :8
 python3 -m recette report                         # unified verdict: identification + MAF + every surface
 ```
 
-The surface is registered in `recette/discovery_harness.py`:
-`SURFACE_ORDER` includes `"mcp"`, mapped to `corpus/manifests/` by `SURFACE_CORPUS`.
-The reference scanner (`ReferenceSourceScanAdapter._from_manifest`) reads the
-`.inspect_ia_agents/manifest.json` directly.
+La surface est enregistree dans `recette/discovery_harness.py` :
+`SURFACE_ORDER` inclut `"mcp"`, mappe vers `corpus/manifests/` par `SURFACE_CORPUS`.
+Le scanner de reference (`ReferenceSourceScanAdapter._from_manifest`) lit le
+`.inspect_ia_agents/manifest.json` directement.
 
 ## API
 
-The aggregate scorecard exposes every surface, mcp included:
+La scorecard agregee expose chaque surface, mcp inclus :
 
 ```
 GET /subjects/scorecard
@@ -49,19 +49,19 @@ GET /subjects/scorecard
      "all_passed": bool }
 ```
 
-`GET /subjects` lists the unified corpus subjects (git_agent + maf_agent families).
+`GET /subjects` liste les sujets du corpus unifie (familles git_agent + maf_agent).
 
 ## Console
 
-The `Discovery` page (`console/src/pages/discovery/`) renders `GET /subjects/scorecard`:
-one row per discovery surface (github/gitlab/temporal/openapi/mcp) plus the
-identification and MAF summaries, with the aggregate PASS/FAIL verdict. It asserts
-invariant properties only. Contract test + captured fixture:
+La page `Discovery` (`console/src/pages/discovery/`) rend `GET /subjects/scorecard` :
+une ligne par surface de discovery (github/gitlab/temporal/openapi/mcp) plus les
+resumes identification et MAF, avec le verdict agrege PASS/FAIL. Elle n'assert
+que les proprietes invariantes. Test de contrat + fixture capturee :
 `console/src/pages/discovery/index.test.tsx` + `__fixtures__/scorecard.fixture.json`.
 
-## Extending
+## Extension
 
-Add a detected subject: create `corpus/manifests/<slug>/repo/.inspect_ia_agents/manifest.json`
-with `target_system: "mcp"` and its capabilities, plus a `discovery-ground-truth.json`
-asserting detection, `agent_count`, `action_patterns`, `risk_rank` and `policy_generated`.
-Keep `risk_rank` monotonic with risk so the cross-corpus ordering check stays green.
+Ajouter un sujet detecte : creer `corpus/manifests/<slug>/repo/.inspect_ia_agents/manifest.json`
+avec `target_system: "mcp"` et ses capabilities, plus un `discovery-ground-truth.json`
+assertant la detection, `agent_count`, `action_patterns`, `risk_rank` et `policy_generated`.
+Garder `risk_rank` monotone avec le risque pour que la verification d'ordre cross-corpus reste verte.

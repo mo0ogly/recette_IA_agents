@@ -1,21 +1,23 @@
-# Runbook -- LLM gateway overlay (LiteLLM)
+# Runbook -- overlay passerelle LLM (LiteLLM)
 
-The wire overlay (mitmproxy) captures the agent's traffic to **target systems**
-(its "hands"). This runbook covers the complementary overlay for the agent's
-**brain**: an OPTIONAL **LiteLLM** gateway that centralizes and observes the
-agents' calls to LLM providers (Groq, OpenAI, Anthropic, ...).
+L'overlay wire (mitmproxy) capture le trafic de l'agent vers les **systemes cibles**
+(ses "mains"). Ce runbook couvre l'overlay complementaire pour le **cerveau** de
+l'agent : une passerelle **LiteLLM** OPTIONNELLE qui centralise et observe les
+appels des agents vers les fournisseurs LLM (Groq, OpenAI, Anthropic, ...).
 
-It is **off by default** and a SURCHARGE, never a replacement: the deterministic
-recette uses `StubLlm`/`ReplayLlm` and never calls a real model (I4). The
-gateway only matters for real-mode runs.
+Elle est **desactivee par defaut** et constitue une SURCHARGE, jamais un
+remplacement : la recette deterministe utilise `StubLlm`/`ReplayLlm` et n'appelle
+jamais un modele reel (I4). La passerelle n'a d'interet que pour les runs en mode
+reel.
 
-## What it is
+## Ce que c'est
 
-[LiteLLM](https://github.com/BerriAI/litellm) Proxy is an OpenAI-compatible
-gateway: clients speak the OpenAI wire format, LiteLLM fans out to the real
-vendors and centralizes auth, usage, and logging. inspect_ia_agents already has an
-`openai_compat` provider (configurable `base_url`, OpenAI wire), so wiring an
-agent to the gateway needs **no code change** -- only a backend pointing at it.
+[LiteLLM](https://github.com/BerriAI/litellm) Proxy est une passerelle compatible
+OpenAI : les clients parlent le format wire OpenAI, LiteLLM redistribue vers les
+vrais fournisseurs et centralise l'auth, l'usage et le logging. inspect_ia_agents possede deja
+un provider `openai_compat` (`base_url` configurable, wire OpenAI), donc connecter
+un agent a la passerelle ne necessite **aucun changement de code** -- seulement un
+backend qui pointe vers elle.
 
 ## Architecture
 
@@ -24,57 +26,58 @@ agent (Lane B) --OpenAI wire--> [LiteLLM container :4000] --> Groq / OpenAI / An
                                       (centralize, observe, log model calls)
 ```
 
-- Docker service `llm-proxy` (compose profile `llm`, LiteLLM image).
-- `config/litellm.config.yaml` -- the `model_list` (one entry per vendor route);
-  keys resolve via `os.environ/<KEY>` (R8, never hardcoded). The container gets
-  the keys from the operator's `.env` (the secret source of truth) through the
-  compose `environment` passthrough.
+- Service Docker `llm-proxy` (profil compose `llm`, image LiteLLM).
+- `config/litellm.config.yaml` -- la `model_list` (une entree par route fournisseur) ;
+  les cles se resolvent via `os.environ/<KEY>` (R8, jamais en dur). Le conteneur recoit
+  les cles depuis le `.env` de l'operateur (la source de verite des secrets) via le
+  passthrough compose `environment`.
 
-## Bring it up (R19, never hand-launch)
+## Demarrage (R19, jamais hand-launch)
 
 ```
 ./recette.sh llm-proxy up
 ```
 
-`down|status|logs` manage the container. The proxy binds `127.0.0.1:4000`
+`down|status|logs` gerent le conteneur. Le proxy ecoute sur `127.0.0.1:4000`
 (override `INSPECT_IA_AGENTS_LLM_PROXY_PORT`).
 
-## Use it from an agent
+## Utilisation depuis un agent
 
-Configure an `ai_backend` (console **Agents** tab -> AI backends, or the API):
+Configurer un `ai_backend` (onglet **Agents** de la console -> AI backends, ou l'API) :
 
-| Field | Value |
+| Champ | Valeur |
 |-------|-------|
 | `provider` | `openai_compat` |
 | `base_url` | `http://127.0.0.1:4000` |
-| `model` | one of the `model_name` entries (`groq-llama`, `openai-gpt`, `anthropic-claude`) |
-| api key (secret) | the `LITELLM_MASTER_KEY` (default `sk-recette-local`) |
+| `model` | une des entrees `model_name` (`groq-llama`, `openai-gpt`, `anthropic-claude`) |
+| cle api (secret) | la `LITELLM_MASTER_KEY` (par defaut `sk-recette-local`) |
 
-Then bind an agent to that backend and run it in real (IA) mode: every model
-call now goes through the gateway, where LiteLLM logs and centralizes it.
+Ensuite, relier un agent a ce backend et le lancer en mode reel (IA) : chaque
+appel modele passe desormais par la passerelle, ou LiteLLM le logue et le
+centralise.
 
-## Add a vendor / model
+## Ajouter un fournisseur / modele
 
-Edit `config/litellm.config.yaml` -- add a `model_list` entry with its
-`model_name`, the LiteLLM `model` (`<vendor>/<model>`), and `api_key:
-os.environ/<KEY>`. Forward the key in the compose `llm-proxy` `environment`
-block, and put the value in `.env`. Restart: `./recette.sh llm-proxy down && up`.
+Editer `config/litellm.config.yaml` -- ajouter une entree `model_list` avec son
+`model_name`, le `model` LiteLLM (`<vendor>/<model>`) et `api_key:
+os.environ/<KEY>`. Transmettre la cle dans le bloc `environment` du `llm-proxy`
+compose, et mettre la valeur dans `.env`. Redemarrer : `./recette.sh llm-proxy down && up`.
 
-## Determinism (I4)
+## Determinisme (I4)
 
-The gateway is never on the recette/replay path: replay uses `StubLlm`/
-`ReplayLlm`. The gateway is for real-mode runs only, where the run is recorded,
-not replayed.
+La passerelle n'est jamais sur le chemin recette/replay : le replay utilise
+`StubLlm`/`ReplayLlm`. La passerelle ne sert que pour les runs en mode reel, ou le
+run est enregistre, pas rejoue.
 
-## Live proof
+## Preuve live
 
-`scripts/smoke_llm_proxy.py` -- self-skips without Docker; otherwise brings the
-gateway up and asserts `GET /v1/models` lists the configured models (no upstream
-model call, no provider key needed).
+`scripts/smoke_llm_proxy.py` -- s'auto-skip sans Docker ; sinon il demarre la
+passerelle et asserte que `GET /v1/models` liste les modeles configures (aucun
+appel modele upstream, aucune cle fournisseur necessaire).
 
-## Related
+## Voir aussi
 
-- `proxy-debug-console.md` -- the wire overlay (mitmproxy), the target-traffic
-  counterpart of this LLM-traffic gateway.
-- `real-slack-proxy.md` -- a real_saas target proxy.
-- `.claude/rules/secrets-source-of-truth.md` (R18) -- where the provider keys live.
+- `proxy-debug-console.md` -- l'overlay wire (mitmproxy), le pendant cote trafic
+  cible de cette passerelle de trafic LLM.
+- `real-slack-proxy.md` -- un proxy cible real_saas.
+- `.claude/rules/secrets-source-of-truth.md` (R18) -- ou vivent les cles fournisseurs.
