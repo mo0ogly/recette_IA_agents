@@ -9,6 +9,7 @@ import CampaignsPage from "./pages/campaigns";
 import CorpusPage from "./pages/corpus";
 import SimPage from "./pages/sim";
 import DashboardPage from "./pages/dashboard";
+import DetectPage from "./pages/detect";
 import DiscoveryPage from "./pages/discovery";
 import FluxPage from "./pages/flux";
 import LivePage from "./pages/live";
@@ -59,6 +60,9 @@ export default function App(): JSX.Element {
           <NavLink to="/discovery" className={navLinkClass}>
             Discovery
           </NavLink>
+          <NavLink to="/detect" className={navLinkClass}>
+            Reperage
+          </NavLink>
           <NavLink to="/registry" className={navLinkClass}>
             Catalogue
           </NavLink>
@@ -106,6 +110,7 @@ export default function App(): JSX.Element {
           <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/rag" element={<RagPage />} />
           <Route path="/discovery" element={<DiscoveryPage />} />
+          <Route path="/detect" element={<DetectPage />} />
           <Route path="/registry" element={<RegistryPage />} />
           <Route path="/probe" element={<ProbePage />} />
           <Route path="/corpus" element={<CorpusPage />} />

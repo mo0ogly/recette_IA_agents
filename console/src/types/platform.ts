@@ -761,3 +761,34 @@ export interface CatalogSummary {
   summary: CatalogSummaryCounts;
   agents: CatalogAgentSummary[];
 }
+
+// ---------------------------------------------------------------------------
+// Reperage: observability-tool detection (GET /detect/signatures, POST /detect/scan)
+// These endpoints answer with a RAW object (no { success, data } envelope), so
+// the client returns the parsed JSON directly -- nothing to unwrap.
+// ---------------------------------------------------------------------------
+
+/** One detectable observability tool and the literal needles that betray it. */
+export interface DetectSignature {
+  tool: string;
+  category: string;
+  needles: string[];
+}
+
+/** The catalog of detectable tools plus the sorted union of their categories. */
+export interface DetectSignatures {
+  tools: DetectSignature[];
+  categories: string[];
+}
+
+/** One scan hit: which tool matched and the literal needle that betrayed it. */
+export interface DetectMatch {
+  tool: string;
+  category: string;
+  matched: string;
+}
+
+/** The result of scanning a text for observability-tool needles. */
+export interface DetectScanResult {
+  matches: DetectMatch[];
+}
