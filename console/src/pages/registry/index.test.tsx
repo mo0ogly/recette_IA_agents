@@ -11,16 +11,19 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import RegistryPage from "./index";
-import { getCatalogSummary } from "../../api/client";
-import type { CatalogSummary } from "../../types/platform";
+import { getCatalogRustSummary, getCatalogSummary } from "../../api/client";
+import type { CatalogRustSummary, CatalogSummary } from "../../types/platform";
 import fixture from "./__fixtures__/catalog-summary.fixture.json";
+import rustFixture from "./__fixtures__/catalog-rust-summary.fixture.json";
 
 vi.mock("../../api/client", () => ({
   getCatalogSummary: vi.fn(),
+  getCatalogRustSummary: vi.fn(),
 }));
 
 // The endpoint answers raw; the test feeds the mock the captured raw payload.
 const payload = fixture as unknown as CatalogSummary;
+const rustPayload = rustFixture as unknown as CatalogRustSummary;
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -29,11 +32,17 @@ afterEach(() => {
 describe("RegistryPage", () => {
   it("renders the summary counts, every agent and marks a tool-less agent", async () => {
     vi.mocked(getCatalogSummary).mockResolvedValue(payload);
+    vi.mocked(getCatalogRustSummary).mockResolvedValue(rustPayload);
     render(<RegistryPage />);
 
     // Summary counts (total / with_tools) render.
     expect(await screen.findByTestId("registry-total")).toHaveTextContent("5");
     expect(screen.getByTestId("registry-with-tools")).toHaveTextContent("4");
+
+    // The native Rust engine panel renders and reports agreement with Python.
+    expect(await screen.findByTestId("registry-rust-agreement")).toHaveTextContent(
+      "Rust == Python",
+    );
 
     // Every agent name renders.
     expect(screen.getByTestId("registry-agent-github-pr-bot")).toBeInTheDocument();
@@ -65,6 +74,7 @@ describe("RegistryPage", () => {
       agents: [],
     };
     vi.mocked(getCatalogSummary).mockResolvedValue(empty);
+    vi.mocked(getCatalogRustSummary).mockResolvedValue(rustPayload);
     render(<RegistryPage />);
 
     expect(await screen.findByTestId("registry-empty")).toBeInTheDocument();
@@ -74,6 +84,7 @@ describe("RegistryPage", () => {
 
   it("surfaces a fetch error inline (fail-safe)", async () => {
     vi.mocked(getCatalogSummary).mockRejectedValue(new Error("503 catalog unavailable"));
+    vi.mocked(getCatalogRustSummary).mockResolvedValue(rustPayload);
     render(<RegistryPage />);
 
     await waitFor(() =>

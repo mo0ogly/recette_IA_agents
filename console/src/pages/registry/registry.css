@@ -196,3 +196,56 @@
   font-style: italic;
   color: var(--color-text-muted);
 }
+
+/* Native Rust discovery engine panel (GET /catalog/rust-summary). */
+.registry-rust {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+}
+
+.registry-rust-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.registry-rust-engine {
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.registry-rust-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.registry-rust-ok {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.registry-rust-warn {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+.registry-rust-off {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.registry-rust-detail {
+  margin: 0.5rem 0 0;
+}
+
+.registry-rust-muted {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

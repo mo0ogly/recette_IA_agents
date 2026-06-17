@@ -77,6 +77,7 @@ function AgentCard({ recording }: { recording: SurfaceRecording }): JSX.Element 
 
 export default function ProbePage(): JSX.Element {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<string>("off");
   const [agentsInput, setAgentsInput] = useState(DEFAULT_AGENTS);
   const [durationMs, setDurationMs] = useState(3000);
   const [result, setResult] = useState<ProbeCaptureResult | null>(null);
@@ -88,7 +89,11 @@ export default function ProbePage(): JSX.Element {
   useEffect(() => {
     let alive = true;
     getProbeStatus()
-      .then((s) => alive && setConfigured(s.configured))
+      .then((s) => {
+        if (!alive) return;
+        setConfigured(s.configured);
+        setMode(s.mode);
+      })
       .catch(() => alive && setConfigured(false));
     return () => {
       alive = false;
@@ -124,8 +129,24 @@ export default function ProbePage(): JSX.Element {
     <section className="probe-page">
       <div className="page-head">
         <h1>Probe eBPF</h1>
+        {configured && (
+          <span
+            className={`probe-chip ${mode === "live" ? "probe-chip-ok" : "probe-chip-replay"}`}
+            data-testid="probe-mode"
+          >
+            {mode === "live" ? "mode live (eBPF)" : "mode replay (reference)"}
+          </span>
+        )}
         <PageHelp topic="probe" />
       </div>
+      {configured && mode === "replay" && (
+        <p className="probe-note probe-replay-note" data-testid="probe-replay-note">
+          Mode replay : la capture rejoue l&apos;etat de surface fige du corpus
+          (corpus/surface), de maniere deterministe (I4) -- ce n&apos;est PAS une
+          capture eBPF live. La preuve live sous CAP_BPF reste le role de la sonde
+          native.
+        </p>
+      )}
       <p className="probe-note">
         Capture bornee via la sonde de reference (eBPF, CAP_BPF cote broker). Prouve
         ce que la sonde discovery VOIT d&apos;un agent simule, surface par surface -- meme

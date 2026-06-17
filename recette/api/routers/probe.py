@@ -26,6 +26,7 @@ from ..probe_relay import ProbeUnavailable, relay_capture
 router = APIRouter(prefix="/probe", tags=["probe"])
 
 _SOCKET_ENV = "INSPECT_IA_AGENTS_PROBE_SOCKET"
+_MODE_ENV = "INSPECT_IA_AGENTS_PROBE_MODE"
 _MAX_DURATION_ENV = "INSPECT_IA_AGENTS_PROBE_MAX_DURATION_MS"
 _DEFAULT_MAX_DURATION_MS = 30_000
 
@@ -46,10 +47,17 @@ def _max_duration_ms() -> int:
 @router.get("/status")
 def status() -> dict:
     """Whether the probe broker socket is configured (for the console to enable
-    the capture button). Does not connect -- reachability is proven by a capture."""
+    the capture button). Does not connect -- reachability is proven by a capture.
+
+    ``mode`` is ``replay`` when a non-privileged replay broker is wired (dev/CI,
+    deterministic replay of corpus surface ground-truth) and ``live`` when the
+    privileged eBPF broker is expected (CAP_BPF). It is surfaced so the console
+    never presents a replay as a live capture (R13/R14). Config-first (R5)."""
+    configured = bool(os.environ.get(_SOCKET_ENV))
     return {
-        "configured": bool(os.environ.get(_SOCKET_ENV)),
+        "configured": configured,
         "socket_env": _SOCKET_ENV,
+        "mode": os.environ.get(_MODE_ENV, "live") if configured else "off",
     }
 
 

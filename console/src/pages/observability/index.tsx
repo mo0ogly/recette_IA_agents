@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { getObservabilityTrace, listObservabilityTraces } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
@@ -143,7 +144,13 @@ export default function ObservabilityPage(): JSX.Element {
       <div className="observability-layout">
         <ul className="trace-list">
           {traces.length === 0 && (
-            <li className="obs-empty">Aucune trace -- lance un agent depuis le cockpit.</li>
+            <li className="obs-empty" data-testid="obs-empty">
+              Aucune trace pour l&apos;instant.{" "}
+              <Link to="/cockpit" className="obs-empty-link" data-testid="obs-empty-cockpit-link">
+                Lance un agent depuis le cockpit
+              </Link>{" "}
+              pour produire une trace.
+            </li>
           )}
           {traces.map((t) => (
             <li key={t.trace_id}>

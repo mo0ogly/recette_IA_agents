@@ -768,6 +768,19 @@ export interface CatalogSummary {
   agents: CatalogAgentSummary[];
 }
 
+/** GET /catalog/rust-summary: the native Rust discovery engine
+ *  (discoveryprobe-catalog) run on the same registry. `available` is false when
+ *  the binary is not built (fail-safe); when true, `agreement` is whether the
+ *  Rust invariant summary equals the Python projection. */
+export interface CatalogRustSummary {
+  available: boolean;
+  engine: string;
+  reason?: string;
+  summary?: CatalogSummaryCounts;
+  python_summary?: CatalogSummaryCounts;
+  agreement?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Reperage: observability-tool detection (GET /detect/signatures, POST /detect/scan)
 // These endpoints answer with a RAW object (no { success, data } envelope), so

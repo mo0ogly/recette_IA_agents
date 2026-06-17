@@ -12,6 +12,7 @@ import type {
   ActionSpec,
   AgentAction,
   AgentConfig,
+  CatalogRustSummary,
   CatalogSummary,
   DetectScanResult,
   DetectSignatures,
@@ -517,6 +518,16 @@ export function getCatalogSummary(): Promise<CatalogSummary> {
   return request<CatalogSummary>("/catalog/summary", { method: "GET" });
 }
 
+/**
+ * GET /catalog/rust-summary: run the native Rust discovery engine
+ * (discoveryprobe-catalog) on the same registry and return its invariant
+ * summary plus whether it agrees with the Python projection. Raw object, no
+ * envelope. `available: false` when the binary is not built (fail-safe).
+ */
+export function getCatalogRustSummary(): Promise<CatalogRustSummary> {
+  return request<CatalogRustSummary>("/catalog/rust-summary", { method: "GET" });
+}
+
 // ---------------------------------------------------------------------------
 // Reperage (/detect/*): observability-tool detection
 // ---------------------------------------------------------------------------
@@ -900,12 +911,14 @@ export interface SurfaceRecording {
   surfaces: Record<string, string[]>;
 }
 
-/** The broker reply: ok with recordings, or rejected with a reason. */
+/** The broker reply: ok with recordings, or rejected with a reason. `mode`
+ *  ("replay" | "live") tags how the recording was produced. */
 export interface BrokerRecording {
   status: string;
   recordings?: SurfaceRecording[];
   recording_sha256?: string;
   reason?: string;
+  mode?: string;
 }
 
 /** The source-agnostic detection scorecard (recette/surface). */
@@ -922,10 +935,14 @@ export interface ProbeCaptureResult {
   scorecard?: DetectionScorecard;
 }
 
-/** GET /probe/status: whether the privileged broker socket is configured. */
+/** GET /probe/status: whether the broker socket is configured. `mode` is
+ *  "replay" (deterministic replay of corpus surface ground-truth, no CAP_BPF),
+ *  "live" (privileged eBPF broker) or "off" (no broker). Surfaced so the console
+ *  never presents a replay as a live eBPF capture. */
 export interface ProbeStatus {
   configured: boolean;
   socket_env: string;
+  mode: "replay" | "live" | "off";
 }
 
 export interface ProbeCaptureRequest {

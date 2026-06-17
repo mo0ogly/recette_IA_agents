@@ -10,13 +10,14 @@
  */
 
 import { useEffect, useState } from "react";
-import { getCatalogSummary } from "../../api/client";
-import type { CatalogSummary } from "../../types/platform";
+import { getCatalogRustSummary, getCatalogSummary } from "../../api/client";
+import type { CatalogRustSummary, CatalogSummary } from "../../types/platform";
 import RegistryAgentCard from "./RegistryAgentCard";
 import "./registry.css";
 
 export default function RegistryPage(): JSX.Element {
   const [summary, setSummary] = useState<CatalogSummary | null>(null);
+  const [rust, setRust] = useState<CatalogRustSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +36,11 @@ export default function RegistryPage(): JSX.Element {
           setLoading(false);
         }
       });
+    // The native Rust engine is best-effort: its absence must never break the
+    // page (fail-safe), so a failed fetch just leaves the panel hidden.
+    getCatalogRustSummary()
+      .then((r) => alive && setRust(r))
+      .catch(() => alive && setRust(null));
     return () => {
       alive = false;
     };
@@ -102,6 +108,43 @@ export default function RegistryPage(): JSX.Element {
                   {tag}
                 </span>
               ))}
+            </div>
+          )}
+
+          {rust && (
+            <div className="registry-rust" data-testid="registry-rust">
+              <div className="registry-rust-head">
+                <span className="registry-rust-engine">Moteur Rust : {rust.engine}</span>
+                {rust.available ? (
+                  <span
+                    className={`registry-rust-chip ${rust.agreement ? "registry-rust-ok" : "registry-rust-warn"}`}
+                    data-testid="registry-rust-agreement"
+                  >
+                    {rust.agreement ? "accord Rust == Python" : "DESACCORD Rust/Python"}
+                  </span>
+                ) : (
+                  <span
+                    className="registry-rust-chip registry-rust-off"
+                    data-testid="registry-rust-unavailable"
+                  >
+                    binaire non compile
+                  </span>
+                )}
+              </div>
+              {rust.available && rust.summary ? (
+                <p className="registry-rust-detail">
+                  Le moteur natif a projete le meme registre :{" "}
+                  <strong>{rust.summary.total}</strong> agents,{" "}
+                  <strong>{rust.summary.unique}</strong> uniques,{" "}
+                  <strong>{rust.summary.with_tools}</strong> avec outils,{" "}
+                  <strong>{rust.summary.tags.length}</strong> tags.
+                </p>
+              ) : (
+                <p className="registry-rust-detail registry-rust-muted">
+                  {rust.reason ?? "moteur indisponible"} (cargo build --release -p
+                  discoveryprobe-catalog)
+                </p>
+              )}
             </div>
           )}
 

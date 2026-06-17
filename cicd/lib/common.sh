@@ -86,6 +86,15 @@ WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8083}"
 # http://127.0.0.1:${LLM_PROXY_PORT}. Off unless the operator brings it up.
 LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-4000}"
 
+# -- discovery probe broker (Unix socket) ------------------------------------
+# The console Probe view relays a capture to a broker on this socket. In dev/CI
+# (no CAP_BPF) the non-privileged REPLAY broker is launched here, serving a
+# deterministic replay of the corpus surface ground-truth (mode=replay). The
+# privileged eBPF broker would set mode=live. Socket path lives under .run/.
+PROBE_SOCKET_PATH="${INSPECT_IA_AGENTS_PROBE_SOCKET:-${RUN_DIR}/probe.sock}"
+PROBE_PID_FILE="${RUN_DIR}/probe.pid"
+PROBE_LOG_FILE="${RUN_DIR}/probe.log"
+
 # -- python picker: prefer the project venv, else system python3 ------------
 py() {
     if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then

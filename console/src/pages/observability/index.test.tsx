@@ -6,6 +6,7 @@
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import tracesFixture from "./__fixtures__/traces.fixture.json";
@@ -45,7 +46,11 @@ describe("ObservabilityPage", () => {
     vi.mocked(listObservabilityTraces).mockResolvedValue(traces);
     vi.mocked(getObservabilityTrace).mockResolvedValue(trace);
 
-    render(<ObservabilityPage />);
+    render(
+      <MemoryRouter>
+        <ObservabilityPage />
+      </MemoryRouter>,
+    );
 
     const row = await screen.findByText(traces[0].agent_id ?? traces[0].recording_id);
     fireEvent.click(row);
@@ -72,9 +77,15 @@ describe("ObservabilityPage", () => {
     }
   });
 
-  it("shows an empty state before any run", async () => {
+  it("shows an empty state with a link to the cockpit before any run", async () => {
     vi.mocked(listObservabilityTraces).mockResolvedValue([]);
-    render(<ObservabilityPage />);
-    expect(await screen.findByText(/Aucune trace/)).toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <ObservabilityPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("obs-empty")).toBeInTheDocument();
+    const link = screen.getByTestId("obs-empty-cockpit-link");
+    expect(link).toHaveAttribute("href", "/cockpit");
   });
 });

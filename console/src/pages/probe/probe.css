@@ -234,6 +234,16 @@
   color: var(--badge-red-fg);
 }
 
+.probe-chip-replay {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.probe-replay-note {
+  border-left: 3px solid var(--badge-amber-fg);
+  padding-left: 0.6rem;
+}
+
 .probe-surfaces {
   list-style: none;
   margin: 0;

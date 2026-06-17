@@ -10,7 +10,11 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
 }));
 
-const CONFIGURED: ProbeStatus = { configured: true, socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET" };
+const CONFIGURED: ProbeStatus = {
+  configured: true,
+  socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET",
+  mode: "replay",
+};
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -39,6 +43,16 @@ describe("ProbePage", () => {
     // The ghost card is marked seen-nowhere.
     expect(screen.getByTestId("probe-agent-ghost-direct-db")).toHaveTextContent(
       "vu nulle part",
+    );
+  });
+
+  it("labels the replay mode so it is never mistaken for a live eBPF capture", async () => {
+    vi.mocked(getProbeStatus).mockResolvedValue(CONFIGURED);
+    render(<ProbePage />);
+
+    expect(await screen.findByTestId("probe-mode")).toHaveTextContent("replay");
+    expect(screen.getByTestId("probe-replay-note")).toHaveTextContent(
+      "PAS une",
     );
   });
 

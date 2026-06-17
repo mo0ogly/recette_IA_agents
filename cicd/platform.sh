@@ -116,6 +116,50 @@ lab_stop() {
     ok "lab mock arrete"
 }
 
+# --- discovery probe replay broker ------------------------------------------
+
+probe_broker_start() {
+    # Launch the NON-privileged replay broker so the console Probe view works in
+    # dev/CI without CAP_BPF. It serves a deterministic replay of the corpus
+    # surface ground-truth (mode=replay), never a live eBPF capture (R13/R14).
+    # The operator can target a real privileged broker by exporting
+    # INSPECT_IA_AGENTS_PROBE_SOCKET (mode=live) before platform up.
+    if _pid_of "${PROBE_PID_FILE}" >/dev/null; then
+        warn "probe broker deja en cours (pid $(_pid_of "${PROBE_PID_FILE}"))"
+        return 0
+    fi
+    mkdir -p "${RUN_DIR}"
+    rm -f "${PROBE_SOCKET_PATH}"
+    hdr "START probe replay broker (socket ${PROBE_SOCKET_PATH}, mode replay)"
+    ( cd "${REPO_ROOT}" \
+        && nohup "$(py)" -m recette.platform.probe.replay_broker \
+             --socket "${PROBE_SOCKET_PATH}" >"${PROBE_LOG_FILE}" 2>&1 & \
+        echo $! >"${PROBE_PID_FILE}" )
+    # The socket appears once the broker has bound; wait briefly.
+    local i
+    for ((i = 0; i < 20; i++)); do
+        [ -S "${PROBE_SOCKET_PATH}" ] && break
+        sleep 0.2
+    done
+    if [ -S "${PROBE_SOCKET_PATH}" ]; then
+        ok "probe replay broker pret (pid $(_pid_of "${PROBE_PID_FILE}")) - logs: ${PROBE_LOG_FILE}"
+    else
+        warn "probe broker socket absent - voir ${PROBE_LOG_FILE} (capture restera desactivee)"
+    fi
+}
+
+probe_broker_stop() {
+    local pid
+    if ! pid="$(_pid_of "${PROBE_PID_FILE}")"; then
+        rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}"
+        return 0
+    fi
+    hdr "STOP probe replay broker (pid ${pid})"
+    kill "${pid}" 2>/dev/null || true
+    rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}"
+    ok "probe broker arrete"
+}
+
 # --- lab mock_local servers (one per target system, started via the API) -----
 
 _lab_servers_start() {
@@ -153,6 +197,17 @@ platform_up() {
     # value wins; the code default stays OFF for tests/replay determinism (I4).
     export INSPECT_IA_AGENTS_LAB_RELOAD="${INSPECT_IA_AGENTS_LAB_RELOAD:-on}"
     lab_start
+    # Probe broker: if the operator already points at a privileged (live) broker
+    # via INSPECT_IA_AGENTS_PROBE_SOCKET, honour it (mode=live). Otherwise launch
+    # the non-privileged replay broker so the Probe view works out of the box.
+    if [ -n "${INSPECT_IA_AGENTS_PROBE_SOCKET:-}" ]; then
+        export INSPECT_IA_AGENTS_PROBE_MODE="${INSPECT_IA_AGENTS_PROBE_MODE:-live}"
+        info "probe broker: socket externe ${INSPECT_IA_AGENTS_PROBE_SOCKET} (mode ${INSPECT_IA_AGENTS_PROBE_MODE})"
+    else
+        probe_broker_start
+        export INSPECT_IA_AGENTS_PROBE_SOCKET="${PROBE_SOCKET_PATH}"
+        export INSPECT_IA_AGENTS_PROBE_MODE="replay"
+    fi
     mkdir -p "${PLATFORM_DATA_DIR}" "${RUN_DIR}"
     _pick_api_port
     echo "${API_PORT}" >"${API_PORT_FILE}"
@@ -179,6 +234,7 @@ platform_up() {
 
 platform_down() {
     "${API_SH}" stop || true
+    probe_broker_stop || true
     lab_stop
     if _pid_of "${CONSOLE_PID_FILE}" >/dev/null; then
         console_stop
@@ -196,6 +252,7 @@ platform_purge() {
     local patterns=(
         "python -m recette.api"
         "python -m recette.lab.mock_server"
+        "recette.platform.probe.replay_broker"
         "${CONSOLE_DIR}.*vite"
     )
     local found=0
@@ -214,7 +271,8 @@ platform_purge() {
             esac
         done < <(pgrep -f "${pat}" 2>/dev/null || true)
     done
-    rm -f "${API_PID_FILE}" "${LAB_PID_FILE}" "${CONSOLE_PID_FILE}" "${API_PORT_FILE}"
+    rm -f "${API_PID_FILE}" "${LAB_PID_FILE}" "${CONSOLE_PID_FILE}" "${API_PORT_FILE}" "${PROBE_PID_FILE}"
+    rm -f "${PROBE_SOCKET_PATH}"
     if [ "${found}" -eq 0 ]; then
         ok "aucun serveur residuel"
     else
@@ -234,6 +292,11 @@ platform_status() {
         info "lab mock   : arrete"
     fi
     "${API_SH}" status || true
+    if pid="$(_pid_of "${PROBE_PID_FILE}")"; then
+        ok "probe broker: pid ${pid}, socket ${PROBE_SOCKET_PATH} (mode replay)"
+    else
+        info "probe broker: arrete"
+    fi
     if pid="$(_pid_of "${CONSOLE_PID_FILE}")"; then
         ok "console    : pid ${pid}, http://localhost:${CONSOLE_PORT}"
     else

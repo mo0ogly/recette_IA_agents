@@ -43,6 +43,12 @@
   padding: 0.6rem 0.2rem;
 }
 
+.obs-empty-link {
+  color: var(--color-accent);
+  font-style: normal;
+  font-weight: 600;
+}
+
 .trace-row {
   width: 100%;
   display: flex;

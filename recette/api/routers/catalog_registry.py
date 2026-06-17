@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess  # nosec B404
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -34,6 +35,10 @@ logger = logging.getLogger(__name__)
 _REGISTRY_ENV = "INSPECT_IA_AGENTS_CATALOG_REGISTRY"
 _DEFAULT_REGISTRY_REL = "corpus/catalog/agent-registry.json"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+
+_RUST_BIN_ENV = "INSPECT_IA_AGENTS_CATALOG_RUST_BIN"
+_DEFAULT_RUST_BIN_REL = "discoveryprobe/target/release/discoveryprobe-catalog"
+_RUST_ENGINE = "discoveryprobe-catalog (Rust)"
 
 
 def _registry_path() -> Path:
@@ -138,3 +143,71 @@ def summary() -> dict:
     never an error.
     """
     return _load_catalog()
+
+
+def _rust_bin_path() -> Path:
+    """The compiled Rust catalog engine binary. Config first (R5): env override,
+    else the release build under the discoveryprobe workspace."""
+    raw = os.environ.get(_RUST_BIN_ENV)
+    if raw:
+        return Path(raw)
+    return _REPO_ROOT / _DEFAULT_RUST_BIN_REL
+
+
+def _run_rust_summary() -> dict:
+    """Invoke the Rust catalog engine on the registry and return its summary.
+
+    The bridge that makes the native Rust discovery engine visible in the
+    console: it runs the compiled ``discoveryprobe-catalog`` binary (no shell,
+    fixed args -- the binary path and the registry path both come from config,
+    never from request input) and parses its JSON summary. Fail-safe (R7): if the
+    binary is absent, errors, times out, or returns non-JSON, returns
+    ``available: false`` with a reason -- never a 500, never a fabricated result.
+    """
+    binary = _rust_bin_path()
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        return {
+            "available": False,
+            "engine": _RUST_ENGINE,
+            "reason": f"binary not built at {binary} (cargo build --release)",
+        }
+    registry = _registry_path()
+    try:
+        # Fixed binary path + registry path from config, no shell, no request input.
+        proc = subprocess.run(  # nosec B603
+            [str(binary), str(registry)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("rust catalog engine failed to run: %s", exc)
+        return {"available": False, "engine": _RUST_ENGINE, "reason": str(exc)}
+    if proc.returncode != 0:
+        reason = proc.stderr.strip() or f"exit code {proc.returncode}"
+        logger.warning("rust catalog engine exited %s: %s", proc.returncode, reason)
+        return {"available": False, "engine": _RUST_ENGINE, "reason": reason}
+    try:
+        rust_summary = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        logger.warning("rust catalog engine returned non-JSON: %s", exc)
+        return {"available": False, "engine": _RUST_ENGINE, "reason": "non-JSON output"}
+    return {"available": True, "engine": _RUST_ENGINE, "summary": rust_summary}
+
+
+@router.get("/rust-summary")
+def rust_summary() -> dict:
+    """Run the native Rust discovery engine on the registry and surface its result.
+
+    Makes the otherwise CLI-only ``discoveryprobe-catalog`` engine visible in the
+    console. Returns ``{available, engine, summary?, reason?, agreement?}`` where
+    ``agreement`` is ``true`` iff the Rust invariant summary equals the Python
+    projection (the cross-engine agreement the design guarantees). Fail-safe: an
+    unbuilt or failing binary returns ``available: false``, never an error."""
+    result = _run_rust_summary()
+    if result.get("available"):
+        python_summary = _load_catalog()["summary"]
+        result["agreement"] = result["summary"] == python_summary
+        result["python_summary"] = python_summary
+    return result
