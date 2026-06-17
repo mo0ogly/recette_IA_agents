@@ -101,6 +101,16 @@ export default function ObservabilityPage(): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [trace, setTrace] = useState<ObservabilityTrace | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  function toggleSpan(spanId: string): void {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(spanId)) next.delete(spanId);
+      else next.add(spanId);
+      return next;
+    });
+  }
 
   useEffect(() => {
     listObservabilityTraces()
@@ -111,6 +121,7 @@ export default function ObservabilityPage(): JSX.Element {
   useEffect(() => {
     if (selected === null) return;
     setTrace(null);
+    setOpen(new Set());
     getObservabilityTrace(selected)
       .then(setTrace)
       .catch((e: unknown) => setError(String(e)));
@@ -192,7 +203,15 @@ export default function ObservabilityPage(): JSX.Element {
                     className="obs-span"
                     style={{ paddingLeft: `${v.depth * 1.4}rem` }}
                   >
-                    <div className="obs-span-line">
+                    <button
+                      type="button"
+                      className="obs-span-line"
+                      aria-expanded={open.has(v.span.span_id)}
+                      onClick={() => toggleSpan(v.span.span_id)}
+                    >
+                      <span className="obs-caret" aria-hidden="true">
+                        {open.has(v.span.span_id) ? "v" : ">"}
+                      </span>
                       <OperationTag operation={v.operation} />
                       <span className="obs-span-title">{v.title}</span>
                       {v.target && <span className="obs-badge obs-badge-target">{v.target}</span>}
@@ -206,7 +225,7 @@ export default function ObservabilityPage(): JSX.Element {
                         <span className="obs-badge obs-badge-denied">non approuve</span>
                       )}
                       <span className="obs-span-dur">{humanDuration(v.span.duration_nano)}</span>
-                    </div>
+                    </button>
                     {(v.resource || v.principal) && (
                       <div className="obs-span-sub">
                         {v.resource && (
@@ -222,6 +241,18 @@ export default function ObservabilityPage(): JSX.Element {
                           </span>
                         )}
                       </div>
+                    )}
+                    {open.has(v.span.span_id) && (
+                      <dl className="obs-attrs">
+                        {Object.keys(v.span.attributes)
+                          .sort()
+                          .map((k) => (
+                            <div className="obs-attr" key={k}>
+                              <dt className="obs-attr-k">{k}</dt>
+                              <dd className="obs-attr-v">{String(v.span.attributes[k])}</dd>
+                            </div>
+                          ))}
+                      </dl>
                     )}
                   </li>
                 ))}

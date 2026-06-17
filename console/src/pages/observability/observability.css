@@ -138,7 +138,57 @@
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  padding: 0.15rem 0 0.15rem 0.6rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+}
+
+.obs-span-line:hover {
+  background-color: var(--color-accent-soft);
+}
+
+.obs-caret {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  width: 0.8rem;
+}
+
+/* Full attribute set, revealed on expand -- complete per-step visibility. */
+.obs-attrs {
+  margin: 0.3rem 0 0.4rem 1.4rem;
+  padding: 0.5rem 0.7rem;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.obs-attr {
+  display: grid;
+  grid-template-columns: minmax(11rem, max-content) 1fr;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
+.obs-attr-k {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.obs-attr-v {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  word-break: break-word;
 }
 
 .obs-span-title {

@@ -75,6 +75,12 @@ describe("ObservabilityPage", () => {
       const approved = Number(writeSpan.attributes["inspect_ia_agents.approved"]) === 1;
       expect(screen.getAllByText(approved ? "approuve" : "non approuve").length).toBeGreaterThan(0);
     }
+
+    // Expanding a span reveals its FULL attribute set (deep per-step visibility).
+    const hiddenKey = "gen_ai.tool.call.id";
+    expect(screen.queryByText(hiddenKey)).toBeNull(); // collapsed by default
+    fireEvent.click(screen.getByText(tool1)); // click the tool span line
+    expect(await screen.findByText(hiddenKey)).toBeInTheDocument();
   });
 
   it("shows an empty state with a link to the cockpit before any run", async () => {
