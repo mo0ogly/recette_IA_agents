@@ -1,8 +1,8 @@
-# Recette de la discovery RailNode -- voir les agents, frontiere host <-> Docker
+# Recette de la discovery par la sonde discovery -- voir les agents, frontiere host <-> Docker
 
 Date : 2026-06-16
 Statut : FONDATEUR (design valide en brainstorm, avant implementation)
-Plans AgentRail touches : Data Plane (RailNode, surface d'observation), Enrichment
+Plans AgentRail touches : Data Plane (la sonde discovery, surface d'observation), Enrichment
 Plane (Discovery), et le banc de recette (ce repo)
 Invariants en jeu : I3 (liaison d'identite), I4 (replay deterministe), I5 (effets de
 bord mediats), I2 (mediation Control Plane)
@@ -14,14 +14,14 @@ bord mediats), I2 (mediation Control Plane)
 **Si l'outil ne voit pas les agents, c'est un echec.**
 
 Tout le reste de la gouvernance AgentRail -- decision, politique, approbation, audit --
-suppose une chose prealable : que RailNode **observe** reellement la communication d'un
+suppose une chose prealable : que la sonde discovery **observe** reellement la communication d'un
 agent. Une decision parfaite sur une action qu'on n'a pas vue ne vaut rien. La discovery
 (reperer un agent et l'identifier a partir de ce qu'il fait sur le fil) est donc la
 **condition de possibilite** de toute la chaine. Ce repo existe pour **prouver** que
-RailNode voit les agents -- ou pour montrer, de facon reproductible, ou il est aveugle.
+la sonde discovery voit les agents -- ou pour montrer, de facon reproductible, ou elle est aveugle.
 
 Ce document fixe l'architecture de cette preuve, et tranche la question qui la bloque en
-pratique : **un banc en Docker, un RailNode natif sur la machine -- comment l'outil
+pratique : **un banc en Docker, une sonde discovery native sur la machine -- comment l'outil
 voit-il les agents simules par le banc ?**
 
 ---
@@ -30,8 +30,8 @@ voit-il les agents simules par le banc ?**
 
 | | Ce que c'est | Role | Ou il tourne |
 |---|---|---|---|
-| **RailNode** | L'outil AgentRail (Rust), Data Plane, *sous test* | Intercepte la comm agent<->serveur, verifie l'identite, decide localement | **Natif** sur l'hote client (VPC tenant) |
-| **Le banc** (ce repo) | La **recette** de RailNode (Python) | Simule des agents + des serveurs, produit la comm, porte le **ground-truth**, **score** l'identification | **Docker** (ou natif via `recette.sh`) |
+| **La sonde discovery** | L'outil AgentRail (Rust), Data Plane, *sous test* | Intercepte la comm agent<->serveur, verifie l'identite, decide localement | **Natif** sur l'hote client (VPC tenant) |
+| **Le banc** (ce repo) | La **recette** de la sonde discovery (Python) | Simule des agents + des serveurs, produit la comm, porte le **ground-truth**, **score** l'identification | **Docker** (ou natif via `recette.sh`) |
 
 Le banc **ne bloque rien**. Il **simule** le verdict gouverne et fournit une **verite de
 reference** pour que l'outil de discovery/identification ait quelque chose de correct
@@ -48,7 +48,7 @@ flowchart LR
         A -->|comm| S
     end
 
-    subgraph SUT["RAILNODE (Rust, natif, SOUS TEST)"]
+    subgraph SUT["LA SONDE DISCOVERY (Rust, native, SOUS TEST)"]
         OBS["Surface d'observation<br/>(hooks + eBPF)"]
         ID["Identification<br/>(qui est l'agent, que fait-il)"]
         OBS --> ID
@@ -64,12 +64,12 @@ flowchart LR
 
 ---
 
-## 2. La surface d'observation de RailNode (le coeur du sujet)
+## 2. La surface d'observation de la sonde discovery (le coeur du sujet)
 
-RailNode n'ecoute pas d'une seule maniere. Il a **plusieurs surfaces d'interception**,
+La sonde discovery n'ecoute pas d'une seule maniere. Elle a **plusieurs surfaces d'interception**,
 selon le type d'agent. C'est l'architecture officielle (RFC + diagramme AgentRail) :
 
-| Agent | Surface RailNode | Nature |
+| Agent | Surface de la sonde discovery | Nature |
 |---|---|---|
 | Claude Code | subprocess hook | inline (dans le process) |
 | Cursor | client LSP / MCP | inline |
@@ -79,9 +79,9 @@ selon le type d'agent. C'est l'architecture officielle (RFC + diagramme AgentRai
 
 Deux familles, et c'est cette distinction qui resout la question Docker :
 
-- **Surface "hook" (inline)** : le shim RailNode vit **dans le process de l'agent**. Il
+- **Surface "hook" (inline)** : le shim de la sonde discovery vit **dans le process de l'agent**. Il
   voit l'appel structure (action, ressource, payload) directement, avant le reseau.
-- **Surface "eBPF / syscall"** : RailNode s'attache au **noyau**. Il voit les
+- **Surface "eBPF / syscall"** : la sonde discovery s'attache au **noyau**. Elle voit les
   syscalls et le trafic reseau de tout process de la machine, sans etre dans le process.
 
 ```mermaid
@@ -100,21 +100,21 @@ flowchart TB
 
     AG -->|"appel d'outil"| INLINE
     AG -->|"syscall / paquet"| KERNEL
-    INLINE --> RN["RailNode<br/>identifie l'agent"]
+    INLINE --> RN["la sonde discovery<br/>identifie l'agent"]
     KERNEL --> RN
 ```
 
-> Consequence directe : **RailNode doit etre natif.** Les hooks inline et surtout l'eBPF
-> exigent le noyau de l'hote et l'espace de process. Un RailNode dans un conteneur serait
+> Consequence directe : **la sonde discovery doit etre native.** Les hooks inline et surtout l'eBPF
+> exigent le noyau de l'hote et l'espace de process. Une sonde discovery dans un conteneur serait
 > aveugle a l'hote. Docker peut heberger les *services* centraux (Railgun, Discovery,
-> Audit), jamais le capteur RailNode.
+> Audit), jamais la sonde discovery.
 
 ---
 
 ## 3. Le probleme pose proprement
 
-Le banc simule les agents et les serveurs **en Docker**. RailNode tourne **en natif**.
-Question : la comm produite dans Docker, RailNode la voit-il, et **de la meme maniere
+Le banc simule les agents et les serveurs **en Docker**. La sonde discovery tourne **en natif**.
+Question : la comm produite dans Docker, la sonde discovery la voit-elle, et **de la meme maniere
 qu'en prod** ? (Sinon la recette est infidele : on validerait une observation que la prod
 ne fera jamais.)
 
@@ -126,10 +126,10 @@ flowchart LR
             SRVD["Serveur simule"]
             AGD -->|comm| SRVD
         end
-        RN["RailNode natif<br/>(sous test)"]
+        RN["la sonde discovery native<br/>(sous test)"]
     end
 
-    AGD -. "??? RailNode voit-il cette comm ???" .-> RN
+    AGD -. "??? la sonde discovery voit-elle cette comm ???" .-> RN
 ```
 
 ---
@@ -142,7 +142,7 @@ Et c'est exactement ce qui rend le probleme soluble.
 ### 4.1 Surface eBPF / syscall -- Docker est transparent
 
 L'eBPF s'attache au **noyau de l'hote**. L'hote et **tous** les conteneurs partagent **un
-seul noyau**. Un RailNode natif privilegie (`CAP_BPF`) voit donc les syscalls et le trafic
+seul noyau**. Une sonde discovery native privilegiee (`CAP_BPF`) voit donc les syscalls et le trafic
 des agents simules **dockerises**, a travers la frontiere de namespace -- Docker ne cache
 rien a l'eBPF de l'hote.
 
@@ -152,7 +152,7 @@ flowchart TB
         subgraph NS["namespace conteneur (Docker)"]
             AGD["Agent simule<br/>(syscalls, sockets)"]
         end
-        RN["RailNode natif<br/>eBPF attache au noyau"]
+        RN["la sonde discovery native<br/>eBPF attache au noyau"]
         K["NOYAU<br/>(syscalls de TOUS les process,<br/>conteneurs inclus)"]
         AGD -->|syscall| K
         K -->|"capture eBPF"| RN
@@ -160,30 +160,30 @@ flowchart TB
 ```
 
 > Conclusion : pour la surface eBPF, **les agents simules peuvent tourner en Docker sans
-> rien changer**. RailNode natif les capte. Pas de probleme de frontiere. C'est la
-> demonstration meme de pourquoi RailNode est natif.
+> rien changer**. La sonde discovery native les capte. Pas de probleme de frontiere. C'est la
+> demonstration meme de pourquoi la sonde discovery est native.
 
 ### 4.2 Surface hook (inline) -- le shim doit etre dans le process
 
-Le shim RailNode (subprocess / SDK / MCP) se charge **dans le process de l'agent**. Pour
+Le shim de la sonde discovery (subprocess / SDK / MCP) se charge **dans le process de l'agent**. Pour
 recetter cette surface fidelement, le chemin propre est de faire tourner l'agent simule
-**en natif sur l'hote**, pour qu'il charge le shim RailNode directement.
+**en natif sur l'hote**, pour qu'il charge le shim de la sonde discovery directement.
 
 ```mermaid
 flowchart LR
     subgraph HOST["HOTE"]
         subgraph PROC["Process agent simule (natif)"]
             AG["logique agent"]
-            SHIM["shim RailNode<br/>(SDK / MCP / subprocess)"]
+            SHIM["shim de la sonde discovery<br/>(SDK / MCP / subprocess)"]
             AG -->|"appel d'outil"| SHIM
         end
-        RN["RailNode natif"]
+        RN["la sonde discovery native"]
         SHIM -->|"appel observe"| RN
     end
 ```
 
 Variante si l'agent doit rester en conteneur : injecter le shim **dans le conteneur** de
-l'agent + relai loopback vers RailNode. Plus de pieces mobiles ; l'agent natif reste la
+l'agent + relai loopback vers la sonde discovery. Plus de pieces mobiles ; l'agent natif reste la
 recette la plus simple et la plus fidele.
 
 ---
@@ -192,10 +192,10 @@ recette la plus simple et la plus fidele.
 
 Point cle pour l'implementation : **le banc possede deja les deux representations** qui
 correspondent aux deux familles de surface. On n'ajoute pas de mecanisme de capture, on
-ajoute un **adaptateur par surface** qui presente la comm simulee a RailNode comme chaque
+ajoute un **adaptateur par surface** qui presente la comm simulee a la sonde discovery comme chaque
 hook le ferait.
 
-| Vue existante du banc | Correspond a la surface RailNode |
+| Vue existante du banc | Correspond a la surface de la sonde discovery |
 |---|---|
 | **ProxyTrace** (requete structuree + reponse serveur, in-app) | surface **hook** (l'appel que l'agent a fait) |
 | **Wire mitmproxy** (octets sur le fil, `POST /proxy/wire`) | surface **eBPF / reseau** (les octets que le syscall voit) |
@@ -206,8 +206,8 @@ flowchart LR
     RUN -->|"effet de bord in-app"| PT["ProxyTrace<br/>requete + reponse"]
     RUN -->|"trafic reseau reel"| WIRE["WireFlow mitmproxy<br/>(octets, /proxy/wire)"]
 
-    PT -->|"adaptateur surface HOOK"| RNH["RailNode<br/>(SDK/MCP/subprocess)"]
-    WIRE -->|"adaptateur surface WIRE/eBPF"| RNE["RailNode<br/>(eBPF/reseau)"]
+    PT -->|"adaptateur surface HOOK"| RNH["la sonde discovery<br/>(SDK/MCP/subprocess)"]
+    WIRE -->|"adaptateur surface WIRE/eBPF"| RNE["la sonde discovery<br/>(eBPF/reseau)"]
 
     RNH --> SCORE["Identification scoree<br/>contre le ground-truth"]
     RNE --> SCORE
@@ -228,7 +228,7 @@ flowchart TB
     subgraph VPC["CLIENT VPC / TENANT (hote, natif)"]
         AGENTS["Agents simules (banc)<br/>hook natif OU dockerises (eBPF)"]
         SERVERS["Serveurs simules (banc)<br/>doubles lab :8082 / :9101-9113"]
-        RAILNODE["RailNode (Rust, natif)<br/>hooks + eBPF + decision LOCALE + WAL"]
+        RAILNODE["la sonde discovery (Rust, native)<br/>hooks + eBPF + decision LOCALE + WAL"]
         AGENTS -->|comm| SERVERS
         AGENTS -. observe .-> RAILNODE
         SERVERS -. observe .-> RAILNODE
@@ -250,11 +250,11 @@ flowchart TB
 
 Deux faits qui desamorcent toute la peur "Docker" :
 
-1. **Le chemin chaud de decision est local a RailNode** (bundle signe en cache + Regorus
+1. **Le chemin chaud de decision est local a la sonde discovery** (bundle signe en cache + Regorus
    local + WAL). La frontiere vers les services centraux (conteneurs/distant) **n'est
    jamais dans le chemin chaud** : elle ne porte que le fetch de bundle (periodique) et le
    push d'events (async NATS). Latence/disponibilite de Docker = sans effet sur un verdict.
-2. **Mode deconnecte = fail-safe.** Services injoignables -> RailNode continue de decider
+2. **Mode deconnecte = fail-safe.** Services injoignables -> la sonde discovery continue de decider
    sur le dernier bundle signe et bufferise dans le WAL, rejoue a la reconnexion. Jamais de
    fail-open ; pas de bundle valide en cache -> DENY par defaut.
 
@@ -269,7 +269,7 @@ Acces concret a travers la frontiere (Linux, verifie sur ce repo) :
 
 ## 7. Modes de recette -- couverture PAR surface (critere de fidelite)
 
-La recette n'est valide que si elle reproduit la surface **reelle** de RailNode, pas un
+La recette n'est valide que si elle reproduit la surface **reelle** de la sonde discovery, pas un
 proxy de celle-ci (legibility-first : on ne recette que ce qu'on rend observable comme en
 prod). Donc on couvre **chaque surface**, chacune avec son ground-truth.
 
@@ -280,21 +280,21 @@ flowchart TB
     GT --> M2["Mode MCP / tool-call"]
     GT --> M3["Mode SDK<br/>(LangGraph / CrewAI)"]
     GT --> M4["Mode eBPF / wire<br/>(agent dockerise OK)"]
-    M1 & M2 & M3 & M4 --> J["RailNode identifie"]
+    M1 & M2 & M3 & M4 --> J["la sonde discovery identifie"]
     J --> V["Verdict compare au ground-truth<br/>(detection + identite + capabilities + policy + comportement)"]
 ```
 
-Un trou de surface (RailNode aveugle sur une surface donnee) doit etre un **test rouge**,
+Un trou de surface (la sonde discovery aveugle sur une surface donnee) doit etre un **test rouge**,
 jamais une lacune trouvee a la main. C'est la traduction directe de la these du paragraphe 0.
 
 ---
 
 ## 8. Les 4 dimensions jugees (rappel) et les invariants
 
-Le banc juge l'identification de RailNode sur les memes 4 dimensions que le reste du
+Le banc juge l'identification de la sonde discovery sur les memes 4 dimensions que le reste du
 corpus, plus la detection :
 
-1. **Detection** : RailNode a-t-il **vu** l'agent ? (la condition zero).
+1. **Detection** : la sonde discovery a-t-elle **vu** l'agent ? (la condition zero).
 2. **Identite (I3)** : l'agent est-il celui qu'il pretend, liaison crypto verifiee ?
 3. **Capabilities** : actions reelles dans le `capability_scope` declare ?
 4. **Policy** : allow / deny / escalate conformes a l'attendu ?
@@ -303,7 +303,7 @@ corpus, plus la detection :
 Invariants engages par CE design :
 - **I3** : l'identification repose sur la liaison crypto (passport / JWT Ed25519,
   DelegationVerifier). Un sujet "identite declaree != identite liee" est un negatif
-  mono-axe `identity_mismatch` que RailNode doit attraper.
+  mono-axe `identity_mismatch` que la sonde discovery doit attraper.
 - **I4** : la comm simulee + le ground-truth sont **deterministes** (horloge logique, pas
   de `time/now/random`), enregistres une fois, rejoues a l'octet -> l'alerte est
   reproductible, pas un flake. Condition necessaire d'un signal de detection fiable.
@@ -326,25 +326,25 @@ Invariants engages par CE design :
 
 ## 10. Done / criteres de succes du design
 
-- RailNode **voit** les agents simules sur **chaque** surface declaree (subprocess, MCP,
+- La sonde discovery **voit** les agents simules sur **chaque** surface declaree (subprocess, MCP,
   SDK, eBPF/wire) -- couverture par surface, trou = test rouge.
 - La frontiere host<->Docker est tranchee : eBPF transparent (un noyau), hook in-process
   (agent natif), services centraux conteneurisables (hors chemin chaud).
 - Le banc fournit un ground-truth deterministe (I4) sur les 4 dimensions + detection, et
-  score l'identification de RailNode sans rien bloquer.
+  score l'identification de la sonde discovery sans rien bloquer.
 - Reutilisation des deux vues existantes (ProxyTrace = hook, WireFlow = eBPF/reseau) via un
   adaptateur par surface -- pas de nouvelle capture.
 
 ## 11. Prochaines etapes (a transformer en plan d'implementation)
 
 1. Definir le **contrat d'adaptateur par surface** (comment le banc presente une comm a
-   RailNode : hook structure vs wire/octets) -- un protocole, comme `DiscoveryAdapter` /
+   la sonde discovery : hook structure vs wire/octets) -- un protocole, comme `DiscoveryAdapter` /
    `IdentificationAdapter` aujourd'hui.
 2. Un **sujet de reference par surface** (un agent simule minimal + ground-truth) pour
    prouver la detection sur chaque surface.
 3. Le **scorecard de detection** : taux de detection par surface, faux negatifs (agent vu
    nulle part = echec), accuracy par dimension.
-4. Brancher RailNode reel via le contrat (CLI/HTTP/gRPC :50051), garder l'oracle de
+4. Brancher la sonde discovery reelle via le contrat (CLI/HTTP/gRPC :50051), garder l'oracle de
    reference offline comme gabarit.
 
 > Etape suivante recommandee : passer ce design en plan d'implementation
@@ -354,7 +354,7 @@ Invariants engages par CE design :
 
 ## Annexe A -- eBPF et hook inline en detail
 
-Les deux surfaces d'observation de RailNode reposent sur deux mecanismes Linux
+Les deux surfaces d'observation de la sonde discovery reposent sur deux mecanismes Linux
 fondamentalement differents. Les comprendre est necessaire pour construire une recette
 fidele : on ne simule pas une comm de la meme maniere selon la surface visee.
 
@@ -381,11 +381,11 @@ Pieces cles :
   decider allow/deny), `XDP`/`tc` (paquets reseau au plus tot), `uprobe` (fonctions
   userspace).
 - **Maps** : structures cle/valeur partagees noyau<->userspace. Le programme eBPF ecrit
-  dans une map, le demon userspace (RailNode) la lit. C'est le canal de remontee des events
+  dans une map, le demon userspace (la sonde discovery) la lit. C'est le canal de remontee des events
   -- et le cache du chemin chaud (`identity_cache`, `decision_cache` du diagramme AgentRail,
   lookup sub-microseconde).
 
-Mecanisme RailNode (surface eBPF) :
+Mecanisme de la sonde discovery (surface eBPF) :
 
 ```mermaid
 sequenceDiagram
@@ -393,7 +393,7 @@ sequenceDiagram
     participant K as Noyau (tracepoint syscall)
     participant BPF as Programme eBPF
     participant MAP as BPF map (kernel cache)
-    participant RN as RailNode (userspace)
+    participant RN as la sonde discovery (userspace)
 
     AG->>K: syscall connect/write/execve/openat
     K->>BPF: declenche le hook
@@ -409,14 +409,14 @@ sequenceDiagram
 `connect`/`sendto` (il parle reseau), `openat`/`write` (il touche un fichier/DB). C'est le
 filet **catch-all** ("Any AI Agent") : aucune cooperation de l'agent requise.
 
-**MVP userspace vs roadmap eBPF** : au depart RailNode capture en userspace (proxy,
+**MVP userspace vs roadmap eBPF** : au depart la sonde discovery capture en userspace (proxy,
 `LD_PRELOAD`, ou ptrace) -- plus simple, moins performant, contournable. La roadmap = vrai
 eBPF noyau pour la perf et la couverture totale (un agent ne peut pas l'eviter).
 
 ### A.2 Hook inline -- un shim dans le process de l'agent
 
 Un hook inline vit **dans le process applicatif de l'agent**, pas dans le noyau. L'agent
-appelle un outil ; l'appel passe d'abord par le shim RailNode, qui voit l'appel
+appelle un outil ; l'appel passe d'abord par le shim de la sonde discovery, qui voit l'appel
 **structure** (action, ressource, payload) avant toute execution.
 
 Variantes (diagramme AgentRail) :
@@ -426,7 +426,7 @@ Variantes (diagramme AgentRail) :
 
 ```
 agent.appelle_outil("github.merge_pr", {repo, number})
-   -> shim RailNode intercepte AVANT execution
+   -> shim de la sonde discovery intercepte AVANT execution
    -> voit l'appel STRUCTURE (action_type, resource, payload)
    -> decision -> laisse passer / bloque
 ```
@@ -442,7 +442,7 @@ agent.appelle_outil("github.merge_pr", {repo, number})
 | **Cooperation agent** | aucune | oui (l'agent charge le shim) |
 | **Couverture** | universelle (tout process) | par framework (un shim par SDK) |
 
-RailNode a **les deux** parce qu'ils sont complementaires : le hook donne l'intention
+La sonde discovery a **les deux** parce qu'ils sont complementaires : le hook donne l'intention
 claire mais contournable ; l'eBPF est incontournable mais semantiquement pauvre.
 
 ### A.4 Le combo = detection du ghost agent
@@ -473,5 +473,5 @@ conteneurs*, pas le **noyau** vis-a-vis d'un observateur privilegie de l'hote.
 Cote banc :
 - **surface eBPF** : l'agent simule (dockerise ou non) emet un vrai syscall reseau
   observable (vrai `connect`/HTTP). L'overlay mitmproxy fournit deja cette vue reseau.
-- **surface hook** : l'agent simule charge le shim RailNode -> il tourne en natif.
+- **surface hook** : l'agent simule charge le shim de la sonde discovery -> il tourne en natif.
 

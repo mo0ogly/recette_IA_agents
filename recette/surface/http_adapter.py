@@ -1,10 +1,10 @@
-"""Live SurfaceDiscoveryAdapter for a real RailNode detection endpoint (HTTP).
+"""Live SurfaceDiscoveryAdapter for a real discovery probe detection endpoint (HTTP).
 
-Wires the per-surface detection recette to a real RailNode. The harness depends
+Wires the per-surface detection recette to a real discovery probe. The harness depends
 only on the ``SurfaceDiscoveryAdapter`` protocol (``recette/surface/detect.py``);
 this is the HTTP implementation, mirroring ``recette/http_adapter.py`` (which
 wires the ``SourceScanAdapter``). The route and the response JSON shape are
-ASSUMED here pending the RailNode detection API; every assumption is isolated in
+ASSUMED here pending the discovery probe detection API; every assumption is isolated in
 this one module so a change is a one-file edit.
 
 - httpx is imported lazily; the package works without it (the reference adapter
@@ -22,7 +22,7 @@ from recette.adapters import DiscoveryResult
 
 from .surfaces import SurfaceObservation
 
-# Assumed RailNode detection route -- confirm against the RailNode API.
+# Assumed discovery probe detection route -- confirm against the discovery probe API.
 ROUTE_DETECT = "/v1/detect"
 
 
@@ -38,10 +38,10 @@ def _unwrap(payload: Any) -> Any:
 
 
 class HttpSurfaceDiscoveryAdapter:
-    """Talks to a RailNode detection endpoint (default http://127.0.0.1:8085).
+    """Talks to a discovery probe detection endpoint (default http://127.0.0.1:8085).
 
     ``detect_on`` POSTs one surface observation and reads back the detection
-    verdict for that surface. A real RailNode answers ``{detected: bool, signals:
+    verdict for that surface. A real discovery probe answers ``{detected: bool, signals:
     [...]}`` (optionally inside a ``{success, data}`` envelope).
     """
 

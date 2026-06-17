@@ -41,6 +41,21 @@ describe("PageHelp", () => {
     expect(screen.getAllByTestId("help-mermaid").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("renders the probe and observability topics (the discovery + traces pages)", () => {
+    const { unmount } = render(<PageHelp topic="probe" />);
+    fireEvent.click(screen.getByRole("button", { name: /aide/i }));
+    expect(screen.getByText(HELP_TOPICS.probe.title)).toBeTruthy();
+    expect(screen.getByText(HELP_TOPICS.probe.summary)).toBeTruthy();
+    // The discovery probe term replaced the legacy "RailNode" wording.
+    expect(screen.getAllByText(/sonde discovery/).length).toBeGreaterThan(0);
+    unmount();
+
+    render(<PageHelp topic="observability" />);
+    fireEvent.click(screen.getByRole("button", { name: /aide/i }));
+    expect(screen.getByText(HELP_TOPICS.observability.title)).toBeTruthy();
+    expect(screen.getByText(HELP_TOPICS.observability.summary)).toBeTruthy();
+  });
+
   it("closes on backdrop click", () => {
     render(<PageHelp topic="catalog" />);
     fireEvent.click(screen.getByRole("button", { name: /aide/i }));

@@ -9,7 +9,7 @@
 //!   unit-tested without privilege.
 //!
 //! The recording is the bridge contract consumed by `recette/surface/` (Python):
-//! the probe proves RailNode SEES a simulated agent on the eBPF-wire surface,
+//! the probe proves the discovery probe sees a simulated agent on the eBPF-wire surface,
 //! even inside a Docker container.
 
 pub mod mapping;

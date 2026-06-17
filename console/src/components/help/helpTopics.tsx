@@ -55,7 +55,9 @@ export type HelpTopicKey =
   | "approvals"
   | "audit"
   | "live"
-  | "proxy";
+  | "proxy"
+  | "probe"
+  | "observability";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1425,6 +1427,64 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Regle fail-safe : un agent qui reference un serveur supprime ou un
           mode non supporte voit son run <strong>echouer</strong>. Executer des
           effets de bord contre le mauvais systeme violerait I5.
+        </p>
+      </>
+    ),
+  },
+  probe: {
+    title: "Aide — Probe (Reperage)",
+    summary:
+      "Capture eBPF bornee : prouve ce que la sonde discovery VOIT d'un agent simule, surface par surface. Un agent vu nulle part = echec de la these.",
+    body: (
+      <>
+        <p>
+          Cette page declenche une <strong>capture eBPF bornee</strong> via le
+          broker non privilegie (<code>POST /probe/capture</code>, CAP_BPF cote
+          broker) puis montre, <strong>par agent et par surface
+          d&apos;observation</strong>, ce que <strong>la sonde discovery</strong> a
+          vu. La these : <em>si l&apos;outil ne voit pas les agents, c&apos;est un
+          echec</em>. Lecture seule au-dela du declencheur de capture ; le juge
+          est <strong>deterministe</strong> (I4).
+        </p>
+        <h3>Les surfaces d&apos;observation</h3>
+        <p>
+          Un agent est cherche sur quatre surfaces (<code>hook_subprocess</code>,
+          <code>hook_mcp</code>, <code>hook_sdk</code>, <code>ebpf_wire</code>).
+          Un agent <strong>vu sur aucune surface</strong> est un faux negatif
+          rendu en <strong>rouge</strong> : c&apos;est l&apos;echec de detection
+          que la recette doit rendre visible, jamais masquer.
+        </p>
+        <h3>Broker non lance</h3>
+        <p>
+          Si le broker de capture n&apos;est pas demarre (variable{" "}
+          <code>INSPECT_IA_AGENTS_PROBE_SOCKET</code>), la page l&apos;indique et la
+          capture reste indisponible — elle ne plante pas (fail-safe).
+        </p>
+      </>
+    ),
+  },
+  observability: {
+    title: "Aide — Observabilite (traces)",
+    summary:
+      "Vue arborescente des spans d'un run persiste : une trace par enregistrement, un span par action. Projection lecture seule du log d'audit (I1), deterministe (I4).",
+    body: (
+      <>
+        <p>
+          Cette page liste les <strong>traces</strong> (une par run enregistre)
+          et, a la selection, rend le run comme une <strong>hierarchie de
+          spans</strong> : un span racine pour l&apos;invocation de l&apos;agent,
+          puis un span par action (outil) avec sa duree logique. C&apos;est une{" "}
+          <strong>projection lecture seule</strong> des enregistrements d&apos;audit
+          (I1), rendue de maniere <strong>deterministe</strong> par le backend
+          (I4).
+        </p>
+        <h3>Ou est la requete/reponse ?</h3>
+        <p>
+          L&apos;<strong>echange</strong> requete/reponse de chaque outil vit dans
+          le <strong>log reseau du cockpit</strong> (onglet Agents), correle par
+          l&apos;<code>event_id</code> de l&apos;action. La trace montre le{" "}
+          <strong>squelette d&apos;execution</strong> (qui a appele quoi, dans quel
+          ordre, combien de temps), le cockpit montre le contenu de l&apos;echange.
         </p>
       </>
     ),

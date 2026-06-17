@@ -1,15 +1,15 @@
-# Surface-detection recette -- does RailNode SEE the agent?
+# Surface-detection recette -- does the discovery probe SEE the agent?
 
 > The recette (acceptance testing) that proves the thesis: **if the tool does not
 > see the agents, it is a failure**. It scores, per observation surface, whether a
-> discovery tool (RailNode) detects a simulated agent. An agent detected on NO
+> discovery tool (the discovery probe) detects a simulated agent. An agent detected on NO
 > surface turns the scorecard RED. Founding design:
 > `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
 > Implementation plan: `docs/plans/2026-06-16-railnode-surface-detection.md`.
 
 ## The four surfaces
 
-RailNode observes an agent through several interception surfaces (AgentRail RFC):
+The discovery probe observes an agent through several interception surfaces (AgentRail RFC):
 
 - `hook_subprocess`, `hook_mcp`, `hook_sdk` -- the inline **hook** family: a shim
   in the agent process sees the structured tool-call (the bench's `ProxyTrace`
@@ -58,7 +58,7 @@ at least one surface. Example output (2 subjects):
 nowhere (the thesis failure); a non-empty list exits 1.
 
 This gate runs inside `make recette` (it is a dep of the `recette` target): a
-simulated agent that RailNode would see on NO surface turns the whole recette
+simulated agent that the discovery probe would see on NO surface turns the whole recette
 RED, in CI, automatically -- never something to catch by hand.
 
 ## The red gate -- the `vanished` negative subject
@@ -74,17 +74,17 @@ separately by `load_surface_negatives()` and exercised by
 (`ok == false`, `false_negatives == ("vanished",)`). This proves the thesis gate
 fires from a committed corpus subject, not just a unit-test literal.
 
-## Wiring the real RailNode
+## Wiring the real discovery probe
 
 The reference oracle (`ReferenceSurfaceDiscoveryAdapter`) is the template. A real
-RailNode plugs in by implementing the `SurfaceDiscoveryAdapter` protocol
+discovery probe plugs in by implementing the `SurfaceDiscoveryAdapter` protocol
 (`recette/surface/detect.py`) -- given a `SurfaceObservation`, return a
 `DiscoveryResult`.
 
 `recette/surface/http_adapter.py::HttpSurfaceDiscoveryAdapter` is the ready HTTP
 implementation (mirrors `recette/http_adapter.py`): it POSTs each observation
-(`{surface, visible}`) to the RailNode detection route (`/v1/detect`, ASSUMED
-pending the RailNode API), unwraps a `{success, data}` envelope, and returns a
+(`{surface, visible}`) to the discovery probe detection route (`/v1/detect`, ASSUMED
+pending the discovery probe API), unwraps a `{success, data}` envelope, and returns a
 `DiscoveryResult`. Config (R5/R8): base URL from `INSPECT_IA_AGENTS_RAILNODE_URL`
 (default `http://127.0.0.1:8085`), bearer token from `INSPECT_IA_AGENTS_RAILNODE_TOKEN`,
 tenant from `INSPECT_IA_AGENTS_TENANT`. httpx is imported lazily with a

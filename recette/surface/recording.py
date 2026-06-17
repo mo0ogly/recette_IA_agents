@@ -101,7 +101,7 @@ def score_recording(
 ) -> DetectionScorecard:
     """Score a broker capture recording (JSON) into a detection scorecard.
 
-    ``adapter`` defaults to the reference oracle; a real RailNode build plugs in
+    ``adapter`` defaults to the reference oracle; a real discovery probe build plugs in
     via the same :class:`SurfaceDiscoveryAdapter` protocol, so this is also the
     conformance seam (reference probe vs team tool on the same recording).
     """

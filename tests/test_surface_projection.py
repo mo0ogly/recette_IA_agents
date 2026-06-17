@@ -1,5 +1,5 @@
 """Surface projection: map a run's hook (ProxyTrace) + wire (WireFlow) views onto
-RailNode observation surfaces. Pure, deterministic (I4)."""
+the discovery probe observation surfaces. Pure, deterministic (I4)."""
 
 from __future__ import annotations
 

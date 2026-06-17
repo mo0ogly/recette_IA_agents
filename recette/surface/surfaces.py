@@ -1,4 +1,4 @@
-"""Project one run's two views onto RailNode's observation surfaces (pure, I4).
+"""Project one run's two views onto the discovery probe's observation surfaces (pure, I4).
 
 A run yields two deterministic views (founding doc 2026-06-16, sec. 5):
 - the HOOK view = the mediated/structured calls (``ProxyTrace`` dicts): what an
@@ -19,7 +19,7 @@ from enum import StrEnum
 
 
 class ObservationSurface(StrEnum):
-    """The surfaces RailNode can observe an agent on (AgentRail RFC + diagram)."""
+    """The surfaces the discovery probe can observe an agent on (AgentRail RFC + diagram)."""
 
     HOOK_SUBPROCESS = "hook_subprocess"
     HOOK_MCP = "hook_mcp"

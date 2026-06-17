@@ -1,4 +1,4 @@
-"""HttpSurfaceDiscoveryAdapter: parses a real RailNode detection response and
+"""HttpSurfaceDiscoveryAdapter: parses a real discovery probe detection response and
 unwraps the {success, data} envelope. Driven by an injected stub client (no
 network), like the recette's other HTTP-adapter tests."""
 

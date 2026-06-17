@@ -1,10 +1,10 @@
-# RailNode Surface Detection Recette -- Implementation Plan
+# Discovery Probe Surface Detection Recette -- Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Prove, deterministically and per observation surface, that a discovery tool (RailNode) SEES a simulated agent -- and make "seen on no surface" a red test.
+**Goal:** Prove, deterministically and per observation surface, that a discovery tool (the discovery probe) SEES a simulated agent -- and make "seen on no surface" a red test.
 
-**Architecture:** A pure surface-projection maps one simulated run (its `ProxyTrace` hook view + its `WireFlow` network view) onto RailNode's observation surfaces (subprocess/MCP/SDK = hook family; eBPF/wire = network family). A `SurfaceDiscoveryAdapter` protocol is the seam where the real RailNode plugs in; a reference adapter is the correct offline oracle. A detection scorecard reports detection rate per surface and flags any agent detected on NO surface (the thesis failure). The ghost agent (native egress, bypasses the SDK) is the keystone subject: invisible on the hook surface, visible on the wire surface.
+**Architecture:** A pure surface-projection maps one simulated run (its `ProxyTrace` hook view + its `WireFlow` network view) onto the discovery probe's observation surfaces (subprocess/MCP/SDK = hook family; eBPF/wire = network family). A `SurfaceDiscoveryAdapter` protocol is the seam where the real discovery probe plugs in; a reference adapter is the correct offline oracle. A detection scorecard reports detection rate per surface and flags any agent detected on NO surface (the thesis failure). The ghost agent (native egress, bypasses the SDK) is the keystone subject: invisible on the hook surface, visible on the wire surface.
 
 **Tech Stack:** Python stdlib (`unittest`, `dataclasses`, `enum`); zero new dependency. Reuses `recette/platform/proxy/tracing.py::ProxyTrace`, `recette/platform/proxy/wire.py::WireFlow`, the `DiscoveryResult` shape from `recette/adapters.py`. Gates: `.venv/bin/python -m unittest discover -s tests`, `make recette`, `.venv-pyaudit/bin/ruff check` + `mypy`.
 
@@ -22,7 +22,7 @@
   - `ProxyTrace` (`recette/platform/proxy/tracing.py:45`) -- the in-app mediated side effect: `action_type`, `resource`, `target`, `ok`, ... This is the **hook** view (the structured call the agent made through the SDK/MCP/subprocess shim).
   - `WireFlow` (`recette/platform/proxy/wire.py:71`) -- one intercepted request/response at the network level: `method`, `host`, `port`, `path`, `status_code`, ... This is the **eBPF/wire** view (the bytes a syscall/eBPF probe sees).
 - **The ghost agent** (founding doc Annexe A.4): an agent that talks straight to a DB/disk in native code bypasses the SDK, so it produces a `WireFlow` but NO `ProxyTrace`. The same wire-vs-audit duality powers `recette/platform/proxy/reconcile.py::reconcile_run`. Detection must therefore be PER SURFACE: the hook surface misses the ghost, the wire surface catches it.
-- **The seam** mirrors `recette/adapters.py`: a `Protocol` + a `Reference*` correct oracle. The real RailNode is wired later by implementing the protocol (like `recette/http_adapter.py` does for `SourceScanAdapter`). We build the oracle now.
+- **The seam** mirrors `recette/adapters.py`: a `Protocol` + a `Reference*` correct oracle. The real discovery probe is wired later by implementing the protocol (like `recette/http_adapter.py` does for `SourceScanAdapter`). We build the oracle now.
 - **Determinism (I4):** projection and detection are pure functions of their inputs -- no clock, no random, stable (sorted) ordering. A replay test asserts a byte-stable scorecard.
 - **New package:** everything lands under a new `recette/surface/` subpackage so it is cohesive and does not bloat `adapters.py`.
 
@@ -40,7 +40,7 @@
 ```python
 # tests/test_surface_projection.py
 """Surface projection: map a run's hook (ProxyTrace) + wire (WireFlow) views onto
-RailNode observation surfaces. Pure, deterministic (I4)."""
+the discovery probe observation surfaces. Pure, deterministic (I4)."""
 from __future__ import annotations
 
 import unittest
@@ -108,12 +108,12 @@ Expected: FAIL (`ModuleNotFoundError: recette.surface`).
 
 ```python
 # recette/surface/__init__.py
-"""Per-surface discovery recette: does RailNode SEE the agent on each surface?"""
+"""Per-surface discovery recette: does the discovery probe SEE the agent on each surface?"""
 ```
 
 ```python
 # recette/surface/surfaces.py
-"""Project one run's two views onto RailNode's observation surfaces (pure, I4).
+"""Project one run's two views onto the discovery probe's observation surfaces (pure, I4).
 
 A run yields two deterministic views (founding doc 2026-06-16, sec. 5):
 - the HOOK view = the mediated/structured calls (``ProxyTrace`` dicts): what an
@@ -133,7 +133,7 @@ from enum import Enum
 
 
 class ObservationSurface(str, Enum):
-    """The surfaces RailNode can observe an agent on (AgentRail RFC + diagram)."""
+    """The surfaces the discovery probe can observe an agent on (AgentRail RFC + diagram)."""
 
     HOOK_SUBPROCESS = "hook_subprocess"
     HOOK_MCP = "hook_mcp"
@@ -191,7 +191,7 @@ Expected: PASS (4 tests).
 
 ```bash
 git add recette/surface/__init__.py recette/surface/surfaces.py tests/test_surface_projection.py
-git commit -m "feat(surface): project run views onto RailNode observation surfaces (pure, I4)"
+git commit -m "feat(surface): project run views onto the discovery probe observation surfaces (pure, I4)"
 ```
 
 ---
@@ -284,7 +284,7 @@ Expected: FAIL (`ModuleNotFoundError`).
 # recette/surface/detect.py
 """Per-surface discovery seam + reference oracle.
 
-``SurfaceDiscoveryAdapter`` is the protocol a real discovery tool (RailNode)
+``SurfaceDiscoveryAdapter`` is the protocol a real discovery tool (the discovery probe)
 implements -- given what is visible on one surface, does it detect an agent?
 ``ReferenceSurfaceDiscoveryAdapter`` is the correct offline oracle (detected iff
 anything is visible). ``detect_agent`` runs every surface and aggregates: an
@@ -794,7 +794,7 @@ def _cmd_surface() -> int:
 ```
 
 Wire it where the other subparsers are declared (mirror the `discovery` subparser): add
-`sub.add_parser("surface", help="per-surface detection recette (RailNode visibility)")`
+`sub.add_parser("surface", help="per-surface detection recette (discovery probe visibility)")`
 and in the dispatch block add `if args.command == "surface": return _cmd_surface()`.
 
 **Step 4: Run test + the command**
@@ -808,7 +808,7 @@ Expected: prints the scorecard JSON (`"ok": true`, `"total_agents": 2`), exit 0.
 
 Create `docs/runbooks/surface-detection-recette.md` summarizing: the thesis (sec. 0 of
 the design), the 4 surfaces, the two views (ProxyTrace/WireFlow), the ghost keystone, how
-to run (`python -m recette surface`), and how a real RailNode plugs in (implement
+to run (`python -m recette surface`), and how a real discovery probe plugs in (implement
 `SurfaceDiscoveryAdapter`, like `http_adapter.py` does for `SourceScanAdapter`).
 
 ```bash
@@ -865,7 +865,7 @@ Expected: clean fast-forward.
   (Task 6), all gates green (Task 7).
 - The thesis is now a test: an agent detected on NO surface turns the scorecard RED.
 - The ghost agent proves per-surface coverage matters: hook-blind, wire-detected.
-- The real RailNode plugs in by implementing `SurfaceDiscoveryAdapter` -- the reference
+- The real discovery probe plugs in by implementing `SurfaceDiscoveryAdapter` -- the reference
   oracle is the template (mirrors `recette/adapters.py` + `recette/http_adapter.py`).
 - No new dependency; everything stdlib + deterministic (I4); mono-axis subjects.
 
@@ -875,6 +875,6 @@ Expected: clean fast-forward.
   views deterministically; live wiring is the smoke's job, a later task).
 - Re-judging the 4 identification dimensions here (that lives in `recette/harness.py`;
   this plan is about DETECTION -- being seen -- not identification correctness).
-- A real RailNode HTTP/gRPC adapter implementation (the seam is defined; wiring the actual
+- A real discovery probe HTTP/gRPC adapter implementation (the seam is defined; wiring the actual
   Rust tool is a follow-up once its invocation interface is known).
 ```

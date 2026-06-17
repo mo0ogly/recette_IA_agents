@@ -1,6 +1,6 @@
 """Per-surface discovery seam + reference oracle.
 
-``SurfaceDiscoveryAdapter`` is the protocol a real discovery tool (RailNode)
+``SurfaceDiscoveryAdapter`` is the protocol a real discovery tool (the discovery probe)
 implements -- given what is visible on one surface, does it detect an agent?
 ``ReferenceSurfaceDiscoveryAdapter`` is the correct offline oracle (detected iff
 anything is visible). ``detect_agent`` runs every surface and aggregates: an

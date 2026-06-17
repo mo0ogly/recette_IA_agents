@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-/// The surfaces RailNode can observe an agent on. The serialised names match
+/// The surfaces the discovery probe can observe an agent on. The serialised names match
 /// `recette/surface/surfaces.py::ObservationSurface` exactly (the bridge).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

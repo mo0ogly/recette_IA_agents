@@ -1,15 +1,15 @@
-# Recette de detection de surface -- RailNode VOIT-il l'agent ?
+# Recette de detection de surface -- la sonde discovery VOIT-elle l'agent ?
 
 > La recette qui prouve la these : **si l'outil ne voit pas les agents, c'est
 > un echec**. Elle evalue, surface d'observation par surface d'observation, si un
-> outil de discovery (RailNode) detecte un agent simule. Un agent detecte sur
+> outil de discovery (la sonde discovery) detecte un agent simule. Un agent detecte sur
 > AUCUNE surface fait passer la scorecard au ROUGE. Conception fondatrice :
 > `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
 > Plan d'implementation : `docs/plans/2026-06-16-railnode-surface-detection.md`.
 
 ## Les quatre surfaces
 
-RailNode observe un agent a travers plusieurs surfaces d'interception (RFC AgentRail) :
+La sonde discovery observe un agent a travers plusieurs surfaces d'interception (RFC AgentRail) :
 
 - `hook_subprocess`, `hook_mcp`, `hook_sdk` -- la famille **hook** inline : un shim
   dans le processus de l'agent voit le tool-call structure (la vue `ProxyTrace` du
@@ -59,7 +59,7 @@ conforme (1/2) -- le ghost est l'angle mort des hooks. `false_negatives` liste t
 agent vu nulle part (l'echec de la these) ; une liste non vide sort avec le code 1.
 
 Ce gate tourne a l'interieur de `make recette` (c'est une dependance de la cible
-`recette`) : un agent simule que RailNode ne verrait sur AUCUNE surface fait passer
+`recette`) : un agent simule que la sonde discovery ne verrait sur AUCUNE surface fait passer
 toute la recette au ROUGE, en CI, automatiquement -- jamais quelque chose a
 attraper a la main.
 
@@ -77,17 +77,17 @@ charge separement par `load_surface_negatives()` et exerce par
 these se declenche depuis un sujet de corpus committe, pas seulement depuis un
 literal de test unitaire.
 
-## Brancher le vrai RailNode
+## Brancher la vraie sonde discovery
 
-L'oracle de reference (`ReferenceSurfaceDiscoveryAdapter`) est le gabarit. Un vrai
-RailNode se branche en implementant le protocol `SurfaceDiscoveryAdapter`
+L'oracle de reference (`ReferenceSurfaceDiscoveryAdapter`) est le gabarit. Une vraie
+sonde discovery se branche en implementant le protocol `SurfaceDiscoveryAdapter`
 (`recette/surface/detect.py`) -- a partir d'une `SurfaceObservation`, renvoyer un
 `DiscoveryResult`.
 
 `recette/surface/http_adapter.py::HttpSurfaceDiscoveryAdapter` est l'implementation
 HTTP prete a l'emploi (calquee sur `recette/http_adapter.py`) : elle envoie en POST
-chaque observation (`{surface, visible}`) vers la route de detection de RailNode
-(`/v1/detect`, SUPPOSEE en attendant l'API RailNode), deballe une enveloppe
+chaque observation (`{surface, visible}`) vers la route de detection de la sonde discovery
+(`/v1/detect`, SUPPOSEE en attendant l'API de la sonde discovery), deballe une enveloppe
 `{success, data}`, et renvoie un `DiscoveryResult`. Config (R5/R8) : URL de base
 depuis `INSPECT_IA_AGENTS_RAILNODE_URL` (defaut `http://127.0.0.1:8085`), bearer
 token depuis `INSPECT_IA_AGENTS_RAILNODE_TOKEN`, tenant depuis

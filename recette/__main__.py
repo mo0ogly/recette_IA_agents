@@ -300,7 +300,7 @@ def _cmd_discovery(adapter_name: str, surface: str) -> int:
 def _cmd_surface(recording: str | None = None) -> int:
     """Run the per-surface detection recette, print the scorecard.
 
-    Proves RailNode SEES each simulated agent on each observation surface
+    Proves the discovery probe SEES each simulated agent on each observation surface
     (subprocess/MCP/SDK hooks + eBPF/wire). With ``--recording`` it scores a
     discoveryprobe broker capture (a live eBPF capture frozen to JSON) through the
     SAME judge; without it, the in-bench corpus projection. Exit 1 if any agent is
@@ -817,7 +817,7 @@ def build_parser() -> argparse.ArgumentParser:
     ragkb.add_argument("--scenario", default=None, help="scenario name (for apply)")
     surface_parser = sub.add_parser(
         "surface",
-        help="per-surface detection recette (does RailNode SEE each agent?)",
+        help="per-surface detection recette (does the discovery probe SEE each agent?)",
     )
     surface_parser.add_argument(
         "--recording",

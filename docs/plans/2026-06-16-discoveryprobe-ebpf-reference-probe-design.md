@@ -42,7 +42,7 @@ HORS scope (decide) :
   `recette/http_adapter.py`). `discoveryprobe` ne les double pas.
 - L'**enforcement** (blocage/kill inline) : le banc OBSERVE, il ne bloque pas. Le
   hard-block reste la plateforme AgentRail.
-- Le **vrai RailNode prod** : `discoveryprobe` est la sonde de REFERENCE du banc, pas le
+- La **vraie sonde discovery prod** : `discoveryprobe` est la sonde de REFERENCE du banc, pas le
   produit. Le produit se branche via le contrat.
 
 ## 2. Decision de langage : Rust
@@ -50,7 +50,7 @@ HORS scope (decide) :
 Fait acte en brainstorm : la sonde OBSERVE et RAPPORTE, elle n'est pas dans un chemin
 de DECISION -> la **milliseconde n'est pas un critere** ici (le ms ne compte que pour
 le chemin chaud d'enforcement en prod). Rust est neanmoins choisi pour :
-- **mirrorer l'artefact prod** (RailNode Data Plane est en Rust) ;
+- **mirrorer l'artefact prod** (la sonde discovery Data Plane est en Rust) ;
 - **vrai eBPF** via `aya` (eBPF pur-Rust, pas de C/bcc) ;
 - un **binaire statique unique** que l'equipe peut lancer.
 

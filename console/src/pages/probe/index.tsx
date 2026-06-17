@@ -3,7 +3,7 @@
  *
  * Launches a bounded eBPF capture through the non-privileged API
  * (POST /probe/capture -> broker, CAP_BPF), then shows -- per agent and per
- * observation surface -- what RailNode SAW. An agent seen on no surface is a
+ * observation surface -- what the discovery probe SAW. An agent seen on no surface is a
  * false negative rendered in prominent red: the thesis failure ("si l'outil ne
  * voit pas les agents, c'est un echec"). Read-only beyond the capture trigger;
  * the judge is deterministic (I4).
@@ -13,9 +13,10 @@ import { useEffect, useMemo, useState } from "react";
 import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
 import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
 import LlmTracePanel from "./LlmTracePanel";
+import PageHelp from "../../components/help/PageHelp";
 import "./probe.css";
 
-/** The four observation surfaces, in the order RailNode is reasoned about. */
+/** The four observation surfaces, in the order the discovery probe is reasoned about. */
 const SURFACE_ORDER = ["hook_subprocess", "hook_mcp", "hook_sdk", "ebpf_wire"] as const;
 const SURFACE_LABEL: Record<string, string> = {
   hook_subprocess: "hook subprocess",
@@ -121,11 +122,14 @@ export default function ProbePage(): JSX.Element {
 
   return (
     <section className="probe-page">
-      <h1>Probe eBPF</h1>
+      <div className="page-head">
+        <h1>Probe eBPF</h1>
+        <PageHelp topic="probe" />
+      </div>
       <p className="probe-note">
         Capture bornee via la sonde de reference (eBPF, CAP_BPF cote broker). Prouve
-        ce que RailNode VOIT d&apos;un agent simule, surface par surface -- meme dans
-        un conteneur (un seul kernel). Un agent vu nulle part est un echec de la
+        ce que la sonde discovery VOIT d&apos;un agent simule, surface par surface -- meme
+        dans un conteneur (un seul kernel). Un agent vu nulle part est un echec de la
         these.
       </p>
 
