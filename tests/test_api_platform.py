@@ -183,10 +183,13 @@ class TestPlatformApi(unittest.TestCase):
     def test_audit_chain_and_verify(self) -> None:
         self._execute("agent-admin", "list_users")
         self._execute("agent-bot", "suspend_user")
+        # Escalate path: suspend_user for identity_admin produces action_requested (I6).
+        self._execute("agent-admin", "suspend_user")
         events = self.client.get("/audit/events").json()["events"]
         kinds = [e["kind"] for e in events]
         self.assertIn("action_executed", kinds)
         self.assertIn("action_denied", kinds)
+        self.assertIn("action_requested", kinds)
         filtered = self.client.get("/audit/events", params={"kind": "action_denied"}).json()
         self.assertEqual([e["kind"] for e in filtered["events"]], ["action_denied"])
         report = self.client.get("/audit/verify").json()

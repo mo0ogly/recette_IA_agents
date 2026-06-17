@@ -100,6 +100,34 @@ class TestInstantiate(unittest.TestCase):
         self.assertEqual(campaign["steps"], [{"agent_id": f"{template['id']}-agent"}])
         self.assertIsNotNone(self.campaign_store.get(template["id"]))
 
+    def test_instantiate_missing_id_raises_key_error(self) -> None:
+        # A template dict without the required "id" key must raise KeyError
+        # immediately -- instantiate builds agent_id from template["id"] and
+        # campaign["id"] from template["id"], so a missing key is caught early.
+        bad_template = {
+            "principal": "x@acme",
+            "target_system": "okta",
+            "goal": "test",
+            "actions": ["suspend_user"],
+            "title": "bad",
+            "profile": "legit",
+        }
+        with self.assertRaises(KeyError):
+            instantiate(bad_template, self.config_store, self.campaign_store)
+
+    def test_instantiate_missing_principal_raises_key_error(self) -> None:
+        # A template without "principal" raises KeyError when building the agent dict.
+        bad_template = {
+            "id": "missing-principal",
+            "target_system": "okta",
+            "goal": "test",
+            "actions": ["suspend_user"],
+            "title": "bad",
+            "profile": "legit",
+        }
+        with self.assertRaises(KeyError):
+            instantiate(bad_template, self.config_store, self.campaign_store)
+
     def test_instantiate_is_idempotent(self) -> None:
         template = TEMPLATES[0]
         instantiate(template, self.config_store, self.campaign_store)
