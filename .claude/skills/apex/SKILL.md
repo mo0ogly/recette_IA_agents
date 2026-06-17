@@ -224,14 +224,6 @@ SUBTASK {N}/{total}
 
 ### 2d. Adversarial Critique
 
-**Konrad-Kurze pre-load (BEFORE the critique agent fires).**
-Check for a recent (< 24h) meta-cognitive directive that targets Malcador or both:
-```bash
-ls -t docs/tracking/directives/KD-*.json 2>/dev/null | head -1
-```
-If a directive exists with `primary_target` in {Malcador, both}, `injection.operation = ADD`, AND `risk_level = LOW`: include its `injection.payload` and `expected_impact` in the critique agent's input prompt. If it has `requires_approval: true` and is not yet APPROVED: surface it in the plan as "Pending Konrad directive" but do NOT auto-apply.
-If APEX has REPLANned >= 2 times on the same subtask in this session, INVOKE `/konrad-kurze` via the Skill tool (model: **sonnet**) BEFORE 2d, with scope = current WAVE id. The directive that comes back feeds into 2d.
-
 Launch an agent Plan (sonnet) to critique the plan BEFORE execution:
 
 ```
