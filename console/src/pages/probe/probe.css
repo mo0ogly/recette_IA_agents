@@ -347,3 +347,28 @@
   border-top: 1px solid var(--color-border);
   padding-top: 1.25rem;
 }
+
+.probe-button-live {
+  background-color: var(--color-danger, #b3261e);
+  color: #fff;
+}
+
+.probe-button-ghost {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+}
+
+.probe-raw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.probe-raw {
+  margin-top: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}

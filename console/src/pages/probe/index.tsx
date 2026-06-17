@@ -9,12 +9,16 @@
  * the judge is deterministic (I4).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
 import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
 import LlmTracePanel from "./LlmTracePanel";
 import PageHelp from "../../components/help/PageHelp";
 import "./probe.css";
+
+// Lazy so the monaco-editor payload stays out of the base bundle (same posture
+// as FluxAnalyzer). The viewer renders the raw recording JSON the probe returned.
+const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
 
 /** The four observation surfaces, in the order the discovery probe is reasoned about. */
 const SURFACE_ORDER = ["hook_subprocess", "hook_mcp", "hook_sdk", "ebpf_wire"] as const;
@@ -26,6 +30,9 @@ const SURFACE_LABEL: Record<string, string> = {
 };
 
 const DEFAULT_AGENTS = "pr-bot-sdk, ghost-direct-db";
+
+/** Pause between successive live capture windows (ms). */
+const LIVE_GAP_MS = 250;
 
 function parseAgents(raw: string): string[] {
   return raw
@@ -85,6 +92,10 @@ export default function ProbePage(): JSX.Element {
   const [capturing, setCapturing] = useState(false);
   const [runId, setRunId] = useState("");
   const [traces, setTraces] = useState<LlmTrace[] | null>(null);
+  // Live mode: repeat bounded captures, streaming each window into the view.
+  const [live, setLive] = useState(false);
+  const [windowCount, setWindowCount] = useState(0);
+  const [showRaw, setShowRaw] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -118,6 +129,49 @@ export default function ProbePage(): JSX.Element {
         setCapturing(false);
       });
   }
+
+  // LIVE mode: the broker is batch (one bounded capture per request), so "live"
+  // here means SUCCESSIVE bounded windows, each streamed into the view as it
+  // lands -- NOT a per-event eBPF stream (honest labelling, R13/R14). The loop
+  // chains one capture after the previous resolves (never overlapping) and stops
+  // on toggle-off, error, or unmount.
+  const liveRef = useRef(false);
+  useEffect(() => {
+    liveRef.current = live;
+    if (!live) {
+      return;
+    }
+    let cancelled = false;
+    async function pump(): Promise<void> {
+      while (!cancelled && liveRef.current) {
+        try {
+          const r = await captureProbe({ agents, duration_ms: durationMs });
+          if (cancelled) {
+            return;
+          }
+          setResult(r);
+          setWindowCount((n) => n + 1);
+          setError(null);
+        } catch (e) {
+          if (!cancelled) {
+            setError(e instanceof Error ? e.message : String(e));
+            setLive(false);
+          }
+          return;
+        }
+        // Small gap between windows: yields to the event loop (so Stop is
+        // responsive) and avoids a tight loop if the broker ever returns
+        // instantly. The real capture already blocks for duration_ms.
+        await new Promise((resolve) => setTimeout(resolve, LIVE_GAP_MS));
+      }
+    }
+    void pump();
+    return () => {
+      cancelled = true;
+    };
+    // agents/durationMs are read fresh each iteration; re-arm only on live toggle
+    // and the window size so a mid-run change takes effect on the next window.
+  }, [live, durationMs, agentsInput]);
 
   function loadTraces(): void {
     getLlmTraces(runId)
@@ -190,11 +244,30 @@ export default function ProbePage(): JSX.Element {
           type="button"
           className="probe-button"
           onClick={runCapture}
-          disabled={capturing || configured === false || agents.length === 0}
+          disabled={capturing || live || configured === false || agents.length === 0}
           data-testid="probe-capture-button"
         >
           {capturing ? "Capture..." : "Capturer"}
         </button>
+        <button
+          type="button"
+          className={`probe-button ${live ? "probe-button-live" : ""}`}
+          onClick={() => {
+            if (!live) {
+              setWindowCount(0);
+            }
+            setLive((on) => !on);
+          }}
+          disabled={configured === false || agents.length === 0}
+          data-testid="probe-live-button"
+        >
+          {live ? "Stop live" : "Live"}
+        </button>
+        {live && (
+          <span className="probe-chip probe-chip-ok" data-testid="probe-live-indicator">
+            live -- fenetre {windowCount} ({durationMs} ms)
+          </span>
+        )}
       </div>
 
       {error && (
@@ -230,6 +303,28 @@ export default function ProbePage(): JSX.Element {
               <AgentCard key={rec.agent_id} recording={rec} />
             ))}
           </div>
+
+          <div className="probe-raw-head">
+            <h2 className="probe-subtitle">Recording brut (ce que la sonde a vu)</h2>
+            <button
+              type="button"
+              className="probe-button probe-button-ghost"
+              onClick={() => setShowRaw((s) => !s)}
+              data-testid="probe-raw-toggle"
+            >
+              {showRaw ? "Masquer le JSON" : "Voir le JSON brut"}
+            </button>
+          </div>
+          {showRaw && (
+            <div className="probe-raw" data-testid="probe-raw">
+              <Suspense fallback={<div className="probe-note">chargement de l'editeur...</div>}>
+                <MonacoJsonViewer
+                  value={JSON.stringify(result.recording, null, 2)}
+                  height="40vh"
+                />
+              </Suspense>
+            </div>
+          )}
         </>
       )}
 

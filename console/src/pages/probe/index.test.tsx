@@ -8,6 +8,13 @@ import fixture from "./__fixtures__/probe-capture.fixture.json";
 vi.mock("../../api/client", () => ({
   getProbeStatus: vi.fn(),
   captureProbe: vi.fn(),
+  getLlmTraces: vi.fn(),
+}));
+
+// The Monaco chunk is heavy and worker-bound; stub it so the raw-JSON panel is
+// asserted by its value prop without loading the real editor in jsdom.
+vi.mock("../../components/MonacoJsonViewer", () => ({
+  default: ({ value }: { value: string }) => <pre data-testid="probe-raw-json">{value}</pre>,
 }));
 
 const CONFIGURED: ProbeStatus = {
@@ -78,5 +85,49 @@ describe("ProbePage", () => {
         "503 broker unreachable",
       ),
     );
+  });
+
+  it("streams successive windows in live mode and labels them honestly", async () => {
+    vi.mocked(getProbeStatus).mockResolvedValue(CONFIGURED);
+    vi.mocked(captureProbe).mockResolvedValue(fixture as ProbeCaptureResult);
+    render(<ProbePage />);
+
+    const liveBtn = await screen.findByTestId("probe-live-button");
+    await waitFor(() => expect(liveBtn).not.toBeDisabled());
+    fireEvent.click(liveBtn);
+
+    // The live indicator appears and is labelled as windowed, not per-event.
+    const indicator = await screen.findByTestId("probe-live-indicator");
+    expect(indicator).toHaveTextContent("live");
+    expect(indicator).toHaveTextContent("fenetre");
+    // One-shot capture is disabled while live runs (no overlapping captures).
+    expect(screen.getByTestId("probe-capture-button")).toBeDisabled();
+    // At least one window was captured.
+    await waitFor(() => expect(vi.mocked(captureProbe).mock.calls.length).toBeGreaterThan(0));
+
+    // Stopping live re-enables the one-shot capture and clears the indicator.
+    fireEvent.click(screen.getByTestId("probe-live-button"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("probe-live-indicator")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("shows the raw recording JSON on demand (Monaco panel)", async () => {
+    vi.mocked(getProbeStatus).mockResolvedValue(CONFIGURED);
+    vi.mocked(captureProbe).mockResolvedValue(fixture as ProbeCaptureResult);
+    render(<ProbePage />);
+
+    const button = await screen.findByTestId("probe-capture-button");
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+
+    const rawToggle = await screen.findByTestId("probe-raw-toggle");
+    expect(screen.queryByTestId("probe-raw-json")).not.toBeInTheDocument();
+    fireEvent.click(rawToggle);
+
+    // The raw panel renders the actual recording the probe returned.
+    const raw = await screen.findByTestId("probe-raw-json");
+    expect(raw.textContent).toContain("recordings");
+    expect(raw.textContent).toContain("ghost-direct-db");
   });
 });

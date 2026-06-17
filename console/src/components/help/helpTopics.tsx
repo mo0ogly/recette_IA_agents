@@ -1456,6 +1456,19 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           rendu en <strong>rouge</strong> : c&apos;est l&apos;echec de detection
           que la recette doit rendre visible, jamais masquer.
         </p>
+        <h3>Voir en direct + recording brut</h3>
+        <p>
+          Le bouton <strong>Live</strong> enchaine des captures bornees
+          successives et streame chaque fenetre dans la vue au fur et a mesure
+          (l&apos;indicateur <em>fenetre N</em> compte les fenetres). Honnetete
+          (R13) : le broker capture par <strong>fenetres</strong> de N ms, ce
+          n&apos;est PAS un flux <em>par-evenement</em> — chaque fenetre est une
+          capture eBPF complete, pas un event isole. Le bouton{" "}
+          <strong>Voir le JSON brut</strong> ouvre un editeur Monaco montrant le{" "}
+          <strong>recording integral</strong> retourne par la sonde (events par
+          surface, sha256), au-dela des seules cartes vu/aveugle — ce que la
+          sonde a litteralement vu.
+        </p>
         <h3>Broker non lance</h3>
         <p>
           Si le broker de capture n&apos;est pas demarre (variable{" "}
