@@ -761,9 +761,3 @@ export interface CatalogSummary {
   summary: CatalogSummaryCounts;
   agents: CatalogAgentSummary[];
 }
-
-/** The raw GET /catalog/summary envelope, before the client unwraps .data. */
-export interface CatalogSummaryEnvelope {
-  success: boolean;
-  data: CatalogSummary;
-}

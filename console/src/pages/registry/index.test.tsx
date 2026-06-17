@@ -1,10 +1,10 @@
 /**
  * R16 contract tests for the agent catalog registry page.
  *
- * The fixture (__fixtures__/catalog-summary.fixture.json) is the captured
- * GET /catalog/summary payload, envelope included. The mocked client returns
- * the UNWRAPPED .data (exactly what getCatalogSummary resolves with), so the
- * render-and-assert proves the page consumes the contract shape without crashing.
+ * The fixture (__fixtures__/catalog-summary.fixture.json) is the captured raw
+ * GET /catalog/summary payload (no envelope -- the endpoint answers raw, exactly
+ * what getCatalogSummary resolves with), so the render-and-assert proves the page
+ * consumes the live contract shape without crashing.
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -12,16 +12,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import RegistryPage from "./index";
 import { getCatalogSummary } from "../../api/client";
-import type { CatalogSummary, CatalogSummaryEnvelope } from "../../types/platform";
+import type { CatalogSummary } from "../../types/platform";
 import fixture from "./__fixtures__/catalog-summary.fixture.json";
 
 vi.mock("../../api/client", () => ({
   getCatalogSummary: vi.fn(),
 }));
 
-// The service unwraps .data; the test feeds the mock the same unwrapped shape.
-const envelope = fixture as unknown as CatalogSummaryEnvelope;
-const payload = envelope.data as CatalogSummary;
+// The endpoint answers raw; the test feeds the mock the captured raw payload.
+const payload = fixture as unknown as CatalogSummary;
 
 afterEach(() => {
   vi.clearAllMocks();

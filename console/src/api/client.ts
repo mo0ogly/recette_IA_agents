@@ -13,7 +13,6 @@ import type {
   AgentAction,
   AgentConfig,
   CatalogSummary,
-  CatalogSummaryEnvelope,
   AiBackend,
   AiProviderInfo,
   AuditEvent,
@@ -505,14 +504,12 @@ export function executeAction(req: ExecuteActionRequest): Promise<ActionOutcome>
 /**
  * GET /catalog/summary: the registry of published agents plus aggregate counts.
  *
- * Unlike the rest of the platform API, this endpoint answers with the standard
- * { success, data } envelope, so the inner CatalogSummary is unwrapped from
- * .data here -- callers receive the bare payload (R16 service-unwrap).
+ * The endpoint answers with the raw catalog object (like the other routes in
+ * this API), so callers receive the bare CatalogSummary directly -- there is no
+ * { success, data } envelope to unwrap.
  */
 export function getCatalogSummary(): Promise<CatalogSummary> {
-  return request<CatalogSummaryEnvelope>("/catalog/summary", { method: "GET" }).then(
-    (res) => res.data,
-  );
+  return request<CatalogSummary>("/catalog/summary", { method: "GET" });
 }
 
 // ---------------------------------------------------------------------------
