@@ -55,6 +55,15 @@ class ProviderModelsTest(unittest.TestCase):
         # Bare vendor names only -- the provider stays "nous", never "hermes".
         self.assertNotIn("hermes", _PROVIDERS)
 
+    def test_gemini_has_curated_models(self) -> None:
+        # Gemini is a major provider: the console must offer a model dropdown,
+        # not an empty free-text field. Ids are GA strings verified at the
+        # Gemini API models docs (R13), default = first.
+        models = provider_models("gemini")
+        self.assertTrue(models, "gemini models must not be empty")
+        self.assertEqual(models[0], "gemini-2.5-pro")
+        self.assertIn("gemini-2.5-flash", models)
+
 
 if __name__ == "__main__":
     unittest.main()

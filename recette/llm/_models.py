@@ -14,6 +14,14 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
         "claude-fable-5",
     ),
     "openai": ("gpt-4o", "gpt-4o-mini"),
+    # GA model ids verified at ai.google.dev/gemini-api/docs/models (R13);
+    # default = first. Preview-only ids are intentionally excluded.
+    "gemini": (
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash",
+    ),
     "groq": ("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
     "mistral": ("mistral-large-latest", "mistral-small-latest"),
     "deepseek": ("deepseek-chat", "deepseek-reasoner"),
