@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python stdlib (`unittest`, `dataclasses`, `enum`); zero new dependency. Reuses `recette/platform/proxy/tracing.py::ProxyTrace`, `recette/platform/proxy/wire.py::WireFlow`, the `DiscoveryResult` shape from `recette/adapters.py`. Gates: `.venv/bin/python -m unittest discover -s tests`, `make recette`, `.venv-pyaudit/bin/ruff check` + `mypy`.
 
-**Design reference:** `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md` (the founding doc; §2 surfaces, §5 the two views, §7 per-surface coverage, Annexe A eBPF/hook).
+**Design reference:** `docs/plans/2026-06-16-discovery-probe-recette-host-docker-design.md` (the founding doc; §2 surfaces, §5 the two views, §7 per-surface coverage, Annexe A eBPF/hook).
 
 **Branch policy:** Work on `main`, no branches (project rule). `git status` before each commit; stage ONLY files you create/own -- never `config/inspect_ia_agents.config.json` or any file another session is editing (R21). Commit small after each task.
 

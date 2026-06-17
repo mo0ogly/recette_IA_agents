@@ -4,8 +4,8 @@
 > see the agents, it is a failure**. It scores, per observation surface, whether a
 > discovery tool (the discovery probe) detects a simulated agent. An agent detected on NO
 > surface turns the scorecard RED. Founding design:
-> `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
-> Implementation plan: `docs/plans/2026-06-16-railnode-surface-detection.md`.
+> `docs/plans/2026-06-16-discovery-probe-recette-host-docker-design.md`.
+> Implementation plan: `docs/plans/2026-06-16-discovery-probe-surface-detection.md`.
 
 ## The four surfaces
 
@@ -85,8 +85,8 @@ discovery probe plugs in by implementing the `SurfaceDiscoveryAdapter` protocol
 implementation (mirrors `recette/http_adapter.py`): it POSTs each observation
 (`{surface, visible}`) to the discovery probe detection route (`/v1/detect`, ASSUMED
 pending the discovery probe API), unwraps a `{success, data}` envelope, and returns a
-`DiscoveryResult`. Config (R5/R8): base URL from `INSPECT_IA_AGENTS_RAILNODE_URL`
-(default `http://127.0.0.1:8085`), bearer token from `INSPECT_IA_AGENTS_RAILNODE_TOKEN`,
+`DiscoveryResult`. Config (R5/R8): base URL from `INSPECT_IA_AGENTS_PROBE_URL`
+(default `http://127.0.0.1:8085`), bearer token from `INSPECT_IA_AGENTS_PROBE_TOKEN`,
 tenant from `INSPECT_IA_AGENTS_TENANT`. httpx is imported lazily with a
 zero-dependency stdlib fallback, so the package needs no network to import.
 

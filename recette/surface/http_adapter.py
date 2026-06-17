@@ -9,7 +9,7 @@ this one module so a change is a one-file edit.
 
 - httpx is imported lazily; the package works without it (the reference adapter
   needs no network). The zero-dependency stdlib client is the fallback.
-- Base URL via ``INSPECT_IA_AGENTS_RAILNODE_URL``; token via env, never hardcoded (R8).
+- Base URL via ``INSPECT_IA_AGENTS_PROBE_URL``; token via env, never hardcoded (R8).
 - The response envelope is unwrapped explicitly (no raw passthrough).
 """
 
@@ -54,10 +54,10 @@ class HttpSurfaceDiscoveryAdapter:
         client: Any | None = None,
     ) -> None:
         self.base_url = (
-            base_url or os.environ.get("INSPECT_IA_AGENTS_RAILNODE_URL", "http://127.0.0.1:8085")
+            base_url or os.environ.get("INSPECT_IA_AGENTS_PROBE_URL", "http://127.0.0.1:8085")
         ).rstrip("/")
         self.tenant = tenant or os.environ.get("INSPECT_IA_AGENTS_TENANT", "dev")
-        self.token = token or os.environ.get("INSPECT_IA_AGENTS_RAILNODE_TOKEN")
+        self.token = token or os.environ.get("INSPECT_IA_AGENTS_PROBE_TOKEN")
         self._client = client or self._default_client()
 
     def _default_client(self) -> Any:

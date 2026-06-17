@@ -132,7 +132,7 @@ client LLM Python) -- pas un choix, une contrainte du mecanisme migre.
 
 ## 10. Liens
 
-- Surfaces fondateur : `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
+- Surfaces fondateur : `docs/plans/2026-06-16-discovery-probe-recette-host-docker-design.md`.
 - Sonde eBPF : `docs/plans/2026-06-16-discoveryprobe-ebpf-reference-probe-design.md`.
 - Regles : `recette-corpus.md` (3 formes, surfaces), `maf-standard.md` (ops vs juge),
   `determinism-replay.md` (I4), `invariants.md` (I1/I6), `recette-and-test-constraints.md` (R20).

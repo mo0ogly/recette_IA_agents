@@ -268,6 +268,6 @@ pur : un agent vu nulle part est un `false_negative` quelle que soit la source.
 
 ## Lien
 
-- Design fondateur surfaces : `docs/plans/2026-06-16-railnode-discovery-recette-host-docker-design.md`.
-- Plan surface-detection (livre) : `docs/plans/2026-06-16-railnode-surface-detection.md`.
+- Design fondateur surfaces : `docs/plans/2026-06-16-discovery-probe-recette-host-docker-design.md`.
+- Plan surface-detection (livre) : `docs/plans/2026-06-16-discovery-probe-surface-detection.md`.
 - Runbook : `docs/runbooks/surface-detection-recette.md`.

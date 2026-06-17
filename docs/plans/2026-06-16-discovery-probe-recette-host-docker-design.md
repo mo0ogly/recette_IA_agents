@@ -228,10 +228,10 @@ flowchart TB
     subgraph VPC["CLIENT VPC / TENANT (hote, natif)"]
         AGENTS["Agents simules (banc)<br/>hook natif OU dockerises (eBPF)"]
         SERVERS["Serveurs simules (banc)<br/>doubles lab :8082 / :9101-9113"]
-        RAILNODE["la sonde discovery (Rust, native)<br/>hooks + eBPF + decision LOCALE + WAL"]
+        PROBE["la sonde discovery (Rust, native)<br/>hooks + eBPF + decision LOCALE + WAL"]
         AGENTS -->|comm| SERVERS
-        AGENTS -. observe .-> RAILNODE
-        SERVERS -. observe .-> RAILNODE
+        AGENTS -. observe .-> PROBE
+        SERVERS -. observe .-> PROBE
     end
 
     subgraph CENTRAL["SERVICES CENTRAUX (conteneurs ou distant)"]
@@ -241,11 +241,11 @@ flowchart TB
         AUDIT["Audit<br/>Ledger hash-chaine PostgreSQL"]
     end
 
-    RAILNODE ==>|"gRPC/mTLS :50051<br/>(uplink: escalade, fetch bundle, heartbeat)"| RAILGUN
+    PROBE ==>|"gRPC/mTLS :50051<br/>(uplink: escalade, fetch bundle, heartbeat)"| RAILGUN
     DISCOVERY -->|"bundle signe"| RAILGUN
     RAILGUN -->|"event"| NATS
     NATS -->|"persiste"| AUDIT
-    RAILNODE -. "WAL -> rejeu a la reconnexion" .-> AUDIT
+    PROBE -. "WAL -> rejeu a la reconnexion" .-> AUDIT
 ```
 
 Deux faits qui desamorcent toute la peur "Docker" :

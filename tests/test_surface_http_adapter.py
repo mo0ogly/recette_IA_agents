@@ -65,9 +65,9 @@ class TestHttpSurfaceAdapter(unittest.TestCase):
 
     def test_base_url_defaults_and_strips_trailing_slash(self) -> None:
         adapter = HttpSurfaceDiscoveryAdapter(
-            base_url="http://railnode.local:8085/", client=object()
+            base_url="http://probe.local:8085/", client=object()
         )
-        self.assertEqual(adapter.base_url, "http://railnode.local:8085")
+        self.assertEqual(adapter.base_url, "http://probe.local:8085")
 
 
 if __name__ == "__main__":
