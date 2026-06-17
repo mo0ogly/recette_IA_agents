@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -424,6 +425,48 @@ def _verify_recording_and_replay(page: Page, console: str) -> None:
     print("[5/5] /campaigns: Replay -> completed (I4)")
 
 
+def _verify_agent_ui(page: Page, console: str) -> None:
+    # The creation WIZARD (Identite -> Cible -> ... -> Revue) composes an agent
+    # and the Revue step's executing DRY-RUN runs its mock scenario in-memory
+    # (no persistence) and shows the action log it would produce. This is the
+    # browser-to-API proof of POST /runs/dry-run wired behind the wizard.
+    page.goto(f"{console}/agents", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    # Identite step: name the agent.
+    page.get_by_role("button", name=re.compile(r"1\. Identite")).click()
+    page.get_by_label("Id", exact=True).fill("smoke-wizard-bot")
+    page.get_by_label("Principal (identity)", exact=True).fill("bot@smoke")
+    # Cible step: scope to the github catalog + a goal (dry-run needs both).
+    page.get_by_role("button", name=re.compile(r"2\. Cible")).click()
+    page.get_by_label("Target system (en face)", exact=True).select_option("github")
+    page.get_by_label("Goal", exact=True).fill("read the smoke repo")
+    # Tools step: pick one read action (composes the mock scenario).
+    page.get_by_role("button", name=re.compile(r"4\. Tools")).click()
+    page.locator("label", has_text="read_repo").get_by_role("checkbox").check()
+    # Revue step: execute the dry-run and assert the action log renders.
+    page.get_by_role("button", name=re.compile(r"7\. Revue")).click()
+    page.get_by_role("button", name=re.compile(r"Tester \(dry-run")).click()
+    result = page.get_by_test_id("agents-dryrun-result")
+    result.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect("read_repo" in result.inner_text(), "wizard dry-run shows the read_repo action")
+    _shot(page, "agent-wizard-dryrun")
+
+
+def _verify_help_modals(page: Page, console: str) -> None:
+    # Every top-level page exposes a "? Aide" modal; /probe and /observability
+    # were missing one. Assert each opens, shows its topic, and -- for /probe --
+    # uses the renamed "sonde discovery" wording with no legacy "RailNode".
+    for path, must_contain in (("/probe", "sonde discovery"), ("/observability", "trace")):
+        page.goto(f"{console}{path}", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+        page.get_by_role("button", name=re.compile(r"Aide")).first.click()
+        dialog = page.get_by_role("dialog")
+        dialog.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+        text = dialog.inner_text()
+        _expect(must_contain in text, f"{path} help modal mentions '{must_contain}'")
+        _expect("RailNode" not in text, f"{path} help modal is free of legacy 'RailNode'")
+        _shot(page, f"help-modal{path.replace('/', '-')}")
+        page.get_by_test_id("help-modal-backdrop").click()
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -448,6 +491,10 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # Independent of the server lifecycle: the IA tab drives the LLM
             # backend catalog + per-backend probe wiring.
             _drive_ai_backends(page, console)
+            # New agent-creation UX: the wizard + executing dry-run, and the
+            # previously-missing help modals on /probe and /observability.
+            _verify_agent_ui(page, console)
+            _verify_help_modals(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")
