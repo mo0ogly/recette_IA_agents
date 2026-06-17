@@ -187,6 +187,23 @@ class TestSimulate(unittest.TestCase):
         )
         self.assertEqual(run().action_log, run().action_log)
 
+    def test_simulation_action_log_matches_golden(self) -> None:
+        """Verify action_log output is stable across process restarts (I4 golden-file gate)."""
+        import dataclasses
+        import json
+        from pathlib import Path
+
+        result = simulate(
+            spec=SPEC,
+            subject=StubLlm([_tc("web_search"), _tc(MCP), _final("ok")]),
+            user_turns=["diagnose"],
+            approver=lambda _a: True,
+        )
+        serialized = [dataclasses.asdict(a) for a in result.action_log]
+        golden_path = Path(__file__).parent / "fixtures" / "maf" / "simulate_action_log.golden.json"
+        golden = json.loads(golden_path.read_text("utf-8"))
+        self.assertEqual(serialized, golden)
+
 
 if __name__ == "__main__":
     unittest.main()

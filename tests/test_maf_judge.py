@@ -5,7 +5,10 @@ a correct subject passes, and each negative breaks EXACTLY one dimension
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import unittest
+from pathlib import Path
 
 from recette.import_maf import maf_to_manifest
 from recette.maf_judge import MafAction, judge_maf
@@ -113,6 +116,14 @@ class TestMafJudge(unittest.TestCase):
     def test_judgement_is_deterministic(self) -> None:
         log = _correct_log()
         self.assertEqual(judge_maf(SPEC, log), judge_maf(SPEC, log))
+
+    def test_judgement_matches_golden(self) -> None:
+        """Verify judge output is stable across process restarts (I4 golden-file gate)."""
+        log = _correct_log()
+        result = dataclasses.asdict(judge_maf(SPEC, log))
+        golden_path = Path(__file__).parent / "fixtures" / "maf" / "maf_judge_correct.golden.json"
+        golden = json.loads(golden_path.read_text("utf-8"))
+        self.assertEqual(result, golden)
 
 
 if __name__ == "__main__":

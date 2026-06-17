@@ -1,0 +1,8 @@
+{
+  "identity_match": true,
+  "capabilities_conform": true,
+  "capability_violations": [],
+  "policy_compliant": true,
+  "behavior_expected": true,
+  "verdict": "correct"
+}

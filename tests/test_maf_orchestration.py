@@ -8,7 +8,10 @@ outside that set is the recette analog of the framework's
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import unittest
+from pathlib import Path
 
 from recette.maf_orchestration import (
     HandoffHop,
@@ -112,6 +115,19 @@ class TestJudgeUnit(unittest.TestCase):
     def test_judge_is_deterministic(self) -> None:
         run = OrchestrationRun(hops=[HandoffHop(1, "triage", "worker")])
         self.assertEqual(judge_orchestration(TEAM, run), judge_orchestration(TEAM, run))
+
+    def test_judge_matches_golden(self) -> None:
+        """Stable output across process restarts (I4 golden-file gate)."""
+        run = OrchestrationRun(
+            hops=[HandoffHop(1, "triage", "worker"), HandoffHop(2, "worker", "triage")],
+            calls=[ToolCall(1, "worker", "AzureOpenAI", "m", "mcp://x", "mcp", approved=True)],
+        )
+        result = dataclasses.asdict(judge_orchestration(TEAM, run))
+        golden_path = (
+            Path(__file__).parent / "fixtures" / "maf" / "maf_orchestration_clean_run.golden.json"
+        )
+        golden = json.loads(golden_path.read_text("utf-8"))
+        self.assertEqual(result, golden)
 
 
 _SEQ_TEAM = {
