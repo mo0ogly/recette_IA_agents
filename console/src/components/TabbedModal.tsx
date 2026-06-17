@@ -23,13 +23,20 @@ interface Props {
 export default function TabbedModal({ open, title, tabs, onClose }: Props): JSX.Element | null {
   const [active, setActive] = useState(0);
 
-  // Reset to the first tab whenever the modal (re)opens or the tab set changes.
+  // Reset to the first tab whenever the modal (re)opens. NOT on tab-set changes:
+  // a consumer that morphs its tabs from a loading placeholder (one tab) to the
+  // loaded set (N tabs) must not have the user's selected tab snapped back to 0 --
+  // that reset effect would race the user's click and clobber it (the active index
+  // is bounds-clamped below, so a shrinking tab set is already safe).
   useEffect(() => {
     if (open) setActive(0);
-  }, [open, tabs.length]);
+  }, [open]);
 
   if (!open || tabs.length === 0) return null;
-  const current = tabs[Math.min(active, tabs.length - 1)];
+  // Bounds-clamp the active index so a shrunk tab set keeps a valid highlighted
+  // tab AND its panel in sync (the raw `active` may exceed the new last index).
+  const activeIndex = Math.min(active, tabs.length - 1);
+  const current = tabs[activeIndex];
 
   return (
     <div className="tm-backdrop" role="dialog" aria-modal="true" aria-label={title}>
@@ -46,8 +53,8 @@ export default function TabbedModal({ open, title, tabs, onClose }: Props): JSX.
               key={t.key}
               type="button"
               role="tab"
-              aria-selected={i === active}
-              className={`tm-tab ${i === active ? "tm-tab-active" : ""}`}
+              aria-selected={i === activeIndex}
+              className={`tm-tab ${i === activeIndex ? "tm-tab-active" : ""}`}
               onClick={() => setActive(i)}
             >
               {t.label}
