@@ -49,12 +49,11 @@ describe("DetectPage", () => {
     expect(heliconeCat).toHaveClass("detect-cat-gateway");
     expect(heliconeCat).not.toHaveClass("detect-cat-tracing");
 
-    // Tools are grouped by category; the catalog covers all five categories.
+    // Tools are grouped by category; the live signature table spans the three
+    // categories its tools fall in (tracing / gateway / eval).
     expect(screen.getByTestId("detect-group-tracing")).toBeInTheDocument();
     expect(screen.getByTestId("detect-group-gateway")).toBeInTheDocument();
     expect(screen.getByTestId("detect-group-eval")).toBeInTheDocument();
-    expect(screen.getByTestId("detect-group-audit")).toBeInTheDocument();
-    expect(screen.getByTestId("detect-group-replay")).toBeInTheDocument();
 
     // A needle (the literal evidence) renders for a tool.
     expect(screen.getByTestId("detect-tool-Helicone")).toHaveTextContent(

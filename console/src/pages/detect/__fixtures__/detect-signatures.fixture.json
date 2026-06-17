@@ -1,65 +1,115 @@
 {
-  "tools": [
-    {
-      "tool": "Langfuse",
-      "category": "tracing",
-      "needles": ["langfuse", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"]
-    },
-    {
-      "tool": "AgentOps",
-      "category": "tracing",
-      "needles": ["agentops", "AGENTOPS_API_KEY"]
-    },
-    {
-      "tool": "LangSmith",
-      "category": "tracing",
-      "needles": ["langsmith", "LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2"]
-    },
-    {
-      "tool": "Arize Phoenix",
-      "category": "tracing",
-      "needles": ["phoenix", "arize", "PHOENIX_COLLECTOR_ENDPOINT"]
-    },
-    {
-      "tool": "Helicone",
-      "category": "gateway",
-      "needles": ["helicone", "HELICONE_API_KEY", "HeliconeManualLogger"]
-    },
-    {
-      "tool": "Portkey",
-      "category": "gateway",
-      "needles": ["portkey", "PORTKEY_API_KEY"]
-    },
-    {
-      "tool": "LiteLLM",
-      "category": "gateway",
-      "needles": ["litellm", "LITELLM_API_KEY"]
-    },
-    {
-      "tool": "Braintrust",
-      "category": "eval",
-      "needles": ["braintrust", "BRAINTRUST_API_KEY"]
-    },
-    {
-      "tool": "Langfuse Evals",
-      "category": "eval",
-      "needles": ["langfuse.evaluate", "create_dataset_run"]
-    },
-    {
-      "tool": "OpenTelemetry",
-      "category": "audit",
-      "needles": ["opentelemetry", "OTEL_EXPORTER_OTLP_ENDPOINT", "otel"]
-    },
-    {
-      "tool": "Logfire",
-      "category": "audit",
-      "needles": ["logfire", "LOGFIRE_TOKEN"]
-    },
-    {
-      "tool": "Inspect AI",
-      "category": "replay",
-      "needles": ["inspect_ai", "eval_log", "INSPECT_LOG_DIR"]
-    }
-  ],
-  "categories": ["audit", "eval", "gateway", "replay", "tracing"]
+    "tools": [
+        {
+            "tool": "Langfuse",
+            "category": "tracing",
+            "needles": [
+                "langfuse",
+                "LANGFUSE_PUBLIC_KEY",
+                "LANGFUSE_SECRET_KEY"
+            ]
+        },
+        {
+            "tool": "LangSmith",
+            "category": "tracing",
+            "needles": [
+                "langsmith",
+                "LANGSMITH_API_KEY",
+                "LANGSMITH_TRACING"
+            ]
+        },
+        {
+            "tool": "Traceloop/OpenLLMetry",
+            "category": "tracing",
+            "needles": [
+                "traceloop",
+                "TRACELOOP_API_KEY",
+                "Traceloop.init"
+            ]
+        },
+        {
+            "tool": "Arize Phoenix",
+            "category": "tracing",
+            "needles": [
+                "arize-phoenix",
+                "phoenix.otel",
+                "PHOENIX_API_KEY",
+                "PHOENIX_COLLECTOR_ENDPOINT"
+            ]
+        },
+        {
+            "tool": "OpenInference",
+            "category": "tracing",
+            "needles": [
+                "openinference",
+                "@arizeai/openinference"
+            ]
+        },
+        {
+            "tool": "AgentOps",
+            "category": "tracing",
+            "needles": [
+                "agentops",
+                "AGENTOPS_API_KEY"
+            ]
+        },
+        {
+            "tool": "Helicone",
+            "category": "gateway",
+            "needles": [
+                "helicone",
+                "HELICONE_API_KEY",
+                "HeliconeManualLogger"
+            ]
+        },
+        {
+            "tool": "Laminar",
+            "category": "tracing",
+            "needles": [
+                "lmnr",
+                "LMNR_PROJECT_API_KEY",
+                "Laminar.initialize"
+            ]
+        },
+        {
+            "tool": "Braintrust",
+            "category": "eval",
+            "needles": [
+                "braintrust",
+                "BRAINTRUST_API_KEY"
+            ]
+        },
+        {
+            "tool": "Literal AI",
+            "category": "tracing",
+            "needles": [
+                "literalai",
+                "LITERAL_API_KEY",
+                "LiteralClient"
+            ]
+        },
+        {
+            "tool": "HoneyHive",
+            "category": "tracing",
+            "needles": [
+                "honeyhive",
+                "HoneyHiveTracer",
+                "HH_API_KEY"
+            ]
+        },
+        {
+            "tool": "OpenTelemetry GenAI",
+            "category": "tracing",
+            "needles": [
+                "opentelemetry-instrumentation-openai-v2",
+                "opentelemetry-util-genai",
+                "OTEL_INSTRUMENTATION_GENAI"
+            ]
+        }
+    ],
+    "categories": [
+        "eval",
+        "gateway",
+        "tracing"
+    ]
 }
