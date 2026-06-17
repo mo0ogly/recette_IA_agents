@@ -854,3 +854,14 @@ export interface DryRunResult {
   tool_results: string[];
   steps: Array<Record<string, unknown>>;
 }
+
+/** Control plane governance digest (GET /control/summary): a read-only,
+ *  deterministic projection of the audit log (I1/I4). */
+export interface ControlSummary {
+  total: number;
+  verdicts: { allow: number; deny: number; escalate: number };
+  approvals: { none: number; pending: number; approved: number; denied: number; timeout: number };
+  executed: number;
+  denied_execution: number;
+  deny_by_default: boolean;
+}

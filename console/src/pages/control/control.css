@@ -1,0 +1,68 @@
+/* Control plane page: governance digest cards (theme tokens only). */
+.control-note {
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-surface, rgba(127, 127, 127, 0.06));
+  color: var(--color-text-muted, inherit);
+  font-size: 0.9rem;
+  max-width: 80ch;
+}
+
+.control-error {
+  color: var(--badge-red-fg);
+}
+
+.control-summary h2 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.control-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.control-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 6rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  border-left-width: 4px;
+}
+
+.control-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.control-stat-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.control-stat-ok {
+  border-left-color: var(--badge-green-fg, #2e7d32);
+}
+
+.control-stat-bad {
+  border-left-color: var(--badge-red-fg, #c62828);
+}
+
+.control-stat-warn {
+  border-left-color: var(--color-accent);
+}
+
+.control-stat-neutral {
+  border-left-color: var(--color-border);
+}
+
+.control-posture {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}

@@ -5,6 +5,7 @@ import AiBackendsPage from "./pages/ai-backends";
 import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
+import ControlPage from "./pages/control";
 import CampaignsPage from "./pages/campaigns";
 import CorpusPage from "./pages/corpus";
 import SimPage from "./pages/sim";
@@ -82,7 +83,10 @@ export default function App(): JSX.Element {
           <NavLink to="/servers" className={navLinkClass}>
             Serveurs
           </NavLink>
-          <span className="nav-sep">Gouvernance (mock)</span>
+          <span className="nav-sep">Control plane</span>
+          <NavLink to="/control" className={navLinkClass}>
+            Control
+          </NavLink>
           <NavLink to="/catalog" className={navLinkClass}>
             Catalog
           </NavLink>
@@ -122,6 +126,7 @@ export default function App(): JSX.Element {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/ai-backends" element={<AiBackendsPage />} />
           <Route path="/servers" element={<ServersPage />} />
+          <Route path="/control" element={<ControlPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />

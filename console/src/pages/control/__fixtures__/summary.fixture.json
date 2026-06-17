@@ -1,0 +1,18 @@
+{
+    "total": 847,
+    "verdicts": {
+        "allow": 0,
+        "deny": 847,
+        "escalate": 0
+    },
+    "approvals": {
+        "none": 847,
+        "pending": 0,
+        "approved": 0,
+        "denied": 0,
+        "timeout": 0
+    },
+    "executed": 0,
+    "denied_execution": 845,
+    "deny_by_default": true
+}

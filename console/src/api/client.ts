@@ -24,6 +24,7 @@ import type {
   CampaignTemplate,
   ChainReport,
   ContainmentState,
+  ControlSummary,
   DryRunResult,
   ObservabilityTrace,
   ObservabilityTraceSummary,
@@ -1276,4 +1277,10 @@ export function dryRunAgent(agent: AgentConfig): Promise<DryRunResult> {
     method: "POST",
     body: JSON.stringify(agent),
   });
+}
+
+/** Control plane governance digest (counts of verdicts / approvals / execution
+ *  over the audit log). Raw JSON, no envelope. */
+export function getControlSummary(): Promise<ControlSummary> {
+  return request<ControlSummary>("/control/summary", { method: "GET" });
 }

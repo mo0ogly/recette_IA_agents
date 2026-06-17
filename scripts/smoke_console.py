@@ -467,6 +467,21 @@ def _verify_help_modals(page: Page, console: str) -> None:
         page.get_by_test_id("help-modal-backdrop").click()
 
 
+def _verify_control(page: Page, console: str) -> None:
+    # The Control plane page: the always-visible 3-plane architecture diagram
+    # plus the live governance digest (verdict counts) from GET /control/summary.
+    page.goto(f"{console}/control", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    # The architecture diagram (Mermaid renders its raw source as a fallback).
+    page.get_by_text(re.compile(r"Control plane -- decide")).first.wait_for(
+        state="visible", timeout=UI_TIMEOUT_MS
+    )
+    # The live digest renders from the audit log aggregate.
+    digest = page.get_by_test_id("control-summary")
+    digest.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect("deny" in digest.inner_text(), "control digest shows verdict cards")
+    _shot(page, "control-plane")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -495,6 +510,8 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # previously-missing help modals on /probe and /observability.
             _verify_agent_ui(page, console)
             _verify_help_modals(page, console)
+            # The Control plane page: architecture diagram + live governance digest.
+            _verify_control(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")

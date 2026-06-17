@@ -58,7 +58,8 @@ export type HelpTopicKey =
   | "proxy"
   | "probe"
   | "discovery"
-  | "observability";
+  | "observability"
+  | "control";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1528,6 +1529,37 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           l&apos;<code>event_id</code> de l&apos;action. La trace montre le{" "}
           <strong>squelette d&apos;execution</strong> (qui a appele quoi, dans quel
           ordre, combien de temps), le cockpit montre le contenu de l&apos;echange.
+        </p>
+      </>
+    ),
+  },
+  control: {
+    title: "Aide — Control plane",
+    summary:
+      "Le coeur de la gouvernance : chaque action est mediee (deny-by-default, I2), decidee allow/deny/escalate, et bloquee jusqu'a approbation si escaladee (I6). Le resume est une projection lecture seule du log (I1/I4).",
+    body: (
+      <>
+        <p>
+          Le <strong>Control plane</strong> decide ce qui est autorise. Toute action agent
+          passe par la <strong>Gateway</strong> (normalisee en <code>AgentActionEvent</code>),
+          le <strong>Policy Engine</strong> (<strong>deny-by-default</strong>, I2) et le{" "}
+          <strong>Risk Engine</strong>, qui produisent un verdict :{" "}
+          <code>allow</code> / <code>deny</code> / <code>escalate</code>.
+        </p>
+        <h3>Le cycle de decision</h3>
+        <p>
+          <code>allow</code> (ou approuve) -&gt; execution mediee par un proxy (Data plane, I5).{" "}
+          <code>deny</code> -&gt; jamais execute. <code>escalate</code> -&gt; l&apos;action{" "}
+          <strong>BLOQUE</strong> jusqu&apos;a resolution ou timeout (I6) : aucune execution
+          optimiste. Tout est persiste dans le <strong>log d&apos;audit</strong> append-only
+          (Audit plane, I1).
+        </p>
+        <h3>La page Control</h3>
+        <p>
+          Le diagramme des trois plans (Control / Data / Audit) est toujours visible ; en
+          dessous, les <strong>compteurs live</strong> (verdicts, approbations, executions) sont
+          une projection <strong>lecture seule et deterministe</strong> du log -- la page ne
+          decide ni n&apos;ecrit rien, elle <em>montre</em> ce que le Control plane a decide.
         </p>
       </>
     ),
