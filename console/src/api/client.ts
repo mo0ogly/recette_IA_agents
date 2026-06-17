@@ -23,6 +23,7 @@ import type {
   CampaignTemplate,
   ChainReport,
   ContainmentState,
+  DryRunResult,
   ObservabilityTrace,
   ObservabilityTraceSummary,
   PendingApproval,
@@ -1218,4 +1219,14 @@ export function getObservabilityTrace(traceId: string): Promise<ObservabilityTra
     `/observability/traces/${encodeURIComponent(traceId)}`,
     { method: "GET" },
   );
+}
+
+/** Dry-run: execute an inline agent's mock scenario without persisting, and
+ *  return the action log it WOULD produce. Raw JSON; rejects (ApiError 400)
+ *  on a real-AI agent, missing fields, or no scenario. */
+export function dryRunAgent(agent: AgentConfig): Promise<DryRunResult> {
+  return request<DryRunResult>("/runs/dry-run", {
+    method: "POST",
+    body: JSON.stringify(agent),
+  });
 }

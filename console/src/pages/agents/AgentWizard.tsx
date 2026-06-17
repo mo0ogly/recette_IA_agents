@@ -18,6 +18,7 @@ import type { AgentAction, AgentConfig, AiBackend } from "../../types/platform";
 import type { AgentFormValues } from "./agentForm";
 import { errorMessage, toAgentConfig } from "./agentForm";
 import AgentGroundTruthStep from "./AgentGroundTruthStep";
+import AgentReviewStep from "./AgentReviewStep";
 
 interface AgentWizardProps {
   editingId: string | null;
@@ -309,39 +310,7 @@ export default function AgentWizard({
         <AgentGroundTruthStep form={form} setField={setField} subjects={subjects} />
       )}
 
-      {step === 6 && (
-        <fieldset className="agents-step">
-          <legend>Revue -- apercu avant {editingId === null ? "creation" : "sauvegarde"}</legend>
-          {"error" in preview ? (
-            <p className="agents-error-banner" role="alert">
-              Scenario JSON invalide : {preview.error}
-            </p>
-          ) : (
-            <dl className="agents-preview" data-testid="agents-preview">
-              <dt>id</dt>
-              <dd>{preview.config.id}</dd>
-              <dt>runtime / IA</dt>
-              <dd>
-                {preview.config.runtime} / {preview.config.ai_mode}
-              </dd>
-              <dt>target</dt>
-              <dd>{preview.config.target_system ?? "(aucun)"}</dd>
-              <dt>capability_scope</dt>
-              <dd>{(preview.config.capability_scope ?? []).join(", ") || "(aucune)"}</dd>
-              <dt>scenario</dt>
-              <dd>{(preview.config.scenario ?? []).length} etape(s)</dd>
-              <dt>memoire</dt>
-              <dd>
-                {preview.config.memory
-                  ? `fenetre ${preview.config.memory.window}`
-                  : "contexte complet"}
-              </dd>
-              <dt>ground-truth</dt>
-              <dd>{preview.config.ground_truth ? "declare" : "(aucun)"}</dd>
-            </dl>
-          )}
-        </fieldset>
-      )}
+      {step === 6 && <AgentReviewStep editingId={editingId} preview={preview} />}
 
       <div className="agents-form-actions">
         <button

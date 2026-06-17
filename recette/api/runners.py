@@ -665,6 +665,45 @@ def make_replay_runner(
     return runner
 
 
+def dry_run_lane_b(agent_cfg: dict) -> dict:
+    """Execute an agent's MOCK scenario in-memory, persisting nothing.
+
+    A pre-create preview of what the agent WOULD do: builds a StubLlm from the
+    scenario and runs the Lane B loop against an in-memory LabForge. No external
+    side effect (I5: the lab forge is in-process), no recording and no run
+    record (I1: the event log is never touched), deterministic (I4: StubLlm +
+    logical clock). Real-AI agents are refused -- a dry-run never calls a live
+    provider nor burns a key. Raises ValueError on invalid/insufficient input.
+    """
+    missing = [
+        k
+        for k in ("principal", "target_system", "goal", "capability_scope")
+        if not agent_cfg.get(k)
+    ]
+    if missing:
+        raise ValueError(f"agent missing {missing}")
+    if agent_cfg.get("ai_mode", "mock") == "real":
+        raise ValueError("dry-run is mock-only (a real-AI agent would call a live provider)")
+    scenario = agent_cfg.get("scenario")
+    if not scenario:
+        raise ValueError("dry-run needs a mock scenario")
+    result = run_lane_b_agent(
+        agent_id=str(agent_cfg.get("id") or "dry-run"),
+        principal=agent_cfg["principal"],
+        target_system=agent_cfg["target_system"],
+        goal=agent_cfg["goal"],
+        capability_scope=agent_cfg["capability_scope"],
+        llm=build_stub_llm(scenario),
+        stop_on_repeat=True,
+        memory_window=_memory_window(agent_cfg),
+    )
+    return {
+        "actions": [a.to_dict() for a in result.actions],
+        "tool_results": result.tool_results,
+        "steps": result.recording.to_dict()["steps"],
+    }
+
+
 def build_stub_llm(script: list[dict]) -> StubLlm:
     return StubLlm(
         [

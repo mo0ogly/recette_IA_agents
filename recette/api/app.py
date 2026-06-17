@@ -53,6 +53,7 @@ from .routers import catalog_registry as catalog_registry_router
 from .routers import config as config_router
 from .routers import detect as detect_router
 from .routers import discovery as discovery_router
+from .routers import dry_run as dry_run_router
 from .routers import events as events_router
 from .routers import observability as observability_router
 from .routers import policies as policies_router
@@ -341,4 +342,5 @@ def create_app(
     app.include_router(detect_router.router)
     app.include_router(capture_router.router)
     app.include_router(observability_router.router)
+    app.include_router(dry_run_router.router)
     return app

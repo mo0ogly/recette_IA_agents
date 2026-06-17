@@ -828,3 +828,16 @@ export interface ObservabilityTrace {
   recording_id: string;
   spans: ObservabilitySpan[];
 }
+
+/** Dry-run preview result: the action log a mock scenario WOULD produce,
+ *  executed in-memory without persisting (no run record, no event log). */
+export interface DryRunResult {
+  actions: Array<{
+    action_type: string;
+    target_system: string;
+    resource: string;
+    [key: string]: unknown;
+  }>;
+  tool_results: string[];
+  steps: Array<Record<string, unknown>>;
+}

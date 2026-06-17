@@ -27,6 +27,7 @@ vi.mock("../../api/client", async (importOriginal) => {
     deleteAiBackend: vi.fn(),
     testAiBackend: vi.fn(),
     listAgentActions: vi.fn(),
+    dryRunAgent: vi.fn(),
     listSubjects: vi.fn(() => Promise.resolve({ count: 0, families: {}, subjects: [] })),
     launchLaneB: vi.fn(),
     openRunSocket: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("../../api/client", async (importOriginal) => {
 
 import {
   createAgent,
+  dryRunAgent,
   launchLaneB,
   listAgentActions,
   listAgents,
@@ -254,6 +256,43 @@ describe("AgentsPage", () => {
     expect(screen.getByTestId("agents-preview")).toHaveTextContent("rev-bot");
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(createAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it("dry-runs the composed agent and shows the action log without saving", async () => {
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listAiBackends).mockResolvedValue([]);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(dryRunAgent).mockResolvedValue({
+      actions: [
+        { action_type: "read_repo", target_system: "github", resource: "acme/x" },
+        { action_type: "open_pr", target_system: "github", resource: "acme/x" },
+      ],
+      tool_results: ["ok", "ok"],
+      steps: [],
+    });
+
+    render(<AgentsPage />);
+    await screen.findByText("Agents");
+
+    gotoStep("Identite");
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "dry-bot" } });
+    gotoStep("Cible");
+    fireEvent.change(screen.getByLabelText("Target system (en face)"), {
+      target: { value: "github" },
+    });
+    gotoStep("Tools");
+    fireEvent.click(await screen.findByRole("checkbox", { name: /read_repo/ }));
+
+    gotoStep("Revue");
+    fireEvent.click(screen.getByRole("button", { name: /Tester \(dry-run/ }));
+
+    // The action log the mock scenario would produce is shown; nothing saved.
+    expect(await screen.findByTestId("agents-dryrun-result")).toHaveTextContent(
+      "read_repo @ github / acme/x",
+    );
+    expect(dryRunAgent).toHaveBeenCalledTimes(1);
+    // A dry-run never creates the agent.
+    expect(createAgent).not.toHaveBeenCalled();
   });
 
   it("edit form exposes role/model/system_prompt/ground_truth and preserves them on save", async () => {
