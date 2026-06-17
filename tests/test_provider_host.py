@@ -64,6 +64,21 @@ class ProviderModelsTest(unittest.TestCase):
         self.assertEqual(models[0], "gemini-2.5-pro")
         self.assertIn("gemini-2.5-flash", models)
 
+    def test_major_providers_carry_curated_models(self) -> None:
+        # Frozen from models.dev (R13). Every major provider offers a dropdown.
+        for provider in ("xai", "cerebras", "minimax", "together"):
+            self.assertTrue(provider_models(provider), f"{provider} must not be empty")
+        self.assertEqual(provider_models("xai")[0], "grok-4.3")
+        self.assertEqual(provider_models("minimax")[0], "MiniMax-M2")
+
+    def test_free_text_providers_stay_empty_by_design(self) -> None:
+        # No canonical curated list: openai_compat (user base_url), bedrock
+        # (hundreds of cross-vendor ids), opencode_zen (routes by model), and
+        # qwen/arcee (absent from models.dev -- never invent ids, R13). These
+        # intentionally fall back to a free-text model field.
+        for provider in ("openai_compat", "bedrock", "opencode_zen", "qwen", "arcee"):
+            self.assertEqual(provider_models(provider), (), f"{provider} stays free-text")
+
 
 if __name__ == "__main__":
     unittest.main()
