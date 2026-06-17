@@ -39,6 +39,7 @@ from ..platform.proxy.tracing import TraceRecorder, TracingProxy
 from ..recording import Recording, replay_backend
 from ..scorecard import Scorecard
 from .config_store import ConfigStore
+from .run_frames import tool_call_frame
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +432,12 @@ def make_lane_b_runner(
 
         def base_on_step(i: int, step: object) -> None:
             emit("step", {"index": i, **step.to_dict()})  # type: ignore[attr-defined]
+            # WS-B: also surface a granular tool-call frame so the console's
+            # interactions timeline reads per-tool (name + args + correlation),
+            # not only as a generic step. Additive: None for a final answer.
+            tc = tool_call_frame(i, step)
+            if tc is not None:
+                emit("tool_call", tc)
 
         result = run_lane_b_agent(
             agent_id=agent_cfg["id"],
@@ -468,6 +475,10 @@ def _lane_b_step_emit(emit: Emit, agent_id: str) -> Callable[[int, object], None
             if decision is not None:
                 frame["decision"] = decision
         emit("step", frame)
+        # WS-B: granular per-tool frame alongside the generic step (additive).
+        tc = tool_call_frame(i, step)
+        if tc is not None:
+            emit("tool_call", {"agent_id": agent_id, **tc})
 
     return on_step
 

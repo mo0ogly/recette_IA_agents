@@ -98,6 +98,15 @@ function frameLine(frame: LiveFrame): string {
       const at = action ? `${action.action_type}@${action.target_system}` : "(no action)";
       return `step #${String(frame.data.index ?? "")}: ${at}`;
     }
+    case "tool_call": {
+      // WS-B: granular interaction line -- the tool the agent invoked and the
+      // arguments it chose. The request/response exchange is in the network log
+      // (correlated by event_id).
+      const args = (frame.data.args as Record<string, unknown> | undefined) ?? {};
+      const keys = Object.keys(args);
+      const summary = keys.length ? ` (${keys.map((k) => `${k}=${String(args[k])}`).join(", ")})` : "";
+      return `tool_call #${String(frame.data.index ?? "")}: ${String(frame.data.name ?? "")}${summary}`;
+    }
     case "result": {
       const actions = (frame.data.actions as unknown[] | undefined) ?? [];
       return `result: ${actions.length} action(s) recorded`;

@@ -10,7 +10,7 @@
  * run_id and renders them (R16: real payload, render-and-assert).
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import agentsFixture from "../agents/__fixtures__/agents.fixture.json";
 import backendsFixture from "../agents/__fixtures__/ai-backends.fixture.json";
@@ -185,5 +185,45 @@ describe("CockpitPage network log", () => {
     fireEvent.change(select, { target: { value: "request" } });
     expect((viewer as HTMLTextAreaElement).value).toContain("action_type");
     expect((viewer as HTMLTextAreaElement).value).not.toContain('"response"');
+  });
+
+  it("renders a granular tool_call frame in the run log (WS-B)", async () => {
+    vi.mocked(listAgents).mockResolvedValue(agentsFixture as AgentConfig[]);
+    vi.mocked(listAiBackends).mockResolvedValue(backendsFixture as AiBackend[]);
+    vi.mocked(launchLaneB).mockResolvedValue({ run_id: "RID123", status: "pending" });
+    const socket = {
+      onmessage: null as ((ev: { data: string }) => void) | null,
+      onopen: null,
+      onerror: null,
+      close: vi.fn(),
+    };
+    vi.mocked(openRunSocket).mockReturnValue(socket as unknown as WebSocket);
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+
+    render(<CockpitPage />);
+    await screen.findByText(/gh-pr-bot/);
+    fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
+
+    // Push a real-shaped tool_call frame over the socket (the backend emits this
+    // alongside the generic step frame). The interactions log reads per-tool.
+    await waitFor(() => expect(socket.onmessage).not.toBeNull());
+    act(() => {
+      socket.onmessage?.({
+        data: JSON.stringify({
+          seq: 1,
+          type: "tool_call",
+          data: {
+            index: 0,
+            name: "read_repo",
+            args: { resource: "acme/x" },
+            event_id: "evt-0001",
+          },
+        }),
+      });
+    });
+
+    expect(
+      await screen.findByText("tool_call #0: read_repo (resource=acme/x)"),
+    ).toBeInTheDocument();
   });
 });
