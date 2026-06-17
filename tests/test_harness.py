@@ -47,9 +47,7 @@ class _NeverDetectedDiscovery:
 class _CorrectIdentification:
     """Identification adapter that always returns a fully-correct verdict."""
 
-    def identify(
-        self, *, manifest: dict, action_log: list[AgentAction]
-    ) -> IdentificationResult:
+    def identify(self, *, manifest: dict, action_log: list[AgentAction]) -> IdentificationResult:
         return IdentificationResult(
             identity_match=True,
             capabilities_conform=True,
@@ -63,9 +61,7 @@ class _CorrectIdentification:
 class _IncorrectCapabilityIdentification:
     """Identification adapter that always flags a capability violation."""
 
-    def identify(
-        self, *, manifest: dict, action_log: list[AgentAction]
-    ) -> IdentificationResult:
+    def identify(self, *, manifest: dict, action_log: list[AgentAction]) -> IdentificationResult:
         from recette.adapters import CapabilityViolation
 
         return IdentificationResult(

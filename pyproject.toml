@@ -21,7 +21,7 @@ temporal = [
 # Ed25519 policy-bundle verification (recette bundle-verify). Optional: the rest of the
 # recette has no crypto dependency.
 bundle = [
-    "cryptography>=44",
+    "cryptography>=48.0.1",
 ]
 # Importing Microsoft Agent Framework declarative specs from YAML (recette import-maf).
 # JSON specs need none of this; only YAML parsing does.
