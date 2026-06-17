@@ -57,6 +57,7 @@ export type HelpTopicKey =
   | "live"
   | "proxy"
   | "probe"
+  | "discovery"
   | "observability";
 
 export interface HelpTopic {
@@ -1459,6 +1460,48 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Si le broker de capture n&apos;est pas demarre (variable{" "}
           <code>INSPECT_IA_AGENTS_PROBE_SOCKET</code>), la page l&apos;indique et la
           capture reste indisponible — elle ne plante pas (fail-safe).
+        </p>
+      </>
+    ),
+  },
+  discovery: {
+    title: "Aide — Discovery recette (verdict unifie)",
+    summary:
+      "Le verdict de recette sur tout le corpus : identification (4 dimensions), sujets MAF, et chaque surface discovery. Compare la sortie des outils EXTERNES au ground-truth. Lecture seule, deterministe (I4).",
+    body: (
+      <>
+        <p>
+          Cette page est le <strong>tableau de bord de recette</strong> : elle
+          rejoue le harness sur le corpus de reference et affiche un{" "}
+          <strong>verdict unifie</strong> (<code>GET /subjects/scorecard</code>).
+          Ce n&apos;est pas un outil de production — c&apos;est l&apos;etalon qui
+          dit si un outil discovery/identification <strong>externe</strong> tombe
+          juste contre le <strong>ground-truth</strong>.
+        </p>
+        <h3>Ce que montrent les chiffres</h3>
+        <p>
+          <strong>PASS/FAIL</strong> global, puis <code>identification</code> et{" "}
+          <code>maf</code> (agents juges sur les 4 dimensions : identite,
+          capacites, policy, comportement) et <code>orchestration</code> (equipes
+          MAF, hops de handoff). Le tableau <strong>Surface</strong> liste chaque
+          surface discovery (github, gitlab, temporal, openapi, mcp) avec repos,
+          passed, faux positifs (FP), faux negatifs (FN), ordre de risque et
+          verdict. On verifie des <strong>proprietes invariantes</strong>
+          (detection, count/dedup, couverture, cible, determinisme), jamais des
+          valeurs opaques.
+        </p>
+        <h3>Detail par repo</h3>
+        <p>
+          Le panneau <strong>Detail par repo (github)</strong> ouvre le verdict
+          surface par repo (<code>GET /discovery/check</code>) : detecte vs
+          attendu, PASS/FAIL, faux positif/negatif, et les <strong>raisons</strong>{" "}
+          d&apos;echec quand il y en a — pour comprendre POURQUOI un repo tombe.
+        </p>
+        <h3>Relancer</h3>
+        <p>
+          Le bouton <strong>Relancer</strong> rejoue le harness cote serveur et
+          rafraichit le verdict + le detail. La recette est deterministe (I4) :
+          a corpus + policy identiques, le resultat est stable.
         </p>
       </>
     ),

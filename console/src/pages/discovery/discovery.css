@@ -100,3 +100,24 @@
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
+
+/* Relancer button in the page head. */
+.discovery-rerun {
+  margin-left: auto;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent);
+  background-color: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discovery-rerun:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.discovery-rerun:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

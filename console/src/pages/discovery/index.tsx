@@ -7,9 +7,10 @@
  * the same way the github surface scans repos.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getDiscoveryCheck, getRecetteScorecard } from "../../api/client";
 import type { DiscoveryCheck, RecetteScorecard } from "../../api/client";
+import PageHelp from "../../components/help/PageHelp";
 import BenchmarkPanel from "./BenchmarkPanel";
 import "./discovery.css";
 
@@ -21,34 +22,46 @@ export default function DiscoveryPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let alive = true;
+  /** Replay the recette server-side and refresh the verdict + per-repo detail.
+   *  Used on mount and by the Relancer button (the harness is deterministic, I4). */
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     getRecetteScorecard()
       .then((c) => {
-        if (alive) {
-          setCard(c);
-          setLoading(false);
-        }
+        setCard(c);
+        setLoading(false);
       })
       .catch((e) => {
-        if (alive) {
-          setError(e instanceof Error ? e.message : String(e));
-          setLoading(false);
-        }
+        setError(e instanceof Error ? e.message : String(e));
+        setLoading(false);
       });
     // Per-repo drill-down behind the github surface aggregate; best-effort so a
     // failure never blanks the page.
     getDiscoveryCheck()
-      .then((d) => alive && setCheck(d))
-      .catch(() => alive && setCheck(null));
-    return () => {
-      alive = false;
-    };
+      .then((d) => setCheck(d))
+      .catch(() => setCheck(null));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <section className="discovery-page">
-      <h1>Discovery recette</h1>
+      <div className="page-head">
+        <h1>Discovery recette</h1>
+        <button
+          type="button"
+          className="discovery-rerun"
+          onClick={load}
+          disabled={loading}
+          data-testid="discovery-rerun"
+        >
+          {loading ? "Relance..." : "Relancer"}
+        </button>
+        <PageHelp topic="discovery" />
+      </div>
       <p className="discovery-note">
         Unified verdict over the test corpus: identification (the four dimensions),
         the standard-aligned MAF subjects, and every discovery surface. The mcp
