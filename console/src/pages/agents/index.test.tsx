@@ -72,6 +72,11 @@ const AGENT_ACTIONS = [
   { target_system: "github", action: "open_pr", description: "Open a PR (bounded write).", kind: "bounded_write" },
 ];
 
+/** Navigate the creation/edit wizard to the step whose label matches. */
+function gotoStep(label: string): void {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`\\d\\. ${label}`) }));
+}
+
 const agents = agentsFixture as unknown as AgentConfig[];
 const agentsWithPace = agentsWithPaceFixture as unknown as AgentConfig[];
 const backends = backendsFixture as unknown as AiBackend[];
@@ -94,7 +99,9 @@ describe("AgentsPage", () => {
     // "github" appears in both the target and the capability-scope columns.
     expect(screen.getAllByText("github").length).toBeGreaterThanOrEqual(1);
 
-    // The agent's AI backend select offers backend-1 plus the empty option.
+    // The agent's AI backend select offers backend-1 plus the empty option
+    // (it lives on the wizard's IA step).
+    gotoStep("IA");
     const backendSelect = screen.getByLabelText(/AI backend \(/);
     const options = within(backendSelect).getAllByRole("option");
     expect(options.map((o) => (o as HTMLOptionElement).value)).toContain(
@@ -143,20 +150,22 @@ describe("AgentsPage", () => {
 
     render(<AgentsPage />);
 
-    // Wait for the catalog to load (the github option appears), then scope to it.
+    // Cible step: scope to the github system (catalog loaded).
+    gotoStep("Cible");
     await screen.findByRole("option", { name: "github" });
     fireEvent.change(screen.getByLabelText("Target system (en face)"), {
       target: { value: "github" },
     });
 
-    // Then pick read_repo + open_pr from that system's catalog.
+    // Tools step: pick read_repo + open_pr from that system's catalog.
+    gotoStep("Tools");
     fireEvent.click(await screen.findByRole("checkbox", { name: /read_repo/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /open_pr/ }));
 
-    // "Id" labels both the agent form and the AI-backend form; the agent one is first.
-    fireEvent.change(screen.getAllByLabelText("Id")[0], {
-      target: { value: "pr-bot" },
-    });
+    // Identite step: set the agent id, then review + create.
+    gotoStep("Identite");
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "pr-bot" } });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     expect(createAgent).toHaveBeenCalledTimes(1);
@@ -180,19 +189,17 @@ describe("AgentsPage", () => {
 
     render(<AgentsPage />);
 
-    await screen.findByRole("option", { name: "github" });
-    fireEvent.change(screen.getByLabelText("Target system (en face)"), {
-      target: { value: "github" },
-    });
-    fireEvent.change(screen.getAllByLabelText("Id")[0], { target: { value: "mem-bot" } });
+    await screen.findByText("Agents");
+    gotoStep("Identite");
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "mem-bot" } });
 
-    // Enable bounded memory and set the sliding-window size.
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: /Borner le contexte/ }),
-    );
+    // Memoire step: enable bounded memory and set the sliding-window size.
+    gotoStep("Memoire");
+    fireEvent.click(screen.getByRole("checkbox", { name: /Borner le contexte/ }));
     fireEvent.change(screen.getByLabelText("Fenetre (messages)"), {
       target: { value: "5" },
     });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     expect(createAgent).toHaveBeenCalledTimes(1);
@@ -207,12 +214,46 @@ describe("AgentsPage", () => {
     vi.mocked(createAgent).mockResolvedValue({} as never);
 
     render(<AgentsPage />);
-    await screen.findByRole("option", { name: "github" });
-    fireEvent.change(screen.getAllByLabelText("Id")[0], { target: { value: "no-mem" } });
+    await screen.findByText("Agents");
+    gotoStep("Identite");
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "no-mem" } });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     const payload = vi.mocked(createAgent).mock.calls[0][0];
     expect(payload.memory).toBeUndefined();
+  });
+
+  it("Revue step previews the composed config and blocks Create on invalid scenario JSON", async () => {
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listAiBackends).mockResolvedValue([]);
+    vi.mocked(listAgentActions).mockResolvedValue(AGENT_ACTIONS as never);
+    vi.mocked(createAgent).mockResolvedValue({} as never);
+
+    render(<AgentsPage />);
+    await screen.findByText("Agents");
+
+    gotoStep("Identite");
+    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "rev-bot" } });
+
+    // A malformed advanced scenario makes the preview an error and disables Create.
+    gotoStep("Tools");
+    fireEvent.change(screen.getByLabelText("Scenario (JSON, avance)"), {
+      target: { value: "{ not json" },
+    });
+    gotoStep("Revue");
+    expect(screen.getByRole("alert")).toHaveTextContent("Scenario JSON invalide");
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+
+    // Clearing it restores a valid preview (id is shown) and re-enables Create.
+    gotoStep("Tools");
+    fireEvent.change(screen.getByLabelText("Scenario (JSON, avance)"), {
+      target: { value: "" },
+    });
+    gotoStep("Revue");
+    expect(screen.getByTestId("agents-preview")).toHaveTextContent("rev-bot");
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(createAgent).toHaveBeenCalledTimes(1);
   });
 
   it("edit form exposes role/model/system_prompt/ground_truth and preserves them on save", async () => {
@@ -240,13 +281,17 @@ describe("AgentsPage", () => {
     const row = (await screen.findByText("rich-bot")).closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
 
-    // The rich properties are now visible in the form (previously hidden).
+    // IA step: the rich AI properties are populated from the edited agent.
+    gotoStep("IA");
     expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("finance_admin");
     expect((screen.getByLabelText("Model") as HTMLInputElement).value).toBe(
       "llama-3.3-70b-versatile",
     );
     const prompt = screen.getByLabelText("System prompt") as HTMLTextAreaElement;
     expect(prompt.value).toBe("You are the finance agent.");
+
+    // Ground-truth step: the inline expected verdict is populated too.
+    gotoStep("Ground-truth");
     expect((screen.getByLabelText("Identite attendue") as HTMLInputElement).value).toBe(
       "bot@acme",
     );
@@ -254,9 +299,13 @@ describe("AgentsPage", () => {
       true,
     );
 
-    // Change the system prompt and save: the payload carries the new prompt AND
-    // the preserved role/model/ground_truth (no silent loss).
-    fireEvent.change(prompt, { target: { value: "Updated prompt." } });
+    // Change the system prompt (back on the IA step) and save: the payload
+    // carries the new prompt AND the preserved role/model/ground_truth.
+    gotoStep("IA");
+    fireEvent.change(screen.getByLabelText("System prompt"), {
+      target: { value: "Updated prompt." },
+    });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
@@ -285,11 +334,13 @@ describe("AgentsPage", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
 
+    gotoStep("Cible");
     const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
     expect(cadence.value).toBe("800");
 
     // Editing and saving carries the new pace as a NUMBER (not a string).
     fireEvent.change(cadence, { target: { value: "1500" } });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
@@ -309,8 +360,10 @@ describe("AgentsPage", () => {
     const row = (await screen.findByText(paced.id)).closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
 
+    gotoStep("Cible");
     const cadence = screen.getByLabelText("Cadence (ms)") as HTMLInputElement;
     fireEvent.change(cadence, { target: { value: "" } });
+    gotoStep("Revue");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
