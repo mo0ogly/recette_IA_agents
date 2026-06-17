@@ -1,0 +1,26 @@
+[
+  {
+    "text": "from langfuse import observe\nagentops.init()",
+    "expected": [
+      {"tool": "AgentOps", "category": "tracing", "matched": "agentops"},
+      {"tool": "Langfuse", "category": "tracing", "matched": "langfuse"}
+    ]
+  },
+  {
+    "text": "base_url = 'https://oai.helicone.ai'",
+    "expected": [
+      {"tool": "Helicone", "category": "gateway", "matched": "helicone"}
+    ]
+  },
+  {
+    "text": "BRAINTRUST_API_KEY=x\nLMNR_PROJECT_API_KEY=y",
+    "expected": [
+      {"tool": "Braintrust", "category": "eval", "matched": "BRAINTRUST_API_KEY"},
+      {"tool": "Laminar", "category": "tracing", "matched": "LMNR_PROJECT_API_KEY"}
+    ]
+  },
+  {
+    "text": "def main():\n    return 0\n",
+    "expected": []
+  }
+]
