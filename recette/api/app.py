@@ -49,6 +49,7 @@ from .routers import campaigns as campaigns_router
 from .routers import capture as capture_router
 from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
+from .routers import catalog_registry as catalog_registry_router
 from .routers import config as config_router
 from .routers import discovery as discovery_router
 from .routers import events as events_router
@@ -317,6 +318,7 @@ def create_app(
 
     app.include_router(config_router.router)
     app.include_router(catalog_router.router)
+    app.include_router(catalog_registry_router.router)
     app.include_router(runs_router.router)
     app.include_router(actions_router.router)
     app.include_router(policies_router.router)
