@@ -13,12 +13,22 @@ import json
 import unittest
 from pathlib import Path
 
-from recette.api.routers import detect as detect_router
+try:
+    # The detector functions are pure, but recette.api.routers.detect imports
+    # fastapi at module level, so collection needs the [api] extra. Guard the
+    # import so the suite collects cleanly without it (R20); the test runs
+    # wherever fastapi is installed.
+    from recette.api.routers import detect as detect_router
+
+    _HAS_API = True
+except ImportError:  # pragma: no cover - depends on the [api] extra (fastapi)
+    _HAS_API = False
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CASES = _REPO_ROOT / "corpus" / "detect" / "agreement-cases.json"
 
 
+@unittest.skipUnless(_HAS_API, "requires the [api] extra (fastapi)")
 class TestDetectAgreement(unittest.TestCase):
     def test_python_detector_matches_the_shared_cases(self) -> None:
         cases = json.loads(_CASES.read_text(encoding="utf-8"))
