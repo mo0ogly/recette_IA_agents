@@ -51,9 +51,9 @@ from .routers import catalog as catalog_router
 from .routers import catalog_actions as catalog_actions_router
 from .routers import catalog_registry as catalog_registry_router
 from .routers import config as config_router
+from .routers import control as control_router
 from .routers import detect as detect_router
 from .routers import discovery as discovery_router
-from .routers import control as control_router
 from .routers import dry_run as dry_run_router
 from .routers import events as events_router
 from .routers import metrics as metrics_router

@@ -55,9 +55,7 @@ class TestCatalogRustBridge(unittest.TestCase):
         body = resp.json()
         self.assertTrue(body["available"], body.get("reason"))
         # the Rust engine produces the invariant summary shape
-        self.assertEqual(
-            set(body["summary"]), {"total", "unique", "with_tools", "tags"}
-        )
+        self.assertEqual(set(body["summary"]), {"total", "unique", "with_tools", "tags"})
         # and it AGREES with the Python projection (cross-engine invariant)
         self.assertTrue(body["agreement"])
         self.assertEqual(body["summary"], body["python_summary"])

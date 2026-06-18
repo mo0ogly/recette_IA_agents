@@ -48,9 +48,7 @@ def _group_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None) -> 
     }
 
 
-def summarize_metrics(
-    traces: list[LlmCallTrace], pricing: PricingTable | None = None
-) -> dict:
+def summarize_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None = None) -> dict:
     """Per-agent and per-tool operational metrics over captured traces.
 
     ``cost_usd`` is ``None`` when no pricing table is supplied or no priced
