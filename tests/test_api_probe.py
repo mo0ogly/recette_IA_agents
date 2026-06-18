@@ -16,6 +16,8 @@ import socket
 import tempfile
 import threading
 import unittest
+from pathlib import Path
+from unittest import mock
 
 try:
     from fastapi.testclient import TestClient
@@ -27,6 +29,7 @@ except ImportError:  # pragma: no cover - only without the [api] extra
     _HAS_FASTAPI = False
 
 _SOCKET_ENV = "INSPECT_IA_AGENTS_PROBE_SOCKET"
+_MODE_ENV = "INSPECT_IA_AGENTS_PROBE_MODE"
 
 _BROKER_OK = {
     "status": "ok",
@@ -80,12 +83,23 @@ class TestProbeApi(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(create_app())
         self._saved = os.environ.pop(_SOCKET_ENV, None)
+        self._saved_mode = os.environ.pop(_MODE_ENV, None)
+        # Neutralize the canonical-socket FALLBACK so the env-contract tests are
+        # deterministic regardless of whether a real broker is running on this
+        # machine (.run/probe.sock). Tests exercising the fallback re-patch it.
+        self._canon = mock.patch(
+            "recette.api.routers.probe._canonical_socket",
+            return_value=Path(tempfile.mkdtemp()) / "absent.sock",
+        )
+        self._canon.start()
+        self.addCleanup(self._canon.stop)
 
     def tearDown(self) -> None:
-        if self._saved is None:
-            os.environ.pop(_SOCKET_ENV, None)
-        else:
-            os.environ[_SOCKET_ENV] = self._saved
+        for env, saved in ((_SOCKET_ENV, self._saved), (_MODE_ENV, self._saved_mode)):
+            if saved is None:
+                os.environ.pop(env, None)
+            else:
+                os.environ[env] = saved
 
     def test_status_reports_unconfigured_without_env(self) -> None:
         resp = self.client.get("/probe/status")
@@ -125,6 +139,35 @@ class TestProbeApi(unittest.TestCase):
         os.environ[_SOCKET_ENV] = os.path.join(tempfile.mkdtemp(), "absent.sock")
         resp = self.client.post("/probe/capture", json={"agents": ["pr-bot-sdk"]})
         self.assertEqual(resp.status_code, 503)
+
+    def test_env_socket_wins_over_canonical_fallback(self) -> None:
+        # When the env IS set, it is authoritative and the mode defaults to live
+        # (operator-set socket targets the privileged broker). The canonical
+        # fallback (patched absent) must not shadow it.
+        os.environ[_SOCKET_ENV] = "/some/explicit/broker.sock"
+        body = self.client.get("/probe/status").json()
+        self.assertTrue(body["configured"])
+        self.assertEqual(body["mode"], "live")
+
+    def test_canonical_socket_fallback_when_env_unset(self) -> None:
+        # The friction this closes: a standalone `api restart` dropped the env
+        # but the auto-started broker is still up at .run/probe.sock. Status must
+        # report configured + replay (R13: the auto broker is replay, not live),
+        # and a capture must relay to that socket -- WITHOUT the env being set.
+        broker = _StubBroker(_BROKER_OK)
+        self.addCleanup(broker.close)
+        with mock.patch(
+            "recette.api.routers.probe._canonical_socket",
+            return_value=Path(broker.path),
+        ):
+            status = self.client.get("/probe/status").json()
+            self.assertTrue(status["configured"])
+            self.assertEqual(status["mode"], "replay")
+            resp = self.client.post("/probe/capture", json={"agents": ["pr-bot-sdk"]})
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.json()["recording"]["status"], "ok")
+        # The env was never set: the fallback alone made the capture work.
+        self.assertNotIn(_SOCKET_ENV, os.environ)
 
 
 if __name__ == "__main__":
