@@ -82,3 +82,46 @@ references publiques ; jamais invente (R13).
 Compile-verifie : la crate eBPF construit un vrai objet `Linux BPF` portant les deux
 programmes tracepoint + les deux maps (readelf). L'attach/capture en live necessite
 CAP_BPF (le broker) et n'est PAS prouve hors d'une execution privilegiee (frontiere R14).
+
+## Vague 2 (2026-06-18) -- observabilite agregee + graphe d'interaction
+
+Suite a l'analyse de 7 repos supplementaires d'observabilite d'agents. Verdict
+honnete : ~80% des mecanismes etaient deja couverts (OTel `recette/otel.py`,
+capture `recette/capture/`, control plane, discovery/surface, ProxyTrace,
+ReplayLlm). Deux GAPS reels repris ci-dessous ; le reste documente comme
+deja-couvert ou deliberement non-pris.
+
+### cogniolab/agent-monitor + IBM/agentic-tool-monitoring-blog + dynatrace examples -- METRIQUES agregees
+
+| Upstream (mecanisme) | Adaptation locale | Reutilise vs adapte |
+|----------------------|-------------------|---------------------|
+| cogniolab : metriques `agent.latency.p50/p95/p99`, `agent.requests.error_rate`, cost USD, agregation Collector->Processor | `recette/capture/metrics.py::summarize_metrics` : p50/p95/p99 (nearest-rank pur), error_rate, tokens, cost ; par agent + par outil ; `GET /metrics/summary` ; page `/metrics` | PATTERN + JEU DE METRIQUES reutilises ; agregation pure (I4) sur le `CaptureStore` existant (pas de TimescaleDB) |
+| IBM : baselines par outil + detection d'anomalie (latence/erreur/volume) deleguee au backend | flag `health=degraded` quand error_rate > seuil (env `INSPECT_IA_AGENTS_METRICS_ERROR_THRESHOLD`, R5) -- signal d'anomalie derive des traces, calcule en local (pas de backend tiers) | PATTERN d'anomalie reutilise ; calcul local pur |
+| dynatrace : `gen_ai.usage.input_tokens/output_tokens`, cost par etape, hierarchie de spans GenAI | tokens/cout deja captures (`LlmCallTrace`) et desormais agreges par /metrics ; la hierarchie de spans GenAI existait deja (`recette/otel.py` invoke_agent/execute_tool) | DEJA COUVERT (spans) + agregation ajoutee |
+
+### chanchimin/AgentMonitor -- GRAPHE d'interaction multi-agent
+
+| Upstream (mecanisme) | Adaptation locale | Reutilise vs adapte |
+|----------------------|-------------------|---------------------|
+| graphe d'execution dirige (noeud=agent, arete=flux d'info) + attributs de graphe (Weighted PageRank pondere par tokens, degres, centralite) | `recette/orchestration_graph.py::interaction_graph` : graphe dirige depuis les handoffs d'un `OrchestrationRun`, PageRank pondere (power iteration pure, deterministe I4), in/out degree, tool_calls ; `GET /subjects/orchestration/{id}/graph` ; page `/graph` | PATTERN graphe + PageRank pondere reutilises ; calcul pur stdlib |
+| `register(agent, input_func, output_func)` plug-and-play (wrap I/O) | NON utilise : nos runs d'orchestration produisent deja le `run.json` (hops + calls) -- la source du graphe existe | SOURCE DEJA DISPONIBLE |
+| predict-before-execute (regresseur XGBoost, Spearman 0.89) | NON PRIS : dependance ML hors-stdlib (viole R20 zero-dep). Note pour evolution future si un extra `[ml]` est justifie | DELIBEREMENT NON-PRIS |
+| post-edit (edition LLM de la reponse avant sortie) | DEJA COUVERT conceptuellement : le control plane medie/bloque avant effet (I2/I6) | DEJA COUVERT |
+
+### microsoft/discovery -- registre/metadata
+
+DEJA COUVERT pour l'essentiel : le concept registry/catalog existe (`/subjects`
+listing + page `/registry` + `corpus/schemas/agent-manifest.schema.json` a
+discriminant `kind`). Le seul ecart = des champs metadata additionnels
+(`compliance` hipaa/soc2, `publisher`, `party` 1p/3p). NON-PRIS pour l'instant :
+additif-optionnel au schema possible mais sans valeur tant que les sujets du
+corpus ne les portent pas (l'ajouter exigerait d'auteur du ground-truth, R20) ;
+note pour evolution.
+
+### michaelalbada/BuildingApplicationsWithAIAgents + topic ai-agent-observability
+
+DEJA COUVERT / confirmation de positionnement. Spec->N adapters + AIJudge/gold
+= notre modele manifest+scenario+ground-truth juge sur 4 dimensions. Le topic
+confirme que le gap rare du paysage (gouvernance/mediation au bord, replay
+deterministe lie a la policy, recette mono-axe pass/fail) est exactement notre
+differenciateur -- deja en place.
