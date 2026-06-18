@@ -55,8 +55,14 @@ function MetricsTable({
           </thead>
           <tbody>
             {keys.map((k) => (
-              <tr key={k}>
-                <td className="metrics-id">{k}</td>
+              <tr key={k} className={rows[k].health === "degraded" ? "metrics-row-degraded" : ""}>
+                <td className="metrics-id">
+                  <span
+                    className={`metrics-health metrics-health-${rows[k].health}`}
+                    title={rows[k].health === "degraded" ? "taux d'erreur eleve" : "sain"}
+                  />
+                  {k}
+                </td>
                 {cells(rows[k]).map((v, i) => (
                   <td key={i} className={i === 1 && rows[k].error_rate > 0 ? "metrics-err" : ""}>
                     {v}

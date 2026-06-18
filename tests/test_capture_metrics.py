@@ -51,6 +51,16 @@ class TestSummarize(unittest.TestCase):
         self.assertEqual(s["tools"]["read_repo"]["error_rate"], 0.5)
         # cost None without a pricing table (never a guessed zero).
         self.assertIsNone(s["totals"]["cost_usd"])
+        # Anomaly flag: read_repo at 50% errors is degraded; open_pr is ok.
+        self.assertEqual(s["tools"]["read_repo"]["health"], "degraded")
+        self.assertEqual(s["tools"]["open_pr"]["health"], "ok")
+
+    def test_error_threshold_is_configurable(self) -> None:
+        traces = [_t("a", "x", 5, 1, 1, err="e"), _t("a", "x", 5, 1, 1)]  # 50% errors
+        self.assertEqual(summarize_metrics(traces, error_threshold=0.6)["totals"]["health"], "ok")
+        self.assertEqual(
+            summarize_metrics(traces, error_threshold=0.4)["totals"]["health"], "degraded"
+        )
 
     def test_deterministic(self) -> None:
         traces = [_t("a", "x", 5, 1, 1), _t("a", "y", 9, 2, 2)]

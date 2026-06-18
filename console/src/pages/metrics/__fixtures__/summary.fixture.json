@@ -9,7 +9,8 @@
       "p95": 340,
       "p99": 340
     },
-    "cost_usd": null
+    "cost_usd": null,
+    "health": "ok"
   },
   "agents": {
     "gh-pr-bot": {
@@ -22,7 +23,8 @@
         "p95": 340,
         "p99": 340
       },
-      "cost_usd": null
+      "cost_usd": null,
+      "health": "degraded"
     },
     "okta-bot": {
       "calls": 1,
@@ -34,7 +36,8 @@
         "p95": 90,
         "p99": 90
       },
-      "cost_usd": null
+      "cost_usd": null,
+      "health": "ok"
     }
   },
   "tools": {
@@ -48,7 +51,8 @@
         "p95": 90,
         "p99": 90
       },
-      "cost_usd": null
+      "cost_usd": null,
+      "health": "ok"
     },
     "open_pr": {
       "calls": 1,
@@ -60,7 +64,8 @@
         "p95": 260,
         "p99": 260
       },
-      "cost_usd": null
+      "cost_usd": null,
+      "health": "ok"
     },
     "read_repo": {
       "calls": 2,
@@ -72,7 +77,8 @@
         "p95": 340,
         "p99": 340
       },
-      "cost_usd": null
+      "cost_usd": null,
+      "health": "degraded"
     }
   }
 }

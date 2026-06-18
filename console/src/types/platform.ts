@@ -874,6 +874,8 @@ export interface MetricGroup {
   total_tokens: number;
   latency_ms: { p50: number; p95: number; p99: number };
   cost_usd: number | null;
+  /** Anomaly flag: "degraded" when the error rate exceeds the threshold. */
+  health: "ok" | "degraded";
 }
 
 /** Operational metrics digest (GET /metrics/summary): per-agent + per-tool. */

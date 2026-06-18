@@ -25,9 +25,20 @@ def _percentile(sorted_vals: list[int], q: float) -> int:
     return sorted_vals[min(rank, len(sorted_vals)) - 1]
 
 
-def _group_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None) -> dict:
+#: Default error-rate above which a group is flagged "degraded" (R5: a single
+#: knob; the router may override from the environment). A trace-derived baseline
+#: anomaly signal, in the spirit of the IBM/cogniolab tool-monitoring approach.
+DEFAULT_ERROR_THRESHOLD = 0.25
+
+
+def _group_metrics(
+    traces: list[LlmCallTrace],
+    pricing: PricingTable | None,
+    error_threshold: float,
+) -> dict:
     n = len(traces)
     errors = sum(1 for t in traces if t.error)
+    error_rate = round(errors / n, 4) if n else 0.0
     total_tokens = sum(t.total_tokens for t in traces)
     latencies = sorted(t.latency_ms for t in traces)
     cost: float | None = None
@@ -37,7 +48,7 @@ def _group_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None) -> 
     return {
         "calls": n,
         "errors": errors,
-        "error_rate": round(errors / n, 4) if n else 0.0,
+        "error_rate": error_rate,
         "total_tokens": total_tokens,
         "latency_ms": {
             "p50": _percentile(latencies, 50),
@@ -45,14 +56,22 @@ def _group_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None) -> 
             "p99": _percentile(latencies, 99),
         },
         "cost_usd": cost,
+        # Anomaly flag: degraded when the error rate exceeds the threshold.
+        "health": "degraded" if error_rate > error_threshold else "ok",
     }
 
 
-def summarize_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None = None) -> dict:
+def summarize_metrics(
+    traces: list[LlmCallTrace],
+    pricing: PricingTable | None = None,
+    error_threshold: float = DEFAULT_ERROR_THRESHOLD,
+) -> dict:
     """Per-agent and per-tool operational metrics over captured traces.
 
     ``cost_usd`` is ``None`` when no pricing table is supplied or no priced
-    model is present (never a guessed zero, see ``cost.py``).
+    model is present (never a guessed zero, see ``cost.py``). Each group carries
+    a ``health`` flag (``degraded`` when its error rate exceeds
+    ``error_threshold``) -- a trace-derived anomaly signal.
     """
     by_agent: dict[str, list[LlmCallTrace]] = defaultdict(list)
     by_tool: dict[str, list[LlmCallTrace]] = defaultdict(list)
@@ -61,7 +80,11 @@ def summarize_metrics(traces: list[LlmCallTrace], pricing: PricingTable | None =
         if t.tool_name:
             by_tool[t.tool_name].append(t)
     return {
-        "totals": _group_metrics(traces, pricing),
-        "agents": {a: _group_metrics(ts, pricing) for a, ts in sorted(by_agent.items())},
-        "tools": {tool: _group_metrics(ts, pricing) for tool, ts in sorted(by_tool.items())},
+        "totals": _group_metrics(traces, pricing, error_threshold),
+        "agents": {
+            a: _group_metrics(ts, pricing, error_threshold) for a, ts in sorted(by_agent.items())
+        },
+        "tools": {
+            t: _group_metrics(ts, pricing, error_threshold) for t, ts in sorted(by_tool.items())
+        },
     }
