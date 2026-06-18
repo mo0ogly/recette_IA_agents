@@ -60,7 +60,8 @@ export type HelpTopicKey =
   | "discovery"
   | "observability"
   | "control"
-  | "metrics";
+  | "metrics"
+  | "graph";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1614,6 +1615,31 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           captures), pas un chemin de decision ni de jugement -- elles n&apos;entrent jamais dans
           le replay (I4). Le cout est <code>null</code> (affiche <code>—</code>) tant qu&apos;aucun
           prix n&apos;est connu : jamais un zero invente.
+        </p>
+      </>
+    ),
+  },
+  graph: {
+    title: "Aide — Graphe d'interaction",
+    summary:
+      "Un run d'orchestration multi-agent comme graphe dirige : noeuds = participants, aretes = handoffs (poids = nombre). PageRank pondere = par quel agent le run transite. Lecture seule, deterministe (I4).",
+    body: (
+      <>
+        <p>
+          Cette page rend un <strong>run d&apos;orchestration</strong> sous forme de{" "}
+          <strong>graphe dirige</strong> : chaque participant est un noeud, chaque{" "}
+          <strong>handoff</strong> (transfert source -&gt; cible) une arete ponderee par son
+          nombre d&apos;occurrences. Par noeud : degre entrant/sortant, nombre d&apos;appels
+          d&apos;outil, et <strong>PageRank pondere</strong>.
+        </p>
+        <h3>A quoi sert le PageRank</h3>
+        <p>
+          Le PageRank pondere par le volume de handoffs revele <strong>par quel agent le run
+          transite reellement</strong> -- un signal d&apos;observabilite et de risque (un agent a
+          fort PageRank concentre le flux). Le mecanisme est repris d&apos;AgentMonitor (attributs
+          de graphe sur les echanges) ; le regresseur ML de prediction n&apos;est pas pris (dep
+          hors-stdlib, R20). Calcul <strong>pur et deterministe</strong> (power iteration a nombre
+          d&apos;iterations fixe).
         </p>
       </>
     ),

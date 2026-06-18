@@ -122,6 +122,30 @@ def orchestration_view(agent_id: str) -> dict:
     return view
 
 
+def build_orchestration_graph(agent_id: str) -> dict | None:
+    """Pure: the directed interaction graph + graph metrics of an orchestration
+    subject's run, or None when the subject is unknown."""
+    from ...maf_orchestration import run_from_doc
+    from ...orchestration_graph import interaction_graph
+
+    for d in discover_orchestration_dirs():
+        if d.name != agent_id:
+            continue
+        run = run_from_doc(load_validated("maf_orchestration_run", d / "run.json"))
+        return interaction_graph(run)
+    return None
+
+
+@router.get("/orchestration/{agent_id}/graph")
+def orchestration_graph(agent_id: str) -> dict:
+    """The interaction graph (nodes + weighted edges) + per-node graph metrics
+    (in/out degree, tool calls, weighted PageRank) of an orchestration run."""
+    graph = build_orchestration_graph(agent_id)
+    if graph is None:
+        raise HTTPException(status_code=404, detail=f"no orchestration subject {agent_id!r}")
+    return graph
+
+
 @router.get("/benchmark")
 def benchmark() -> dict:
     """Judge-accuracy benchmark per dimension / style / area over the corpus."""

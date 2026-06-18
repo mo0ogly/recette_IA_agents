@@ -6,6 +6,7 @@ import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
 import ControlPage from "./pages/control";
+import GraphPage from "./pages/graph";
 import MetricsPage from "./pages/metrics";
 import CampaignsPage from "./pages/campaigns";
 import CorpusPage from "./pages/corpus";
@@ -103,6 +104,9 @@ export default function App(): JSX.Element {
           <NavLink to="/metrics" className={navLinkClass}>
             Metriques
           </NavLink>
+          <NavLink to="/graph" className={navLinkClass}>
+            Graphe
+          </NavLink>
           <NavLink to="/proxy" className={navLinkClass}>
             Proxy
             <ProxyNavBadge />
@@ -132,6 +136,7 @@ export default function App(): JSX.Element {
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/control" element={<ControlPage />} />
           <Route path="/metrics" element={<MetricsPage />} />
+          <Route path="/graph" element={<GraphPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />

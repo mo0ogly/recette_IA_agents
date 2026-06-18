@@ -491,6 +491,18 @@ def _verify_metrics(page: Page, console: str) -> None:
     _shot(page, "metrics")
 
 
+def _verify_graph(page: Page, console: str) -> None:
+    # The interaction-graph page: pick an orchestration subject (auto-selected),
+    # render the directed graph + per-node graph metrics (PageRank etc).
+    page.goto(f"{console}/graph", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("graph-metrics").wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect(
+        "pagerank" in page.get_by_test_id("graph-metrics").inner_text().lower(),
+        "graph metrics table renders",
+    )
+    _shot(page, "interaction-graph")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -522,6 +534,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # The Control plane page: architecture diagram + live governance digest.
             _verify_control(page, console)
             _verify_metrics(page, console)
+            _verify_graph(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")

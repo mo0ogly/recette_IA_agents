@@ -1,0 +1,48 @@
+/* Interaction graph page (theme tokens only). */
+.graph-note {
+  margin: 0.5rem 0 1rem;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-surface, rgba(127, 127, 127, 0.06));
+  color: var(--color-text-muted, inherit);
+  font-size: 0.9rem;
+  max-width: 80ch;
+}
+
+.graph-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.graph-error {
+  color: var(--badge-red-fg);
+}
+
+.graph-table {
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.88rem;
+}
+
+.graph-table th,
+.graph-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.35rem 0.7rem;
+  text-align: right;
+  color: var(--color-text);
+}
+
+.graph-table th:first-child,
+.graph-table td:first-child {
+  text-align: left;
+}
+
+.graph-table th {
+  color: var(--color-text-muted);
+}
+
+.graph-id {
+  font-family: monospace;
+}

@@ -882,3 +882,25 @@ export interface MetricsSummary {
   agents: Record<string, MetricGroup>;
   tools: Record<string, MetricGroup>;
 }
+
+/** One node of a multi-agent interaction graph (per-agent graph metrics). */
+export interface GraphNode {
+  id: string;
+  in_degree: number;
+  out_degree: number;
+  tool_calls: number;
+  pagerank: number;
+}
+
+/** One weighted directed edge (a handoff source -> target, weight = count). */
+export interface GraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+/** The interaction graph of an orchestration run (nodes + weighted edges). */
+export interface OrchestrationGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}

@@ -1,0 +1,45 @@
+{
+  "agent_id": "support-handoff-correct",
+  "graph": {
+    "nodes": [
+      {
+        "id": "order",
+        "in_degree": 1,
+        "out_degree": 0,
+        "tool_calls": 1,
+        "pagerank": 0.3032
+      },
+      {
+        "id": "refund",
+        "in_degree": 1,
+        "out_degree": 1,
+        "tool_calls": 1,
+        "pagerank": 0.3032
+      },
+      {
+        "id": "triage",
+        "in_degree": 1,
+        "out_degree": 2,
+        "tool_calls": 0,
+        "pagerank": 0.3936
+      }
+    ],
+    "edges": [
+      {
+        "source": "refund",
+        "target": "triage",
+        "weight": 1
+      },
+      {
+        "source": "triage",
+        "target": "order",
+        "weight": 1
+      },
+      {
+        "source": "triage",
+        "target": "refund",
+        "weight": 1
+      }
+    ]
+  }
+}

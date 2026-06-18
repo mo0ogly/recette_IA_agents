@@ -29,6 +29,7 @@ import type {
   MetricsSummary,
   ObservabilityTrace,
   ObservabilityTraceSummary,
+  OrchestrationGraph,
   PendingApproval,
   PolicyDocument,
   ProxyDebugStatus,
@@ -1290,4 +1291,12 @@ export function getControlSummary(): Promise<ControlSummary> {
  *  error rate, tokens, cost). Raw JSON, no envelope. */
 export function getMetricsSummary(): Promise<MetricsSummary> {
   return request<MetricsSummary>("/metrics/summary", { method: "GET" });
+}
+
+/** The interaction graph + graph metrics of an orchestration subject's run. */
+export function getOrchestrationGraph(agentId: string): Promise<OrchestrationGraph> {
+  return request<OrchestrationGraph>(
+    `/subjects/orchestration/${encodeURIComponent(agentId)}/graph`,
+    { method: "GET" },
+  );
 }
