@@ -1306,3 +1306,13 @@ export function getOrchestrationGraph(agentId: string): Promise<OrchestrationGra
 export function getAgentRegistry(): Promise<AgentRegistry> {
   return request<AgentRegistry>("/registry/agents", { method: "GET" });
 }
+
+/** Token-rich OTLP/JSON GenAI spans for a run's captured traces (gen_ai.usage
+ *  tokens + cost), interoperable with any OTel backend. Empty doc for an
+ *  unknown run. */
+export function getCaptureOtlp(runId: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(
+    `/capture/otlp?run_id=${encodeURIComponent(runId)}`,
+    { method: "GET" },
+  );
+}

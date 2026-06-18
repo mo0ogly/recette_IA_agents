@@ -39,6 +39,11 @@ class CaptureStore:
         with self._lock:
             return [t.to_dict() for t in self._rings.get(run_id, ())]
 
+    def run_traces(self, run_id: str) -> list[LlmCallTrace]:
+        """The captured trace objects for one run (for OTLP export, ordered)."""
+        with self._lock:
+            return list(self._rings.get(run_id, ()))
+
     def all_traces(self) -> list[LlmCallTrace]:
         """Every captured trace across all runs (for the metrics aggregate),
         ordered by run then capture order. A bounded snapshot (rings are

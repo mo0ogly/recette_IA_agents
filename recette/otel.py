@@ -39,6 +39,11 @@ AGENT_NAME = "gen_ai.agent.name"
 AGENT_ID = "gen_ai.agent.id"
 TOOL_NAME = "gen_ai.tool.name"
 TOOL_CALL_ID = "gen_ai.tool.call.id"
+# Token + cost attribution (dynatrace/OTel GenAI usage conventions). Emitted on
+# capture-sourced spans where the captured trace carries the token counts.
+USAGE_INPUT = "gen_ai.usage.input_tokens"
+USAGE_OUTPUT = "gen_ai.usage.output_tokens"
+COST_USD = "inspect_ia_agents.cost_usd"
 # inspect_ia_agents-specific attributes for the canonical AgentActionEvent fields that
 # have no GenAI equivalent (target system, identity-in-use, side-effect class).
 TARGET_SYSTEM = "inspect_ia_agents.target_system"
@@ -255,6 +260,67 @@ def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
                 RESOURCE: str(action.get("resource", "")),
                 APPROVED: int(bool(action.get("approved", False))),
             },
+        )
+    return spans
+
+
+def capture_spans(traces: list[dict], seed: str) -> list[GenAiSpan]:
+    """Map a run's captured LLM traces to TOKEN-RICH GenAI spans.
+
+    Unlike the recording-sourced spans, the capture surface carries the token
+    counts (and cost when a pricing table priced them), so these execute_tool
+    spans emit ``gen_ai.usage.input_tokens`` / ``output_tokens`` (and the cost
+    attribute) -- the dynatrace/OTel GenAI usage conventions. ``traces`` are the
+    ``LlmCallTrace.to_dict(pricing)`` dicts (keys: agent_id, tool_name, resource,
+    prompt_tokens, completion_tokens, latency_ms; optional ``cost``). The span
+    duration uses the captured ``latency_ms`` (an operational value, not a
+    decision input). Deterministic given the (ordered) trace list.
+    """
+    if not traces:
+        return []
+    trace_id = _trace_id(seed)
+    spans: list[GenAiSpan] = [
+        GenAiSpan(
+            name=f"{OP_INVOKE_AGENT} {seed}",
+            span_id=_span_id(seed, 0),
+            parent_span_id="",
+            trace_id=trace_id,
+            start_nano=0,
+            end_nano=_STEP_NANO,
+            attributes={SYSTEM: _SYSTEM, OP: OP_INVOKE_AGENT, AGENT_NAME: seed, AGENT_ID: seed},
+        )
+    ]
+    root_id = spans[0].span_id
+    cursor = 0
+    for idx, trace in enumerate(traces, start=1):
+        tool = trace.get("tool_name")
+        if not tool:
+            continue  # a final answer carries no tool span
+        latency = max(1, int(trace.get("latency_ms", 0))) * _STEP_NANO
+        start = cursor
+        cursor += latency
+        attrs: dict[str, str | int] = {
+            SYSTEM: _SYSTEM,
+            OP: OP_EXECUTE_TOOL,
+            TOOL_NAME: str(tool),
+            AGENT_ID: str(trace.get("agent_id", seed)),
+            RESOURCE: str(trace.get("resource", "")),
+            USAGE_INPUT: int(trace.get("prompt_tokens", 0)),
+            USAGE_OUTPUT: int(trace.get("completion_tokens", 0)),
+        }
+        cost = trace.get("cost")
+        if isinstance(cost, (int, float)):
+            attrs[COST_USD] = str(cost)
+        spans.append(
+            GenAiSpan(
+                name=f"{OP_EXECUTE_TOOL} {tool}",
+                span_id=_span_id(seed, idx),
+                parent_span_id=root_id,
+                trace_id=trace_id,
+                start_nano=start,
+                end_nano=start + latency,
+                attributes=attrs,
+            )
         )
     return spans
 
