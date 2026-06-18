@@ -1,0 +1,66 @@
+/* Agent registry page (theme tokens only). */
+.registry-note {
+  margin: 0.5rem 0 1rem;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-surface, rgba(127, 127, 127, 0.06));
+  color: var(--color-text-muted, inherit);
+  font-size: 0.9rem;
+  max-width: 80ch;
+}
+
+.registry-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.registry-count {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.registry-error {
+  color: var(--badge-red-fg);
+}
+
+.registry-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+
+.registry-table th,
+.registry-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  color: var(--color-text);
+}
+
+.registry-table th {
+  color: var(--color-text-muted);
+}
+
+.registry-id {
+  font-family: monospace;
+}
+
+.registry-party {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 0.78rem;
+}
+
+.registry-party-1p {
+  border-color: var(--badge-green-fg, #2e7d32);
+  color: var(--badge-green-fg, #2e7d32);
+}
+
+.registry-party-3p {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

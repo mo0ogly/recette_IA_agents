@@ -906,3 +906,26 @@ export interface OrchestrationGraph {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+/** One row of the generated agent registry (microsoft/discovery-style). */
+export interface RegistryAgent {
+  agent_id: string;
+  name: string | null;
+  kind: string;
+  family: string;
+  version: string | null;
+  target_systems: string[];
+  capabilities: number;
+  standard: string | null;
+  publisher: string | null;
+  compliance: string[];
+  party: string | null;
+  tags: string[];
+}
+
+/** The generated agent registry (GET /registry/agents): a derived aggregate. */
+export interface AgentRegistry {
+  generated: boolean;
+  count: number;
+  agents: RegistryAgent[];
+}

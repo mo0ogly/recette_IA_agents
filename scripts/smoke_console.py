@@ -503,6 +503,15 @@ def _verify_graph(page: Page, console: str) -> None:
     _shot(page, "interaction-graph")
 
 
+def _verify_registry(page: Page, console: str) -> None:
+    # The generated agent registry: one row per corpus subject + metadata.
+    page.goto(f"{console}/agent-registry", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    table = page.get_by_test_id("registry-table")
+    table.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect("gl-release-bot" in table.inner_text(), "registry lists the seeded subject")
+    _shot(page, "agent-registry")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -535,6 +544,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_control(page, console)
             _verify_metrics(page, console)
             _verify_graph(page, console)
+            _verify_registry(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")

@@ -61,7 +61,8 @@ export type HelpTopicKey =
   | "observability"
   | "control"
   | "metrics"
-  | "graph";
+  | "graph"
+  | "agent_registry";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1640,6 +1641,30 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           de graphe sur les echanges) ; le regresseur ML de prediction n&apos;est pas pris (dep
           hors-stdlib, R20). Calcul <strong>pur et deterministe</strong> (power iteration a nombre
           d&apos;iterations fixe).
+        </p>
+      </>
+    ),
+  },
+  agent_registry: {
+    title: "Aide — Agent registry",
+    summary:
+      "Registre GENERE des sujets du corpus (jamais ecrit a la main) : identite, kind/famille, version, capacites, provenance, et metadonnees optionnelles (publisher / compliance / party / tags). Lecture seule.",
+    body: (
+      <>
+        <p>
+          Cette page agrege tous les <strong>sujets du corpus</strong> (agents git + sujets MAF)
+          en un <strong>registre genere</strong> -- un aggregat <strong>derive</strong>, jamais
+          ecrit a la main (le concept auto-registry-on-merge de microsoft/discovery). Chaque ligne
+          porte l&apos;identite, le <code>kind</code>/famille, la version, les systemes cibles, le
+          nombre de capacites et la provenance d&apos;import.
+        </p>
+        <h3>Metadonnees de registre</h3>
+        <p>
+          Champs <strong>optionnels</strong> portes par le manifest (<code>metadata</code>) :{" "}
+          <strong>publisher</strong>, <strong>compliance</strong> (hipaa / soc2 / gdpr / pci_dss),{" "}
+          <strong>party</strong> (1p / 3p), <strong>tags</strong>. Absents = affiches{" "}
+          <code>—</code>, jamais inventes. Le filtre <em>party</em> distingue le first-party du
+          third-party.
         </p>
       </>
     ),

@@ -4,6 +4,7 @@ import AgentsPage from "./pages/agents";
 import AiBackendsPage from "./pages/ai-backends";
 import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
+import AgentRegistryPage from "./pages/agent-registry";
 import CatalogPage from "./pages/catalog";
 import ControlPage from "./pages/control";
 import GraphPage from "./pages/graph";
@@ -70,6 +71,9 @@ export default function App(): JSX.Element {
           <NavLink to="/registry" className={navLinkClass}>
             Catalogue
           </NavLink>
+          <NavLink to="/agent-registry" className={navLinkClass}>
+            Registry
+          </NavLink>
           <NavLink to="/probe" className={navLinkClass}>
             Probe
           </NavLink>
@@ -128,6 +132,7 @@ export default function App(): JSX.Element {
           <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/detect" element={<DetectPage />} />
           <Route path="/registry" element={<RegistryPage />} />
+          <Route path="/agent-registry" element={<AgentRegistryPage />} />
           <Route path="/probe" element={<ProbePage />} />
           <Route path="/corpus" element={<CorpusPage />} />
           <Route path="/sim" element={<SimPage />} />

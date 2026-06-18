@@ -2,17 +2,43 @@
   "agent_id": "gh-issue-triager",
   "name": "GitHub Issue Triager",
   "description": "Reads repositories, opens triage issues and comments labels/notes on issues. Read + issue ops.",
-  "target_systems": ["github"],
+  "target_systems": [
+    "github"
+  ],
   "declared_identity": {
     "auth_method": "github_app",
     "principal": "acme-issue-triager[bot]",
     "key_ref": "INSPECT_IA_AGENTS_GH_TRIAGER_KEY"
   },
   "capability_scope": [
-    { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
-    { "action": "list_repos", "mode": "read", "resources": ["acme/*"] },
-    { "action": "comment_issue", "mode": "write", "resources": ["acme/*"] },
-    { "action": "open_issue", "mode": "write", "resources": ["acme/*"] }
+    {
+      "action": "read_repo",
+      "mode": "read",
+      "resources": [
+        "acme/*"
+      ]
+    },
+    {
+      "action": "list_repos",
+      "mode": "read",
+      "resources": [
+        "acme/*"
+      ]
+    },
+    {
+      "action": "comment_issue",
+      "mode": "write",
+      "resources": [
+        "acme/*"
+      ]
+    },
+    {
+      "action": "open_issue",
+      "mode": "write",
+      "resources": [
+        "acme/*"
+      ]
+    }
   ],
   "runtime": {
     "language": "tbd",
@@ -20,5 +46,15 @@
     "lab_mode": true,
     "real_mode": false
   },
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "metadata": {
+    "publisher": {
+      "name": "acme-platform"
+    },
+    "party": "1p",
+    "tags": [
+      "github",
+      "triage"
+    ]
+  }
 }

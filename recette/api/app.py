@@ -63,6 +63,7 @@ from .routers import probe as probe_router
 from .routers import proxy as proxy_router
 from .routers import rag as rag_router
 from .routers import recette_campaigns as recette_campaigns_router
+from .routers import registry as registry_router
 from .routers import runs as runs_router
 from .routers import sim as sim_router
 from .routers import subjects as subjects_router
@@ -347,4 +348,5 @@ def create_app(
     app.include_router(dry_run_router.router)
     app.include_router(control_router.router)
     app.include_router(metrics_router.router)
+    app.include_router(registry_router.router)
     return app

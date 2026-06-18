@@ -12,6 +12,7 @@ import type {
   ActionSpec,
   AgentAction,
   AgentConfig,
+  AgentRegistry,
   CatalogRustSummary,
   CatalogSummary,
   DetectScanResult,
@@ -1299,4 +1300,9 @@ export function getOrchestrationGraph(agentId: string): Promise<OrchestrationGra
     `/subjects/orchestration/${encodeURIComponent(agentId)}/graph`,
     { method: "GET" },
   );
+}
+
+/** The generated agent registry (one row per corpus subject + metadata). */
+export function getAgentRegistry(): Promise<AgentRegistry> {
+  return request<AgentRegistry>("/registry/agents", { method: "GET" });
 }

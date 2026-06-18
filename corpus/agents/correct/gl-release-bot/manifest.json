@@ -39,5 +39,19 @@
     "lab_mode": true,
     "real_mode": false
   },
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "metadata": {
+    "publisher": {
+      "name": "acme-platform",
+      "contact": "platform@acme.test"
+    },
+    "compliance": [
+      "soc2"
+    ],
+    "party": "1p",
+    "tags": [
+      "gitlab",
+      "release"
+    ]
+  }
 }

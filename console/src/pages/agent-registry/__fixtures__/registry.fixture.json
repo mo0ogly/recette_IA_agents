@@ -1,0 +1,282 @@
+{
+  "generated": true,
+  "count": 16,
+  "agents": [
+    {
+      "agent_id": "diagnostic-behavior-anomaly",
+      "name": "Diagnostic Agent",
+      "kind": "maf_agent",
+      "family": "maf",
+      "version": "0.1.0",
+      "target_systems": [
+        "azureopenai",
+        "web_search",
+        "mcp"
+      ],
+      "capabilities": 3,
+      "standard": "microsoft-agent-framework",
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "diagnostic-capability-overreach",
+      "name": "Diagnostic Agent",
+      "kind": "maf_agent",
+      "family": "maf",
+      "version": "0.1.0",
+      "target_systems": [
+        "azureopenai",
+        "web_search",
+        "mcp"
+      ],
+      "capabilities": 3,
+      "standard": "microsoft-agent-framework",
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "diagnostic-correct",
+      "name": "Diagnostic Agent",
+      "kind": "maf_agent",
+      "family": "maf",
+      "version": "0.1.0",
+      "target_systems": [
+        "azureopenai",
+        "web_search",
+        "mcp"
+      ],
+      "capabilities": 3,
+      "standard": "microsoft-agent-framework",
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "diagnostic-identity-mismatch",
+      "name": "Diagnostic Agent",
+      "kind": "maf_agent",
+      "family": "maf",
+      "version": "0.1.0",
+      "target_systems": [
+        "azureopenai",
+        "web_search",
+        "mcp"
+      ],
+      "capabilities": 3,
+      "standard": "microsoft-agent-framework",
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "diagnostic-policy-violation",
+      "name": "Diagnostic Agent",
+      "kind": "maf_agent",
+      "family": "maf",
+      "version": "0.1.0",
+      "target_systems": [
+        "azureopenai",
+        "web_search",
+        "mcp"
+      ],
+      "capabilities": 3,
+      "standard": "microsoft-agent-framework",
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gh-comment-spam",
+      "name": "GitHub Commenter (spammy)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": "unknown-vendor",
+      "compliance": [],
+      "party": "3p",
+      "tags": [
+        "github"
+      ]
+    },
+    {
+      "agent_id": "gh-identity-spoof",
+      "name": "GitHub Reader (identity spoof)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 1,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gh-issue-triager",
+      "name": "GitHub Issue Triager",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 4,
+      "standard": null,
+      "publisher": "acme-platform",
+      "compliance": [],
+      "party": "1p",
+      "tags": [
+        "github",
+        "triage"
+      ]
+    },
+    {
+      "agent_id": "gh-readonly-overreach",
+      "name": "GitHub Read-Only Reporter (overreaching)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 1,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gh-unapproved-merge",
+      "name": "GitHub Merger (unapproved)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "ghost-unmediated-writer",
+      "name": "GitHub Ghost Writer (unmediated push)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "github"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gl-ci-spam",
+      "name": "GitLab CI Trigger (spammy)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "gitlab"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gl-identity-mismatch",
+      "name": "GitLab Reader (identity mismatch)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "gitlab"
+      ],
+      "capabilities": 1,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gl-readonly-overreach",
+      "name": "GitLab Read-Only Reporter (overreaching)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "gitlab"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    },
+    {
+      "agent_id": "gl-release-bot",
+      "name": "GitLab Release Bot",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "gitlab"
+      ],
+      "capabilities": 3,
+      "standard": null,
+      "publisher": "acme-platform",
+      "compliance": [
+        "soc2"
+      ],
+      "party": "1p",
+      "tags": [
+        "gitlab",
+        "release"
+      ]
+    },
+    {
+      "agent_id": "gl-unapproved-push",
+      "name": "GitLab Pusher (unapproved)",
+      "kind": "git_agent",
+      "family": "git",
+      "version": "1.0.0",
+      "target_systems": [
+        "gitlab"
+      ],
+      "capabilities": 2,
+      "standard": null,
+      "publisher": null,
+      "compliance": [],
+      "party": null,
+      "tags": []
+    }
+  ]
+}
