@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import unittest
 
-from recette.api.routers.control import summarize
+try:
+    # summarize is pure, but recette.api.routers.control imports fastapi at
+    # module level, so collection needs the [api] extra. Guard the import so the
+    # suite collects cleanly without it (R20); the test runs where fastapi is.
+    from recette.api.routers.control import summarize
+
+    _HAS_API = True
+except ImportError:  # pragma: no cover - depends on the [api] extra (fastapi)
+    _HAS_API = False
+
 from recette.platform.eventstore.protocol import StoredEvent
 
 
@@ -32,6 +41,7 @@ _LOG = [
 ]
 
 
+@unittest.skipUnless(_HAS_API, "requires the [api] extra (fastapi)")
 class TestSummarize(unittest.TestCase):
     def test_counts_verdicts_approvals_execution(self) -> None:
         s = summarize(_LOG)
@@ -63,6 +73,7 @@ except ImportError:  # pragma: no cover
 
 
 @unittest.skipUnless(_HAVE_FASTAPI, "fastapi not installed")
+@unittest.skipUnless(_HAS_API, "requires the [api] extra (fastapi)")
 class TestControlRoute(unittest.TestCase):
     def test_summary_endpoint_shape(self) -> None:
         client = TestClient(create_app())
