@@ -108,15 +108,22 @@ deja-couvert ou deliberement non-pris.
 | predict-before-execute (regresseur XGBoost, Spearman 0.89) | NON PRIS : dependance ML hors-stdlib (viole R20 zero-dep). Note pour evolution future si un extra `[ml]` est justifie | DELIBEREMENT NON-PRIS |
 | post-edit (edition LLM de la reponse avant sortie) | DEJA COUVERT conceptuellement : le control plane medie/bloque avant effet (I2/I6) | DEJA COUVERT |
 
-### microsoft/discovery -- registre/metadata
+### microsoft/discovery -- registre/metadata (PRIS)
 
-DEJA COUVERT pour l'essentiel : le concept registry/catalog existe (`/subjects`
-listing + page `/registry` + `corpus/schemas/agent-manifest.schema.json` a
-discriminant `kind`). Le seul ecart = des champs metadata additionnels
-(`compliance` hipaa/soc2, `publisher`, `party` 1p/3p). NON-PRIS pour l'instant :
-additif-optionnel au schema possible mais sans valeur tant que les sujets du
-corpus ne les portent pas (l'ajouter exigerait d'auteur du ground-truth, R20) ;
-note pour evolution.
+PRIS : le bloc `metadata` optionnel (publisher / compliance hipaa-soc2-gdpr-pci /
+party 1p-3p / tags) ajoute au schema manifest (additif, tous les sujets restent
+valides), 3 sujets semes en exemple ; un registre GENERE `GET /registry/agents`
+(auto-registry-on-merge : aggregat derive, jamais ecrit a la main) + page
+`/agent-registry` (filtre party). `recette/registry.py::registry_row` pur ;
+metadata absente -> `—`, jamais inventee.
+
+### dynatrace -- tokens/cout sur les spans OTel (PRIS)
+
+PRIS via la surface CAPTURE (qui porte les tokens) plutot que la surface
+recording (impedance des stores) : `recette/otel.py::capture_spans` emet
+`gen_ai.usage.input_tokens/output_tokens` + cout sur chaque span execute_tool ;
+`GET /capture/otlp?run_id=` rend le document OTLP/JSON, interoperable avec tout
+backend OTel. Seul element non pris de la vague 2 = le regresseur ML (R20).
 
 ### michaelalbada/BuildingApplicationsWithAIAgents + topic ai-agent-observability
 
