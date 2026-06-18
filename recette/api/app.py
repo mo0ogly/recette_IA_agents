@@ -56,6 +56,7 @@ from .routers import discovery as discovery_router
 from .routers import control as control_router
 from .routers import dry_run as dry_run_router
 from .routers import events as events_router
+from .routers import metrics as metrics_router
 from .routers import observability as observability_router
 from .routers import policies as policies_router
 from .routers import probe as probe_router
@@ -345,4 +346,5 @@ def create_app(
     app.include_router(observability_router.router)
     app.include_router(dry_run_router.router)
     app.include_router(control_router.router)
+    app.include_router(metrics_router.router)
     return app

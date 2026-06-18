@@ -38,3 +38,10 @@ class CaptureStore:
     def traces(self, run_id: str) -> list[dict]:
         with self._lock:
             return [t.to_dict() for t in self._rings.get(run_id, ())]
+
+    def all_traces(self) -> list[LlmCallTrace]:
+        """Every captured trace across all runs (for the metrics aggregate),
+        ordered by run then capture order. A bounded snapshot (rings are
+        capacity-capped); read-only."""
+        with self._lock:
+            return [trace for ring in self._rings.values() for trace in ring]

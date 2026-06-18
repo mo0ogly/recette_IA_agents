@@ -1,0 +1,69 @@
+/* Metrics page: per-agent / per-tool operational tables (theme tokens only). */
+.metrics-note {
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-surface, rgba(127, 127, 127, 0.06));
+  color: var(--color-text-muted, inherit);
+  font-size: 0.9rem;
+  max-width: 80ch;
+}
+
+.metrics-error {
+  color: var(--badge-red-fg);
+}
+
+.metrics-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.metrics-total-item {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.metrics-block h2 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.metrics-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+
+.metrics-table th,
+.metrics-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.35rem 0.6rem;
+  text-align: right;
+  color: var(--color-text);
+}
+
+.metrics-table th:first-child,
+.metrics-table td:first-child {
+  text-align: left;
+}
+
+.metrics-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.metrics-id {
+  font-family: monospace;
+}
+
+.metrics-err {
+  color: var(--badge-red-fg);
+  font-weight: 600;
+}
+
+.metrics-empty {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

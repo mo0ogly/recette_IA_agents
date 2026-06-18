@@ -865,3 +865,20 @@ export interface ControlSummary {
   denied_execution: number;
   deny_by_default: boolean;
 }
+
+/** One metric group (per-agent, per-tool, or totals) over captured traces. */
+export interface MetricGroup {
+  calls: number;
+  errors: number;
+  error_rate: number;
+  total_tokens: number;
+  latency_ms: { p50: number; p95: number; p99: number };
+  cost_usd: number | null;
+}
+
+/** Operational metrics digest (GET /metrics/summary): per-agent + per-tool. */
+export interface MetricsSummary {
+  totals: MetricGroup;
+  agents: Record<string, MetricGroup>;
+  tools: Record<string, MetricGroup>;
+}

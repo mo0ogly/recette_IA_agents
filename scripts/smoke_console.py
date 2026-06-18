@@ -482,6 +482,15 @@ def _verify_control(page: Page, console: str) -> None:
     _shot(page, "control-plane")
 
 
+def _verify_metrics(page: Page, console: str) -> None:
+    # The Metrics page: per-agent / per-tool operational digest over captured
+    # traces (GET /metrics/summary). The totals strip is always present.
+    page.goto(f"{console}/metrics", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("metrics-totals").wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect("appel" in page.get_by_test_id("metrics-totals").inner_text(), "metrics totals render")
+    _shot(page, "metrics")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -512,6 +521,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_help_modals(page, console)
             # The Control plane page: architecture diagram + live governance digest.
             _verify_control(page, console)
+            _verify_metrics(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")

@@ -59,7 +59,8 @@ export type HelpTopicKey =
   | "probe"
   | "discovery"
   | "observability"
-  | "control";
+  | "control"
+  | "metrics";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1590,6 +1591,29 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           dessous, les <strong>compteurs live</strong> (verdicts, approbations, executions) sont
           une projection <strong>lecture seule et deterministe</strong> du log -- la page ne
           decide ni n&apos;ecrit rien, elle <em>montre</em> ce que le Control plane a decide.
+        </p>
+      </>
+    ),
+  },
+  metrics: {
+    title: "Aide — Metriques",
+    summary:
+      "Metriques operationnelles sur les traces LLM capturees (surface hook in-process) : volume, taux d'erreur, latence p50/p95/p99, tokens et cout, par agent et par outil. Lecture seule.",
+    body: (
+      <>
+        <p>
+          Cette page agrege les <strong>traces LLM capturees</strong> (la surface hook
+          in-process, <code>CapturingLlm</code> -&gt; <code>CaptureStore</code>) en metriques
+          operationnelles : nombre d&apos;appels, <strong>taux d&apos;erreur</strong>, latence
+          (<strong>p50 / p95 / p99</strong>), tokens et <strong>cout</strong> (en USD quand une
+          table de prix est configuree). Par <strong>agent</strong> et par <strong>outil</strong>.
+        </p>
+        <h3>Operationnel, pas decisionnel</h3>
+        <p>
+          Ce sont des metriques <strong>a propos</strong> des runs (derivees des latences/tokens
+          captures), pas un chemin de decision ni de jugement -- elles n&apos;entrent jamais dans
+          le replay (I4). Le cout est <code>null</code> (affiche <code>—</code>) tant qu&apos;aucun
+          prix n&apos;est connu : jamais un zero invente.
         </p>
       </>
     ),

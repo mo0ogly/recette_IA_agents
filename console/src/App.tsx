@@ -6,6 +6,7 @@ import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import CatalogPage from "./pages/catalog";
 import ControlPage from "./pages/control";
+import MetricsPage from "./pages/metrics";
 import CampaignsPage from "./pages/campaigns";
 import CorpusPage from "./pages/corpus";
 import SimPage from "./pages/sim";
@@ -99,6 +100,9 @@ export default function App(): JSX.Element {
           <NavLink to="/observability" className={navLinkClass}>
             Observabilite
           </NavLink>
+          <NavLink to="/metrics" className={navLinkClass}>
+            Metriques
+          </NavLink>
           <NavLink to="/proxy" className={navLinkClass}>
             Proxy
             <ProxyNavBadge />
@@ -127,6 +131,7 @@ export default function App(): JSX.Element {
           <Route path="/ai-backends" element={<AiBackendsPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/control" element={<ControlPage />} />
+          <Route path="/metrics" element={<MetricsPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/audit" element={<AuditPage />} />

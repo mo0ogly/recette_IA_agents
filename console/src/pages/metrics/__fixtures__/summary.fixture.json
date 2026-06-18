@@ -1,0 +1,78 @@
+{
+  "totals": {
+    "calls": 4,
+    "errors": 1,
+    "error_rate": 0.25,
+    "total_tokens": 190,
+    "latency_ms": {
+      "p50": 120,
+      "p95": 340,
+      "p99": 340
+    },
+    "cost_usd": null
+  },
+  "agents": {
+    "gh-pr-bot": {
+      "calls": 3,
+      "errors": 1,
+      "error_rate": 0.3333,
+      "total_tokens": 165,
+      "latency_ms": {
+        "p50": 260,
+        "p95": 340,
+        "p99": 340
+      },
+      "cost_usd": null
+    },
+    "okta-bot": {
+      "calls": 1,
+      "errors": 0,
+      "error_rate": 0.0,
+      "total_tokens": 25,
+      "latency_ms": {
+        "p50": 90,
+        "p95": 90,
+        "p99": 90
+      },
+      "cost_usd": null
+    }
+  },
+  "tools": {
+    "list_users": {
+      "calls": 1,
+      "errors": 0,
+      "error_rate": 0.0,
+      "total_tokens": 25,
+      "latency_ms": {
+        "p50": 90,
+        "p95": 90,
+        "p99": 90
+      },
+      "cost_usd": null
+    },
+    "open_pr": {
+      "calls": 1,
+      "errors": 0,
+      "error_rate": 0.0,
+      "total_tokens": 38,
+      "latency_ms": {
+        "p50": 260,
+        "p95": 260,
+        "p99": 260
+      },
+      "cost_usd": null
+    },
+    "read_repo": {
+      "calls": 2,
+      "errors": 1,
+      "error_rate": 0.5,
+      "total_tokens": 127,
+      "latency_ms": {
+        "p50": 120,
+        "p95": 340,
+        "p99": 340
+      },
+      "cost_usd": null
+    }
+  }
+}

@@ -26,6 +26,7 @@ import type {
   ContainmentState,
   ControlSummary,
   DryRunResult,
+  MetricsSummary,
   ObservabilityTrace,
   ObservabilityTraceSummary,
   PendingApproval,
@@ -1283,4 +1284,10 @@ export function dryRunAgent(agent: AgentConfig): Promise<DryRunResult> {
  *  over the audit log). Raw JSON, no envelope. */
 export function getControlSummary(): Promise<ControlSummary> {
   return request<ControlSummary>("/control/summary", { method: "GET" });
+}
+
+/** Operational metrics over captured traces (per-agent / per-tool latency,
+ *  error rate, tokens, cost). Raw JSON, no envelope. */
+export function getMetricsSummary(): Promise<MetricsSummary> {
+  return request<MetricsSummary>("/metrics/summary", { method: "GET" });
 }
