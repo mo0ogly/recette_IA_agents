@@ -145,9 +145,19 @@ probe_broker_start() {
     mkdir -p "${RUN_DIR}"
     rm -f "${PROBE_SOCKET_PATH}"
     if _probe_live_capable; then
+        # Auto-build the watch-list from EVERY configured agent unless the
+        # operator pinned a manifest (INSPECT_IA_AGENTS_PROBE_MANIFEST). So a
+        # freshly-created agent is watchable without a manual manifest step.
+        local manifest="${PROBE_MANIFEST}"
+        if [ -z "${INSPECT_IA_AGENTS_PROBE_MANIFEST:-}" ]; then
+            local cfg="${INSPECT_IA_AGENTS_CONFIG_PATH:-${REPO_ROOT}/config/inspect_ia_agents.config.json}"
+            if ( cd "${REPO_ROOT}" && "$(py)" -m recette.platform.probe.manifest_gen --from-config "${cfg}" --out "${RUN_DIR}/probe-manifest.json" >/dev/null 2>&1 ); then
+                manifest="${RUN_DIR}/probe-manifest.json"
+            fi
+        fi
         hdr "START probe LIVE eBPF broker (socket ${PROBE_SOCKET_PATH}, mode live, CAP_BPF)"
         ( cd "${REPO_ROOT}" \
-            && nohup "${PROBE_LIVE_BROKER}" --socket "${PROBE_SOCKET_PATH}" --manifest "${PROBE_MANIFEST}" --audit "${PROBE_AUDIT_FILE}" --bpf-object "${PROBE_BPF_OBJECT}" >"${PROBE_LOG_FILE}" 2>&1 & \
+            && nohup "${PROBE_LIVE_BROKER}" --socket "${PROBE_SOCKET_PATH}" --manifest "${manifest}" --audit "${PROBE_AUDIT_FILE}" --bpf-object "${PROBE_BPF_OBJECT}" >"${PROBE_LOG_FILE}" 2>&1 & \
             echo $! >"${PROBE_PID_FILE}" )
         printf 'live\n' >"${PROBE_MODE_FILE}"
     else

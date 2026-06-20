@@ -14,6 +14,7 @@ Pure and deterministic (I4): same agent ids -> same manifest, sorted.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 # The kernel truncates ``comm`` to TASK_COMM_LEN (16 incl. NUL) -> 15 usable bytes.
 _COMM_MAX = 15
@@ -32,11 +33,24 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--agents", required=True, help="comma-separated agent ids")
+    parser.add_argument("--agents", help="comma-separated agent ids")
+    parser.add_argument(
+        "--from-config",
+        help="read agent ids from a config json (agents[].id); the launcher uses "
+        "this to auto-build the watch-list from every configured agent",
+    )
     parser.add_argument("--out", required=True, help="output manifest path")
     parser.add_argument("--max-duration-ms", type=int, default=5000)
     args = parser.parse_args(argv)
-    ids = [a.strip() for a in args.agents.split(",") if a.strip()]
+    ids: list[str] = []
+    if args.agents:
+        ids += [a.strip() for a in args.agents.split(",") if a.strip()]
+    if args.from_config:
+        try:
+            cfg = json.loads(Path(args.from_config).read_text(encoding="utf-8"))
+            ids += [a["id"] for a in cfg.get("agents", []) if a.get("id")]
+        except (OSError, ValueError):
+            pass
     manifest = build_manifest(ids, max_duration_ms=args.max_duration_ms)
     with open(args.out, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)
