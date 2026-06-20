@@ -668,6 +668,14 @@ export function getProxyDebugStatus(): Promise<ProxyDebugStatus> {
   return request<ProxyDebugStatus>("/proxy/debug", { method: "GET" });
 }
 
+/** Toggle side-effect trace recording at runtime (operator action). */
+export function setProxyDebug(enabled: boolean): Promise<{ debug_enabled: boolean }> {
+  return request<{ debug_enabled: boolean }>("/proxy/debug", {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 /** Discard the debug trace buffer (the append-only audit log is untouched, I1). */
 export function clearProxyTraces(): Promise<{ cleared: boolean }> {
   return request<{ cleared: boolean }>("/proxy/traces", { method: "DELETE" });

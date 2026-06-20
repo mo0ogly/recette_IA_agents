@@ -27,10 +27,11 @@ vi.mock("../../api/client", async (importOriginal) => {
     ...actual,
     getProxyTraces: vi.fn(),
     clearProxyTraces: vi.fn(),
+    setProxyDebug: vi.fn(),
   };
 });
 
-import { clearProxyTraces, getProxyTraces } from "../../api/client";
+import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
 import ProxyPage from "./index";
 
 const fixture = tracesFixture as ProxyTraceResponse;
@@ -80,6 +81,15 @@ describe("ProxyPage (R16 contract)", () => {
     vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
     renderPage();
     expect(await screen.findByRole("status")).toHaveTextContent("INSPECT_IA_AGENTS_PROXY_DEBUG");
+  });
+
+  it("toggles proxy debug on from the UI when it is off", async () => {
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
+    vi.mocked(setProxyDebug).mockResolvedValue({ debug_enabled: true });
+    renderPage();
+    const toggle = await screen.findByTestId("proxy-debug-toggle");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(setProxyDebug).toHaveBeenCalledWith(true));
   });
 
   it("clears the buffer through the API on demand", async () => {

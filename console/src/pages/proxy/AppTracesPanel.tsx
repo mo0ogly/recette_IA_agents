@@ -20,7 +20,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
-import { clearProxyTraces, getProxyTraces } from "../../api/client";
+import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
 import type { ProxyTrace } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import {
@@ -112,6 +112,17 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
     }
   }, [refresh]);
 
+  // Toggle side-effect trace recording at runtime (operator action): flip the
+  // backend switch then re-poll so the panel reflects the new state.
+  const onToggleDebug = useCallback(async (): Promise<void> => {
+    try {
+      await setProxyDebug(!debugEnabled);
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [debugEnabled, refresh]);
+
   const filter: ProxyTraceFilter = useMemo(
     () => ({
       agentId: agentId || undefined,
@@ -172,6 +183,17 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
         </button>
         <button type="button" className="proxy-clear" onClick={() => void onClear()}>
           Vider le tampon
+        </button>
+        <button
+          type="button"
+          className="proxy-mode-btn"
+          data-testid="proxy-debug-toggle"
+          data-active={debugEnabled === true}
+          onClick={() => void onToggleDebug()}
+        >
+          {debugEnabled
+            ? "Enregistrement actif - desactiver"
+            : "Activer l'enregistrement"}
         </button>
       </div>
 
