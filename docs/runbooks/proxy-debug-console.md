@@ -56,16 +56,23 @@ produit aucun effet de bord externe et n'est donc pas trace.
 | Methode | Chemin | Role |
 |--------|------|---------|
 | GET | `/proxy/debug` | `{debug_enabled, trace_count}` |
-| GET | `/proxy/traces?tail=N` | traces enregistrees (les plus anciennes d'abord ; `tail` conserve les N dernieres) |
+| POST | `/proxy/debug` | bascule le tracage a chaud `{enabled: bool}` -> `{debug_enabled}` (action operateur, loggee via tracing, jamais ecrite dans l'event store ; 422 si non-bool) |
+| GET | `/proxy/traces?tail=N&run_id=...` | traces enregistrees (les plus anciennes d'abord ; `tail` conserve les N dernieres ; `run_id` filtre un run) |
 | DELETE | `/proxy/traces` | vide le buffer (le log d'audit est intact, I1) |
 
 Exemple :
 
 ```
 curl -s http://127.0.0.1:8080/proxy/debug
+curl -s -X POST http://127.0.0.1:8080/proxy/debug -H 'Content-Type: application/json' -d '{"enabled":true}'
 curl -s "http://127.0.0.1:8080/proxy/traces?tail=50"
 curl -s -X DELETE http://127.0.0.1:8080/proxy/traces
 ```
+
+Le `POST /proxy/debug` permet de **basculer le tracage depuis l'UI** (interrupteur
+dans le sous-header de la source "traces app") sans redemarrer l'app : il bascule
+a la fois le drapeau `app.state` et le `TracingProxy` vivant (`set_enabled`). La
+valeur par defaut au boot reste celle de `INSPECT_IA_AGENTS_PROXY_DEBUG` (R5).
 
 ## Cablage real_saas
 
@@ -137,10 +144,45 @@ remplacement : la recette deterministe ne passe jamais par lui (I4 inchange), le
 
 ### Dans l'UX
 
-La page `/proxy` a une bascule de source : **traces app** (la liste des
-`ProxyTrace`) et **wire (mitmproxy)** (`WirePanel` : statut, liste de flows,
-detail requete/reponse, clear). Lorsque l'overlay n'est pas configure, le panneau
-montre comment l'activer plutot qu'une liste vide.
+La page `/proxy` est pilotee par un registre de sources (menu en tete, deep-link
+`?source=`). Quatre sources read-only :
+
+- **traces app** -- la liste des `ProxyTrace` (intention + reponse), filtres
+  agent/target/run, viewer Monaco, + un **interrupteur d'enregistrement** (POST
+  `/proxy/debug`, remplace l'ancienne banniere passive).
+- **wire (mitmproxy)** -- `WirePanel` : statut, liste de flows, detail
+  requete/reponse, clear, + un **bouton on/off de l'overlay** (POST
+  `/proxy/wire/overlay`). Overlay non configure -> le panneau montre comment
+  l'activer.
+- **reconciliation** -- la jointure wire<->audit (voir plus bas).
+- **sessions** -- les echanges agent<->serveur **groupes en sessions** (voir la
+  section dediee ci-dessous).
+
+En tete de page, un **mini-lanceur** (`LaunchPanel`) lance un agent runtime
+configure (POST `/runs` lane_b) et bascule automatiquement sur la source
+**sessions** preselectionnee sur ce run -- "lancer un agent et le voir live dans
+le proxy" en un ecran. Depuis le cockpit, un bouton "Voir dans le proxy"
+deep-linke un run vers sa session (`/proxy?source=sessions&run=<id>`).
+
+### Vue sessions -- echanges groupes + fusion wire
+
+La source **sessions** (`SessionsPanel`) regroupe les `ProxyTrace` en SESSIONS
+selectionnables par cle (`run` / `agent` / `agent->target`). Le groupement est
+PUR et deterministe (I4 : tri stable par `seq`, aucune horloge ; gere les runs
+concurrents entrelaces dans le ring global sans contamination croisee). Chaque
+session liste ses echanges ; deplier un echange montre la paire **requete<->
+reponse** (intention `action_type`+`resource`+`payload` ET reponse serveur), et
+"JSON complet" ouvre la trace brute dans Monaco.
+
+**Fusion wire** : quand l'overlay est actif, chaque echange dont les octets
+reseau ont ete captures porte un badge **`wire (octets)`** ; clic -> les octets
+bruts (method/host/path/status + bodies) dans Monaco. La jointure echange<->flow
+se fait par le `side_effect_hash` canonique (cf. correlation par run ci-dessous).
+Overlay eteint -> pas de badge, le reste de la vue est intact (degradation
+gracieuse).
+
+Live : poll 2s (quasi temps reel ; pas de push SSE). Lecture seule de bout en
+bout (I1).
 
 ### Choisir la route de transport (selecteur de proxy)
 
@@ -177,7 +219,32 @@ agent --(HTTP proxy)--> [mitmproxy container] --> lab / real system
 - `scripts/mitm_wire_addon.py` -- addon mitmdump : normalise chaque flow et le
   POST vers l'ingest de l'API (fail-safe, n'altere jamais le trafic).
 - Endpoints : `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`,
-  `run_id`), `DELETE /proxy/wire`, `GET /proxy/wire/status`.
+  `run_id` ; chaque flow porte aussi son `side_effect_hash` recalcule pour la
+  fusion sessions), `DELETE /proxy/wire`, `GET /proxy/wire/status`,
+  `POST /proxy/wire/overlay {action: up|down}` (controle l'overlay depuis l'UI ;
+  voir ci-dessous).
+
+### Correlation au run (x-inspect-run-id)
+
+Pour que les octets reseau se rattachent a un run/agent/session, le proxy lab
+injecte l'en-tete de requete **`x-inspect-run-id`** (le `run_id` du run). L'addon
+mitmproxy le lit et tague chaque `WireFlow` avec ce `run_id`. Cable :
+`resolve_proxy(run_id=...)` -> `LabHttpProxy(run_id=...)` -> en-tete par defaut du
+client HTTP. C'est une metadonnee de transport : elle n'entre pas dans le chemin
+de decision (I4) et le lab ignore un en-tete inconnu. Ainsi `GET
+/proxy/wire?run_id=` ne renvoie que les flows d'un run, et la reconciliation +
+la fusion sessions correlent par run.
+
+### Controle de l'overlay depuis l'UI (POST /proxy/wire/overlay)
+
+Le bouton on/off du panneau wire appelle `POST /proxy/wire/overlay {action}` qui
+execute `./recette.sh wire up|down`. **Deny par defaut** (fail-safe, R5) : l'API
+ne lance docker QUE si `INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL` est truthy (sinon
+403) ; action invalide -> 422 ; action operateur loggee via tracing (jamais dans
+l'event store). HONNETE : le script DEMARRE/ARRETE le conteneur ; router le
+trafic agent au travers exige encore que l'API tourne avec
+`INSPECT_IA_AGENTS_WIRE_PROXY` (ou la route de transport `wire`, ci-dessous) +
+confiance CA -- rapporte dans `next_step`.
 
 ### Le demarrer (R19, jamais de lancement manuel)
 
@@ -190,6 +257,13 @@ export INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:8083
 Les effets de bord de l'agent en mode lab (mock_local / declared_url) passent
 alors par mitmproxy et apparaissent dans le panneau wire. `./recette.sh wire
 down|status|logs` gerent le conteneur ; `wire ca` affiche le chemin de la CA.
+
+**Sans redemarrage** : le registre de route de transport porte deja une cible
+`wire` (proxy_url `:8083`). Apres `./recette.sh wire up`, selectionner la route
+`wire` (`POST /proxy/route {target:"wire"}` ou le `ProxySelector` dans l'UI)
+suffit a router les runs DEMARRES ENSUITE a travers l'overlay -- pas besoin de
+`INSPECT_IA_AGENTS_WIRE_PROXY` + restart pour le trafic HTTP du lab. (Le restart
++ env reste necessaire pour le HTTPS des systemes reels via la CA, ci-dessous.)
 
 ### HTTPS vers des systemes reels (real_saas)
 
@@ -226,6 +300,10 @@ pilote une requete a travers lui vers le lab, et asserte que le flow atteint
 |------|--------|
 | `tests/test_wire_proxy.py` | normalize/clamp de WireFlow, ring borne, seq monotone, immutabilite |
 | `tests/test_api_wire.py` | endpoints `/proxy/wire*` ; ingest/list/clear/status ; tail ; run_id ; 422 |
+| `tests/test_api_wire_overlay.py` | `POST /proxy/wire/overlay` : deny par defaut (403), 422 action invalide, ordre validation-avant-gate, subprocess mocke |
+| `tests/test_wire_run_correlation.py` | `LabHttpProxy(run_id=...)` pose l'en-tete `x-inspect-run-id` ; `resolve_proxy(run_id=...)` le threade ; absent sinon |
+| `tests/test_api_wire_session_hash.py` | `GET /proxy/wire` enrichit chaque flow d'un `side_effect_hash` (gouverne -> str, sinon null) -- la cle de fusion sessions |
+| `tests/test_api_proxy_debug_toggle.py` | `POST /proxy/debug` bascule a chaud l'etat + le TracingProxy ; 422 non-bool |
 
 ### Reconciliation wire-vs-audit -- detecter un chemin non mediatise (ghost-agent)
 
@@ -256,8 +334,12 @@ onglet "reconciliation"). Prouve de bout en bout par le smoke live
 directement sur `:9113` -> reconcile rapporte `ok:false` avec le bypass `:9113`)
 et par les suites unitaires/contrat deterministes (`tests/test_reconcile.py`,
 `test_api_reconcile.py`, `test_ghost_probe.py`, `ReconcilePanel.contract.test.tsx`).
-Une jointure par `side_effect_hash` au niveau du flow (ghost via une cible
-*allowlistee*) est la phase 3. Cela reste un LAB de recette : il *observe* le
+La jointure par `side_effect_hash` au niveau du flow (ghost via une cible
+*allowlistee*) est desormais IMPLEMENTEE (`reconcile_strict`, `GET
+/proxy/reconcile?strict=true` + bascule "strict" sur le panneau) : chaque flow
+gouverne vers une cible mediatisee doit aussi porter un `side_effect_hash`
+correspondant a un `ProxyTrace`, sinon `bypass_reason=no_audit_event`. Cela reste
+un LAB de recette : il *observe* le
 chemin non mediatise, il n'*applique* pas de blocage reseau. Bloquer en dur le
 chemin sortant direct (isolation reseau du pod, plus le handshake d'identite au
 boot de I3) est le travail de la plateforme, pas de la simulation. Le lab prepare
