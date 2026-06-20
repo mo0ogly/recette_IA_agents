@@ -97,6 +97,44 @@ def export_receipts_route(request: Request, run_id: str | None = None) -> dict:
     return export_receipts(chain_receipts([t.to_dict() for t in traces]))
 
 
+@router.get("/receipts/merkle")
+def receipts_merkle_route(request: Request, run_id: str | None = None) -> dict:
+    """The Merkle root committing to the current chained receipts (+ count).
+
+    A single value that commits to the whole batch; pair it with an inclusion
+    proof (below) to attest that ONE receipt is committed without disclosing the
+    others (selective disclosure). Pure given the snapshot (I4), content-free."""
+    from ...context_receipt import chain_receipts
+    from ...receipt_merkle import merkle_root
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    receipts = chain_receipts([t.to_dict() for t in traces])
+    return {"root": merkle_root(receipts), "count": len(receipts)}
+
+
+@router.get("/receipts/merkle/proof")
+def receipts_merkle_proof_route(request: Request, seq: int, run_id: str | None = None) -> dict:
+    """Inclusion proof that the receipt with ``seq`` is committed under the root.
+
+    Returns ``{leaf, index, count, root, path}`` -- the disclosed leaf plus the
+    sibling-hash audit path; a verifier reconstructs the root from these alone,
+    never the other receipts. A ``seq`` absent from the (run-scoped) selection is
+    a 404. Pure given the snapshot (I4), content-free."""
+    from ...context_receipt import chain_receipts
+    from ...receipt_merkle import inclusion_proof
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    receipts = chain_receipts([t.to_dict() for t in traces])
+    index = next((i for i, r in enumerate(receipts) if r.get("seq") == seq), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail=f"no receipt with seq {seq} in selection")
+    return inclusion_proof(receipts, index)
+
+
 @router.post("/receipts/verify-import")
 def verify_import_route(request: Request, envelope: dict) -> dict:
     """Cross-verify a third-party receipt export envelope (off-platform proof).
