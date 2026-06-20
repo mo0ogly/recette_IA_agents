@@ -103,6 +103,30 @@ def list_recordings(request: Request) -> dict:
     return {"recordings": _recordings(request).list()}
 
 
+@router.get("/recordings/list")
+def list_recordings_for_launcher(request: Request) -> list[dict]:
+    """Lean recordings list for the proxy launcher "replay a recording" option.
+
+    Returns a bare JSON array, each item keyed by ``id`` (plus the minimal
+    metadata the launcher shows), built from the SAME recording store the
+    replay route reads. Registered before ``/recordings/{recording_id}`` so the
+    literal path wins over the id capture. Read-only (I1); pure given the store
+    (I4).
+    """
+    recordings = _recordings(request).list()
+    return [
+        {
+            "id": rec.get("recording_id"),
+            "agent_id": rec.get("agent_id"),
+            "target_system": rec.get("target_system"),
+            "goal": rec.get("goal"),
+            "provider": rec.get("provider"),
+            "steps": rec.get("steps"),
+        }
+        for rec in recordings
+    ]
+
+
 @router.get("/recordings/{recording_id}")
 def get_recording(request: Request, recording_id: str) -> dict:
     try:
