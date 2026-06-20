@@ -174,3 +174,13 @@ real network connect, live, entirely from the UX after a one-time host grant.
 B and C are inert/no-op until A lands and caps are granted, so order: A (process
 entrypoint + replay test) -> broker pid/comm matching -> B (launcher + API mode)
 -> C (console) -> operator grant -> live UX proof.
+
+### Gap-free watch stream PROVEN LIVE (2026-06-20)
+
+The follow-up "gap-free stream" (broker `watch` command: attach once, drain per
+slice, stream recording lines) is live. Started the monitor, launched agents:
+`dx-live-bot` flagged on `ebpf_wire` after ~1 slice, from the console
+("Surveillance eBPF (live)" -> actif -> "dx-live-bot VU ebpf_wire"). The broker
+log shows a single "broker listening" with NO repeated capture attach -- one
+attach for the whole stream, nothing lost between slices.
+Screenshot docs/screenshots/sim/dx-ebpf-stream-live.png.
