@@ -18,5 +18,16 @@
       "replay": 2,
       "tracing": 12
     }
+  },
+  "surfaces": {
+    "total_agents": 2,
+    "detected_per_surface": {
+      "ebpf_wire": 2,
+      "hook_mcp": 1,
+      "hook_sdk": 1,
+      "hook_subprocess": 1
+    },
+    "ghosts": 0,
+    "ok": true
   }
 }

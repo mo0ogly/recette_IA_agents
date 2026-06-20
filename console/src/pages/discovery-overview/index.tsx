@@ -61,8 +61,10 @@ export default function DiscoveryPage(): JSX.Element {
 
   const catalog = overview?.catalog;
   const detect = overview?.detect;
+  const surfaces = overview?.surfaces;
   const categories = detect ? sortedEntries(detect.by_category) : [];
   const capabilities = detect ? sortedEntries(detect.by_capability) : [];
+  const surfaceDist = surfaces ? sortedEntries(surfaces.detected_per_surface) : [];
   const isEmpty =
     overview !== null &&
     (catalog?.total ?? 0) === 0 &&
@@ -72,11 +74,12 @@ export default function DiscoveryPage(): JSX.Element {
     <section className="discovery-overview-page">
       <h1>Discovery</h1>
       <p className="discovery-overview-note">
-        La vue d&apos;ensemble operateur des deux surfaces de discovery : le
-        catalogue des agents publies (ce qu&apos;ils declarent) et le reperage des
-        outils d&apos;observabilite (ce qui les trahit dans le code). L&apos;axe de
-        gouvernance -- audit et replay -- est mis en avant : ce sont les capacites
-        qui rendent un agent recettable.
+        La vue d&apos;ensemble operateur des trois piliers de discovery : le
+        catalogue des agents publies (ce qu&apos;ils declarent), le reperage des
+        outils d&apos;observabilite (ce qui les trahit dans le code), et les
+        surfaces (le tool voit-il l&apos;agent sur le hook et le wire eBPF).
+        L&apos;axe de gouvernance -- audit et replay -- est mis en avant : ce sont
+        les capacites qui rendent un agent recettable.
       </p>
 
       {error && (
@@ -236,6 +239,53 @@ export default function DiscoveryPage(): JSX.Element {
                   </ul>
                 )}
               </div>
+            </div>
+          </section>
+
+          <section
+            className="discovery-overview-section"
+            data-testid="discovery-overview-surfaces"
+          >
+            <header className="discovery-overview-section-head">
+              <h2 className="discovery-overview-section-title">Surfaces</h2>
+              <span className="discovery-overview-dist-hint">
+                le tool VOIT-il l&apos;agent sur chaque surface (hook + eBPF-wire) ?
+              </span>
+            </header>
+            <div className="discovery-overview-stats">
+              <DiscoveryStatCard
+                value={surfaces?.total_agents ?? 0}
+                label="Agents observes"
+                testId="discovery-overview-surfaces-total"
+              />
+              <DiscoveryStatCard
+                value={surfaces?.ghosts ?? 0}
+                label="Fantomes"
+                caption="vus sur aucune surface"
+                testId="discovery-overview-surfaces-ghosts"
+              />
+            </div>
+            <div
+              className="discovery-overview-dist"
+              data-testid="discovery-overview-by-surface"
+            >
+              <h3 className="discovery-overview-dist-title">Par surface</h3>
+              {surfaceDist.length === 0 ? (
+                <p className="discovery-overview-dist-empty">aucune surface</p>
+              ) : (
+                <ul className="discovery-overview-dist-list">
+                  {surfaceDist.map(([surface, count]) => (
+                    <li
+                      key={surface}
+                      className="discovery-overview-dist-row"
+                      data-testid={`discovery-overview-surface-${surface}`}
+                    >
+                      <span className="discovery-overview-dist-label">{surface}</span>
+                      <span className="discovery-overview-dist-count">{count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </section>
         </>

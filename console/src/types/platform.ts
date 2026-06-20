@@ -694,6 +694,61 @@ export interface ReconcileReport {
   strict?: boolean;
 }
 
+/** Response of GET /proxy/reconcile/status: the reconciliation verdict and the
+ *  bypass count only (no flows) -- the lightweight feed for the source-menu
+ *  badge, pollable without the reconcile panel being open. */
+export interface ReconcileStatus {
+  ok: boolean;
+  bypass_count: number;
+}
+
+/** Per-agent detection in the discovery-exchange overlay. HOOK-attributable
+ *  only: ebpf_wire is reported per surface but never claimed for an agent (wire
+ *  flows carry no agent_id). `detected_anywhere` reflects the hook surfaces. */
+export interface ExchangeAgentDetection {
+  agent_id: string;
+  detected_anywhere: boolean;
+  per_surface: { surface: string; detected: boolean }[];
+}
+
+/** One exchange annotated with what discovery saw of it. `kind` "hook" is a
+ *  mediated ProxyTrace (always identified); "wire" is a WireFlow, identified
+ *  when it joins back to an audited side effect, else a ghost exchange with the
+ *  reconcile `reason` (non_mediated_target | no_audit_event). */
+export interface ExchangeVerdict {
+  seq: number;
+  kind: "hook" | "wire";
+  identified: boolean;
+  reason: string | null;
+  agent_id: string | null;
+  target: string;
+  action_type: string | null;
+}
+
+/** The surface scorecard embedded in the exchange overlay (mirrors
+ *  recette/surface DetectionScorecard). `false_negatives` are ghost agents. */
+export interface ExchangeScorecard {
+  ok: boolean;
+  total_agents: number;
+  detected_per_surface: Record<string, number>;
+  false_negatives: string[];
+}
+
+/**
+ * Response of GET /proxy/discovery-exchange: the discovery verdict overlaid on
+ * the real exchange of a run. `agents` is the per-agent (hook) detection,
+ * `exchanges` the per-exchange drill-down, `ghost_exchanges` the count of
+ * wire-only flows discovery could not attribute to any identified agent.
+ */
+export interface ExchangeReport {
+  debug_enabled: boolean;
+  run_id: string | null;
+  ghost_exchanges: number;
+  agents: ExchangeAgentDetection[];
+  scorecard: ExchangeScorecard;
+  exchanges: ExchangeVerdict[];
+}
+
 /** Response of GET /proxy/wire/status: overlay state and buffered flow count. */
 export interface WireStatus {
   enabled: boolean;
@@ -836,10 +891,21 @@ export interface DiscoveryDetectOverview {
   by_capability: Record<string, number>;
 }
 
+/** The surfaces slice of the discovery overview: does the tool SEE the agent on
+ *  each observation surface (hook + eBPF-wire)? `ghosts` are agents detected on
+ *  no surface (the thesis failure); `ok` is true when there are none. */
+export interface DiscoverySurfacesOverview {
+  total_agents: number;
+  detected_per_surface: Record<string, number>;
+  ghosts: number;
+  ok: boolean;
+}
+
 /** The unwrapped payload of GET /discovery/overview (raw object, no envelope). */
 export interface DiscoveryOverview {
   catalog: DiscoveryCatalogOverview;
   detect: DiscoveryDetectOverview;
+  surfaces: DiscoverySurfacesOverview;
 }
 
 /** WS-C: a single GenAI span in a run's observability trace tree (flat; the

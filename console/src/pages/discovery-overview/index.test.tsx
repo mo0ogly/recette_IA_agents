@@ -85,12 +85,24 @@ describe("DiscoveryPage (overview)", () => {
     expect(replay).toHaveTextContent("2");
     expect(replay).toHaveClass("discovery-overview-dist-row-governance");
     expect(screen.getByTestId("discovery-overview-gov-replay")).toBeInTheDocument();
+
+    // Surfaces pillar: agents observed (2), zero ghosts, eBPF-wire sees both.
+    expect(
+      screen.getByTestId("discovery-overview-surfaces-total-value"),
+    ).toHaveTextContent("2");
+    expect(
+      screen.getByTestId("discovery-overview-surfaces-ghosts-value"),
+    ).toHaveTextContent("0");
+    expect(
+      screen.getByTestId("discovery-overview-surface-ebpf_wire"),
+    ).toHaveTextContent("2");
   });
 
   it("renders an empty state for an all-zero overview (no crash)", async () => {
     const empty: DiscoveryOverview = {
       catalog: { total: 0, with_tools: 0, tags: 0 },
       detect: { tools: 0, by_category: {}, by_capability: {} },
+      surfaces: { total_agents: 0, detected_per_surface: {}, ghosts: 0, ok: true },
     };
     vi.mocked(getDiscoveryOverview).mockResolvedValue(empty);
     renderPage();
