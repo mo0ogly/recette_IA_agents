@@ -74,21 +74,9 @@ def _cmd_surface(recording: str | None = None) -> int:
         print(json.dumps(asdict(card), sort_keys=True, indent=2))
         return 0 if card.ok else 1
 
-    from ..surface.corpus import load_surface_subjects
-    from ..surface.detect import ReferenceSurfaceDiscoveryAdapter, detect_agent
-    from ..surface.scorecard import score_detections
+    from ..surface.summary import surface_corpus_scorecard
 
-    adapter = ReferenceSurfaceDiscoveryAdapter()
-    detections = [
-        detect_agent(
-            agent_id=s["agent_id"],
-            proxy_traces=s["run"]["proxy_traces"],
-            wire_flows=s["run"]["wire_flows"],
-            adapter=adapter,
-        )
-        for s in load_surface_subjects()
-    ]
-    card = score_detections(detections)
+    card = surface_corpus_scorecard()
     print(json.dumps(asdict(card), sort_keys=True, indent=2))
     return 0 if card.ok else 1
 

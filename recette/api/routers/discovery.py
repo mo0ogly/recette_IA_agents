@@ -21,6 +21,7 @@ from fastapi import APIRouter
 
 from ...discovery_harness import run_discovery_recette
 from ...discovery_scorecard import DiscoveryScorecard
+from ...surface.summary import surface_corpus_scorecard
 from .catalog_registry import _load_catalog
 from .detect import _load_signatures
 
@@ -95,7 +96,24 @@ def _overview() -> dict:
         "by_category": {key: by_category[key] for key in sorted(by_category)},
         "by_capability": {key: by_capability[key] for key in sorted(by_capability)},
     }
-    return {"catalog": catalog_section, "detect": detect_section}
+
+    # The third discovery pillar: can the tool SEE the agent on each observation
+    # surface (hook / eBPF-wire)? A subject seen nowhere is a ghost.
+    card = surface_corpus_scorecard()
+    surfaces_section = {
+        "total_agents": card.total_agents,
+        "detected_per_surface": {
+            key: card.detected_per_surface[key] for key in sorted(card.detected_per_surface)
+        },
+        "ghosts": len(card.false_negatives),
+        "ok": card.ok,
+    }
+
+    return {
+        "catalog": catalog_section,
+        "detect": detect_section,
+        "surfaces": surfaces_section,
+    }
 
 
 @router.get("/overview")
@@ -103,8 +121,9 @@ def overview() -> dict:
     """Unified discovery overview for the console dashboard.
 
     Returns ``{catalog: {total, with_tools, tags}, detect: {tools, by_category,
-    by_capability}}`` aggregated from the catalog registry and the
-    observability-signature table. Fail-safe: empty/absent sources yield zeros,
+    by_capability}, surfaces: {total_agents, detected_per_surface, ghosts, ok}}``
+    aggregated from the catalog registry, the observability-signature table, and
+    the surface corpus scorecard. Fail-safe: empty/absent sources yield zeros,
     never an error.
     """
     return _overview()

@@ -84,18 +84,28 @@ class TestDiscoveryOverview(unittest.TestCase):
             json.dumps(second, sort_keys=True),
         )
 
+    def test_overview_includes_the_surface_corpus_pillar(self) -> None:
+        client = TestClient(create_app())
+        surfaces = client.get("/discovery/overview").json()["surfaces"]
+        self.assertEqual(surfaces["total_agents"], 2)
+        self.assertTrue(surfaces["ok"])
+        self.assertEqual(surfaces["ghosts"], 0)
+        self.assertIn("ebpf_wire", surfaces["detected_per_surface"])
+
     def test_overview_fail_safe_on_empty_sources(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             os.environ[_REGISTRY_ENV] = str(Path(tmp) / "no-registry.json")
             os.environ[_SIGNATURES_ENV] = str(Path(tmp) / "no-signatures.json")
             client = TestClient(create_app())
             body = client.get("/discovery/overview").json()
+            # The neutralised sources (catalog + detect via env) collapse to
+            # zeros; the surface corpus is a separate real source, so assert the
+            # neutralised sections precisely and only the surfaces SHAPE.
+            self.assertEqual(body["catalog"], {"total": 0, "with_tools": 0, "tags": 0})
+            self.assertEqual(body["detect"], {"tools": 0, "by_category": {}, "by_capability": {}})
             self.assertEqual(
-                body,
-                {
-                    "catalog": {"total": 0, "with_tools": 0, "tags": 0},
-                    "detect": {"tools": 0, "by_category": {}, "by_capability": {}},
-                },
+                set(body["surfaces"]),
+                {"total_agents", "detected_per_surface", "ghosts", "ok"},
             )
 
 
