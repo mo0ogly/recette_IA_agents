@@ -812,6 +812,36 @@ export interface DetectScanResult {
   matches: DetectMatch[];
 }
 
+// ---------------------------------------------------------------------------
+// Discovery overview (GET /discovery/overview): the unified operator dashboard
+// that ties the agent catalog together with the observability-reperage tally.
+// The endpoint answers with a RAW object (no { success, data } envelope), so the
+// client returns the parsed JSON directly -- nothing to unwrap.
+// ---------------------------------------------------------------------------
+
+/** The catalog slice of the discovery overview: how many agents are published,
+ *  how many declare at least one tool, and how many distinct tags exist. */
+export interface DiscoveryCatalogOverview {
+  total: number;
+  with_tools: number;
+  tags: number;
+}
+
+/** The reperage slice of the discovery overview: the total count of detectable
+ *  observability tools plus two distribution maps -- by detection category and
+ *  by governance capability (audit / replay are the governance axis). */
+export interface DiscoveryDetectOverview {
+  tools: number;
+  by_category: Record<string, number>;
+  by_capability: Record<string, number>;
+}
+
+/** The unwrapped payload of GET /discovery/overview (raw object, no envelope). */
+export interface DiscoveryOverview {
+  catalog: DiscoveryCatalogOverview;
+  detect: DiscoveryDetectOverview;
+}
+
 /** WS-C: a single GenAI span in a run's observability trace tree (flat; the
  *  viewer rebuilds the hierarchy from parent_span_id). Times are logical (I4). */
 export interface ObservabilitySpan {

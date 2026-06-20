@@ -1,0 +1,207 @@
+/* Page-scoped styles for the unified Discovery dashboard. Reuses global tokens. */
+
+.discovery-overview-page {
+  max-width: 1100px;
+}
+
+.discovery-overview-note {
+  color: var(--color-text-muted);
+  max-width: 72ch;
+  margin: 0.25rem 0 1.5rem;
+}
+
+.discovery-overview-error {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border: 1px solid var(--badge-red-fg);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.discovery-overview-loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Empty state -- an all-zero overview is a valid, non-crashing view. */
+.discovery-overview-empty {
+  background-color: var(--color-surface-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* A dashboard section (Catalogue / Reperage). */
+.discovery-overview-section {
+  margin-bottom: 2rem;
+}
+
+.discovery-overview-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.discovery-overview-section-title {
+  font-size: 1.05rem;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.discovery-overview-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.discovery-overview-link:hover {
+  text-decoration: underline;
+}
+
+/* Headline stat cards. */
+.discovery-overview-stats {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.discovery-overview-stat {
+  flex: 1 1 9rem;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1.1rem;
+}
+
+/* The governance axis (audit + replay) is marked distinctly. */
+.discovery-overview-stat-emphasis {
+  border-color: var(--color-accent);
+  border-left-width: 5px;
+}
+
+.discovery-overview-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+.discovery-overview-stat-label {
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.discovery-overview-stat-caption {
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+/* Two distribution panels side by side (by category / by capability). */
+.discovery-overview-dist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.discovery-overview-dist {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1.1rem;
+}
+
+.discovery-overview-dist-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+  margin: 0 0 0.75rem;
+  color: var(--color-text);
+}
+
+.discovery-overview-dist-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.discovery-overview-dist-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.discovery-overview-dist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.discovery-overview-dist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.7rem;
+}
+
+/* Governance capabilities (audit / replay) stand out from the rest. */
+.discovery-overview-dist-row-governance {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+}
+
+.discovery-overview-dist-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.discovery-overview-gov-chip {
+  display: inline-block;
+  padding: 0.08rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent);
+  color: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.discovery-overview-dist-count {
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+}

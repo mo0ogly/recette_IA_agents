@@ -15,6 +15,7 @@ import SimPage from "./pages/sim";
 import DashboardPage from "./pages/dashboard";
 import DetectPage from "./pages/detect";
 import DiscoveryPage from "./pages/discovery";
+import DiscoveryOverviewPage from "./pages/discovery-overview";
 import FluxPage from "./pages/flux";
 import LivePage from "./pages/live";
 import ObservabilityPage from "./pages/observability";
@@ -64,6 +65,9 @@ export default function App(): JSX.Element {
           </NavLink>
           <NavLink to="/discovery" className={navLinkClass}>
             Discovery
+          </NavLink>
+          <NavLink to="/discovery-overview" className={navLinkClass}>
+            Discovery overview
           </NavLink>
           <NavLink to="/detect" className={navLinkClass}>
             Reperage
@@ -130,6 +134,7 @@ export default function App(): JSX.Element {
           <Route path="/verdicts" element={<VerdictsPage />} />
           <Route path="/rag" element={<RagPage />} />
           <Route path="/discovery" element={<DiscoveryPage />} />
+          <Route path="/discovery-overview" element={<DiscoveryOverviewPage />} />
           <Route path="/detect" element={<DetectPage />} />
           <Route path="/registry" element={<RegistryPage />} />
           <Route path="/agent-registry" element={<AgentRegistryPage />} />
