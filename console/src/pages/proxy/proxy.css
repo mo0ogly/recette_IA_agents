@@ -186,6 +186,33 @@
   font-size: 0.85rem;
 }
 
+/* Sessions source: the expanded exchange shows the request intent and the
+   server response side by side (the readable req<->resp pair), with the
+   "JSON complet" action spanning both columns below them. */
+.proxy-exchange {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.5rem;
+}
+
+.proxy-exchange-side {
+  overflow: auto;
+  max-height: 30vh;
+  margin: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.proxy-exchange .proxy-export {
+  grid-column: 1 / -1;
+}
+
 /* Source menu (registry-driven switcher: app traces / wire overlay /
    reconciliation). A segmented group of toggle buttons, each with a hint and a
    live badge fed by the mounted panel's reported status. */
