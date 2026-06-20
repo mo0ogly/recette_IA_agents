@@ -1385,3 +1385,25 @@ export function exportContextReceipts(runId?: string): Promise<Record<string, un
   const path = withQuery("/proxy/receipts/export", { run_id: runId });
   return request<Record<string, unknown>>(path, { method: "GET" });
 }
+
+/** The verdict of cross-verifying an imported export envelope (off-platform proof). */
+export interface ReceiptImportVerdict {
+  signature: { valid: boolean; reason: string };
+  chain: ChainReport;
+}
+
+/** Cross-verify a third-party receipt export: re-checks the Ed25519 signature
+ *  and the receipt hash chain server-side, trusting nothing in the envelope.
+ *  ``expectedPublicKey`` pins the signer (key pinning). */
+export function verifyImportedReceipts(
+  envelope: unknown,
+  expectedPublicKey?: string,
+): Promise<ReceiptImportVerdict> {
+  const path = withQuery("/proxy/receipts/verify-import", {
+    expected_public_key: expectedPublicKey,
+  });
+  return request<ReceiptImportVerdict>(path, {
+    method: "POST",
+    body: JSON.stringify(envelope),
+  });
+}

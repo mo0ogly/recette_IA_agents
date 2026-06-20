@@ -14,6 +14,8 @@ import {
   exportContextReceipts,
   getContextReceipts,
   verifyContextReceipts,
+  verifyImportedReceipts,
+  type ReceiptImportVerdict,
 } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import type { ChainReport, ContextReceipt } from "../../types/platform";
@@ -28,6 +30,29 @@ export default function ReceiptsPage(): JSX.Element {
   const [chain, setChain] = useState<ChainReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [importVerdict, setImportVerdict] = useState<ReceiptImportVerdict | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  function readFileText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleImport(file: File): Promise<void> {
+    setImportVerdict(null);
+    setImportError(null);
+    try {
+      const envelope: unknown = JSON.parse(await readFileText(file));
+      const verdict = await verifyImportedReceipts(envelope);
+      setImportVerdict(verdict);
+    } catch (e: unknown) {
+      setImportError(String(e));
+    }
+  }
 
   async function handleExport(): Promise<void> {
     setExporting(true);
@@ -89,7 +114,36 @@ export default function ReceiptsPage(): JSX.Element {
         >
           {exporting ? "Export..." : "Exporter (signe Ed25519)"}
         </button>
+        <label className="receipts-import">
+          Verifier un export tiers
+          <input
+            type="file"
+            accept="application/json,.json"
+            data-testid="receipts-import-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleImport(file);
+            }}
+          />
+        </label>
       </div>
+      {importError && <p className="receipts-error">{importError}</p>}
+      {importVerdict !== null && (
+        <p
+          className={`receipts-verdict receipts-verdict-${
+            importVerdict.signature.valid && importVerdict.chain.ok ? "ok" : "bad"
+          }`}
+          data-testid="receipts-import-verdict"
+        >
+          <strong>Signature</strong>{" "}
+          {importVerdict.signature.valid ? "valide" : `invalide -- ${importVerdict.signature.reason}`}
+          {" / "}
+          <strong>Chaine</strong>{" "}
+          {importVerdict.chain.ok
+            ? `verifiee (${importVerdict.chain.checked})`
+            : `rompue @ seq ${importVerdict.chain.first_break_seq}`}
+        </p>
+      )}
       {error && <p className="receipts-error">{error}</p>}
       {receipts !== null &&
         (receipts.length === 0 ? (

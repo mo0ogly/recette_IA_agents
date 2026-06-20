@@ -97,6 +97,29 @@ def export_receipts_route(request: Request, run_id: str | None = None) -> dict:
     return export_receipts(chain_receipts([t.to_dict() for t in traces]))
 
 
+@router.post("/receipts/verify-import")
+def verify_import_route(request: Request, envelope: dict) -> dict:
+    """Cross-verify a third-party receipt export envelope (off-platform proof).
+
+    Stateless and pure (I4): takes ANY ``inspect_ia_agents-receipt-export-v1`` envelope
+    (exported here or elsewhere) and checks the Ed25519 signature over its
+    canonical payload, plus the receipt hash chain. Returns ``signature`` (the
+    verify_export verdict) and ``chain`` (the chain-integrity verdict). Never
+    touches the audit log or the buffers; nothing is trusted, the envelope
+    crosses a process boundary and is fully re-verified. ``expected_public_key``
+    (optional query) pins the signer."""
+    from ...context_receipt import verify_chain
+    from ...receipt_export import verify_export
+
+    if not isinstance(envelope, dict):
+        raise HTTPException(status_code=422, detail="body must be an export envelope object")
+    expected = request.query_params.get("expected_public_key") or None
+    signature = verify_export(envelope, expected_public_key=expected)
+    receipts = envelope.get("receipts")
+    chain = verify_chain(receipts if isinstance(receipts, list) else [])
+    return {"signature": signature, "chain": chain}
+
+
 @router.delete("/traces")
 def clear_traces(request: Request) -> dict:
     """Discard the debug trace buffer (the audit log is untouched, I1)."""

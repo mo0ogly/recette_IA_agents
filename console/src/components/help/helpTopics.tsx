@@ -1708,6 +1708,15 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           l&apos;export est rendu <strong>non signe</strong> (fail-safe), jamais une fausse
           signature.
         </p>
+        <h3>Verifier un export tiers</h3>
+        <p>
+          <strong>Verifier un export tiers</strong> ingere une enveloppe{" "}
+          <code>inspect_ia_agents-receipt-export-v1</code> (signee ici ou ailleurs) et la{" "}
+          <strong>re-verifie integralement</strong> cote serveur sans rien lui faire confiance :
+          la signature Ed25519 sur sa charge canonique ET la chaine de hash des recus. Le verdict
+          affiche les deux. C&apos;est l&apos;echange <strong>hors plateforme</strong> : on signe
+          d&apos;un cote, on verifie de l&apos;autre, toujours sans contenu.
+        </p>
       </>
     ),
   },

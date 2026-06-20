@@ -4,7 +4,7 @@
  * bodies.
  */
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import receiptsFixture from "./__fixtures__/receipts.fixture.json";
@@ -14,9 +14,14 @@ vi.mock("../../api/client", () => ({
   getContextReceipts: vi.fn(),
   verifyContextReceipts: vi.fn(),
   exportContextReceipts: vi.fn(),
+  verifyImportedReceipts: vi.fn(),
 }));
 
-import { getContextReceipts, verifyContextReceipts } from "../../api/client";
+import {
+  getContextReceipts,
+  verifyContextReceipts,
+  verifyImportedReceipts,
+} from "../../api/client";
 import ReceiptsPage from "./index";
 
 const fixture = receiptsFixture as unknown as ReceiptsResponse;
@@ -43,6 +48,28 @@ describe("ReceiptsPage", () => {
     expect(await screen.findByTestId("receipts-chain")).toHaveTextContent(/chaine verifiee/);
     // The signed-export action is offered (downloads the Ed25519 envelope).
     expect(screen.getByRole("button", { name: /Exporter \(signe/ })).toBeEnabled();
+  });
+
+  it("cross-verifies an imported third-party export and surfaces the verdict", async () => {
+    vi.mocked(getContextReceipts).mockResolvedValue(fixture);
+    vi.mocked(verifyContextReceipts).mockResolvedValue(verify);
+    vi.mocked(verifyImportedReceipts).mockResolvedValue({
+      signature: { valid: true, reason: "signature valid over canonical payload" },
+      chain: { ok: true, checked: 2, first_break_seq: null, detail: null },
+    });
+    render(<ReceiptsPage />);
+
+    const input = await screen.findByTestId("receipts-import-input");
+    const envelope = { schema: "inspect_ia_agents-receipt-export-v1", receipts: [] };
+    const file = new File([JSON.stringify(envelope)], "export.json", {
+      type: "application/json",
+    });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    const verdict = await screen.findByTestId("receipts-import-verdict");
+    expect(verdict).toHaveTextContent(/Signature\s+valide/);
+    expect(verdict).toHaveTextContent(/Chaine\s+verifiee/);
+    expect(vi.mocked(verifyImportedReceipts)).toHaveBeenCalledOnce();
   });
 
   it("shows an empty state when no side effect was traced", async () => {

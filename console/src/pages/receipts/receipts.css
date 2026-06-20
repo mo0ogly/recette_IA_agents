@@ -72,6 +72,36 @@
 
 .receipts-actions {
   margin: 0.5rem 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.receipts-import {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.receipts-import input[type="file"] {
+  font-size: 0.8rem;
+}
+.receipts-verdict {
+  margin: 0 0 1rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+}
+.receipts-verdict-ok {
+  border-color: var(--badge-green-fg, #2e7d32);
+  color: var(--badge-green-fg, #2e7d32);
+}
+.receipts-verdict-bad {
+  border-color: var(--badge-red-fg, #c62828);
+  color: var(--badge-red-fg, #c62828);
 }
 .receipts-export {
   appearance: none;
