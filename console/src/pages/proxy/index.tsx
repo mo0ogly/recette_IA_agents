@@ -10,7 +10,8 @@
  * happened; this page never mutates one.
  */
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import PageHelp from "../../components/help/PageHelp";
 import type { SourceId, SourceStatus } from "./proxyMenu";
@@ -18,8 +19,34 @@ import SourceMenu from "./SourceMenu";
 import { SOURCE_DESCRIPTORS } from "./sources";
 import "./proxy.css";
 
+/** The registered source ids, for validating the ?source= query param. */
+const VALID_SOURCES = new Set<SourceId>(SOURCE_DESCRIPTORS.map((s) => s.id));
+
 export default function ProxyPage(): JSX.Element {
-  const [source, setSource] = useState<SourceId>(SOURCE_DESCRIPTORS[0].id);
+  // Active source is derived from the URL (?source=wire), not duplicated into
+  // state: it makes a view deep-linkable and keeps back/forward in sync. An
+  // unknown or missing value falls back to the default (first) source.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawSource = searchParams.get("source");
+  const source: SourceId =
+    rawSource !== null && VALID_SOURCES.has(rawSource as SourceId)
+      ? (rawSource as SourceId)
+      : SOURCE_DESCRIPTORS[0].id;
+
+  const onSelectSource = useCallback(
+    (id: SourceId): void => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("source", id);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [statusById, setStatusById] = useState<Partial<Record<SourceId, SourceStatus>>>({});
 
   // One stable status setter per registered source, so a panel's polling
@@ -47,7 +74,7 @@ export default function ProxyPage(): JSX.Element {
       <SourceMenu
         sources={SOURCE_DESCRIPTORS}
         active={source}
-        onSelect={setSource}
+        onSelect={onSelectSource}
         statusById={statusById}
       />
 

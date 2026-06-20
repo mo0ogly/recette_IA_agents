@@ -95,6 +95,24 @@ describe("ProxyPage (R16 contract)", () => {
     expect(await screen.findByText(/network down/)).toBeInTheDocument();
   });
 
+  it("deep-links the active source via ?source= (renders the wire panel)", async () => {
+    render(
+      <MemoryRouter initialEntries={["/proxy?source=wire"]}>
+        <ProxyPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("wire-panel")).toBeInTheDocument();
+  });
+
+  it("falls back to the app source on an unknown ?source= value", async () => {
+    render(
+      <MemoryRouter initialEntries={["/proxy?source=bogus"]}>
+        <ProxyPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("list", { name: "proxy traces" })).toBeInTheDocument();
+  });
+
   it("filters the list by agent_id", async () => {
     const t0 = fixture.traces[0];
     vi.mocked(getProxyTraces).mockResolvedValue({
