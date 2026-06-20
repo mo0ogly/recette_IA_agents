@@ -97,6 +97,21 @@ def export_receipts_route(request: Request, run_id: str | None = None) -> dict:
     return export_receipts(chain_receipts([t.to_dict() for t in traces]))
 
 
+@router.get("/receipts/root-attestation")
+def receipts_root_attestation_route(request: Request, run_id: str | None = None) -> dict:
+    """A tiny, Ed25519-signed commitment to the receipts: chain head + count +
+    Merkle root, NO receipts. Pair it with GET /proxy/receipts/merkle/proof to
+    attest that ONE side effect crossed the boundary without disclosing the
+    others (selective disclosure). Unsigned (fail-safe) when no key is set."""
+    from ...context_receipt import chain_receipts
+    from ...receipt_export import export_root_attestation
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    return export_root_attestation(chain_receipts([t.to_dict() for t in traces]))
+
+
 @router.get("/receipts/merkle")
 def receipts_merkle_route(request: Request, run_id: str | None = None) -> dict:
     """The Merkle root committing to the current chained receipts (+ count).

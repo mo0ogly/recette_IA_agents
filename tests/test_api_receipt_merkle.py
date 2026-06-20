@@ -76,6 +76,24 @@ class ReceiptMerkleEndpointTest(unittest.TestCase):
         resp = self.client.get("/proxy/receipts/merkle/proof?seq=9999")
         self.assertEqual(resp.status_code, 404)
 
+    def test_root_attestation_commits_to_the_same_root(self) -> None:
+        # The signed (or fail-safe unsigned) root attestation carries the same
+        # Merkle root the /merkle endpoint reports, and NO receipts.
+        root = self.client.get("/proxy/receipts/merkle").json()["root"]
+        att = self.client.get("/proxy/receipts/root-attestation").json()
+        self.assertEqual(att["schema"], "inspect_ia_agents-receipt-root-v1")
+        self.assertEqual(att["merkle_root"], root)
+        self.assertEqual(att["count"], 3)
+        self.assertNotIn("receipts", att)
+
+    def test_root_attestation_then_inclusion_off_platform(self) -> None:
+        # Selective disclosure: the attestation's root + one inclusion proof are
+        # enough to attest a single receipt, without the others.
+        att = self.client.get("/proxy/receipts/root-attestation").json()
+        seq = self.client.get("/proxy/receipts").json()["receipts"][0]["seq"]
+        proof = self.client.get(f"/proxy/receipts/merkle/proof?seq={seq}").json()
+        self.assertTrue(verify_inclusion(proof["leaf"], proof["path"], att["merkle_root"]))
+
 
 if __name__ == "__main__":
     unittest.main()

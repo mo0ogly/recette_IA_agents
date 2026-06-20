@@ -39,21 +39,12 @@ def _signing_key_hex() -> str | None:
     return key or None
 
 
-def export_receipts(receipts: list[dict]) -> dict:
-    """Build a (possibly signed) export envelope over the chained receipts.
+def _attach_signature(envelope: dict, payload: bytes) -> dict:
+    """Sign ``payload`` with the env key and attach the result to ``envelope``.
 
-    ``chain_head`` is the last receipt's hash (the tip of the integrity chain),
-    or "" when empty. When a signing key resolves from the env, the envelope is
-    signed with Ed25519 and carries ``signed: true`` + ``public_key`` +
-    ``signature`` (hex). With no key it is returned unsigned (fail-safe)."""
-    chain_head = receipts[-1].get("hash", "") if receipts else ""
-    envelope: dict = {
-        "schema": "inspect_ia_agents-receipt-export-v1",
-        "count": len(receipts),
-        "chain_head": chain_head,
-        "receipts": receipts,
-        "signed": False,
-    }
+    Shared by every signable artifact (full export, root attestation). With no
+    key -> ``signed: false`` (fail-safe). Lazy import keeps the core crypto-free
+    (R20). Never raises on a bad/absent key; records ``sign_error`` instead."""
     key_hex = _signing_key_hex()
     if key_hex is None:
         return envelope
@@ -67,11 +58,10 @@ def export_receipts(receipts: list[dict]) -> dict:
     except ValueError:
         envelope["sign_error"] = "signing key is not valid hex / wrong length"
         return envelope
-    signature = private_key.sign(canonical_payload(chain_head, receipts))
-    public_key = private_key.public_key()
     from cryptography.hazmat.primitives import serialization
 
-    pub_raw = public_key.public_bytes(
+    signature = private_key.sign(payload)
+    pub_raw = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
     )
     envelope["signed"] = True
@@ -80,13 +70,13 @@ def export_receipts(receipts: list[dict]) -> dict:
     return envelope
 
 
-def verify_export(envelope: dict, *, expected_public_key: str | None = None) -> dict:
-    """Verify a signed receipt export. Returns ``{valid, reason}``.
+def _verify_signature(envelope: dict, payload: bytes, expected_public_key: str | None) -> dict:
+    """Verify ``envelope``'s Ed25519 signature over ``payload``. ``{valid, reason}``.
 
-    Mirrors recette.bundle.verify_bundle: optional key pinning, lazy import.
-    An unsigned envelope is reported invalid (nothing to verify)."""
+    Shared by verify_export and verify_root_attestation: optional key pinning,
+    lazy import. An unsigned envelope is invalid (nothing to verify)."""
     if not envelope.get("signed"):
-        return {"valid": False, "reason": "export is not signed"}
+        return {"valid": False, "reason": "envelope is not signed"}
     try:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -103,9 +93,79 @@ def verify_export(envelope: dict, *, expected_public_key: str | None = None) -> 
         signature = bytes.fromhex(sig_hex)
     except ValueError:
         return {"valid": False, "reason": "public_key or signature is not valid hex"}
-    payload = canonical_payload(envelope.get("chain_head", ""), envelope.get("receipts", []))
     try:
         public_key.verify(signature, payload)
     except InvalidSignature:
         return {"valid": False, "reason": "signature does not match payload (tampered/wrong key)"}
     return {"valid": True, "reason": "signature valid over canonical payload"}
+
+
+def canonical_root_payload(chain_head: str, count: int, merkle_root: str) -> bytes:
+    """Bytes the root-attestation signature covers: ``{chain_head, count,
+    merkle_root}`` -- the COMMITMENT only, NO receipts. Stable across runs (I4).
+    Signing this lets a verifier trust the Merkle root WITHOUT the receipts, so a
+    single receipt can later be disclosed + proven against it."""
+    return json.dumps(
+        {"chain_head": chain_head, "count": count, "merkle_root": merkle_root},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def export_root_attestation(receipts: list[dict]) -> dict:
+    """A tiny, signed commitment to the receipts: chain head + count + Merkle
+    root, NO receipts. Pair it with an inclusion proof (recette/receipt_merkle.py)
+    to attest that ONE side effect crossed the boundary without disclosing the
+    others (selective disclosure). Unsigned (fail-safe) when no key is set."""
+    from .receipt_merkle import merkle_root
+
+    chain_head = receipts[-1].get("hash", "") if receipts else ""
+    root = merkle_root(receipts)
+    envelope: dict = {
+        "schema": "inspect_ia_agents-receipt-root-v1",
+        "count": len(receipts),
+        "chain_head": chain_head,
+        "merkle_root": root,
+        "signed": False,
+    }
+    return _attach_signature(envelope, canonical_root_payload(chain_head, len(receipts), root))
+
+
+def verify_root_attestation(envelope: dict, *, expected_public_key: str | None = None) -> dict:
+    """Verify a signed root attestation. ``{valid, reason}``. The verdict is a
+    function of the compact ``{chain_head, count, merkle_root}`` payload alone --
+    no receipts needed (selective disclosure)."""
+    payload = canonical_root_payload(
+        envelope.get("chain_head", ""),
+        envelope.get("count", 0),
+        envelope.get("merkle_root", ""),
+    )
+    return _verify_signature(envelope, payload, expected_public_key)
+
+
+def export_receipts(receipts: list[dict]) -> dict:
+    """Build a (possibly signed) export envelope over the chained receipts.
+
+    ``chain_head`` is the last receipt's hash (the tip of the integrity chain),
+    or "" when empty. When a signing key resolves from the env, the envelope is
+    signed with Ed25519 and carries ``signed: true`` + ``public_key`` +
+    ``signature`` (hex). With no key it is returned unsigned (fail-safe)."""
+    chain_head = receipts[-1].get("hash", "") if receipts else ""
+    envelope: dict = {
+        "schema": "inspect_ia_agents-receipt-export-v1",
+        "count": len(receipts),
+        "chain_head": chain_head,
+        "receipts": receipts,
+        "signed": False,
+    }
+    return _attach_signature(envelope, canonical_payload(chain_head, receipts))
+
+
+def verify_export(envelope: dict, *, expected_public_key: str | None = None) -> dict:
+    """Verify a signed receipt export. Returns ``{valid, reason}``.
+
+    Optional key pinning, lazy import. An unsigned envelope is reported invalid
+    (nothing to verify)."""
+    payload = canonical_payload(envelope.get("chain_head", ""), envelope.get("receipts", []))
+    return _verify_signature(envelope, payload, expected_public_key)
