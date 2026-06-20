@@ -847,6 +847,58 @@ def make_process_run_runner(
     return runner
 
 
+def run_process_capture(
+    agent_cfg: dict,
+    servers: list[dict],
+    *,
+    socket_path: str,
+    duration_ms: int = 3000,
+) -> dict:
+    """Spawn the agent as its own process and capture it by PID (precise).
+
+    The launcher knows the spawned child's pid, so it asks the broker to attribute
+    by that exact pid (``agent_pids``) -- no reliance on the 15-byte ``comm``. The
+    child runs (server-bound -> real connects), the broker captures the window,
+    and the recording is scored. Returns ``{"recording": ..., "scorecard": ...}``.
+    Fail-safe: a broker error raises ProbeUnavailable (never a fabricated result).
+    """
+    from ..surface.recording import score_recording
+    from .probe_relay import relay_capture
+
+    agent_id = str(agent_cfg.get("id") or "agent")
+    with tempfile.TemporaryDirectory() as tmp:
+        agent_file = Path(tmp) / "agent.json"
+        agent_file.write_text(json.dumps(agent_cfg), encoding="utf-8")
+        argv = [sys.executable, "-m", "recette.agent_proc", "--agent-file", str(agent_file)]
+        if servers and agent_cfg.get("server"):
+            servers_file = Path(tmp) / "servers.json"
+            servers_file.write_text(json.dumps(servers), encoding="utf-8")
+            argv += ["--servers-file", str(servers_file)]
+        proc = subprocess.Popen(  # nosec B603 - fixed interpreter + module, no shell
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(Path(__file__).resolve().parent.parent.parent),
+        )
+        # Capture by the child's exact pid while it runs (the window overlaps the
+        # child's real connects). relay_capture blocks for the window; the child
+        # runs concurrently.
+        recording = relay_capture(
+            socket_path=socket_path,
+            agents=[agent_id],
+            duration_ms=duration_ms,
+            agent_pids={agent_id: [proc.pid]},
+        )
+        proc.wait(timeout=max(5, duration_ms // 1000 + 5))
+    scorecard = None
+    if recording.get("status") == "ok":
+        from dataclasses import asdict
+
+        scorecard = asdict(score_recording(json.dumps(recording)))
+    return {"recording": recording, "scorecard": scorecard}
+
+
 def build_stub_llm(script: list[dict]) -> StubLlm:
     return StubLlm(
         [

@@ -1079,6 +1079,18 @@ export function stopProbeMonitor(): Promise<{ running: boolean }> {
   return request("/probe/monitor/stop", { method: "POST" });
 }
 
+/** Spawn an agent as its own process and capture it by PID (precise eBPF): the
+ *  broker attributes by the spawned child's exact pid, not the 15-byte comm. */
+export function processCapture(
+  agentId: string,
+  durationMs?: number,
+): Promise<ProbeCaptureResult> {
+  return request<ProbeCaptureResult>("/probe/process-capture", {
+    method: "POST",
+    body: JSON.stringify({ agent_id: agentId, duration_ms: durationMs }),
+  });
+}
+
 /** POST /probe/capture result: the broker recording + (when ok) its scorecard. */
 export interface ProbeCaptureResult {
   recording: BrokerRecording;

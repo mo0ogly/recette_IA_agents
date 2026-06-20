@@ -179,6 +179,38 @@ def monitor_stop(request: Request) -> dict:
     return {"running": False}
 
 
+@router.post("/process-capture")
+def process_capture(request: Request, body: dict[str, Any]) -> dict:
+    """Spawn an agent as its own process and capture it by PID (precise eBPF).
+
+    The launcher knows the spawned child's pid, so the broker attributes by that
+    exact pid -- no reliance on the 15-byte ``comm``. Mock-only (a live key never
+    crosses the subprocess). 503 when no broker socket; 400 on a bad agent."""
+    socket_path, _ = _resolve_socket()
+    if not socket_path:
+        raise HTTPException(status_code=503, detail=f"{_SOCKET_ENV} not set and no broker socket")
+    store = request.app.state.config_store
+    agent_cfg = store.get_agent(str(body.get("agent_id", "")))
+    if agent_cfg is None:
+        raise HTTPException(status_code=400, detail="unknown agent_id")
+    if agent_cfg.get("ai_mode", "mock") == "real":
+        raise HTTPException(status_code=400, detail="process-capture is mock-only")
+    if not agent_cfg.get("scenario"):
+        raise HTTPException(status_code=400, detail="process-capture needs a mock scenario")
+    duration_ms = body.get("duration_ms", 3000)
+    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or duration_ms <= 0:
+        raise HTTPException(status_code=400, detail="duration_ms must be a positive integer")
+    from ..probe_relay import ProbeUnavailable
+    from ..runners import run_process_capture
+
+    try:
+        return run_process_capture(
+            agent_cfg, store.list_servers(), socket_path=socket_path, duration_ms=duration_ms
+        )
+    except ProbeUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.post("/capture")
 def capture(body: dict[str, Any]) -> dict:
     """Relay one bounded capture to the broker and score the recording.

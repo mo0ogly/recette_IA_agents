@@ -43,14 +43,21 @@ def relay_capture(
     socket_path: str,
     agents: list[str],
     duration_ms: int,
+    agent_pids: dict[str, list[int]] | None = None,
     timeout: float = 30.0,
 ) -> dict:
     """Send one bounded capture command to the broker and return its JSON reply.
 
-    Raises :class:`ProbeUnavailable` on any connect / timeout / protocol error so
-    the caller can fail closed rather than invent a result.
+    ``agent_pids`` (optional) gives the broker exact pids per agent for PRECISE
+    attribution -- the launcher passes the spawned child pid, so the match does
+    not rely on the (15-byte truncated) ``comm``. Raises :class:`ProbeUnavailable`
+    on any connect / timeout / protocol error so the caller fails closed rather
+    than invent a result.
     """
-    request = json.dumps({"command": "capture", "agents": agents, "duration_ms": duration_ms})
+    payload: dict = {"command": "capture", "agents": agents, "duration_ms": duration_ms}
+    if agent_pids:
+        payload["agent_pids"] = agent_pids
+    request = json.dumps(payload)
     chunks: list[bytes] = []
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:

@@ -18,6 +18,7 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
   listAgents: vi.fn(),
   launchProcessRun: vi.fn(),
+  processCapture: vi.fn(),
   getProbeMonitor: vi.fn(),
   startProbeMonitor: vi.fn(),
   stopProbeMonitor: vi.fn(),
@@ -30,6 +31,7 @@ import {
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  processCapture,
   startProbeMonitor,
 } from "../../api/client";
 import DiscoveryExchangePage from "./index";
@@ -183,8 +185,7 @@ describe("DiscoveryExchangePage", () => {
     vi.mocked(listAgents).mockResolvedValue([
       { id: "dx-live-bot", runtime: "lab", ai_mode: "mock", scenario: [{ kind: "final", text: "x" }] },
     ] as AgentConfig[]);
-    vi.mocked(launchProcessRun).mockResolvedValue({ run_id: "run-xyz", status: "running" });
-    vi.mocked(captureProbe).mockResolvedValue({
+    vi.mocked(processCapture).mockResolvedValue({
       recording: { status: "ok", recordings: [] },
       scorecard: {
         ok: true,
@@ -197,10 +198,9 @@ describe("DiscoveryExchangePage", () => {
     const picker = await screen.findByTestId("dx-proc-agent");
     fireEvent.change(picker, { target: { value: "dx-live-bot" } });
     fireEvent.click(screen.getByTestId("dx-launch-proc"));
-    // the kernel detection surfaces from the coordinated capture
+    // the kernel detection surfaces from the precise pid capture (process-capture)
     expect(await screen.findByTestId("ebpf-surface-ebpf_wire")).toHaveTextContent("DETECTE");
-    expect(vi.mocked(captureProbe)).toHaveBeenCalledWith({ agents: ["dx-live-bot"] });
-    expect(vi.mocked(launchProcessRun)).toHaveBeenCalledWith("dx-live-bot");
+    expect(vi.mocked(processCapture)).toHaveBeenCalledWith("dx-live-bot");
   });
 
   it("surfaces a load error without crashing", async () => {

@@ -115,6 +115,7 @@ mod tests {
             command: "capture".to_string(),
             agents: agents.iter().map(|s| s.to_string()).collect(),
             duration_ms,
+            agent_pids: std::collections::HashMap::new(),
         }
     }
 

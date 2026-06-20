@@ -23,6 +23,7 @@ import {
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  processCapture,
   startProbeMonitor,
   stopProbeMonitor,
 } from "../../api/client";
@@ -110,26 +111,27 @@ export default function DiscoveryExchangePage(): JSX.Element {
     if (!procAgent) return;
     setLaunchMsg(null);
     setEbpfError(null);
-    // Coordinate: open the eBPF capture window (broker) and launch the process
-    // INSIDE it, so the kernel tracepoints observe the agent's real connects.
-    // When no broker is configured the capture is skipped (oracle-only).
-    const capturing = brokerLive ? captureProbe({ agents: [procAgent] }) : null;
+    if (brokerLive) {
+      // Precise: spawn the agent as its own process and capture it by the
+      // child's exact PID (no reliance on the 15-byte comm). One coordinated
+      // backend call (spawn + pid capture + score).
+      try {
+        const res = await processCapture(procAgent);
+        setEbpfCard(res.scorecard ?? null);
+        setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
+        setSource("ebpf");
+        setLaunchMsg(`process capture (pid): ${procAgent}`);
+      } catch (e: unknown) {
+        setLaunchMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    // No broker: just launch the process run (oracle-only view).
     try {
-      await new Promise((r) => setTimeout(r, 400));
       const run = await launchProcessRun(procAgent);
       setLaunchMsg(`process lance: ${procAgent} (run ${run.run_id.slice(0, 8)})`);
     } catch (e: unknown) {
       setLaunchMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (capturing !== null) {
-      try {
-        const res = await capturing;
-        setEbpfCard(res.scorecard ?? null);
-        setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
-        setSource("ebpf");
-      } catch (e: unknown) {
-        setEbpfError(e instanceof Error ? e.message : String(e));
-      }
     }
   }, [procAgent, brokerLive]);
 

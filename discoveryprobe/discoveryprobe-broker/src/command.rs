@@ -21,6 +21,11 @@ pub struct CaptureRequest {
     pub agents: Vec<String>,
     /// Requested capture window in milliseconds (bounded by the manifest).
     pub duration_ms: u64,
+    /// Optional exact pids per agent id, for PRECISE attribution when the
+    /// launcher spawned the process and knows its pid (sidesteps `comm`
+    /// truncation/collision). Absent -> match by manifest `comm_marker` only.
+    #[serde(default)]
+    pub agent_pids: std::collections::HashMap<String, Vec<u32>>,
 }
 
 /// A validated, ready-to-run capture: resolved process specs + bounded window.
@@ -92,7 +97,12 @@ pub fn validate(
         let marker = manifest
             .marker(agent_id)
             .ok_or_else(|| RejectReason::UnknownAgent(agent_id.clone()))?;
-        specs.push(AgentProcessSpec::new(agent_id, marker));
+        match request.agent_pids.get(agent_id) {
+            Some(pids) if !pids.is_empty() => {
+                specs.push(AgentProcessSpec::with_pids(agent_id, marker, pids.clone()))
+            }
+            _ => specs.push(AgentProcessSpec::new(agent_id, marker)),
+        }
     }
     Ok(ValidatedCapture {
         specs,
@@ -116,6 +126,7 @@ mod tests {
             command: command.to_string(),
             agents: agents.iter().map(|s| s.to_string()).collect(),
             duration_ms,
+            agent_pids: std::collections::HashMap::new(),
         }
     }
 

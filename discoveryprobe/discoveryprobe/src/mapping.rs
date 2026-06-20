@@ -17,15 +17,39 @@ pub struct AgentProcessSpec {
     pub agent_id: String,
     /// The exact process command name expected for this agent.
     pub comm_marker: String,
+    /// Optional exact pids of the agent's process(es). When the launcher knows
+    /// the spawned child pid it matches PRECISELY by pid, sidestepping `comm`
+    /// truncation (15 bytes) and collisions. Empty = match by `comm_marker` only.
+    pub pids: Vec<u32>,
 }
 
 impl AgentProcessSpec {
-    /// Build a spec from an agent id and its expected process command name.
+    /// Build a spec matched by `comm_marker` only (no pid).
     pub fn new(agent_id: impl Into<String>, comm_marker: impl Into<String>) -> Self {
         Self {
             agent_id: agent_id.into(),
             comm_marker: comm_marker.into(),
+            pids: Vec::new(),
         }
+    }
+
+    /// Build a spec that ALSO matches the given pids (precise attribution).
+    pub fn with_pids(
+        agent_id: impl Into<String>,
+        comm_marker: impl Into<String>,
+        pids: Vec<u32>,
+    ) -> Self {
+        Self {
+            agent_id: agent_id.into(),
+            comm_marker: comm_marker.into(),
+            pids,
+        }
+    }
+
+    /// True iff a captured event (its `comm` + `pid`) belongs to this agent:
+    /// an exact pid match (precise) OR the comm marker (fallback).
+    pub fn matches(&self, comm: &str, pid: u32) -> bool {
+        self.pids.contains(&pid) || comm == self.comm_marker
     }
 }
 
@@ -71,7 +95,7 @@ pub fn recordings_from_capture(
             let mut recording = CaptureRecording::new(&spec.agent_id);
             for event in execs {
                 let comm = event.comm_str();
-                if comm == spec.comm_marker {
+                if spec.matches(comm, event.pid) {
                     recording.observe(
                         ObservationSurface::EbpfWire,
                         format!("exec:{comm}:{}", event.pid),
@@ -79,7 +103,7 @@ pub fn recordings_from_capture(
                 }
             }
             for event in connects {
-                if event.comm_str() == spec.comm_marker {
+                if spec.matches(event.comm_str(), event.pid) {
                     recording.observe(
                         ObservationSurface::EbpfWire,
                         format!("connect:{}", dest_of(event)),
@@ -125,6 +149,36 @@ mod tests {
         assert_eq!(recs.len(), 1);
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
         assert_eq!(visible, Some(&vec!["exec:pr-bot:42".to_string()]));
+    }
+
+    #[test]
+    fn pid_match_attributes_even_when_comm_differs() {
+        // The launcher knows the spawned pid; match precisely by pid even though
+        // the kernel comm ("python3") is not the agent id (comm fallback misses).
+        let agents = [AgentProcessSpec::with_pids(
+            "dx-live-bot",
+            "dx-live-bot",
+            vec![4242],
+        )];
+        let recs = recordings_from_capture(
+            &agents,
+            &[exec(4242, "python3")],
+            &[connect(4242, [127, 0, 0, 1], 9101, "python3")],
+        );
+        let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
+        assert!(visible.contains(&"exec:python3:4242".to_string()));
+        assert!(visible.contains(&"connect:127.0.0.1:9101".to_string()));
+    }
+
+    #[test]
+    fn pid_mismatch_with_wrong_comm_is_not_attributed() {
+        let agents = [AgentProcessSpec::with_pids(
+            "dx-live-bot",
+            "dx-live-bot",
+            vec![4242],
+        )];
+        let recs = recordings_from_execs(&agents, &[exec(9999, "python3")]);
+        assert!(!recs[0].detected_anywhere());
     }
 
     #[test]
