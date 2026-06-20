@@ -16,9 +16,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from recette.api.routers import probe
+try:
+    from recette.api.routers import probe
+
+    _HAS_FASTAPI = True
+except ImportError:  # pragma: no cover - depends on the [api] extra
+    _HAS_FASTAPI = False
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class ProbeModeResolveTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
