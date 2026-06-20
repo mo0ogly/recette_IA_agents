@@ -73,9 +73,9 @@ def _api(method: str, url: str, body: dict | None = None) -> tuple[int, dict | l
         url, data=data, headers={"Content-Type": "application/json"}, method=method
     )
     try:
-        # nosec B310 -- smoke-only; URL is built from the trusted local API base
+        # Smoke-only; URL is built from the trusted local API base
         # (http://127.0.0.1:8090) plus a fixed path, never external/user input.
-        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310  # nosec B310
             raw = response.read().decode("utf-8")
             return response.status, json.loads(raw) if raw else {}
     except urllib.error.HTTPError as error:
