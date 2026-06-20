@@ -99,7 +99,7 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
       // Wire overlay is optional: when the overlay is off (or the fetch fails)
       // the traces must still render, so this never propagates to the panel.
       try {
-        const w = await getWireFlows();
+        const w = await getWireFlows(undefined, runParam ?? undefined);
         setWireFlows(w.flows);
       } catch {
         setWireFlows([]);
@@ -107,7 +107,7 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [runParam]);
 
   useEffect(() => {
     void refresh();
@@ -230,7 +230,11 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
                     className="proxy-list-item"
                     data-active={ex.seq === expandedSeq}
                     data-outcome={ex.response.ok ? "ok" : "fail"}
-                    onClick={() => setExpandedSeq(expandedSeq === ex.seq ? null : ex.seq)}
+                    onClick={() => {
+                      setExpandedSeq(expandedSeq === ex.seq ? null : ex.seq);
+                      setWireSeq(null);
+                      setDetailSeq(null);
+                    }}
                   >
                     <span className="proxy-seq">#{ex.seq}</span>
                     <span className="proxy-badge" data-outcome={ex.response.ok ? "ok" : "fail"}>

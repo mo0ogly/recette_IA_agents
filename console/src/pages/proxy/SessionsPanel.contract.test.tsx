@@ -71,6 +71,9 @@ describe("SessionsPanel (R16 contract)", () => {
     const wireBtn = await screen.findByTestId("exchange-wire-btn");
     fireEvent.click(wireBtn);
     expect(await screen.findByText(/event_id/)).toBeInTheDocument(); // raw request bytes
+    // Prove the wire OBJECT is rendered (not just the serialized request_body
+    // string): a top-level wire field from the fixture (path) must be present.
+    expect(screen.getByText(/\/github\/execute/)).toBeInTheDocument();
   });
 
   it("preselects the run named in ?run= without a click", async () => {
