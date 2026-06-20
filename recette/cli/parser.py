@@ -41,6 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
     bnd = sub.add_parser("bundle-verify", help="verify an Ed25519-signed policy bundle")
     bnd.add_argument("path", help="path to the policy bundle JSON")
     bnd.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
+    rcv = sub.add_parser(
+        "receipts-verify", help="verify a signed context-receipt export off-platform"
+    )
+    rcv.add_argument("path", help="path to the receipt export JSON envelope")
+    rcv.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
+    rcv.add_argument("--json", action="store_true", help="emit the JSON verdict instead of text")
     agent = sub.add_parser("agent", help="Lane B live LLM agents (run / replay / freeze)")
     agent_sub = agent.add_subparsers(dest="agent_cmd", required=True)
     a_run = agent_sub.add_parser("run", help="run a live LLM agent (provider key from env)")

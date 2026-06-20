@@ -107,3 +107,35 @@ def _cmd_bundle_verify(path: str, pubkey: str | None) -> int:
     print(f"bundle: {path}")
     print(f"verdict: {'VALID' if result.valid else 'INVALID'} -- {result.reason}")
     return 0 if result.valid else 1
+
+
+def _cmd_receipts_verify(path: str, pubkey: str | None, as_json: bool) -> int:
+    """Verify a signed context-receipt export off-platform (file + public key only).
+
+    The terminal twin of POST /proxy/receipts/verify-import: checks the Ed25519
+    signature over the canonical payload AND the receipt hash chain, trusting
+    nothing in the envelope. Pure given the file (I4). Exit 0 only when BOTH the
+    signature is valid and the chain is intact -- a third party (auditor, RSSI)
+    proves the trail without the platform, the console, or a network call."""
+    from ..context_receipt import verify_chain
+    from ..receipt_export import verify_export
+
+    envelope = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(envelope, dict):
+        print("INVALID export: top level is not an envelope object", file=sys.stderr)
+        return 1
+    signature = verify_export(envelope, expected_public_key=pubkey)
+    receipts = envelope.get("receipts")
+    chain = verify_chain(receipts if isinstance(receipts, list) else [])
+    ok = bool(signature["valid"]) and bool(chain["ok"])
+    if as_json:
+        print(json.dumps({"signature": signature, "chain": chain, "ok": ok}, indent=2))
+        return 0 if ok else 1
+    print(f"export: {path}")
+    print(f"signature: {'VALID' if signature['valid'] else 'INVALID'} -- {signature['reason']}")
+    if chain["ok"]:
+        print(f"chain: INTACT -- {chain['checked']} receipt(s)")
+    else:
+        print(f"chain: BROKEN -- first break at seq {chain['first_break_seq']}")
+    print(f"verdict: {'VALID' if ok else 'INVALID'}")
+    return 0 if ok else 1
