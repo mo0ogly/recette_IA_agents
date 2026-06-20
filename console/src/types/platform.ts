@@ -723,6 +723,8 @@ export interface ExchangeVerdict {
   agent_id: string | null;
   target: string;
   action_type: string | null;
+  /** Originating run; used by the console run filter. null for non-run flows. */
+  run_id: string | null;
 }
 
 /** The surface scorecard embedded in the exchange overlay (mirrors

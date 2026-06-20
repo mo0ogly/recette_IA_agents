@@ -10,16 +10,25 @@
  * Source of the verdict: the deterministic surface ORACLE by default
  * (GET /proxy/discovery-exchange, always available, no CAP_BPF); the real eBPF
  * broker capture when it is configured (captureProbe) -- the toggle is disabled
- * with a note when the broker is off (fail-safe). Polls every 2s like the proxy
- * console.
+ * with a note when the broker is off (fail-safe). A run filter narrows the view
+ * client-side. Polls every 2s like the proxy console.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { captureProbe, getDiscoveryExchange, getProbeStatus } from "../../api/client";
 import type { DetectionScorecard, ProbeStatus } from "../../api/client";
+import PageHelp from "../../components/help/PageHelp";
 import type { ExchangeReport } from "../../types/platform";
-import { agentOutcome, detectedSurfaces, exchangeToLine } from "./exchangeModel";
+import {
+  agentOutcome,
+  agentsForRun,
+  detectedSurfaces,
+  distinctRuns,
+  exchangeToLine,
+  filterByRun,
+  ghostCount,
+} from "./exchangeModel";
 import "./discovery-exchange.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -30,6 +39,7 @@ export default function DiscoveryExchangePage(): JSX.Element {
   const [report, setReport] = useState<ExchangeReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<Source>("oracle");
+  const [runId, setRunId] = useState("");
   const [probe, setProbe] = useState<ProbeStatus | null>(null);
   const [ebpfCard, setEbpfCard] = useState<DetectionScorecard | null>(null);
   const [ebpfError, setEbpfError] = useState<string | null>(null);
@@ -52,8 +62,19 @@ export default function DiscoveryExchangePage(): JSX.Element {
     return () => clearInterval(timer);
   }, [refresh]);
 
+  const exchanges = useMemo(() => report?.exchanges ?? [], [report]);
+  const runOptions = useMemo(() => distinctRuns(exchanges), [exchanges]);
+  const shownExchanges = useMemo(() => filterByRun(exchanges, runId), [exchanges, runId]);
+  const lines = useMemo(() => shownExchanges.map(exchangeToLine), [shownExchanges]);
+  const ghosts = useMemo(() => ghostCount(shownExchanges), [shownExchanges]);
+  const shownAgents = useMemo(
+    () => agentsForRun(report?.agents ?? [], exchanges, runId),
+    [report, exchanges, runId],
+  );
+
   const agentIds = useMemo(() => (report?.agents ?? []).map((a) => a.agent_id), [report]);
   const brokerReady = probe?.configured === true;
+  const showEbpf = source === "ebpf" && ebpfCard !== null;
 
   const runEbpf = useCallback(async (): Promise<void> => {
     if (!brokerReady || agentIds.length === 0) return;
@@ -66,22 +87,18 @@ export default function DiscoveryExchangePage(): JSX.Element {
     }
   }, [brokerReady, agentIds]);
 
-  const lines = useMemo(
-    () => (report?.exchanges ?? []).map(exchangeToLine),
-    [report],
-  );
-
   return (
     <section className="page dx-page">
       <div className="page-head">
         <h1>Discovery x Echange</h1>
+        <PageHelp topic="discovery_exchange" />
         {report !== null && (
           <span
-            className={`dx-ghost dx-ghost-${report.ghost_exchanges === 0 ? "ok" : "alert"}`}
+            className={`dx-ghost dx-ghost-${ghosts === 0 ? "ok" : "alert"}`}
             data-testid="dx-ghost-count"
             title="Echanges wire-only que discovery n'a pu rattacher a aucun agent identifie"
           >
-            {report.ghost_exchanges} echange(s) ghost
+            {ghosts} echange(s) ghost
           </span>
         )}
       </div>
@@ -93,31 +110,51 @@ export default function DiscoveryExchangePage(): JSX.Element {
         wire-only. Lecture seule.
       </p>
 
-      <div className="dx-source" role="group" aria-label="source du verdict">
-        <button
-          type="button"
-          className="dx-source-btn"
-          data-active={source === "oracle"}
-          onClick={() => setSource("oracle")}
-        >
-          Oracle (defaut)
-        </button>
-        <button
-          type="button"
-          className="dx-source-btn"
-          data-active={source === "ebpf"}
-          disabled={!brokerReady}
-          title={brokerReady ? undefined : "broker eBPF non configure"}
-          onClick={() => {
-            setSource("ebpf");
-            void runEbpf();
-          }}
-        >
-          eBPF {probe ? `(${probe.mode})` : ""}
-        </button>
-        {source === "ebpf" && !brokerReady && (
-          <span className="dx-source-note">broker eBPF indisponible -- oracle reste la source</span>
-        )}
+      <div className="dx-controls">
+        <div className="dx-source" role="group" aria-label="source du verdict">
+          <button
+            type="button"
+            className="dx-source-btn"
+            data-active={source === "oracle"}
+            onClick={() => setSource("oracle")}
+          >
+            Oracle (defaut)
+          </button>
+          <button
+            type="button"
+            className="dx-source-btn"
+            data-active={source === "ebpf"}
+            disabled={!brokerReady}
+            title={brokerReady ? undefined : "broker eBPF non configure"}
+            onClick={() => {
+              setSource("ebpf");
+              void runEbpf();
+            }}
+          >
+            eBPF {probe ? `(${probe.mode})` : ""}
+          </button>
+          {source === "ebpf" && !brokerReady && (
+            <span className="dx-source-note">
+              broker eBPF indisponible -- oracle reste la source
+            </span>
+          )}
+        </div>
+        <label className="dx-filter-label">
+          run
+          <select
+            className="dx-filter-input"
+            data-testid="dx-run-filter"
+            value={runId}
+            onChange={(e) => setRunId(e.target.value)}
+          >
+            <option value="">tous</option>
+            {runOptions.map((r) => (
+              <option key={r} value={r}>
+                {r.slice(0, 12)}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error !== null && <p className="dx-error">{error}</p>}
@@ -126,7 +163,9 @@ export default function DiscoveryExchangePage(): JSX.Element {
         <section className="dx-col" aria-label="echange reel">
           <h2 className="dx-col-title">Echange reel</h2>
           {report !== null && lines.length === 0 ? (
-            <p className="dx-empty">Aucun echange -- lance un agent (les effets de bord sont traces ici).</p>
+            <p className="dx-empty">
+              Aucun echange -- lance un agent (les effets de bord sont traces ici).
+            </p>
           ) : (
             <table className="dx-table" data-testid="exchange-table">
               <thead>
@@ -144,7 +183,10 @@ export default function DiscoveryExchangePage(): JSX.Element {
                     <td className="dx-kind">{l.kind}</td>
                     <td className="dx-label">{l.label}</td>
                     <td>
-                      <span className={`dx-badge dx-badge-${l.outcome}`} data-testid="exchange-outcome">
+                      <span
+                        className={`dx-badge dx-badge-${l.outcome}`}
+                        data-testid="exchange-outcome"
+                      >
                         {l.outcome}
                       </span>
                     </td>
@@ -156,13 +198,32 @@ export default function DiscoveryExchangePage(): JSX.Element {
         </section>
 
         <section className="dx-col" aria-label="ce que discovery a vu">
-          <h2 className="dx-col-title">Discovery a vu</h2>
+          <h2 className="dx-col-title">
+            Discovery a vu {showEbpf && <span className="dx-src-tag">(eBPF {probe?.mode})</span>}
+          </h2>
           {ebpfError !== null && <p className="dx-error">{ebpfError}</p>}
-          {report !== null && report.agents.length === 0 ? (
+          {showEbpf && ebpfCard !== null ? (
+            // eBPF source: the broker capture can surface a ghost AGENT (captured
+            // on no surface) -- not reconstructable from the live oracle buffers.
+            <ul className="dx-agents" data-testid="agents-list">
+              {ebpfCard.false_negatives.length === 0 && (
+                <li className="dx-empty">aucun ghost (eBPF)</li>
+              )}
+              {ebpfCard.false_negatives.map((id) => (
+                <li key={id} className="dx-agent" data-testid={`agent-${id}`}>
+                  <span className="dx-agent-id">{id}</span>
+                  <span className="dx-badge dx-badge-ghost" data-testid="agent-outcome">
+                    GHOST
+                  </span>
+                  <span className="dx-surfaces">aucune surface (eBPF)</span>
+                </li>
+              ))}
+            </ul>
+          ) : report !== null && shownAgents.length === 0 ? (
             <p className="dx-empty">Aucun agent observe.</p>
           ) : (
             <ul className="dx-agents" data-testid="agents-list">
-              {(report?.agents ?? []).map((a) => {
+              {shownAgents.map((a) => {
                 const outcome = agentOutcome(a);
                 return (
                   <li key={a.agent_id} className="dx-agent" data-testid={`agent-${a.agent_id}`}>
@@ -173,7 +234,9 @@ export default function DiscoveryExchangePage(): JSX.Element {
                     >
                       {outcome}
                     </span>
-                    <span className="dx-surfaces">{detectedSurfaces(a).join(", ") || "aucune surface"}</span>
+                    <span className="dx-surfaces">
+                      {detectedSurfaces(a).join(", ") || "aucune surface"}
+                    </span>
                   </li>
                 );
               })}
@@ -183,7 +246,7 @@ export default function DiscoveryExchangePage(): JSX.Element {
             <p className="dx-scorecard" data-testid="scorecard">
               {report.scorecard.total_agents} agent(s),{" "}
               {report.scorecard.false_negatives.length} ghost(s)
-              {source === "ebpf" && ebpfCard !== null && (
+              {showEbpf && ebpfCard !== null && (
                 <> -- eBPF: {ebpfCard.false_negatives.length} ghost(s)</>
               )}
             </p>

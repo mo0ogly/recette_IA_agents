@@ -53,6 +53,7 @@
       "identified": true,
       "kind": "hook",
       "reason": null,
+      "run_id": "run-ghost",
       "seq": 1,
       "target": "github/octo/repo"
     },
@@ -62,6 +63,7 @@
       "identified": false,
       "kind": "wire",
       "reason": "no_audit_event",
+      "run_id": "run-ghost",
       "seq": 2,
       "target": "POST 127.0.0.1:9101/github/execute"
     }

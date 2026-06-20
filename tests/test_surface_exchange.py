@@ -55,6 +55,8 @@ class TestExchangeReport(unittest.TestCase):
         self.assertEqual(len(hook), 1)
         self.assertTrue(hook[0]["identified"])
         self.assertEqual(hook[0]["agent_id"], "pr-bot")
+        # each exchange carries its originating run (client-side run filter)
+        self.assertEqual(hook[0]["run_id"], "run-1")
 
     def test_per_agent_wire_surface_not_claimed(self) -> None:
         # A wire flow exists, but per-agent detection must NOT claim ebpf_wire

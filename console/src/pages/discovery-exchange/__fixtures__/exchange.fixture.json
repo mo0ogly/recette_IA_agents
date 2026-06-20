@@ -53,6 +53,7 @@
       "identified": true,
       "kind": "hook",
       "reason": null,
+      "run_id": "run-1",
       "seq": 1,
       "target": "github/octo/repo"
     },
@@ -62,6 +63,7 @@
       "identified": true,
       "kind": "hook",
       "reason": null,
+      "run_id": "run-1",
       "seq": 2,
       "target": "github/octo/repo#7"
     },
@@ -71,6 +73,7 @@
       "identified": false,
       "kind": "wire",
       "reason": "non_mediated_target",
+      "run_id": "run-1",
       "seq": 3,
       "target": "POST evil.test:443/leak"
     }

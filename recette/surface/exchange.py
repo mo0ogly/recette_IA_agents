@@ -54,6 +54,7 @@ class ExchangeVerdict:
     agent_id: str | None
     target: str
     action_type: str | None
+    run_id: str | None
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +65,7 @@ class ExchangeVerdict:
             "agent_id": self.agent_id,
             "target": self.target,
             "action_type": self.action_type,
+            "run_id": self.run_id,
         }
 
 
@@ -165,6 +167,7 @@ def build_exchange_report(
                 agent_id=str(trace.get("agent_id", "")) or None,
                 target=_hook_target(trace),
                 action_type=trace.get("action_type"),
+                run_id=trace.get("run_id"),
             )
         )
     for flow in wire_flows:
@@ -179,6 +182,7 @@ def build_exchange_report(
                 agent_id=None,
                 target=_wire_target(flow),
                 action_type=None,
+                run_id=flow.get("run_id"),
             )
         )
     exchanges.sort(key=lambda e: (e.kind, e.seq))

@@ -58,6 +58,7 @@ export type HelpTopicKey =
   | "proxy"
   | "probe"
   | "discovery"
+  | "discovery_exchange"
   | "observability"
   | "control"
   | "metrics"
@@ -75,6 +76,50 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
+  discovery_exchange: {
+    title: "Aide — Discovery x Echange",
+    summary:
+      "Superpose le verdict du discovery sur l'echange reel agent <-> serveur : agent detecte/ghost et echange identifie ou wire-only, en regard du trafic reel (hook + wire).",
+    body: (
+      <>
+        <p>
+          Cette page met cote a cote <strong>l&apos;echange reel</strong> (les{" "}
+          <code>ProxyTrace</code> de la vue hook + les <code>WireFlow</code> de la vue reseau) et{" "}
+          <strong>ce que le discovery a vu</strong> de ce meme echange. C&apos;est la lisibilite{" "}
+          <em>du declare au reel</em> rendue verifiable : on ne juge le discovery que sur ce
+          qu&apos;il observe.
+        </p>
+        <h3>Par agent</h3>
+        <p>
+          Chaque agent porte un badge <strong>DETECTE</strong> ou <strong>GHOST</strong> et les{" "}
+          <strong>surfaces</strong> ou il a ete vu (<code>hook_subprocess</code>, <code>hook_mcp</code>,{" "}
+          <code>hook_sdk</code>, <code>ebpf_wire</code>). La detection par agent est{" "}
+          <strong>hook-attribuable</strong> seulement : un <code>WireFlow</code> ne porte pas
+          d&apos;<code>agent_id</code> (c&apos;est precisement ce qui rend un ghost detectable :
+          vu sur le wire, aveugle au hook), donc la surface wire n&apos;est jamais revendiquee
+          pour un agent.
+        </p>
+        <h3>Par echange + signal ghost</h3>
+        <p>
+          Un echange <strong>hook</strong> est <strong>identifie</strong> (son intention
+          structuree est visible) ; un <strong>wire</strong> est corrobore quand il se rattache
+          a un effet de bord audite, sinon c&apos;est un <strong>echange ghost</strong> (wire-only,
+          via la reconciliation <code>reconcile_strict</code>). Le compteur en tete{" "}
+          <strong>echange(s) ghost</strong> agrege ce trafic que le discovery n&apos;a pu
+          rattacher a aucun agent identifie.
+        </p>
+        <h3>Source du verdict</h3>
+        <p>
+          <strong>Oracle</strong> (par defaut) : l&apos;oracle surface deterministe (I4), toujours
+          disponible, sans privilege. <strong>eBPF</strong> : la capture reelle du broker
+          (<code>POST /probe/capture</code>) quand il tourne -- seule source capable de faire
+          apparaitre un <strong>ghost AGENT</strong> (capture sur aucune surface). Le bouton eBPF
+          est desactive si le broker est absent (fail-safe). Le filtre <strong>run</strong> reduit
+          la vue a un run. Lecture seule.
+        </p>
+      </>
+    ),
+  },
   recette_campaigns: {
     title: "Aide — Campagnes recette",
     summary:

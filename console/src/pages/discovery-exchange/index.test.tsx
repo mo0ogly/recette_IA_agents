@@ -5,7 +5,7 @@
  * an identified exchange + a ghost exchange, a DETECTE agent + a GHOST agent.
  */
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import exchangeFixture from "./__fixtures__/exchange.fixture.json";
@@ -18,7 +18,7 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
 }));
 
-import { getDiscoveryExchange, getProbeStatus } from "../../api/client";
+import { captureProbe, getDiscoveryExchange, getProbeStatus } from "../../api/client";
 import DiscoveryExchangePage from "./index";
 
 const fixture = exchangeFixture as unknown as ExchangeReport;
@@ -58,6 +58,45 @@ describe("DiscoveryExchangePage", () => {
     expect(within(ghost).getByTestId("agent-outcome")).toHaveTextContent("GHOST");
     expect(within(ghost).getByText(/aucune surface/)).toBeInTheDocument();
     expect(screen.getByTestId("scorecard")).toHaveTextContent(/1 ghost/);
+  });
+
+  it("offers a run filter populated from the exchanges and narrows the view", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    render(<DiscoveryExchangePage />);
+    const filter = (await screen.findByTestId("dx-run-filter")) as HTMLSelectElement;
+    // the seeded run id is offered as an option
+    expect(within(filter).getByRole("option", { name: /run-1/ })).toBeInTheDocument();
+    // selecting it keeps the run-1 exchanges (all of the fixture)
+    fireEvent.change(filter, { target: { value: "run-1" } });
+    await waitFor(() =>
+      expect(within(screen.getByTestId("exchange-table")).getAllByTestId("exchange-outcome").length)
+        .toBeGreaterThan(0),
+    );
+  });
+
+  it("captures via eBPF and surfaces a ghost AGENT from the broker scorecard", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(getProbeStatus).mockResolvedValue({
+      configured: true,
+      socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET",
+      mode: "replay",
+    });
+    vi.mocked(captureProbe).mockResolvedValue({
+      recording: { status: "ok", recordings: [] },
+      scorecard: {
+        ok: false,
+        total_agents: 2,
+        detected_per_surface: { hook_sdk: 1 },
+        false_negatives: ["shadow-agent"],
+      },
+    });
+    render(<DiscoveryExchangePage />);
+    // wait for the agents to load (so capture has agent ids), then switch source
+    await screen.findByTestId("agent-pr-bot");
+    fireEvent.click(screen.getByRole("button", { name: /eBPF/ }));
+    const ghost = await screen.findByTestId("agent-shadow-agent");
+    expect(within(ghost).getByTestId("agent-outcome")).toHaveTextContent("GHOST");
+    expect(vi.mocked(captureProbe)).toHaveBeenCalled();
   });
 
   it("surfaces a load error without crashing", async () => {
