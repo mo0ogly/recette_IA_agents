@@ -19,8 +19,8 @@ import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, use
 import type { ErrorInfo, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getProxyTraces } from "../../api/client";
-import type { ProxyTrace } from "../../types/platform";
+import { getProxyTraces, getWireFlows } from "../../api/client";
+import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import {
   type Exchange,
@@ -67,6 +67,8 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
   const [detailSeq, setDetailSeq] = useState<number | null>(null);
+  const [wireFlows, setWireFlows] = useState<WireFlow[]>([]);
+  const [wireSeq, setWireSeq] = useState<number | null>(null);
 
   // Deep-link: ?run=<run_id> auto-selects that run's session without a click,
   // so a "Voir dans le proxy" button from the cockpit lands on its exchanges.
@@ -94,6 +96,14 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
       setTraces(res.traces);
       setDebugEnabled(res.debug_enabled);
       setError(null);
+      // Wire overlay is optional: when the overlay is off (or the fetch fails)
+      // the traces must still render, so this never propagates to the panel.
+      try {
+        const w = await getWireFlows();
+        setWireFlows(w.flows);
+      } catch {
+        setWireFlows([]);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -108,7 +118,10 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
     return () => clearInterval(timer);
   }, [refresh, liveMode]);
 
-  const sessions = useMemo(() => groupSessions(traces, groupKey), [traces, groupKey]);
+  const sessions = useMemo(
+    () => groupSessions(traces, groupKey, wireFlows),
+    [traces, groupKey, wireFlows],
+  );
 
   useEffect(() => {
     onStatusRef.current?.({
@@ -126,6 +139,10 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
     () => selected?.exchanges.find((e) => e.seq === detailSeq),
     [selected, detailSeq],
   );
+  const wireDetail = useMemo(
+    () => selected?.exchanges.find((e) => e.seq === wireSeq)?.wire,
+    [selected, wireSeq],
+  );
 
   return (
     <section className="proxy-app" data-testid="sessions-panel">
@@ -141,6 +158,7 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
               setSelectedKey(null);
               setExpandedSeq(null);
               setDetailSeq(null);
+              setWireSeq(null);
             }}
           >
             <option value="run">run</option>
@@ -185,6 +203,7 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
                   setSelectedKey(s.key);
                   setExpandedSeq(null);
                   setDetailSeq(null);
+                  setWireSeq(null);
                 }}
               >
                 <span className="proxy-badge" data-outcome={s.failed > 0 ? "fail" : "ok"}>
@@ -236,6 +255,18 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
                       >
                         JSON complet
                       </button>
+                      {ex.wire && (
+                        // Only shown when a wire flow matched (overlay on): opens
+                        // the raw network bytes of this exchange in Monaco.
+                        <button
+                          type="button"
+                          className="proxy-export"
+                          data-testid="exchange-wire-btn"
+                          onClick={() => setWireSeq(ex.seq)}
+                        >
+                          wire (octets)
+                        </button>
+                      )}
                     </div>
                   )}
                 </li>
@@ -250,6 +281,16 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
           <ViewerBoundary>
             <Suspense fallback={<div className="proxy-viewer-msg">loading editor...</div>}>
               <MonacoJsonViewer value={JSON.stringify(detail.raw, null, 2)} />
+            </Suspense>
+          </ViewerBoundary>
+        </div>
+      )}
+
+      {wireDetail !== undefined && (
+        <div className="proxy-viewer">
+          <ViewerBoundary>
+            <Suspense fallback={<div className="proxy-viewer-msg">loading editor...</div>}>
+              <MonacoJsonViewer value={JSON.stringify(wireDetail, null, 2)} />
             </Suspense>
           </ViewerBoundary>
         </div>

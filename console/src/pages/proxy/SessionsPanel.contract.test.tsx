@@ -13,12 +13,23 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ProxyTraceResponse } from "../../types/platform";
+import type { ProxyTraceResponse, WireFlowResponse } from "../../types/platform";
 import fixture from "./__fixtures__/sessions.fixture.json";
+import wireFixture from "./__fixtures__/sessions-wire.fixture.json";
 import SessionsPanel from "./SessionsPanel";
+
+// The wire fixture's flow shares run_id + side_effect_hash with the FIRST trace
+// (seq 5) of this run, so its first exchange carries the matched wire flow.
+const RUN_WITH_WIRE = "1e9b7889ec614c45894e8c855ea72543";
 
 vi.mock("../../api/client", () => ({
   getProxyTraces: vi.fn(() => Promise.resolve(fixture as ProxyTraceResponse)),
+  getWireFlows: vi.fn(() => Promise.resolve(wireFixture as WireFlowResponse)),
+}));
+
+// Stub Monaco so its rendered value is assertable in jsdom.
+vi.mock("../../components/MonacoJsonViewer", () => ({
+  default: ({ value }: { value: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
 afterEach(() => vi.clearAllMocks());
@@ -51,6 +62,15 @@ describe("SessionsPanel (R16 contract)", () => {
     fireEvent.click(firstExchange);
     expect(await screen.findByTestId("exchange-intent")).toBeInTheDocument();
     expect(screen.getByTestId("exchange-response")).toBeInTheDocument();
+  });
+
+  it("shows a wire badge on an exchange and opens the raw bytes in Monaco", async () => {
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    const wireBtn = await screen.findByTestId("exchange-wire-btn");
+    fireEvent.click(wireBtn);
+    expect(await screen.findByText(/event_id/)).toBeInTheDocument(); // raw request bytes
   });
 
   it("preselects the run named in ?run= without a click", async () => {

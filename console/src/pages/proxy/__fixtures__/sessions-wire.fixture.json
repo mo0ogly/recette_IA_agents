@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "proxy_url": "http://127.0.0.1:8083",
+  "flows": [
+    {
+      "seq": 1,
+      "method": "POST",
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 9101,
+      "path": "/github/execute",
+      "status_code": 200,
+      "ok": true,
+      "content_type": "application/json",
+      "request_body": "{\"event_id\":\"e1\",\"action_type\":\"read_repo\",\"resource\":\"acme/x\",\"payload\":{}}",
+      "response_body": "{\"data\":{\"action\":\"read_repo\"},\"success\":true}",
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "side_effect_hash": "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9"
+    }
+  ]
+}
