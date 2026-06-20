@@ -42,11 +42,13 @@ class TestDetect(unittest.TestCase):
         body = self.client.get("/detect/signatures").json()
         tools = body["tools"]
         self.assertEqual(len(tools), 12)
-        # every entry carries the documented shape.
+        # every entry carries the documented shape, including the sorted
+        # capabilities list passed through from the signature source.
         first = tools[0]
-        self.assertEqual(set(first.keys()), {"tool", "category", "needles"})
+        self.assertEqual(set(first.keys()), {"tool", "category", "capabilities", "needles"})
         self.assertEqual(first["tool"], "Langfuse")
         self.assertIn("langfuse", first["needles"])
+        self.assertEqual(first["capabilities"], ["audit", "replay", "tracing"])
         # categories are sorted + distinct and cover the documented span.
         categories = body["categories"]
         self.assertEqual(categories, sorted(set(categories)))
@@ -97,7 +99,18 @@ class TestDetect(unittest.TestCase):
             os.environ[_SIGNATURES_ENV] = str(path)
             client = TestClient(create_app())
             sigs = client.get("/detect/signatures").json()
-            self.assertEqual(sigs["tools"], table)
+            # capabilities absent in the source defaults to [category].
+            self.assertEqual(
+                sigs["tools"],
+                [
+                    {
+                        "tool": "Solo",
+                        "category": "audit",
+                        "capabilities": ["audit"],
+                        "needles": ["solo_marker", "SOLO_KEY"],
+                    }
+                ],
+            )
             self.assertEqual(sigs["categories"], ["audit"])
             scan = client.post("/detect/scan", json={"text": "x = solo_marker"}).json()
             self.assertEqual(
