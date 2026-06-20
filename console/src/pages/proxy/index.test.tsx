@@ -176,6 +176,16 @@ describe("ProxyPage (R16 contract)", () => {
     expect(within(list).getByRole("button")).toHaveTextContent("#1");
   });
 
+  it("exposes the sessions source in the menu and renders its panel when selected", async () => {
+    renderPage();
+    // The source menu lists every registered source as a button by its label.
+    const sourceMenu = await screen.findByRole("group", { name: "source" });
+    const sessionsButton = within(sourceMenu).getByText("sessions");
+    fireEvent.click(sessionsButton);
+    // The sessions panel mounts (it carries data-testid="sessions-panel").
+    expect(await screen.findByTestId("sessions-panel")).toBeInTheDocument();
+  });
+
   it("exports the shown traces as a JSONL download", async () => {
     const createUrl = vi.fn(() => "blob:proxy");
     const revokeUrl = vi.fn();

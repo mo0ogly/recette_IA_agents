@@ -20,6 +20,7 @@ import type { SourceDescriptor } from "./proxyMenu";
 
 const WirePanel = lazy(() => import("./WirePanel"));
 const ReconcilePanel = lazy(() => import("./ReconcilePanel"));
+const SessionsPanel = lazy(() => import("./SessionsPanel"));
 
 /**
  * The ordered source registry. Order is the menu order. The first entry is the
@@ -43,5 +44,11 @@ export const SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
     label: "reconciliation",
     hint: "join wire <-> audit : detecte un chemin non-medie",
     Component: ReconcilePanel,
+  },
+  {
+    id: "sessions",
+    label: "sessions",
+    hint: "echanges agent<->serveur groupes par session (run/agent/target)",
+    Component: SessionsPanel,
   },
 ] as const;
