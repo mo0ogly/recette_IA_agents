@@ -19,6 +19,7 @@ only -- the export is a derived view, never a mutation (I1).
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -51,6 +52,12 @@ PRINCIPAL = "inspect_ia_agents.principal"
 ACTION_MODE = "inspect_ia_agents.mode"
 RESOURCE = "inspect_ia_agents.resource"
 APPROVED = "inspect_ia_agents.approved"
+# Legibility level 2 (the "why"): the agent objective on the root span, and per
+# step the LLM decision text + the expressed tool arguments (the intent). All
+# read from the persisted recording -- pure, deterministic (I4).
+GOAL = "inspect_ia_agents.goal"
+DECISION = "inspect_ia_agents.decision"
+TOOL_ARGS = "gen_ai.tool.call.arguments"
 
 _SYSTEM = "inspect_ia_agents"
 _STEP_NANO = 1_000_000  # logical 1ms per span; deterministic, not wall clock
@@ -235,6 +242,9 @@ def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
         AGENT_NAME: agent_id,
         AGENT_ID: agent_id,
     }
+    goal = str(getattr(recording, "goal", "") or "")
+    if goal:
+        root_attrs[GOAL] = goal
     if provider:
         root_attrs[PROVIDER] = provider
     if model:
@@ -246,21 +256,28 @@ def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
         if not isinstance(action, dict):
             continue  # a final answer carries no tool call -> no execute_tool span
         action_type = str(action.get("action_type", ""))
-        _emit(
-            f"{OP_EXECUTE_TOOL} {action_type}",
-            parent=root,
-            attrs={
-                OP: OP_EXECUTE_TOOL,
-                TOOL_NAME: action_type,
-                TOOL_CALL_ID: str(action.get("seq", "")),
-                AGENT_ID: str(action.get("agent_id", agent_id)),
-                TARGET_SYSTEM: str(action.get("target_system", "")),
-                PRINCIPAL: str(action.get("principal", "")),
-                ACTION_MODE: str(action.get("mode", "")),
-                RESOURCE: str(action.get("resource", "")),
-                APPROVED: int(bool(action.get("approved", False))),
-            },
-        )
+        attrs: dict[str, str | int] = {
+            OP: OP_EXECUTE_TOOL,
+            TOOL_NAME: action_type,
+            TOOL_CALL_ID: str(action.get("seq", "")),
+            AGENT_ID: str(action.get("agent_id", agent_id)),
+            TARGET_SYSTEM: str(action.get("target_system", "")),
+            PRINCIPAL: str(action.get("principal", "")),
+            ACTION_MODE: str(action.get("mode", "")),
+            RESOURCE: str(action.get("resource", "")),
+            APPROVED: int(bool(action.get("approved", False))),
+        }
+        # The "why": the LLM decision text + the expressed tool arguments
+        # (the intent), read from the persisted decision. Deterministic (I4):
+        # tool args are JSON-serialized with sorted keys.
+        decision = getattr(step, "decision", None)
+        decision_text = str(getattr(decision, "text", "") or "")
+        if decision_text:
+            attrs[DECISION] = decision_text
+        tool_args = getattr(decision, "tool_args", None)
+        if isinstance(tool_args, dict) and tool_args:
+            attrs[TOOL_ARGS] = json.dumps(tool_args, sort_keys=True, ensure_ascii=False)
+        _emit(f"{OP_EXECUTE_TOOL} {action_type}", parent=root, attrs=attrs)
     return spans
 
 

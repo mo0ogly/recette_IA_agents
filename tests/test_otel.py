@@ -10,21 +10,27 @@ from __future__ import annotations
 import unittest
 
 from recette.events import AgentAction
+from recette.llm import LlmDecision
 from recette.maf_orchestration import HandoffHop, OrchestrationRun, ToolCall
 from recette.otel import (
     AGENT_ID,
     AGENT_NAME,
     APPROVED,
+    DECISION,
+    GOAL,
     OP,
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
     RESOURCE,
     TARGET_SYSTEM,
+    TOOL_ARGS,
     TOOL_NAME,
     action_log_spans,
     orchestration_spans,
+    recording_spans,
     to_otlp,
 )
+from recette.recording import RecordedStep, Recording
 
 TEAM = {
     "kind": "maf_orchestration",
@@ -167,6 +173,54 @@ class TestActionLogSpans(unittest.TestCase):
         )
         # I1: the source rows are untouched.
         self.assertEqual([a.seq for a in ACTION_LOG], [1, 2])
+
+
+class TestRecordingSpansWhy(unittest.TestCase):
+    """The legibility 'why': goal on the root, intent (tool_args) + decision text
+    on each tool span. Read from the persisted recording, deterministic (I4)."""
+
+    def _recording(self) -> Recording:
+        rec = Recording(
+            agent_id="pay-bot",
+            principal="ci-bot",
+            target_system="finance",
+            goal="Process the weekly accounts-payable run",
+            provider="stub",
+        )
+        rec.steps = [
+            RecordedStep(
+                decision=LlmDecision(
+                    kind="tool_call",
+                    text="invoice looks valid, paying",
+                    tool_name="create_payment",
+                    tool_args={"resource": "inv/v1", "amount": 100},
+                ),
+                action={
+                    "action_type": "create_payment",
+                    "seq": 1,
+                    "agent_id": "pay-bot",
+                    "target_system": "finance",
+                    "principal": "ci-bot",
+                    "mode": "write",
+                    "resource": "inv/v1",
+                    "approved": True,
+                },
+            ),
+        ]
+        return rec
+
+    def test_goal_on_root_and_intent_plus_decision_on_tool_span(self) -> None:
+        spans = recording_spans(self._recording(), "rec-why-1")
+        root, tool = spans[0], spans[1]
+        self.assertEqual(root.attributes[GOAL], "Process the weekly accounts-payable run")
+        self.assertEqual(tool.attributes[DECISION], "invoice looks valid, paying")
+        # tool args are JSON with sorted keys (deterministic intent string).
+        self.assertEqual(tool.attributes[TOOL_ARGS], '{"amount": 100, "resource": "inv/v1"}')
+
+    def test_deterministic(self) -> None:
+        a = to_otlp(recording_spans(self._recording(), "rec-why-1"))
+        b = to_otlp(recording_spans(self._recording(), "rec-why-1"))
+        self.assertEqual(a, b)
 
 
 if __name__ == "__main__":

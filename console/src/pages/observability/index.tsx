@@ -63,6 +63,10 @@ interface SpanView {
   principal: string;
   /** approval-gated? null = not a gated action, true/false = gated + outcome (I6). */
   approved: boolean | null;
+  /** The intent the agent expressed for this step (tool arguments). */
+  intent: string;
+  /** The LLM decision text -- the "why" (empty for scripted/stub providers). */
+  why: string;
 }
 
 function decode(span: ObservabilitySpan, depth: number): SpanView {
@@ -83,6 +87,8 @@ function decode(span: ObservabilitySpan, depth: number): SpanView {
     mode,
     principal: attr(span, "inspect_ia_agents.principal"),
     approved: isGated ? Number(approvedRaw) === 1 : null,
+    intent: attr(span, "gen_ai.tool.call.arguments"),
+    why: attr(span, "inspect_ia_agents.decision"),
   };
 }
 
@@ -161,6 +167,14 @@ export default function ObservabilityPage(): JSX.Element {
     return { actions: tools.length, writes: writes.length, unapproved: unapproved.length, targets };
   }, [views]);
 
+  // The agent objective rides on the root invoke_agent span (the "why" context).
+  const goal = useMemo(() => {
+    const root = (trace?.spans ?? []).find(
+      (s) => String(s.attributes["gen_ai.operation.name"]) === "invoke_agent",
+    );
+    return root ? String(root.attributes["inspect_ia_agents.goal"] ?? "") : "";
+  }, [trace]);
+
   return (
     <section className="page observability-page">
       <div className="page-head">
@@ -233,6 +247,11 @@ export default function ObservabilityPage(): JSX.Element {
                     {selectedSummary.agent_id ?? selectedSummary.recording_id}
                   </span>
                   <code className="obs-trace-rec">{selectedSummary.recording_id}</code>
+                  {goal && (
+                    <p className="obs-goal" data-testid="obs-goal">
+                      <span className="obs-k">objectif</span> {goal}
+                    </p>
+                  )}
                   <div className="obs-stats" data-testid="obs-stats">
                     <span className="obs-stat">
                       <strong>{stats.actions}</strong> action(s)
@@ -285,12 +304,18 @@ export default function ObservabilityPage(): JSX.Element {
                       )}
                       <span className="obs-span-dur">{humanDuration(v.span.duration_nano)}</span>
                     </button>
-                    {(v.resource || v.principal) && (
+                    {(v.resource || v.principal || v.intent) && (
                       <div className="obs-span-sub">
                         {v.resource && (
                           <span className="obs-kv">
                             <span className="obs-k">ressource</span>
                             <code className="obs-v">{v.resource}</code>
+                          </span>
+                        )}
+                        {v.intent && (
+                          <span className="obs-kv">
+                            <span className="obs-k">intention</span>
+                            <code className="obs-v">{v.intent}</code>
                           </span>
                         )}
                         {v.principal && (
@@ -301,6 +326,7 @@ export default function ObservabilityPage(): JSX.Element {
                         )}
                       </div>
                     )}
+                    {v.why && <p className="obs-why">{v.why}</p>}
                     {open.has(v.span.span_id) && (
                       <dl className="obs-attrs">
                         {Object.keys(v.span.attributes)

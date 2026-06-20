@@ -76,6 +76,17 @@ describe("ObservabilityPage", () => {
       expect(screen.getAllByText(approved ? "approuve" : "non approuve").length).toBeGreaterThan(0);
     }
 
+    // The "why": the agent objective (goal) shows on the trace header.
+    const root = trace.spans.find(
+      (s) => String(s.attributes["gen_ai.operation.name"]) === "invoke_agent",
+    );
+    const goal = root ? String(root.attributes["inspect_ia_agents.goal"] ?? "") : "";
+    if (goal) expect(await screen.findByTestId("obs-goal")).toHaveTextContent(goal);
+
+    // The intent (tool arguments) the agent expressed for a step.
+    const intent = spanAttr(1, "gen_ai.tool.call.arguments");
+    if (intent) expect(screen.getAllByText(intent).length).toBeGreaterThan(0);
+
     // The derived run summary gives visibility at a glance (counts + I6 risk).
     const stats = await screen.findByTestId("obs-stats");
     const toolCount = trace.spans.filter(
