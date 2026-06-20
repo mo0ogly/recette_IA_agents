@@ -55,7 +55,7 @@ is a template: `{ "max_duration_ms": 5000, "agents": { "<id>": { "comm_marker": 
 Option A -- least privilege (grant only the caps, then run unprivileged):
 
 ```
-sudo setcap cap_bpf,cap_perfmon,cap_net_admin+ep discoveryprobe/target/release/discoveryprobe-broker
+sudo setcap cap_bpf,cap_perfmon,cap_net_admin,cap_dac_read_search+ep discoveryprobe/target/release/discoveryprobe-broker
 discoveryprobe/target/release/discoveryprobe-broker --socket /run/inspect_ia_agents/probe-live.sock --manifest discoveryprobe/discoveryprobe-broker/manifest.example.json --audit .run/probe-live.audit.jsonl --bpf-object discoveryprobe/discoveryprobe-ebpf/target/bpfel-unknown-none/release/discoveryprobe-trace
 ```
 

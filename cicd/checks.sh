@@ -61,8 +61,12 @@ run_local() {
                          _bin="${REPO_ROOT}/discoveryprobe/target/release/discoveryprobe-broker"
                          [ -x "${_bin}" ] || err "broker not built -- run ./recette.sh probe-ebpf-build first"
                          [ -x "${_bin}" ] || exit 1
-                         hdr "grant cap_bpf,cap_perfmon,cap_net_admin to ${_bin} (sudo)"
-                         sudo setcap cap_bpf,cap_perfmon,cap_net_admin+ep "${_bin}" \
+                         # cap_dac_read_search: aya attaches a tracepoint by
+                         # reading /sys/kernel/tracing/events/.../id, which is
+                         # root-only (0440); cap_bpf/cap_perfmon do NOT bypass
+                         # filesystem DAC, so without it the attach fails EACCES.
+                         hdr "grant cap_bpf,cap_perfmon,cap_net_admin,cap_dac_read_search to ${_bin} (sudo)"
+                         sudo setcap cap_bpf,cap_perfmon,cap_net_admin,cap_dac_read_search+ep "${_bin}" \
                            && getcap "${_bin}" \
                            && ok "caps granted -- ./recette.sh platform up will now start the LIVE broker" ;;
         console-build) ( cd "${REPO_ROOT}/console" \
