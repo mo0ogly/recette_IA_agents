@@ -138,7 +138,10 @@ def run_agent(
             decision=decision,
         )
         actions.append(action)
-        step = RecordedStep(decision=decision, action=action.to_dict())
+        # The server's response for this action -- captured into the step so it
+        # is persisted with the recording (legibility level 3, durable I1).
+        result_text = tool_output(action)
+        step = RecordedStep(decision=decision, action=action.to_dict(), result=result_text)
         recording.steps.append(step)
         if on_step is not None:
             on_step(i, step)
@@ -154,7 +157,6 @@ def run_agent(
                 tool_call_id=call_id,
             )
         )
-        result_text = tool_output(action)
         tool_results.append(result_text)
         history.append(
             Message(

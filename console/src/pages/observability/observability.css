@@ -150,6 +150,11 @@
   color: var(--color-text);
 }
 
+/* The server's response for an action (the other half of the exchange). */
+.obs-response .obs-v {
+  color: var(--badge-green-fg);
+}
+
 /* The model's closing prose (real-run final answer). */
 .obs-final {
   flex-basis: 100%;

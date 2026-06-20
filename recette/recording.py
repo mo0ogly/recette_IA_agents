@@ -36,13 +36,25 @@ def _decision_from_dict(d: dict) -> LlmDecision:
 class RecordedStep:
     decision: LlmDecision
     action: dict | None = None  # serialized AgentAction, or None for a final step
+    # The tool-result text the server returned for this action -- the other half
+    # of the exchange (legibility level 3: "what the server answered"). Empty for
+    # a final step. Persisted so the response is durable + replayable (I1), not
+    # lost with the ephemeral run.
+    result: str = ""
 
     def to_dict(self) -> dict:
-        return {"decision": _decision_to_dict(self.decision), "action": self.action}
+        out: dict = {"decision": _decision_to_dict(self.decision), "action": self.action}
+        if self.result:
+            out["result"] = self.result
+        return out
 
     @staticmethod
     def from_dict(d: dict) -> RecordedStep:
-        return RecordedStep(decision=_decision_from_dict(d["decision"]), action=d.get("action"))
+        return RecordedStep(
+            decision=_decision_from_dict(d["decision"]),
+            action=d.get("action"),
+            result=str(d.get("result", "")),
+        )
 
 
 @dataclass

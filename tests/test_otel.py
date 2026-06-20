@@ -23,6 +23,7 @@ from recette.otel import (
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
     RESOURCE,
+    RESPONSE,
     TARGET_SYSTEM,
     TOOL_ARGS,
     TOOL_NAME,
@@ -206,6 +207,7 @@ class TestRecordingSpansWhy(unittest.TestCase):
                     "resource": "inv/v1",
                     "approved": True,
                 },
+                result="ok: create_payment on inv/v1 (mode=write)",
             ),
         ]
         return rec
@@ -217,6 +219,8 @@ class TestRecordingSpansWhy(unittest.TestCase):
         self.assertEqual(tool.attributes[DECISION], "invoice looks valid, paying")
         # tool args are JSON with sorted keys (deterministic intent string).
         self.assertEqual(tool.attributes[TOOL_ARGS], '{"amount": 100, "resource": "inv/v1"}')
+        # The server's response -- the other half of the exchange (level 3).
+        self.assertEqual(tool.attributes[RESPONSE], "ok: create_payment on inv/v1 (mode=write)")
 
     def test_deterministic(self) -> None:
         a = to_otlp(recording_spans(self._recording(), "rec-why-1"))

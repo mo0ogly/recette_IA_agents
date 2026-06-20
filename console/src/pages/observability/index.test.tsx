@@ -129,6 +129,14 @@ describe("ObservabilityPage", () => {
     const finalAnswer = String(root?.attributes["inspect_ia_agents.final_answer"] ?? "");
     expect(finalAnswer).not.toBe(""); // the fixture must actually carry it
     expect(await screen.findByTestId("obs-final")).toHaveTextContent(finalAnswer);
+
+    // The server's response per action -- the other half of the exchange (level 3).
+    const toolSpan = groqTrace.spans.find(
+      (s) => String(s.attributes["inspect_ia_agents.response"] ?? "") !== "",
+    );
+    const response = String(toolSpan?.attributes["inspect_ia_agents.response"] ?? "");
+    expect(response).not.toBe("");
+    expect(screen.getByText(response)).toBeInTheDocument();
   });
 
   it("filters the trace list by agent/target/recording (R16)", async () => {

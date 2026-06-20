@@ -62,6 +62,9 @@ TOOL_ARGS = "gen_ai.tool.call.arguments"
 # structured calls with no per-step prose, so the only reasoning text a real run
 # produces lives on the final step -- surfaced on the root span.
 FINAL_ANSWER = "inspect_ia_agents.final_answer"
+# The server's response for an action (legibility level 3: the other half of the
+# exchange). Read from the persisted step result -- deterministic (I4).
+RESPONSE = "inspect_ia_agents.response"
 
 _SYSTEM = "inspect_ia_agents"
 _STEP_NANO = 1_000_000  # logical 1ms per span; deterministic, not wall clock
@@ -288,6 +291,10 @@ def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
         tool_args = getattr(decision, "tool_args", None)
         if isinstance(tool_args, dict) and tool_args:
             attrs[TOOL_ARGS] = json.dumps(tool_args, sort_keys=True, ensure_ascii=False)
+        # The server's response -- the other half of the exchange (level 3).
+        result = str(getattr(step, "result", "") or "")
+        if result:
+            attrs[RESPONSE] = result
         _emit(f"{OP_EXECUTE_TOOL} {action_type}", parent=root, attrs=attrs)
     return spans
 

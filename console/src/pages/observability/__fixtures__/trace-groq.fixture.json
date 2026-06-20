@@ -16,7 +16,7 @@
                 "gen_ai.agent.name": "groq-proof-bot",
                 "gen_ai.agent.id": "groq-proof-bot",
                 "inspect_ia_agents.goal": "Read the repo acme/widgets, then open a pull request that fixes the README typo.",
-                "inspect_ia_agents.final_answer": "The goal has been met. The function calls are complete.",
+                "inspect_ia_agents.final_answer": "The goal has been met. The repository acme/widgets has been read and a pull request to fix the README typo has been opened.",
                 "gen_ai.provider.name": "groq",
                 "gen_ai.request.model": "llama-3.3-70b-versatile"
             }
@@ -40,7 +40,8 @@
                 "inspect_ia_agents.mode": "read",
                 "inspect_ia_agents.resource": "acme/widgets",
                 "inspect_ia_agents.approved": 0,
-                "gen_ai.tool.call.arguments": "{\"resource\": \"acme/widgets\"}"
+                "gen_ai.tool.call.arguments": "{\"resource\": \"acme/widgets\"}",
+                "inspect_ia_agents.response": "ok: read_repo on acme/widgets (mode=read)"
             }
         },
         {
@@ -62,7 +63,8 @@
                 "inspect_ia_agents.mode": "write",
                 "inspect_ia_agents.resource": "acme/widgets",
                 "inspect_ia_agents.approved": 0,
-                "gen_ai.tool.call.arguments": "{\"params\": {\"fix_type\": \"README typo\", \"pr_type\": \"fix\"}, \"resource\": \"acme/widgets\"}"
+                "gen_ai.tool.call.arguments": "{\"params\": {\"pr_body\": \"Fix typo in README.md\", \"pr_title\": \"Fix README typo\"}, \"resource\": \"acme/widgets\"}",
+                "inspect_ia_agents.response": "ok: open_pr on acme/widgets (mode=write)"
             }
         }
     ]

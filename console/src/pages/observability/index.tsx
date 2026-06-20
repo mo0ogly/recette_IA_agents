@@ -67,6 +67,8 @@ interface SpanView {
   intent: string;
   /** The LLM decision text -- the "why" (empty for scripted/stub providers). */
   why: string;
+  /** The server's response for this action (the other half of the exchange). */
+  response: string;
 }
 
 function decode(span: ObservabilitySpan, depth: number): SpanView {
@@ -89,6 +91,7 @@ function decode(span: ObservabilitySpan, depth: number): SpanView {
     approved: isGated ? Number(approvedRaw) === 1 : null,
     intent: attr(span, "gen_ai.tool.call.arguments"),
     why: attr(span, "inspect_ia_agents.decision"),
+    response: attr(span, "inspect_ia_agents.response"),
   };
 }
 
@@ -335,6 +338,14 @@ export default function ObservabilityPage(): JSX.Element {
                       </div>
                     )}
                     {v.why && <p className="obs-why">{v.why}</p>}
+                    {v.response && (
+                      <div className="obs-span-sub obs-response">
+                        <span className="obs-kv">
+                          <span className="obs-k">reponse</span>
+                          <code className="obs-v">{v.response}</code>
+                        </span>
+                      </div>
+                    )}
                     {open.has(v.span.span_id) && (
                       <dl className="obs-attrs">
                         {Object.keys(v.span.attributes)
