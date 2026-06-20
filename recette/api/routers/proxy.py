@@ -15,6 +15,9 @@ in-memory ring; it never touches the event store.
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -216,6 +219,53 @@ def get_wire_status(request: Request) -> dict:
         "enabled": proxy_url is not None,
         "proxy_url": proxy_url,
         "flow_count": len(recorder.snapshot()),
+    }
+
+
+@router.post("/wire/overlay")
+def control_wire_overlay(request: Request, body: dict) -> dict:
+    """Start/stop the OPTIONAL mitmproxy wire overlay (operator action).
+
+    Deny-by-default: the API spawns docker only when
+    INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL is truthy (fail-safe, R5). The script only
+    STARTS/STOPS the container; routing agent traffic through it still needs the
+    API restarted with INSPECT_IA_AGENTS_WIRE_PROXY set and the CA trusted --
+    reported back in ``next_step``. Logged via tracing (ops action), never
+    appended to the canonical event store."""
+    action = body.get("action")
+    if action not in {"up", "down"}:
+        raise HTTPException(status_code=422, detail='body.action must be "up" or "down"')
+    allowed = os.environ.get("INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL", "").strip().lower()
+    if allowed not in {"1", "true", "yes", "on"}:
+        raise HTTPException(
+            status_code=403,
+            detail="wire overlay control disabled (set INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL=1)",
+        )
+    logging.getLogger("recette.proxy").info("operator wire overlay action=%s", action)
+    # Resolve the repo root from this module's path so the launcher is found
+    # regardless of the API process cwd (recette/api/routers/proxy.py -> repo root).
+    repo_root = Path(__file__).resolve().parents[3]
+    try:
+        result = subprocess.run(
+            ["./recette.sh", "wire", action],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+            cwd=str(repo_root),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(status_code=502, detail=f"wire control failed: {exc}") from exc
+    ok = result.returncode == 0
+    return {
+        "ok": ok,
+        "action": action,
+        "returncode": result.returncode,
+        "next_step": (
+            "set INSPECT_IA_AGENTS_WIRE_PROXY + trust the CA, then ./recette.sh api restart"
+            if action == "up"
+            else None
+        ),
     }
 
 
