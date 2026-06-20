@@ -10,15 +10,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import exchangeFixture from "./__fixtures__/exchange.fixture.json";
 import ghostAgentFixture from "./__fixtures__/exchange-ghost-agent.fixture.json";
-import type { ExchangeReport } from "../../types/platform";
+import type { AgentConfig, ExchangeReport } from "../../types/platform";
 
 vi.mock("../../api/client", () => ({
   getDiscoveryExchange: vi.fn(),
   getProbeStatus: vi.fn(),
   captureProbe: vi.fn(),
+  listAgents: vi.fn(),
+  launchProcessRun: vi.fn(),
 }));
 
-import { captureProbe, getDiscoveryExchange, getProbeStatus } from "../../api/client";
+import {
+  captureProbe,
+  getDiscoveryExchange,
+  getProbeStatus,
+  launchProcessRun,
+  listAgents,
+} from "../../api/client";
 import DiscoveryExchangePage from "./index";
 
 const fixture = exchangeFixture as unknown as ExchangeReport;
@@ -29,6 +37,7 @@ describe("DiscoveryExchangePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getProbeStatus).mockResolvedValue(probeOff);
+    vi.mocked(listAgents).mockResolvedValue([]);
   });
 
   it("renders the real exchange with identified + ghost verdicts and the ghost count", async () => {
@@ -97,6 +106,26 @@ describe("DiscoveryExchangePage", () => {
     const ghost = await screen.findByTestId("agent-shadow-agent");
     expect(within(ghost).getByTestId("agent-outcome")).toHaveTextContent("GHOST");
     expect(vi.mocked(captureProbe)).toHaveBeenCalled();
+  });
+
+  it("launches a process-mode (eBPF-observable) run from the picker", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(listAgents).mockResolvedValue([
+      { id: "proc-bot", runtime: "lab", ai_mode: "mock", scenario: [{ kind: "final", text: "x" }] },
+    ] as AgentConfig[]);
+    vi.mocked(launchProcessRun).mockResolvedValue({ run_id: "run-proc-123", status: "running" });
+    render(<DiscoveryExchangePage />);
+
+    const picker = (await screen.findByTestId("dx-proc-agent")) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(within(picker).getByRole("option", { name: "proc-bot" })).toBeInTheDocument(),
+    );
+    fireEvent.change(picker, { target: { value: "proc-bot" } });
+    fireEvent.click(screen.getByTestId("dx-launch-proc"));
+    await waitFor(() =>
+      expect(screen.getByTestId("dx-launch-msg")).toHaveTextContent(/process lance: proc-bot/),
+    );
+    expect(vi.mocked(launchProcessRun)).toHaveBeenCalledWith("proc-bot");
   });
 
   it("surfaces a load error without crashing", async () => {

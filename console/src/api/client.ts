@@ -357,6 +357,16 @@ export function launchLaneB(req: LaunchLaneBRequest): Promise<RunHandle> {
   });
 }
 
+/** Launch an agent as a SEPARATE OS process (eBPF-observable, mock-only). The
+ *  process-mode run is the prerequisite for a live eBPF capture of the agent
+ *  (the in-process run is invisible to the kernel tracepoints). */
+export function launchProcessRun(agentId: string): Promise<RunHandle> {
+  return request<RunHandle>("/runs", {
+    method: "POST",
+    body: JSON.stringify({ kind: "lane_b_process", params: { agent_id: agentId } }),
+  });
+}
+
 export function launchRunner(
   kind: "discovery" | "identification",
   params: Record<string, unknown> = {},

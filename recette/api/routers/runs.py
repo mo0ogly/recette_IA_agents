@@ -90,6 +90,24 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
             ),
         )
         return {"run_id": run.id, "status": run.status}
+    if kind == "lane_b_process":
+        # Run the agent as a SEPARATE OS process (eBPF-observable). Mock-only:
+        # the process path runs the deterministic StubLlm loop, never a live
+        # provider (a live key never crosses a subprocess boundary here).
+        from ..runners import make_process_run_runner
+
+        store = request.app.state.config_store
+        agent_cfg = store.get_agent(str(body.get("params", {}).get("agent_id", "")))
+        if agent_cfg is None:
+            raise HTTPException(status_code=400, detail="unknown lane_b_process agent_id")
+        if agent_cfg.get("ai_mode", "mock") == "real":
+            raise HTTPException(status_code=400, detail="process mode is mock-only")
+        if not agent_cfg.get("scenario"):
+            raise HTTPException(status_code=400, detail="process mode needs a mock scenario")
+        mgr = request.app.state.run_manager
+        run = mgr.create("lane_b_process", body.get("params", {}))
+        mgr.start(run, make_process_run_runner(agent_cfg))
+        return {"run_id": run.id, "status": run.status}
     runner = _RUNNERS.get(kind) if isinstance(kind, str) else None
     if runner is None:
         raise HTTPException(status_code=400, detail=f"unknown run kind {kind!r}")

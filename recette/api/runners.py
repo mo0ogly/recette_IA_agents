@@ -7,9 +7,14 @@ Runners never touch HTTP or asyncio — they are pure orchestration over recette
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess  # nosec B404 - spawns our own python -m recette.agent_proc, fixed argv
+import sys
+import tempfile
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..adapters import ReferenceDiscoveryAdapter, ReferenceIdentificationAdapter
@@ -778,6 +783,57 @@ def dry_run_lane_b(agent_cfg: dict) -> dict:
         "tool_results": result.tool_results,
         "steps": result.recording.to_dict()["steps"],
     }
+
+
+def make_process_run_runner(agent_cfg: dict) -> Callable[[dict, Emit, ShouldStop], None]:
+    """Run an agent as a SEPARATE OS process so the eBPF probe can observe it.
+
+    Spawns ``python -m recette.agent_proc`` (same deterministic Lane B loop as the
+    in-process path) with its ``comm`` set to the agent id, so the kernel
+    exec/connect tracepoints attribute it -- the prerequisite for a LIVE eBPF
+    capture from the UX. The judged action log is emitted from the child's stdout
+    (byte-identical to the in-process run, I4 -- see test_agent_proc).
+
+    Fail-safe: a non-zero exit or unparseable output is surfaced as a step_error
+    and fails the run; the child is terminated if the run is asked to stop. This
+    path is NOT governed (no gateway) -- it exists to be eBPF-observable; the
+    governed path stays the in-process lane_b run.
+    """
+    agent_id = str(agent_cfg.get("id") or "agent")
+
+    def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
+        emit("agent_start", {"agent_id": agent_id, "mode": "process"})
+        with tempfile.TemporaryDirectory() as tmp:
+            agent_file = Path(tmp) / "agent.json"
+            agent_file.write_text(json.dumps(agent_cfg), encoding="utf-8")
+            proc = subprocess.Popen(  # nosec B603 - fixed interpreter + module, no shell
+                [sys.executable, "-m", "recette.agent_proc", "--agent-file", str(agent_file)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+            )
+            while proc.poll() is None:
+                if should_stop():
+                    proc.terminate()
+                    emit("agent_done", {"agent_id": agent_id, "stopped": True})
+                    return
+                time.sleep(0.05)
+            out, err = proc.communicate()
+        if proc.returncode != 0:
+            emit("step_error", {"agent_id": agent_id, "message": err.strip() or "process failed"})
+            raise RuntimeError(f"process-mode agent {agent_id!r} failed: {err.strip()}")
+        try:
+            result = json.loads(out)
+        except (TypeError, ValueError) as exc:
+            emit("step_error", {"agent_id": agent_id, "message": f"bad output: {exc}"})
+            raise RuntimeError(f"process-mode agent {agent_id!r} bad output") from exc
+        emit(
+            "agent_done",
+            {"agent_id": agent_id, "actions": len(result.get("actions", [])), "mode": "process"},
+        )
+
+    return runner
 
 
 def build_stub_llm(script: list[dict]) -> StubLlm:

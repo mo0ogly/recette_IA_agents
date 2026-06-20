@@ -16,10 +16,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { captureProbe, getDiscoveryExchange, getProbeStatus } from "../../api/client";
+import {
+  captureProbe,
+  getDiscoveryExchange,
+  getProbeStatus,
+  launchProcessRun,
+  listAgents,
+} from "../../api/client";
 import type { DetectionScorecard, ProbeStatus } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
-import type { ExchangeReport } from "../../types/platform";
+import type { AgentConfig, ExchangeReport } from "../../types/platform";
 import {
   agentOutcome,
   agentsForRun,
@@ -43,6 +49,11 @@ export default function DiscoveryExchangePage(): JSX.Element {
   const [probe, setProbe] = useState<ProbeStatus | null>(null);
   const [ebpfCard, setEbpfCard] = useState<DetectionScorecard | null>(null);
   const [ebpfError, setEbpfError] = useState<string | null>(null);
+  // Process-mode launch (eBPF-observable): mock agents that can run as their own
+  // OS process so the kernel tracepoints (eBPF source) can attribute them.
+  const [agents, setAgents] = useState<AgentConfig[]>([]);
+  const [procAgent, setProcAgent] = useState("");
+  const [launchMsg, setLaunchMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -58,9 +69,23 @@ export default function DiscoveryExchangePage(): JSX.Element {
     getProbeStatus()
       .then(setProbe)
       .catch(() => setProbe(null));
+    listAgents()
+      .then((a) => setAgents(a.filter((x) => (x.ai_mode ?? "mock") !== "real" && x.scenario)))
+      .catch(() => setAgents([]));
     const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  const launchProc = useCallback(async (): Promise<void> => {
+    if (!procAgent) return;
+    setLaunchMsg(null);
+    try {
+      const run = await launchProcessRun(procAgent);
+      setLaunchMsg(`process lance: ${procAgent} (run ${run.run_id.slice(0, 8)})`);
+    } catch (e: unknown) {
+      setLaunchMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [procAgent]);
 
   const exchanges = useMemo(() => report?.exchanges ?? [], [report]);
   const runOptions = useMemo(() => distinctRuns(exchanges), [exchanges]);
@@ -155,6 +180,41 @@ export default function DiscoveryExchangePage(): JSX.Element {
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="dx-launch" role="group" aria-label="lancer en mode process">
+        <span className="dx-launch-title">Mode process (eBPF)</span>
+        <select
+          className="dx-filter-input"
+          data-testid="dx-proc-agent"
+          aria-label="agent process"
+          value={procAgent}
+          onChange={(e) => setProcAgent(e.target.value)}
+        >
+          <option value="">agent...</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.id}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="dx-source-btn"
+          data-testid="dx-launch-proc"
+          disabled={!procAgent}
+          onClick={() => void launchProc()}
+        >
+          Lancer (process)
+        </button>
+        <span className="dx-launch-note">
+          lance l&apos;agent comme process OS -&gt; observable par la capture eBPF (toggle ci-dessus)
+        </span>
+        {launchMsg !== null && (
+          <span className="dx-launch-msg" data-testid="dx-launch-msg">
+            {launchMsg}
+          </span>
+        )}
       </div>
 
       {error !== null && <p className="dx-error">{error}</p>}
