@@ -41,6 +41,22 @@ def _canonical_socket() -> Path:
     return Path(__file__).resolve().parent.parent.parent.parent / ".run" / "probe.sock"
 
 
+def _canonical_mode(default: str) -> str:
+    """Mode of the launcher's canonical broker, read from ``.run/probe.mode``.
+
+    The launcher writes ``live`` there when it started the privileged CAP_BPF
+    broker on the canonical socket, ``replay`` for the non-privileged one. Read
+    it so ``/probe/status`` tells the truth (R13/R14: never claim live for a
+    replay broker, never hide a real live one). Falls back to ``default`` when
+    the file is absent/unreadable (a hand-started broker without the marker)."""
+    mode_file = _canonical_socket().with_name("probe.mode")
+    try:
+        value = mode_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return default
+    return value if value in ("live", "replay") else default
+
+
 def _resolve_socket() -> tuple[str | None, str]:
     """Resolve the broker socket and its mode (config-first, R5/R18).
 
@@ -49,9 +65,10 @@ def _resolve_socket() -> tuple[str | None, str]:
     2. Fallback: the launcher's canonical ``.run/probe.sock`` IF it exists as a
        socket. This closes the friction where a standalone ``api restart`` (e.g.
        from a concurrent session) drops the env while the auto-started broker is
-       still up -- the probe stays usable instead of going dark. The auto-started
-       broker is the REPLAY broker, so the fallback mode is ``replay`` (R13/R14:
-       never claim live for it).
+       still up -- the probe stays usable instead of going dark. Its mode comes
+       from ``.run/probe.mode`` (the launcher records live vs replay there), so a
+       launcher-started LIVE broker on the canonical socket reports ``live`` while
+       the default replay broker reports ``replay`` (R13/R14).
     3. Otherwise: no socket -> ``(None, "off")``.
     """
     env_socket = os.environ.get(_SOCKET_ENV)
@@ -59,7 +76,7 @@ def _resolve_socket() -> tuple[str | None, str]:
         return env_socket, os.environ.get(_MODE_ENV, "live")
     canonical = _canonical_socket()
     if canonical.is_socket():
-        return str(canonical), os.environ.get(_MODE_ENV, "replay")
+        return str(canonical), _canonical_mode(os.environ.get(_MODE_ENV, "replay"))
     return None, "off"
 
 

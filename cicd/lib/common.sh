@@ -94,6 +94,16 @@ LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-4000}"
 PROBE_SOCKET_PATH="${INSPECT_IA_AGENTS_PROBE_SOCKET:-${RUN_DIR}/probe.sock}"
 PROBE_PID_FILE="${RUN_DIR}/probe.pid"
 PROBE_LOG_FILE="${RUN_DIR}/probe.log"
+# The launcher records here which broker it started (live|replay) so the API's
+# /probe/status reports the truth for the canonical socket (R13/R14).
+PROBE_MODE_FILE="${RUN_DIR}/probe.mode"
+# The CAP_BPF live broker + its eBPF object (built by `recette.sh probe-ebpf-build`)
+# and the agents allowlist manifest. The live broker is used ONLY when the binary
+# carries cap_bpf (one-time `recette.sh probe-grant-caps`); otherwise replay.
+PROBE_LIVE_BROKER="${REPO_ROOT}/discoveryprobe/target/release/discoveryprobe-broker"
+PROBE_BPF_OBJECT="${REPO_ROOT}/discoveryprobe/discoveryprobe-ebpf/target/bpfel-unknown-none/release/discoveryprobe-trace"
+PROBE_MANIFEST="${INSPECT_IA_AGENTS_PROBE_MANIFEST:-${REPO_ROOT}/discoveryprobe/discoveryprobe-broker/manifest.example.json}"
+PROBE_AUDIT_FILE="${RUN_DIR}/probe.audit.jsonl"
 
 # -- python picker: prefer the project venv, else system python3 ------------
 py() {

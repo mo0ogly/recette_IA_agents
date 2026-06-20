@@ -18,6 +18,7 @@ set -euo pipefail
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
 #   ./recette.sh discovery-build               # native Rust discovery engines (cargo, discoveryprobe/)
 #   ./recette.sh probe-ebpf-build              # build the eBPF object + CAP_BPF broker (live capture; see docs/runbooks/ebpf-live-capture.md)
+#   ./recette.sh probe-grant-caps              # ONE-TIME: grant CAP_BPF to the broker (sudo) so platform up runs it live
 #   ./recette.sh docs-build|docs-serve         # Docusaurus doc site build / serve fr+en (docs-site/)
 #   ./recette.sh smoke [--server-port N]               # e2e lab smoke (API + serveur mock + replay)
 #   ./recette.sh wire up|down|status|logs|ca           # optional mitmproxy wire-interception overlay (Docker)
@@ -128,7 +129,7 @@ case "${cmd}" in
     platform)                          "${PLATFORM_SH}" "$@" ;;
     console)                           "${PLATFORM_SH}" console "$@" ;;
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
-    test|gates|report|validate|run|discovery|discovery-build|probe-ebpf-build|console-build|console-test|docs-build|docs-serve)
+    test|gates|report|validate|run|discovery|discovery-build|probe-ebpf-build|probe-grant-caps|console-build|console-test|docs-build|docs-serve)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     wire)                              "${WIRE_SH}" "$@" ;;

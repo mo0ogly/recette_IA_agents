@@ -52,6 +52,19 @@ run_local() {
                            && cargo build --release -p discoveryprobe-broker \
                            && ls -l discoveryprobe-ebpf/target/bpfel-unknown-none/release/discoveryprobe-trace \
                                     target/release/discoveryprobe-broker ) ;;
+        probe-grant-caps) # ONE-TIME host provisioning: grant the live broker the
+                         # caps it needs to load eBPF, so the launcher can run it
+                         # UNPRIVILEGED afterwards (no per-capture sudo -- the
+                         # capture then works entirely from the UX). Requires the
+                         # operator's sudo password (a kernel requirement, the one
+                         # irreducible privileged step). Build first if needed.
+                         _bin="${REPO_ROOT}/discoveryprobe/target/release/discoveryprobe-broker"
+                         [ -x "${_bin}" ] || err "broker not built -- run ./recette.sh probe-ebpf-build first"
+                         [ -x "${_bin}" ] || exit 1
+                         hdr "grant cap_bpf,cap_perfmon,cap_net_admin to ${_bin} (sudo)"
+                         sudo setcap cap_bpf,cap_perfmon,cap_net_admin+ep "${_bin}" \
+                           && getcap "${_bin}" \
+                           && ok "caps granted -- ./recette.sh platform up will now start the LIVE broker" ;;
         console-build) ( cd "${REPO_ROOT}/console" \
                          && node node_modules/.bin/tsc --noEmit \
                          && node node_modules/.bin/vite build ) ;;

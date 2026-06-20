@@ -118,23 +118,45 @@ lab_stop() {
 
 # --- discovery probe replay broker ------------------------------------------
 
+_probe_live_capable() {
+    # True iff the privileged live broker can run unprivileged here: the binary
+    # exists and carries cap_bpf (granted once via `recette.sh probe-grant-caps`),
+    # the eBPF object is built, and a manifest exists. Any missing piece -> replay
+    # (fail-safe: never try a live load that would EPERM, never fake one).
+    command -v getcap >/dev/null 2>&1 || return 1
+    [ -x "${PROBE_LIVE_BROKER}" ] || return 1
+    [ -f "${PROBE_BPF_OBJECT}" ] || return 1
+    [ -f "${PROBE_MANIFEST}" ] || return 1
+    getcap "${PROBE_LIVE_BROKER}" 2>/dev/null | grep -q "cap_bpf" || return 1
+    return 0
+}
+
 probe_broker_start() {
-    # Launch the NON-privileged replay broker so the console Probe view works in
-    # dev/CI without CAP_BPF. It serves a deterministic replay of the corpus
-    # surface ground-truth (mode=replay), never a live eBPF capture (R13/R14).
-    # The operator can target a real privileged broker by exporting
-    # INSPECT_IA_AGENTS_PROBE_SOCKET (mode=live) before platform up.
+    # Start the discovery probe broker on the canonical socket. Prefer the
+    # PRIVILEGED live eBPF broker when it is capability-granted (one-time
+    # `recette.sh probe-grant-caps`); otherwise the NON-privileged replay broker
+    # (deterministic corpus replay). The chosen mode is recorded in
+    # PROBE_MODE_FILE so the API's /probe/status reports the truth (R13/R14). An
+    # operator-set INSPECT_IA_AGENTS_PROBE_SOCKET still wins (handled API-side).
     if _pid_of "${PROBE_PID_FILE}" >/dev/null; then
         warn "probe broker deja en cours (pid $(_pid_of "${PROBE_PID_FILE}"))"
         return 0
     fi
     mkdir -p "${RUN_DIR}"
     rm -f "${PROBE_SOCKET_PATH}"
-    hdr "START probe replay broker (socket ${PROBE_SOCKET_PATH}, mode replay)"
-    ( cd "${REPO_ROOT}" \
-        && nohup "$(py)" -m recette.platform.probe.replay_broker \
-             --socket "${PROBE_SOCKET_PATH}" >"${PROBE_LOG_FILE}" 2>&1 & \
-        echo $! >"${PROBE_PID_FILE}" )
+    if _probe_live_capable; then
+        hdr "START probe LIVE eBPF broker (socket ${PROBE_SOCKET_PATH}, mode live, CAP_BPF)"
+        ( cd "${REPO_ROOT}" \
+            && nohup "${PROBE_LIVE_BROKER}" --socket "${PROBE_SOCKET_PATH}" --manifest "${PROBE_MANIFEST}" --audit "${PROBE_AUDIT_FILE}" --bpf-object "${PROBE_BPF_OBJECT}" >"${PROBE_LOG_FILE}" 2>&1 & \
+            echo $! >"${PROBE_PID_FILE}" )
+        printf 'live\n' >"${PROBE_MODE_FILE}"
+    else
+        hdr "START probe replay broker (socket ${PROBE_SOCKET_PATH}, mode replay)"
+        ( cd "${REPO_ROOT}" \
+            && nohup "$(py)" -m recette.platform.probe.replay_broker --socket "${PROBE_SOCKET_PATH}" >"${PROBE_LOG_FILE}" 2>&1 & \
+            echo $! >"${PROBE_PID_FILE}" )
+        printf 'replay\n' >"${PROBE_MODE_FILE}"
+    fi
     # The socket appears once the broker has bound; wait briefly.
     local i
     for ((i = 0; i < 20; i++)); do
@@ -142,7 +164,7 @@ probe_broker_start() {
         sleep 0.2
     done
     if [ -S "${PROBE_SOCKET_PATH}" ]; then
-        ok "probe replay broker pret (pid $(_pid_of "${PROBE_PID_FILE}")) - logs: ${PROBE_LOG_FILE}"
+        ok "probe broker pret (mode $(cat "${PROBE_MODE_FILE}" 2>/dev/null), pid $(_pid_of "${PROBE_PID_FILE}")) - logs: ${PROBE_LOG_FILE}"
     else
         warn "probe broker socket absent - voir ${PROBE_LOG_FILE} (capture restera desactivee)"
     fi
@@ -151,12 +173,12 @@ probe_broker_start() {
 probe_broker_stop() {
     local pid
     if ! pid="$(_pid_of "${PROBE_PID_FILE}")"; then
-        rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}"
+        rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}" "${PROBE_MODE_FILE}"
         return 0
     fi
-    hdr "STOP probe replay broker (pid ${pid})"
+    hdr "STOP probe broker (pid ${pid})"
     kill "${pid}" 2>/dev/null || true
-    rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}"
+    rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}" "${PROBE_MODE_FILE}"
     ok "probe broker arrete"
 }
 
