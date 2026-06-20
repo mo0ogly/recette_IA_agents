@@ -129,6 +129,41 @@ class ReconcileEndpointTest(unittest.TestCase):
         self.assertFalse(strict["ok"])  # phase 3 catches it
         self.assertEqual([f["bypass_reason"] for f in strict["bypass_flows"]], ["no_audit_event"])
 
+    def test_status_clean_run_is_ok_with_zero_bypass(self) -> None:
+        # The lightweight badge endpoint mirrors /reconcile's verdict without the
+        # full bypass_flows payload.
+        self.client.post("/proxy/wire", json=_flow(port=8082))  # mediated
+        body = self.client.get("/proxy/reconcile/status", params={"run_id": "run-1"}).json()
+        self.assertEqual(body, {"ok": True, "bypass_count": 0})
+
+    def test_status_counts_bypass_flows_without_listing_them(self) -> None:
+        self.client.post("/proxy/wire", json=_flow(port=8082))  # mediated
+        self.client.post("/proxy/wire", json=_flow(port=9113, path="/write"))  # ghost
+        self.client.post("/proxy/wire", json=_flow(port=9113, path="/write2"))  # ghost
+        body = self.client.get("/proxy/reconcile/status", params={"run_id": "run-1"}).json()
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["bypass_count"], 2)
+        # The status payload carries only the verdict + count, never the flows.
+        self.assertNotIn("bypass_flows", body)
+
+    def test_status_strict_catches_ghost_via_allowlisted_target(self) -> None:
+        ghost = _flow(
+            port=8082,
+            path="/github/execute",
+            request_body=json.dumps(
+                {"action_type": "open_pr", "resource": "acme/x", "payload": {}}
+            ),
+            response_body=json.dumps({"success": True, "data": {"number": 42}}),
+        )
+        self.client.post("/proxy/wire", json=ghost)
+        lenient = self.client.get("/proxy/reconcile/status", params={"run_id": "run-1"}).json()
+        self.assertTrue(lenient["ok"])  # phase 2 misses it
+        strict = self.client.get(
+            "/proxy/reconcile/status", params={"run_id": "run-1", "strict": "true"}
+        ).json()
+        self.assertFalse(strict["ok"])  # phase 3 catches it
+        self.assertEqual(strict["bypass_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

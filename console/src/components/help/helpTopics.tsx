@@ -1699,6 +1699,15 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           pointe le premier <code>seq</code> casse. La chaine hashe le recu (deja sans contenu),
           jamais les corps.
         </p>
+        <h3>Export signe (Ed25519)</h3>
+        <p>
+          Le bouton <strong>Exporter</strong> telecharge une enveloppe signee{" "}
+          <strong>Ed25519</strong> (cle privee via env, R8 ; <code>[bundle]</code> extra) sur la
+          charge canonique <code>{"{chain_head, receipts}"}</code>. Un tiers verifie la preuve{" "}
+          <strong>hors plateforme</strong> avec la seule cle publique -- sans cle configuree,
+          l&apos;export est rendu <strong>non signe</strong> (fail-safe), jamais une fausse
+          signature.
+        </p>
       </>
     ),
   },

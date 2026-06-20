@@ -10,7 +10,11 @@
 
 import { useEffect, useState } from "react";
 
-import { getContextReceipts, verifyContextReceipts } from "../../api/client";
+import {
+  exportContextReceipts,
+  getContextReceipts,
+  verifyContextReceipts,
+} from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import type { ChainReport, ContextReceipt } from "../../types/platform";
 import "./receipts.css";
@@ -23,6 +27,25 @@ export default function ReceiptsPage(): JSX.Element {
   const [receipts, setReceipts] = useState<ContextReceipt[] | null>(null);
   const [chain, setChain] = useState<ChainReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport(): Promise<void> {
+    setExporting(true);
+    try {
+      const envelope = await exportContextReceipts();
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "context-receipts-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     getContextReceipts()
@@ -57,6 +80,16 @@ export default function ReceiptsPage(): JSX.Element {
         <strong>SHA-256</strong> des corps requete/reponse -- <strong>jamais les corps</strong>.
         Prouve ce qui a traverse, sans exposer le contenu (RSSI-safe). Lecture seule.
       </p>
+      <div className="receipts-actions">
+        <button
+          type="button"
+          className="receipts-export"
+          disabled={exporting || (receipts?.length ?? 0) === 0}
+          onClick={() => void handleExport()}
+        >
+          {exporting ? "Export..." : "Exporter (signe Ed25519)"}
+        </button>
+      </div>
       {error && <p className="receipts-error">{error}</p>}
       {receipts !== null &&
         (receipts.length === 0 ? (

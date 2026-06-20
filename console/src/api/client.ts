@@ -57,7 +57,9 @@ import type {
   RagScorecard,
   VerdictScorecard,
   ProxyRouteState,
+  ExchangeReport,
   ReconcileReport,
+  ReconcileStatus,
   VerdictSubmission,
   VerdictSubmissionRequest,
   WireFlowResponse,
@@ -704,6 +706,37 @@ export function getReconcile(runId?: string, strict?: boolean): Promise<Reconcil
   );
 }
 
+/** Lightweight reconciliation verdict (ok + bypass_count, no flows) for the
+ *  source-menu badge -- the same join as getReconcile without the full payload,
+ *  pollable without the reconcile panel being open. */
+export function getReconcileStatus(
+  runId?: string,
+  strict?: boolean,
+): Promise<ReconcileStatus> {
+  return request<ReconcileStatus>(
+    withQuery("/proxy/reconcile/status", {
+      run_id: runId,
+      strict: strict ? "true" : undefined,
+    }),
+    { method: "GET" },
+  );
+}
+
+/** Discovery verdict overlaid on the real exchange (GET /proxy/discovery-exchange).
+ *  Per-agent hook detection + per-exchange identified/ghost verdict, scored by the
+ *  deterministic surface oracle (the always-available default source; the eBPF
+ *  source is captureProbe). runId narrows to one run; strict (default true) uses
+ *  the phase-3 per-flow side_effect_hash join for the ghost-exchange annotation. */
+export function getDiscoveryExchange(runId?: string, strict = true): Promise<ExchangeReport> {
+  return request<ExchangeReport>(
+    withQuery("/proxy/discovery-exchange", {
+      run_id: runId,
+      strict: strict ? undefined : "false",
+    }),
+    { method: "GET" },
+  );
+}
+
 /** Record each detected bypass as a compensatory bypass_detected event in the
  *  append-only audit log (I1). Idempotent: a bypass already recorded is not
  *  appended twice. Returns how many NEW events were raised. strict raises the
@@ -1344,4 +1377,11 @@ export function getContextReceipts(runId?: string, tail?: number): Promise<Recei
 export function verifyContextReceipts(runId?: string): Promise<ChainReport> {
   const path = withQuery("/proxy/receipts/verify", { run_id: runId });
   return request<ChainReport>(path, { method: "GET" });
+}
+
+/** A transferable, Ed25519-signed export of the chained context receipts.
+ *  Unsigned (signed:false) when no signing key is configured (fail-safe). */
+export function exportContextReceipts(runId?: string): Promise<Record<string, unknown>> {
+  const path = withQuery("/proxy/receipts/export", { run_id: runId });
+  return request<Record<string, unknown>>(path, { method: "GET" });
 }

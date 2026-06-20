@@ -13,6 +13,7 @@ import type { ReceiptsResponse } from "../../types/platform";
 vi.mock("../../api/client", () => ({
   getContextReceipts: vi.fn(),
   verifyContextReceipts: vi.fn(),
+  exportContextReceipts: vi.fn(),
 }));
 
 import { getContextReceipts, verifyContextReceipts } from "../../api/client";
@@ -40,6 +41,8 @@ describe("ReceiptsPage", () => {
     expect(within(table).getAllByTitle(first.request_sha256).length).toBeGreaterThan(0);
     // The hash-chain integrity badge reports the verified sequence.
     expect(await screen.findByTestId("receipts-chain")).toHaveTextContent(/chaine verifiee/);
+    // The signed-export action is offered (downloads the Ed25519 envelope).
+    expect(screen.getByRole("button", { name: /Exporter \(signe/ })).toBeEnabled();
   });
 
   it("shows an empty state when no side effect was traced", async () => {

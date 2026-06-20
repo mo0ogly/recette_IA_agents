@@ -81,6 +81,22 @@ def verify_receipts(request: Request, run_id: str | None = None) -> dict:
     return verify_chain(chain_receipts([t.to_dict() for t in traces]))
 
 
+@router.get("/receipts/export")
+def export_receipts_route(request: Request, run_id: str | None = None) -> dict:
+    """A transferable, Ed25519-signed export of the chained receipts.
+
+    The envelope carries the content-free chained receipts + their chain head,
+    signed when a signing key is configured (fail-safe unsigned otherwise). Lets
+    an auditor verify the trail OFF-platform with the public key alone."""
+    from ...context_receipt import chain_receipts
+    from ...receipt_export import export_receipts
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    return export_receipts(chain_receipts([t.to_dict() for t in traces]))
+
+
 @router.delete("/traces")
 def clear_traces(request: Request) -> dict:
     """Discard the debug trace buffer (the audit log is untouched, I1)."""
@@ -173,23 +189,17 @@ def set_proxy_route(request: Request, body: dict) -> dict:
     return {"active": chosen.id, "proxy_url": chosen.proxy_url}
 
 
-def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = False):
-    """Compute the run-scoped wire<->audit reconciliation over the live recorders.
+def _build_run_allowlist(request: Request, run_id: str | None):
+    """The run's flows + traces (as dicts) and the mediated-target allowlist.
 
-    Shared by the read endpoint and the raise endpoint so both see the exact
-    same join. ``strict`` selects the phase-3 per-flow side_effect_hash join
-    (catches a ghost via an allowlisted target); the default is the phase-2
-    target/run join. Pure given the recorder snapshots (I4); no side effect."""
+    Shared by reconciliation and the discovery-exchange overlay so both see the
+    exact same recorder snapshots and allowlist. Pure given the snapshots (I4);
+    no side effect. Returns ``(allow, flow_dicts, trace_dicts)``."""
     from urllib.parse import urlparse
 
     from ...llm import provider_host
     from ...platform.proxy.lab_proxy import lab_url_from_env
-    from ...platform.proxy.reconcile import (
-        build_allowlist,
-        reconcile_run,
-        reconcile_strict,
-        target_of,
-    )
+    from ...platform.proxy.reconcile import build_allowlist, target_of
 
     flows = request.app.state.wire_flow_recorder.snapshot()
     traces = request.app.state.proxy_trace_recorder.snapshot()
@@ -213,8 +223,47 @@ def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = Fa
         lab_host=lab_host,
         llm_hosts=llm_hosts,
     )
+    return allow, [f.to_dict() for f in flows], [t.to_dict() for t in traces]
+
+
+def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = False):
+    """Compute the run-scoped wire<->audit reconciliation over the live recorders.
+
+    Shared by the read endpoint and the raise endpoint so both see the exact
+    same join. ``strict`` selects the phase-3 per-flow side_effect_hash join
+    (catches a ghost via an allowlisted target); the default is the phase-2
+    target/run join. Pure given the recorder snapshots (I4); no side effect."""
+    from ...platform.proxy.reconcile import reconcile_run, reconcile_strict
+
+    allow, flow_dicts, trace_dicts = _build_run_allowlist(request, run_id)
     join = reconcile_strict if strict else reconcile_run
-    return join([f.to_dict() for f in flows], [t.to_dict() for t in traces], allow)
+    return join(flow_dicts, trace_dicts, allow)
+
+
+@router.get("/discovery-exchange")
+def get_discovery_exchange(
+    request: Request, run_id: str | None = None, strict: bool = True
+) -> dict:
+    """Overlay the discovery verdict onto the real exchange (run-scoped).
+
+    Joins the two real-exchange views (ProxyTrace hook + WireFlow wire) with what
+    the surface discovery oracle SAW: per-agent detection (hook grouped by
+    agent_id, wire run-scoped) with the ghost agents in
+    ``scorecard.false_negatives``, plus a per-exchange verdict (hook = identified;
+    wire = corroborated, or a ghost exchange via ``reconcile_strict``). Pure given
+    the recorder snapshots (I4); read-only. The eBPF source is the separate POST
+    /probe/capture; this endpoint is the always-available deterministic oracle.
+    Fail-safe: empty recorders -> an empty report, never a 500."""
+    from ...surface.exchange import build_exchange_report
+
+    allow, flow_dicts, trace_dicts = _build_run_allowlist(request, run_id)
+    report = build_exchange_report(
+        proxy_traces=trace_dicts,
+        wire_flows=flow_dicts,
+        allowlist=allow,
+        run_id=run_id,
+    )
+    return {"debug_enabled": bool(request.app.state.proxy_debug_enabled), **report.to_dict()}
 
 
 @router.get("/reconcile")
@@ -234,6 +283,20 @@ def get_reconcile(request: Request, run_id: str | None = None, strict: bool = Fa
     POST /proxy/reconcile/raise records the bypass as a compensatory event."""
     report = _reconcile_report(request, run_id, strict=strict)
     return {"run_id": run_id, "strict": strict, **report.to_dict()}
+
+
+@router.get("/reconcile/status")
+def get_reconcile_status(request: Request, run_id: str | None = None, strict: bool = False) -> dict:
+    """Lightweight reconciliation verdict for the source-menu badge.
+
+    Same run-scoped join as GET /proxy/reconcile (pure given the recorder
+    snapshots, I4) but returns only the verdict and the bypass count -- the Proxy
+    console menu shows a live reconciliation badge without shipping (or
+    rendering) the full ``bypass_flows`` payload, and without the panel being
+    open. Read-only."""
+    report = _reconcile_report(request, run_id, strict=strict)
+    data = report.to_dict()
+    return {"ok": bool(data["ok"]), "bypass_count": len(data["bypass_flows"])}
 
 
 @router.post("/reconcile/raise")
