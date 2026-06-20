@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProxyTrace } from "../../types/platform";
-import { groupSessions, type GroupKey } from "./sessionModel";
+import { groupSessions, sessionsFailed, type GroupKey } from "./sessionModel";
 
 /** Minimal trace factory: only the fields the model reads. */
 function trace(over: Partial<ProxyTrace>): ProxyTrace {
@@ -92,5 +92,31 @@ describe("groupSessions", () => {
     const sessions = groupSessions([trace({ seq: 1, run_id: null })], "run");
     expect(sessions).toHaveLength(1);
     expect(sessions[0].exchanges).toHaveLength(1);
+  });
+
+  it("sums failed exchanges across sessions via sessionsFailed", () => {
+    const traces = [
+      trace({ seq: 1, run_id: "r1", ok: true, status_code: 200 }),
+      trace({ seq: 2, run_id: "r1", ok: false, status_code: 500 }),
+      trace({ seq: 3, run_id: "r2", ok: true, status_code: 200 }),
+    ];
+    const sessions = groupSessions(traces, "run");
+    // One failed exchange in r1, none in r2 -> total 1.
+    expect(sessions.find((s) => s.key === "r1")!.failed).toBe(1);
+    expect(sessions.find((s) => s.key === "r2")!.failed).toBe(0);
+    expect(sessionsFailed(sessions)).toBe(1);
+  });
+
+  it("tie-breaks equal lastSeq by firstSeq asc (smaller firstSeq first)", () => {
+    // r1: firstSeq=1, lastSeq=10 ; r2: firstSeq=4, lastSeq=10 (same lastSeq).
+    const traces = [
+      trace({ seq: 1, run_id: "r1" }),
+      trace({ seq: 10, run_id: "r1" }),
+      trace({ seq: 4, run_id: "r2" }),
+      trace({ seq: 10, run_id: "r2" }),
+    ];
+    const sessions = groupSessions(traces, "run");
+    expect(sessions.map((s) => s.lastSeq)).toEqual([10, 10]);
+    expect(sessions.map((s) => s.key)).toEqual(["r1", "r2"]); // firstSeq 1 < 4
   });
 });
