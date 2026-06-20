@@ -17,6 +17,7 @@
 
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { getProxyTraces } from "../../api/client";
 import type { ProxyTrace } from "../../types/platform";
@@ -66,6 +67,19 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
   const [detailSeq, setDetailSeq] = useState<number | null>(null);
+
+  // Deep-link: ?run=<run_id> auto-selects that run's session without a click,
+  // so a "Voir dans le proxy" button from the cockpit lands on its exchanges.
+  // Selection holds by key, so if the session is not in the ring yet it still
+  // selects when it arrives on a later poll; aged-out degrades to the hint.
+  const [searchParams] = useSearchParams();
+  const runParam = searchParams.get("run");
+  useEffect(() => {
+    if (runParam) {
+      setGroupKey("run");
+      setSelectedKey(runParam);
+    }
+  }, [runParam]);
 
   // Keep the latest onStatus without making it an effect dependency: a parent
   // passing an inline callback must not retrigger the status effect (loop guard).
