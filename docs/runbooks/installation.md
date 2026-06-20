@@ -23,10 +23,15 @@ Cette doc installe le projet et lance, **uniquement via `./recette.sh`**
 | Python | >= 3.11 | recette, lab mock, API |
 | Node.js + npm | >= 20 | console UX (vite) |
 | bash, curl, ss | -- | `recette.sh` et ses sondes de sante |
+| Rust (rustup) + `bpf-linker` | nightly (epingle) | **moteur discovery Rust (eBPF live)** -- optionnel mais c'est le coeur (section 5) |
+| `setcap`/`getcap` (libcap), kernel BTF (`/sys/kernel/btf/vmlinux`) | -- | meme usage : charger l'eBPF (CAP_BPF) |
 
 Le lab mock (les serveurs appeles par les agents) est en **stdlib pure** : aucune
 dependance a installer pour lui. Seule l'API a besoin de l'extra `[api]`
-(FastAPI + uvicorn).
+(FastAPI + uvicorn). Le **moteur discovery Rust** (section 5) est optionnel : sans
+lui, le broker tourne en mode `replay` deterministe (zero privilege) et l'UX
+fonctionne ; avec lui, le broker voit les **vraies** comms agent<->serveur au
+niveau kernel (exec + connect).
 
 ---
 
@@ -91,7 +96,56 @@ existante ; `real_saas` tape un vrai systeme). Ces serveurs-la ne passent pas pa
 
 ---
 
-## 5. Verifier
+## 5. Moteur de discovery Rust (eBPF live) -- le coeur
+
+Le **noyau discovery natif** (`discoveryprobe/`, Rust + eBPF) est le coeur du
+produit : il VOIT au niveau kernel ce qu'un agent fait vraiment (exec + connect
+sortant), pas seulement ce qui passe par le proxy applicatif. Sans lui, le broker
+demarre en mode `replay` (Python, deterministe, zero privilege) -- l'UX marche,
+mais sur une rejoue du corpus, pas sur du trafic reel.
+
+Le provisioning est **entierement via `recette.sh`** (R19). Une seule etape est
+privilegiee -- accorder CAP_BPF -- car charger un programme eBPF l'exige ; c'est
+**ponctuel** (une fois par hote, ou apres un rebuild du broker).
+
+```
+./recette.sh discovery-build      # moteurs natifs (catalog, detect, broker)
+./recette.sh probe-ebpf-build     # objet eBPF + broker CAP_BPF
+./recette.sh probe-grant-caps     # PONCTUEL (sudo) : cap_bpf,cap_perfmon,cap_net_admin,cap_dac_read_search+ep
+./recette.sh platform up          # le launcher demarre AUTO le broker LIVE (caps presents)
+```
+
+Le launcher detecte les caps (`_probe_live_capable`) et choisit seul le broker
+live ; il ecrit le mode dans `.run/probe.mode` et l'API le lit -- pas de variable
+d'env a poser a la main. Verifier :
+
+```
+cat .run/probe.mode                                  # -> live
+curl -s http://127.0.0.1:8090/probe/status           # -> {"configured":true,...,"mode":"live"}
+```
+
+Preuve que le moteur voit une vraie comm (capture par PID d'un agent mock lie a
+un serveur lab) :
+
+```
+curl -s -X POST http://127.0.0.1:8090/probe/process-capture -H 'content-type: application/json' -d '{"agent_id":"dx-live-bot","duration_ms":4000}'
+# -> recordings[0].surfaces.ebpf_wire = ["connect:127.0.0.1:9101"], scorecard.ok=true
+```
+
+Depuis l'UX : page **Discovery x Echange**, toggle source **eBPF (live)**, ou
+lancer un agent en **Mode process (eBPF)** -- le verdict DETECTE/GHOST vient du
+broker live, en regard du vrai echange (proxy) a gauche.
+
+> Important : un **rebuild du broker** (`probe-ebpf-build` / `discovery-build`)
+> remet a zero les file-caps -> relancer `./recette.sh probe-grant-caps`. C'est la
+> seule recurrence. Sans les caps, le broker retombe en `replay` (fail-safe : il
+> ne fabrique jamais une capture, il ne tente jamais un load qui ferait EPERM).
+
+Detail (least-privilege vs sudo, manifest, teardown) : [ebpf-live-capture.md](ebpf-live-capture.md).
+
+---
+
+## 6. Verifier
 
 ```
 ./recette.sh platform status
@@ -104,7 +158,7 @@ d'audit (`GET /audit/verify`).
 
 ---
 
-## 6. Arreter
+## 7. Arreter
 
 ```
 ./recette.sh platform down       # arret propre lab + API (+ console)
@@ -117,7 +171,7 @@ un container Docker ni un process exterieur.
 
 ---
 
-## 7. Ports et configuration
+## 8. Ports et configuration
 
 | Service | Port defaut | Override (env, R5) |
 |---------|-------------|--------------------|
@@ -131,7 +185,7 @@ credentials de systemes reels viennent de l'environnement.
 
 ---
 
-## 8. Voir aussi
+## 9. Voir aussi
 
 - Guide operateur complet (menu interactif + toutes les commandes) :
   [recette-sh.md](recette-sh.md).

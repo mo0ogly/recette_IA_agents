@@ -10,6 +10,26 @@
 > **CAP_BPF** -- loading/attaching an eBPF program requires it. Run the broker
 > with privilege as below.
 
+## Fast path (automated, reproducible) -- prefer this
+
+The launcher now wires live end-to-end; no manual env. One-time host provisioning,
+then `platform up` selects the live broker by itself (it reads the file-caps via
+`_probe_live_capable` and records the chosen mode in `.run/probe.mode`, which the
+API honours -- no `INSPECT_IA_AGENTS_PROBE_SOCKET`/`_MODE` to export):
+
+```
+./recette.sh discovery-build && ./recette.sh probe-ebpf-build
+./recette.sh probe-grant-caps     # ONE-TIME (sudo): CAP_BPF on the broker binary
+./recette.sh platform up          # auto-starts the LIVE broker, mode=live
+curl -s http://127.0.0.1:8090/probe/status                 # -> "mode":"live"
+curl -s -X POST http://127.0.0.1:8090/probe/process-capture -H 'content-type: application/json' -d '{"agent_id":"dx-live-bot","duration_ms":4000}'
+# -> surfaces.ebpf_wire=["connect:127.0.0.1:9101"], scorecard.ok=true (PID-precise)
+```
+
+A broker rebuild drops the file-caps -> re-run `probe-grant-caps`. The manual
+operator-socket path below stays valid (e.g. a broker on a different socket) but
+is no longer required.
+
 ## Why a runbook (not automated)
 
 The default platform launches the **replay** broker (Python,
@@ -120,9 +140,12 @@ A dashboard/Lane B agent runs IN-PROCESS, invisible to eBPF. To capture one live
    starts the LIVE broker with that manifest, mode=live), then from the UX:
    eBPF toggle on `/discovery-exchange` -> capture around a process-mode run.
 
-Known follow-up: a **pid-based** capture request (the launcher knows the child
-pid) would be more precise than the `comm` match and is tracked in the design
-(docs/plans/2026-06-20-ebpf-live-process-mode-design.md).
+**PID-based capture (precise) -- DONE.** `POST /probe/process-capture
+{"agent_id":...}` spawns the child, captures it by its exact pid (no reliance on
+the 15-byte `comm`), and scores it. Verified live: `dx-live-bot` ->
+`ebpf_wire: connect:127.0.0.1:9101`. The console "Mode process (eBPF)" picker on
+`/discovery-exchange` drives the same path. Design:
+docs/plans/2026-06-20-ebpf-live-process-mode-design.md.
 
 ## Notes
 

@@ -1442,6 +1442,39 @@
           "behavior": true
         }
       }
+    },
+    {
+      "id": "dx-live-bot",
+      "runtime": "lab",
+      "ai_mode": "mock",
+      "principal": "dx@acme",
+      "target_system": "github",
+      "server": "gh-mock",
+      "goal": "live ebpf: read then pr",
+      "capability_scope": [
+        "read_repo",
+        "open_pr"
+      ],
+      "scenario": [
+        {
+          "kind": "tool_call",
+          "tool_name": "read_repo",
+          "tool_args": {
+            "resource": "acme/x"
+          }
+        },
+        {
+          "kind": "tool_call",
+          "tool_name": "open_pr",
+          "tool_args": {
+            "resource": "acme/x"
+          }
+        },
+        {
+          "kind": "final",
+          "text": "done"
+        }
+      ]
     }
   ],
   "ai_backends": [

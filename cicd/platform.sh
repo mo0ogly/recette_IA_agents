@@ -238,7 +238,12 @@ platform_up() {
     else
         probe_broker_start
         export INSPECT_IA_AGENTS_PROBE_SOCKET="${PROBE_SOCKET_PATH}"
-        export INSPECT_IA_AGENTS_PROBE_MODE="replay"
+        # Honour the mode the broker ACTUALLY started in (live when CAP_BPF was
+        # granted via `recette.sh probe-grant-caps`, replay otherwise). Never
+        # force replay over a live broker -- that mismatch made /probe/status lie
+        # and forced manual env trafiquer. The launcher alone now wires live
+        # end-to-end (R5/R13/R14, R19 single entry point).
+        export INSPECT_IA_AGENTS_PROBE_MODE="$(cat "${PROBE_MODE_FILE}" 2>/dev/null || echo replay)"
     fi
     mkdir -p "${PLATFORM_DATA_DIR}" "${RUN_DIR}"
     _pick_api_port
