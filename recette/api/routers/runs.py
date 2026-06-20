@@ -111,7 +111,9 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
             raise HTTPException(status_code=400, detail="process mode needs a mock scenario")
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b_process", body.get("params", {}))
-        mgr.start(run, make_process_run_runner(agent_cfg))
+        # Pass the servers registry so a server-bound agent runs through the real
+        # ProxyForge (real TCP connects -> the eBPF connect surface).
+        mgr.start(run, make_process_run_runner(agent_cfg, store.list_servers()))
         return {"run_id": run.id, "status": run.status}
     runner = _RUNNERS.get(kind) if isinstance(kind, str) else None
     if runner is None:

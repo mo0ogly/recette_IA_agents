@@ -13,7 +13,9 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from recette.agent_proc import run_agent_process, set_process_comm
@@ -65,6 +67,57 @@ class AgentProcTest(unittest.TestCase):
     def test_real_agent_is_refused(self) -> None:
         with self.assertRaises(ValueError):
             run_agent_process({**_AGENT, "ai_mode": "real"})
+
+
+class _StubLab(BaseHTTPRequestHandler):
+    """Minimal lab server: records that a real TCP request arrived."""
+
+    received: list[str] = []
+
+    def log_message(self, *args: object) -> None:
+        return
+
+    def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        _ = self.rfile.read(length) if length else b""
+        type(self).received.append(self.path)
+        body = json.dumps({"success": True, "data": {"ok": True}}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+class AgentProcServerBoundTest(unittest.TestCase):
+    """A server-bound process agent runs through the real ProxyForge -> REAL TCP
+    connects (the prerequisite for the eBPF connect surface)."""
+
+    def setUp(self) -> None:
+        _StubLab.received = []
+        self._srv = HTTPServer(("127.0.0.1", 0), _StubLab)
+        self._port = self._srv.server_address[1]
+        self._t = threading.Thread(target=self._srv.serve_forever, daemon=True)
+        self._t.start()
+        self.addCleanup(self._srv.server_close)
+        self.addCleanup(self._srv.shutdown)
+
+    def test_server_bound_run_makes_real_connects(self) -> None:
+        agent = {**_AGENT, "id": "proc-bound", "server": "gh-lab"}
+        servers = [
+            {
+                "id": "gh-lab",
+                "system": "github",
+                "mode": "declared_url",
+                "base_url": f"http://127.0.0.1:{self._port}",
+            }
+        ]
+        result = run_agent_process(agent, servers)
+        # The agent's two tool calls became real HTTP POSTs to the stub lab
+        # (real outbound TCP = what the kernel eBPF connect tracepoint observes).
+        self.assertEqual(len(result["actions"]), 2)
+        self.assertEqual(len(_StubLab.received), 2)
+        self.assertTrue(all(p.endswith("/execute") for p in _StubLab.received))
 
 
 if __name__ == "__main__":

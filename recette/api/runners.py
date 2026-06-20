@@ -785,7 +785,9 @@ def dry_run_lane_b(agent_cfg: dict) -> dict:
     }
 
 
-def make_process_run_runner(agent_cfg: dict) -> Callable[[dict, Emit, ShouldStop], None]:
+def make_process_run_runner(
+    agent_cfg: dict, servers: list[dict] | None = None
+) -> Callable[[dict, Emit, ShouldStop], None]:
     """Run an agent as a SEPARATE OS process so the eBPF probe can observe it.
 
     Spawns ``python -m recette.agent_proc`` (same deterministic Lane B loop as the
@@ -806,8 +808,16 @@ def make_process_run_runner(agent_cfg: dict) -> Callable[[dict, Emit, ShouldStop
         with tempfile.TemporaryDirectory() as tmp:
             agent_file = Path(tmp) / "agent.json"
             agent_file.write_text(json.dumps(agent_cfg), encoding="utf-8")
+            argv = [sys.executable, "-m", "recette.agent_proc", "--agent-file", str(agent_file)]
+            # A server-bound agent runs through the real ProxyForge (real TCP
+            # connects -> eBPF connect surface); pass the servers registry so the
+            # child can resolve the binding.
+            if servers and agent_cfg.get("server"):
+                servers_file = Path(tmp) / "servers.json"
+                servers_file.write_text(json.dumps(servers), encoding="utf-8")
+                argv += ["--servers-file", str(servers_file)]
             proc = subprocess.Popen(  # nosec B603 - fixed interpreter + module, no shell
-                [sys.executable, "-m", "recette.agent_proc", "--agent-file", str(agent_file)],
+                argv,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

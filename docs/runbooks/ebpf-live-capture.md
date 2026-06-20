@@ -98,6 +98,32 @@ unset INSPECT_IA_AGENTS_PROBE_SOCKET INSPECT_IA_AGENTS_PROBE_MODE
 ./recette.sh api restart      # back to the replay broker (default)
 ```
 
+## Process-mode dashboard agents (the full live chain)
+
+A dashboard/Lane B agent runs IN-PROCESS, invisible to eBPF. To capture one live:
+
+1. **Make it eBPF-observable + make real connects.** Bind the agent to a
+   `mock_local` server (so each action is a real localhost TCP connect) and
+   launch it in PROCESS mode -- the console `/discovery-exchange` "Mode process
+   (eBPF)" picker, or `POST /runs {"kind":"lane_b_process","params":{"agent_id":...}}`.
+   The child process runs `recette.agent_proc`, sets its `comm` to the agent id
+   (`prctl`), and (server-bound) goes through `ProxyForge` = real outbound TCP.
+2. **Generate a matching manifest** so the broker allowlists that agent by the
+   `comm` it will carry on its connect events:
+
+   ```
+   python -m recette.platform.probe.manifest_gen --agents <id1>,<id2> --out .run/probe-manifest.json
+   export INSPECT_IA_AGENTS_PROBE_MANIFEST=$PWD/.run/probe-manifest.json
+   ```
+
+3. Grant caps once (step 2 above), `./recette.sh platform up` (the launcher
+   starts the LIVE broker with that manifest, mode=live), then from the UX:
+   eBPF toggle on `/discovery-exchange` -> capture around a process-mode run.
+
+Known follow-up: a **pid-based** capture request (the launcher knows the child
+pid) would be more precise than the `comm` match and is tracked in the design
+(docs/plans/2026-06-20-ebpf-live-process-mode-design.md).
+
 ## Notes
 
 - Determinism (I4) applies to the pure judge, not to this measurement: a live

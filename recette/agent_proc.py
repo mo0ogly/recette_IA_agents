@@ -48,15 +48,52 @@ def set_process_comm(name: str) -> bool:
         return False
 
 
-def run_agent_process(agent_cfg: dict) -> dict:
+def run_agent_process(agent_cfg: dict, servers: list[dict] | None = None) -> dict:
     """Run the agent's Lane B loop in THIS process and return the judged result.
 
-    Reuses ``dry_run_lane_b`` so the output is identical (same engine, same
-    StubLlm, same forge) to the in-process API run -- the determinism contract
-    (I4) the replay test asserts."""
-    from .api.runners import dry_run_lane_b
+    Without a server binding (or no ``servers`` list) this is exactly
+    ``dry_run_lane_b`` -- the in-memory ``LabForge``, deterministic (I4), the
+    contract the replay test asserts. It makes NO real network I/O.
 
-    return dry_run_lane_b(agent_cfg)
+    With a ``server`` binding AND a ``servers`` registry, the agent runs through
+    the real ``ProxyForge`` (HTTP to the bound ``mock_local`` server), so each
+    action is a REAL outbound TCP connect -- the only way the kernel eBPF
+    ``connect`` tracepoint has anything to attribute (with ``comm`` set to the
+    agent id by :func:`set_process_comm`). No gateway here (the process path is
+    eBPF-observability, not governance)."""
+    from .api.runners import build_stub_llm, forge_for_agent
+    from .lane_b import run_agent as run_lane_b_agent
+
+    if not agent_cfg.get("server") or not servers:
+        from .api.runners import dry_run_lane_b
+
+        return dry_run_lane_b(agent_cfg)
+
+    for key in ("principal", "target_system", "goal", "capability_scope"):
+        if not agent_cfg.get(key):
+            raise ValueError(f"agent missing {key!r}")
+    scenario = agent_cfg.get("scenario")
+    if not scenario:
+        raise ValueError("process mode needs a mock scenario")
+    if agent_cfg.get("ai_mode", "mock") == "real":
+        raise ValueError("process mode is mock-only")
+    # gateway=None: a server-bound agent resolves to ProxyForge (real HTTP).
+    forge = forge_for_agent(agent_cfg, servers, gateway=None)
+    result = run_lane_b_agent(
+        agent_id=str(agent_cfg.get("id") or "agent"),
+        principal=agent_cfg["principal"],
+        target_system=agent_cfg["target_system"],
+        goal=agent_cfg["goal"],
+        capability_scope=agent_cfg["capability_scope"],
+        llm=build_stub_llm(scenario),
+        forge=forge,
+        stop_on_repeat=True,
+    )
+    return {
+        "actions": [a.to_dict() for a in result.actions],
+        "tool_results": result.tool_results,
+        "steps": result.recording.to_dict()["steps"],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,18 +106,28 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="process comm to set (default: the agent id); for eBPF attribution",
     )
+    parser.add_argument(
+        "--servers-file",
+        default=None,
+        help="path to the servers registry JSON (list); enables the real ProxyForge "
+        "path so a server-bound agent makes real TCP connects (eBPF connect surface)",
+    )
     args = parser.parse_args(argv)
 
     agent_cfg = json.loads(Path(args.agent_file).read_text(encoding="utf-8"))
     if not isinstance(agent_cfg, dict):
         print("agent-file must contain a single JSON object", file=sys.stderr)
         return 2
+    servers: list[dict] | None = None
+    if args.servers_file:
+        loaded = json.loads(Path(args.servers_file).read_text(encoding="utf-8"))
+        servers = loaded if isinstance(loaded, list) else None
 
     comm = args.name or str(agent_cfg.get("id") or "agent")
     set_process_comm(comm)
 
     try:
-        result = run_agent_process(agent_cfg)
+        result = run_agent_process(agent_cfg, servers)
     except ValueError as exc:
         print(f"agent run rejected: {exc}", file=sys.stderr)
         return 1

@@ -136,6 +136,24 @@ So the shipped A+B+C is the verified scaffolding; a fully meaningful live eBPF
 capture of a dashboard agent additionally needs: the one-time grant + a
 pid/comm-correct manifest + the agent making real connects.
 
+### Both gaps now ADDRESSED (verified without CAP_BPF)
+
+1. **Real connects** -- `recette.agent_proc` / `run_agent_process(agent_cfg, servers)`
+   runs a SERVER-BOUND agent through the real `ProxyForge` (HTTP to the bound
+   `mock_local` server), so each action is a real outbound TCP connect. Verified:
+   `test_agent_proc.AgentProcServerBoundTest` asserts a stub lab received the real
+   POSTs. `make_process_run_runner` passes the servers registry; the server-less
+   path stays the deterministic in-memory run (replay test intact).
+2. **comm match** -- `recette.platform.probe.manifest_gen.build_manifest` emits
+   `comm_marker = agent_id[:15]`; `agent_proc` sets `comm` via `prctl` BEFORE the
+   run, so the connect events captured during the run carry that name and match.
+   Verified: `test_probe_manifest_gen`. The runbook wires
+   `INSPECT_IA_AGENTS_PROBE_MANIFEST` to the generated file.
+
+Remaining (needs CAP_BPF to verify, not blocking): pid-based capture request
+(more precise than comm), and the operator's one-time `probe-grant-caps` for the
+final kernel-capture proof.
+
 ## Sequencing
 
 B and C are inert/no-op until A lands and caps are granted, so order: A (process
