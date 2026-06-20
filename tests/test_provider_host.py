@@ -16,9 +16,7 @@ from recette.llm import _PROVIDER_CLASSES, _PROVIDERS, provider_host, provider_m
 # silently: adding a provider here is a visible decision (the only way to clear
 # the no-silent-empty guard without curating model ids). See R13 -- never invent
 # model ids; a provider with no authoritative source stays free-text.
-_FREE_TEXT_PROVIDERS = frozenset(
-    {"openai_compat", "bedrock", "opencode_zen", "qwen", "arcee"}
-)
+_FREE_TEXT_PROVIDERS = frozenset({"openai_compat", "bedrock", "opencode_zen", "qwen", "arcee"})
 
 
 class ProviderHostTest(unittest.TestCase):

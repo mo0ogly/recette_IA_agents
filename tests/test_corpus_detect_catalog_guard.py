@@ -67,11 +67,7 @@ class TestDetectCorpusGuard(unittest.TestCase):
                 (repo / "expected.json").is_file(),
                 f"repo fixture {repo.name} missing expected.json",
             )
-            sources = [
-                p
-                for p in repo.iterdir()
-                if p.is_file() and p.name != "expected.json"
-            ]
+            sources = [p for p in repo.iterdir() if p.is_file() and p.name != "expected.json"]
             self.assertTrue(sources, f"repo fixture {repo.name} has no source files")
 
 
