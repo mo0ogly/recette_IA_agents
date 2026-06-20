@@ -14,7 +14,8 @@
       "content_type": "",
       "request_body": "{}",
       "response_body": "{\"written\":true}",
-      "run_id": "ghost-run-1"
+      "run_id": "ghost-run-1",
+      "side_effect_hash": null
     }
   ],
   "audited_run_ids": []

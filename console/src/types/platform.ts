@@ -663,6 +663,9 @@ export interface WireFlow {
   response_body: string;
   /** Originating run when the addon could attribute it; null otherwise. */
   run_id: string | null;
+  /** Canonical side_effect_hash recomputed from the bytes, for joining a wire
+   *  flow to its app-level exchange; null for a non-governed flow. */
+  side_effect_hash: string | null;
 }
 
 /** Response of GET /proxy/wire: the captured flows plus the overlay state. */
