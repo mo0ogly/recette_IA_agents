@@ -153,6 +153,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.scheduler.start()
     yield
     await app.state.scheduler.stop()
+    app.state.probe_monitor.stop()
     app.state.server_manager.shutdown()
     app.state.realtime_transport.close()
 
@@ -326,6 +327,10 @@ def create_app(
         agent_resolver=AgentResolver(cfg_store.get_agent),
     )
     app.state.scheduler = build_scheduler_from_env(_maintenance_tasks(app, transport))
+    # Passive eBPF watch (start/stop via /probe/monitor); stopped on shutdown.
+    from .probe_monitor import ProbeMonitor
+
+    app.state.probe_monitor = ProbeMonitor()
 
     @app.get("/health")
     def health() -> dict[str, str]:

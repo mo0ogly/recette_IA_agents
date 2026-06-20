@@ -19,11 +19,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   captureProbe,
   getDiscoveryExchange,
+  getProbeMonitor,
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  startProbeMonitor,
+  stopProbeMonitor,
 } from "../../api/client";
-import type { DetectionScorecard, ProbeStatus } from "../../api/client";
+import type { DetectionScorecard, ProbeMonitorState, ProbeStatus } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import type { AgentConfig, ExchangeReport } from "../../types/platform";
 import {
@@ -54,6 +57,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [procAgent, setProcAgent] = useState("");
   const [launchMsg, setLaunchMsg] = useState<string | null>(null);
+  // Passive eBPF watch: agents seen on the wire in near-real-time (no per-capture click).
+  const [monitor, setMonitor] = useState<ProbeMonitorState | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -72,9 +77,32 @@ export default function DiscoveryExchangePage(): JSX.Element {
     listAgents()
       .then((a) => setAgents(a.filter((x) => (x.ai_mode ?? "mock") !== "real" && x.scenario)))
       .catch(() => setAgents([]));
+    const pollMonitor = (): void => {
+      getProbeMonitor()
+        .then(setMonitor)
+        .catch(() => setMonitor(null));
+    };
+    pollMonitor();
     const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
+    const monTimer = setInterval(pollMonitor, POLL_INTERVAL_MS);
+    return () => {
+      clearInterval(timer);
+      clearInterval(monTimer);
+    };
   }, [refresh]);
+
+  const toggleMonitor = useCallback(async (): Promise<void> => {
+    try {
+      if (monitor?.running) {
+        await stopProbeMonitor();
+      } else {
+        await startProbeMonitor();
+      }
+      setMonitor(await getProbeMonitor());
+    } catch (e: unknown) {
+      setEbpfError(e instanceof Error ? e.message : String(e));
+    }
+  }, [monitor]);
 
   const brokerLive = probe?.configured === true;
 
@@ -232,6 +260,41 @@ export default function DiscoveryExchangePage(): JSX.Element {
           <span className="dx-launch-msg" data-testid="dx-launch-msg">
             {launchMsg}
           </span>
+        )}
+      </div>
+
+      <div className="dx-monitor" role="group" aria-label="surveillance ebpf live">
+        <span className="dx-launch-title">Surveillance eBPF (live)</span>
+        <button
+          type="button"
+          className="dx-source-btn"
+          data-testid="dx-monitor-toggle"
+          data-active={monitor?.running === true}
+          onClick={() => void toggleMonitor()}
+        >
+          {monitor?.running ? "Arreter" : "Demarrer"}
+        </button>
+        <span className="dx-launch-note">
+          veille passive : tout agent surveille qui se connecte est flague ici, sans capture manuelle
+        </span>
+        {monitor !== null && (
+          <span className="dx-monitor-status" data-testid="dx-monitor-status">
+            {monitor.running ? `actif (${monitor.windows} fenetre(s))` : "arrete"}
+            {monitor.last_error ? ` -- ${monitor.last_error}` : ""}
+          </span>
+        )}
+        {monitor !== null && monitor.sightings.length > 0 && (
+          <ul className="dx-sightings" data-testid="dx-sightings">
+            {monitor.sightings.map((s) => (
+              <li key={s.agent_id} className="dx-agent" data-testid={`sighting-${s.agent_id}`}>
+                <span className="dx-agent-id">{s.agent_id}</span>
+                <span className="dx-badge dx-badge-identifie">VU</span>
+                <span className="dx-surfaces">
+                  {s.surfaces.join(", ")} ({s.windows_seen}x)
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

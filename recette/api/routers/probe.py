@@ -19,7 +19,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
@@ -112,6 +112,71 @@ def status() -> dict:
         "socket_env": _SOCKET_ENV,
         "mode": mode,
     }
+
+
+_MANIFEST_ENV = "INSPECT_IA_AGENTS_PROBE_MANIFEST"
+
+
+def _manifest_agents() -> list[str]:
+    """Agent ids in the broker manifest (the watch-list). Reads
+    ``INSPECT_IA_AGENTS_PROBE_MANIFEST`` then the launcher's canonical
+    ``.run/probe-manifest.json``. Empty/absent -> []. Fail-safe (never raises)."""
+    candidates = []
+    env_path = os.environ.get(_MANIFEST_ENV)
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.append(_canonical_socket().with_name("probe-manifest.json"))
+    for path in candidates:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        agents = data.get("agents") if isinstance(data, dict) else None
+        if isinstance(agents, dict):
+            return sorted(agents)
+    return []
+
+
+@router.get("/monitor")
+def monitor_status(request: Request) -> dict:
+    """Live state of the passive eBPF watch: running?, window, and the rolling
+    sightings (agents seen on the wire, with their surfaces). Read-only."""
+    return request.app.state.probe_monitor.snapshot()
+
+
+@router.post("/monitor/start")
+def monitor_start(request: Request, body: dict[str, Any]) -> dict:
+    """Start the passive watch: a background loop of back-to-back broker captures
+    over the watch-list, so any watched agent that runs is flagged in
+    near-real-time. ``agents`` defaults to every configured agent id (the broker
+    manifest is the real allowlist). 503 when no broker socket is configured."""
+    socket_path, mode = _resolve_socket()
+    if not socket_path:
+        raise HTTPException(status_code=503, detail=f"{_SOCKET_ENV} not set and no broker socket")
+    agents = body.get("agents")
+    if not isinstance(agents, list) or not agents:
+        # Default watch-list = the broker MANIFEST agents (the broker rejects a
+        # capture naming any non-manifest agent, so we never watch beyond it).
+        agents = _manifest_agents()
+    if not agents:
+        raise HTTPException(
+            status_code=400,
+            detail="no agents to watch (set a broker manifest or pass agents)",
+        )
+    window_ms = body.get("window_ms", 2000)
+    if not isinstance(window_ms, int) or isinstance(window_ms, bool) or window_ms <= 0:
+        raise HTTPException(status_code=400, detail="window_ms must be a positive integer")
+    started = request.app.state.probe_monitor.start(
+        socket_path=socket_path, agents=agents, window_ms=window_ms
+    )
+    return {"started": started, "mode": mode, "agents": agents}
+
+
+@router.post("/monitor/stop")
+def monitor_stop(request: Request) -> dict:
+    """Stop the passive watch (idempotent)."""
+    request.app.state.probe_monitor.stop()
+    return {"running": False}
 
 
 @router.post("/capture")

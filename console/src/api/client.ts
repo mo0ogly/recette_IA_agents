@@ -1040,6 +1040,45 @@ export interface DetectionScorecard {
   false_negatives: string[];
 }
 
+/** One live sighting from the passive eBPF monitor: an agent seen on the wire. */
+export interface ProbeSighting {
+  agent_id: string;
+  surfaces: string[];
+  windows_seen: number;
+  last_window: number;
+}
+
+/** GET /probe/monitor: the passive watch state + rolling live sightings. */
+export interface ProbeMonitorState {
+  running: boolean;
+  window_ms: number;
+  agents: string[];
+  windows: number;
+  last_error: string | null;
+  sightings: ProbeSighting[];
+}
+
+/** Live state of the passive eBPF watch (agents seen on the wire in ~real time). */
+export function getProbeMonitor(): Promise<ProbeMonitorState> {
+  return request<ProbeMonitorState>("/probe/monitor");
+}
+
+/** Start the passive watch (agents default to all configured ids). */
+export function startProbeMonitor(
+  agents?: string[],
+  windowMs?: number,
+): Promise<{ started: boolean; mode: string; agents: string[] }> {
+  return request("/probe/monitor/start", {
+    method: "POST",
+    body: JSON.stringify({ agents, window_ms: windowMs }),
+  });
+}
+
+/** Stop the passive watch (idempotent). */
+export function stopProbeMonitor(): Promise<{ running: boolean }> {
+  return request("/probe/monitor/stop", { method: "POST" });
+}
+
 /** POST /probe/capture result: the broker recording + (when ok) its scorecard. */
 export interface ProbeCaptureResult {
   recording: BrokerRecording;

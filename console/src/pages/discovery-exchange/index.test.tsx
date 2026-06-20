@@ -18,14 +18,19 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
   listAgents: vi.fn(),
   launchProcessRun: vi.fn(),
+  getProbeMonitor: vi.fn(),
+  startProbeMonitor: vi.fn(),
+  stopProbeMonitor: vi.fn(),
 }));
 
 import {
   captureProbe,
   getDiscoveryExchange,
+  getProbeMonitor,
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  startProbeMonitor,
 } from "../../api/client";
 import DiscoveryExchangePage from "./index";
 
@@ -38,6 +43,46 @@ describe("DiscoveryExchangePage", () => {
     vi.clearAllMocks();
     vi.mocked(getProbeStatus).mockResolvedValue(probeOff);
     vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(getProbeMonitor).mockResolvedValue({
+      running: false,
+      window_ms: 2000,
+      agents: [],
+      windows: 0,
+      last_error: null,
+      sightings: [],
+    });
+  });
+
+  it("starts the passive eBPF monitor and lists live sightings", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(startProbeMonitor).mockResolvedValue({
+      started: true,
+      mode: "live",
+      agents: ["dx-live-bot"],
+    });
+    vi.mocked(getProbeMonitor)
+      .mockResolvedValueOnce({
+        running: false,
+        window_ms: 2000,
+        agents: [],
+        windows: 0,
+        last_error: null,
+        sightings: [],
+      })
+      .mockResolvedValue({
+        running: true,
+        window_ms: 2000,
+        agents: ["dx-live-bot"],
+        windows: 3,
+        last_error: null,
+        sightings: [
+          { agent_id: "dx-live-bot", surfaces: ["ebpf_wire"], windows_seen: 2, last_window: 3 },
+        ],
+      });
+    render(<DiscoveryExchangePage />);
+    fireEvent.click(await screen.findByTestId("dx-monitor-toggle"));
+    expect(await screen.findByTestId("sighting-dx-live-bot")).toHaveTextContent(/ebpf_wire/);
+    expect(vi.mocked(startProbeMonitor)).toHaveBeenCalled();
   });
 
   it("renders the real exchange with identified + ghost verdicts and the ghost count", async () => {
