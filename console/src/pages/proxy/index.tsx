@@ -14,6 +14,7 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import PageHelp from "../../components/help/PageHelp";
+import LaunchPanel from "./LaunchPanel";
 import type { SourceId, SourceStatus } from "./proxyMenu";
 import SourceMenu from "./SourceMenu";
 import { SOURCE_DESCRIPTORS } from "./sources";
@@ -84,6 +85,20 @@ export default function ProxyPage(): JSX.Element {
         <h1>Proxy</h1>
         <PageHelp topic="proxy" />
       </header>
+
+      <LaunchPanel
+        onLaunched={(runId) =>
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("source", "sessions");
+              next.set("run", runId);
+              return next;
+            },
+            { replace: true },
+          )
+        }
+      />
 
       <SourceMenu
         sources={SOURCE_DESCRIPTORS}

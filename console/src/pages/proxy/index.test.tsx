@@ -28,6 +28,12 @@ vi.mock("../../api/client", async (importOriginal) => {
     getProxyTraces: vi.fn(),
     clearProxyTraces: vi.fn(),
     setProxyDebug: vi.fn(),
+    // The page now mounts LaunchPanel, which loads these on mount; stub them so
+    // the page test does not hit the network and stays deterministic.
+    listAgents: vi.fn(() => Promise.resolve([])),
+    listRecordings: vi.fn(() => Promise.resolve([])),
+    launchLaneB: vi.fn(),
+    replayRecording: vi.fn(),
   };
 });
 
