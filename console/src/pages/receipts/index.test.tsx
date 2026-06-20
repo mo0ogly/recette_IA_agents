@@ -10,20 +10,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import receiptsFixture from "./__fixtures__/receipts.fixture.json";
 import type { ReceiptsResponse } from "../../types/platform";
 
-vi.mock("../../api/client", () => ({ getContextReceipts: vi.fn() }));
+vi.mock("../../api/client", () => ({
+  getContextReceipts: vi.fn(),
+  verifyContextReceipts: vi.fn(),
+}));
 
-import { getContextReceipts } from "../../api/client";
+import { getContextReceipts, verifyContextReceipts } from "../../api/client";
 import ReceiptsPage from "./index";
 
 const fixture = receiptsFixture as unknown as ReceiptsResponse;
+const verify = { ok: true, checked: fixture.receipts.length, first_break_seq: null, detail: null };
 
 describe("ReceiptsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders the content-free receipts (intent + size/digest, no bodies)", async () => {
+  it("renders the content-free receipts (intent + size/digest, no bodies) + chain badge", async () => {
     vi.mocked(getContextReceipts).mockResolvedValue(fixture);
+    vi.mocked(verifyContextReceipts).mockResolvedValue(verify);
     render(<ReceiptsPage />);
 
     const table = await screen.findByTestId("receipts-table");
@@ -33,6 +38,8 @@ describe("ReceiptsPage", () => {
     expect(within(table).getAllByText(`${first.request_bytes} o`).length).toBeGreaterThan(0);
     // The digest is shown truncated; the full sha is in the title attribute.
     expect(within(table).getAllByTitle(first.request_sha256).length).toBeGreaterThan(0);
+    // The hash-chain integrity badge reports the verified sequence.
+    expect(await screen.findByTestId("receipts-chain")).toHaveTextContent(/chaine verifiee/);
   });
 
   it("shows an empty state when no side effect was traced", async () => {

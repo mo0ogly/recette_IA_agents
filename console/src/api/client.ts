@@ -1324,3 +1324,9 @@ export function getContextReceipts(runId?: string, tail?: number): Promise<Recei
   const path = withQuery("/proxy/receipts", { run_id: runId, tail });
   return request<ReceiptsResponse>(path, { method: "GET" });
 }
+
+/** Verify the context-receipt hash chain (sequence-integrity proof). */
+export function verifyContextReceipts(runId?: string): Promise<ChainReport> {
+  const path = withQuery("/proxy/receipts/verify", { run_id: runId });
+  return request<ChainReport>(path, { method: "GET" });
+}

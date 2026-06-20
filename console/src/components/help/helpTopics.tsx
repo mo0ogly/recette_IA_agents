@@ -1691,6 +1691,14 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <em>privacy-safe</em> : on rend auditable sans exposer. Projection{" "}
           <strong>lecture seule et deterministe</strong> (SHA-256 sur le JSON canonique).
         </p>
+        <h3>Chaine d&apos;integrite</h3>
+        <p>
+          Les recus sont <strong>chaines par hash</strong> (<code>prev_hash</code> -&gt;{" "}
+          <code>hash</code>), comme le log d&apos;audit (I1) : le badge en tete prouve que la{" "}
+          <strong>sequence</strong> n&apos;a pas ete reordonnee, tronquee ni alteree. Une rupture
+          pointe le premier <code>seq</code> casse. La chaine hashe le recu (deja sans contenu),
+          jamais les corps.
+        </p>
       </>
     ),
   },

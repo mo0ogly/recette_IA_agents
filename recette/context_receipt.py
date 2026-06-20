@@ -27,6 +27,45 @@ def _digest(body: object) -> tuple[int, str]:
     return len(raw), hashlib.sha256(raw).hexdigest()
 
 
+def _chain_hash(prev_hash: str, body: dict) -> str:
+    """sha256(prev_hash || canonical(body)) -- the receipt's chained digest.
+    ``body`` is the receipt WITHOUT its prev_hash/hash fields."""
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256((prev_hash + canonical).encode("utf-8")).hexdigest()
+
+
+def chain_receipts(traces: list[dict]) -> list[dict]:
+    """Content-free receipts linked in a hash chain (sequence-integrity proof,
+    like the audit log I1). Each receipt carries ``prev_hash`` and ``hash`` so a
+    verifier can prove the SEQUENCE was not reordered, dropped, or altered --
+    still content-free (the chain hashes the receipt, not the bodies). Pure (I4):
+    genesis prev_hash is the empty string; order follows the input list."""
+    out: list[dict] = []
+    prev = ""
+    for trace in traces:
+        r = receipt(trace)  # the body to hash (no prev_hash/hash yet)
+        h = _chain_hash(prev, r)
+        r["prev_hash"] = prev
+        r["hash"] = h
+        out.append(r)
+        prev = h
+    return out
+
+
+def verify_chain(receipts: list[dict]) -> dict:
+    """Recompute every chained hash from genesis; report the first break.
+
+    ``ok`` is True when every receipt's ``hash`` matches the recomputation and
+    its ``prev_hash`` matches the predecessor's ``hash``. Pure (I4)."""
+    prev = ""
+    for idx, r in enumerate(receipts):
+        body = {k: v for k, v in r.items() if k not in ("prev_hash", "hash")}
+        if r.get("prev_hash") != prev or r.get("hash") != _chain_hash(prev, body):
+            return {"ok": False, "checked": idx, "first_break_seq": r.get("seq")}
+        prev = r["hash"]
+    return {"ok": True, "checked": len(receipts), "first_break_seq": None}
+
+
 def receipt(trace: dict) -> dict:
     """Content-free receipt of one ProxyTrace dict: intent metadata + body
     size/digest, never the body itself."""

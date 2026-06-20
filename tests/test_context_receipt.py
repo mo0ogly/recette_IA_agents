@@ -6,7 +6,7 @@ import hashlib
 import json
 import unittest
 
-from recette.context_receipt import receipt
+from recette.context_receipt import chain_receipts, receipt, verify_chain
 
 _TRACE = {
     "seq": 3,
@@ -60,6 +60,36 @@ class TestReceipt(unittest.TestCase):
 
     def test_deterministic(self) -> None:
         self.assertEqual(receipt(_TRACE), receipt(_TRACE))
+
+
+class TestReceiptChain(unittest.TestCase):
+    def _traces(self) -> list[dict]:
+        return [{**_TRACE, "seq": i, "event_id": f"evt-{i:04d}"} for i in (1, 2, 3)]
+
+    def test_chain_links_prev_to_hash(self) -> None:
+        chain = chain_receipts(self._traces())
+        self.assertEqual(chain[0]["prev_hash"], "")
+        self.assertEqual(chain[1]["prev_hash"], chain[0]["hash"])
+        self.assertEqual(chain[2]["prev_hash"], chain[1]["hash"])
+
+    def test_verify_ok_on_intact_chain(self) -> None:
+        v = verify_chain(chain_receipts(self._traces()))
+        self.assertTrue(v["ok"])
+        self.assertEqual(v["checked"], 3)
+        self.assertIsNone(v["first_break_seq"])
+
+    def test_verify_detects_tamper(self) -> None:
+        chain = chain_receipts(self._traces())
+        chain[1]["action_type"] = "TAMPERED"  # mutate a receipt without re-hashing
+        v = verify_chain(chain)
+        self.assertFalse(v["ok"])
+        self.assertEqual(v["first_break_seq"], 2)
+
+    def test_chain_is_deterministic(self) -> None:
+        self.assertEqual(chain_receipts(self._traces()), chain_receipts(self._traces()))
+
+    def test_empty_chain_verifies(self) -> None:
+        self.assertTrue(verify_chain([])["ok"])
 
 
 try:

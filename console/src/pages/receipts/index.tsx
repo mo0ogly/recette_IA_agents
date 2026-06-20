@@ -10,9 +10,9 @@
 
 import { useEffect, useState } from "react";
 
-import { getContextReceipts } from "../../api/client";
+import { getContextReceipts, verifyContextReceipts } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
-import type { ContextReceipt } from "../../types/platform";
+import type { ChainReport, ContextReceipt } from "../../types/platform";
 import "./receipts.css";
 
 function shortHash(h: string): string {
@@ -21,12 +21,16 @@ function shortHash(h: string): string {
 
 export default function ReceiptsPage(): JSX.Element {
   const [receipts, setReceipts] = useState<ContextReceipt[] | null>(null);
+  const [chain, setChain] = useState<ChainReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getContextReceipts()
       .then((r) => setReceipts(r.receipts))
       .catch((e: unknown) => setError(String(e)));
+    verifyContextReceipts()
+      .then(setChain)
+      .catch(() => setChain(null));
   }, []);
 
   return (
@@ -34,6 +38,17 @@ export default function ReceiptsPage(): JSX.Element {
       <div className="page-head">
         <h1>Context receipts</h1>
         <PageHelp topic="receipts" />
+        {chain !== null && (
+          <span
+            className={`receipts-chain receipts-chain-${chain.ok ? "ok" : "broken"}`}
+            data-testid="receipts-chain"
+            title="Preuve d'integrite de sequence (hash chain, comme l'audit log I1)"
+          >
+            {chain.ok
+              ? `chaine verifiee (${chain.checked})`
+              : `chaine rompue @ seq ${chain.first_break_seq}`}
+          </span>
+        )}
       </div>
       <p className="receipts-note">
         Audit <strong>sans contenu</strong> de ce qui a franchi la frontiere agent &lt;-&gt;

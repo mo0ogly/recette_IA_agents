@@ -53,3 +53,19 @@
   color: var(--badge-red-fg);
   font-weight: 600;
 }
+
+.receipts-chain {
+  margin-left: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+}
+.receipts-chain-ok {
+  border-color: var(--badge-green-fg, #2e7d32);
+  color: var(--badge-green-fg, #2e7d32);
+}
+.receipts-chain-broken {
+  border-color: var(--badge-red-fg, #c62828);
+  color: var(--badge-red-fg, #c62828);
+}

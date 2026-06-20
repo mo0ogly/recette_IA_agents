@@ -57,14 +57,28 @@ def list_receipts(request: Request, tail: int | None = None, run_id: str | None 
     request/response bodies. Lets an auditor prove what crossed the boundary and
     that it is unchanged without the platform exposing the content (RSSI-safe).
     """
-    from ...context_receipt import receipt
+    from ...context_receipt import chain_receipts
 
     traces = request.app.state.proxy_trace_recorder.snapshot()
     if run_id is not None:
         traces = [t for t in traces if t.run_id == run_id]
     if tail is not None and tail >= 0:
         traces = traces[-tail:]
-    return {"receipts": [receipt(t.to_dict()) for t in traces]}
+    return {"receipts": chain_receipts([t.to_dict() for t in traces])}
+
+
+@router.get("/receipts/verify")
+def verify_receipts(request: Request, run_id: str | None = None) -> dict:
+    """Verify the receipt hash chain (sequence-integrity proof, like I1).
+
+    Recomputes every chained hash from genesis over the same selection; ``ok``
+    false reports the first break. Read-only, content-free."""
+    from ...context_receipt import chain_receipts, verify_chain
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    return verify_chain(chain_receipts([t.to_dict() for t in traces]))
 
 
 @router.delete("/traces")

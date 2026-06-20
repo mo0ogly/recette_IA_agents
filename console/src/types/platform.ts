@@ -949,6 +949,9 @@ export interface ContextReceipt {
   request_sha256: string;
   response_bytes: number;
   response_sha256: string;
+  /** Hash-chain links (sequence-integrity proof, like the audit log I1). */
+  prev_hash: string;
+  hash: string;
 }
 
 /** Response of GET /proxy/receipts. */
