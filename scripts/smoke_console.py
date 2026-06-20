@@ -593,6 +593,20 @@ def _verify_discovery_exchange(page: Page, console: str, api: str) -> None:
         ".some(n => n.textContent.trim() === 'ghost')",
         timeout=UI_TIMEOUT_MS,
     )
+    # The real launched agents (the campaigns above) now surface: at least one
+    # IDENTIFIED hook exchange and at least one DETECTE agent. Proves the full
+    # chain from the UX -- launch an agent -> its exchange -> discovery sees it --
+    # including the server-less governed path (GatewayForge tracing).
+    page.wait_for_function(
+        "() => Array.from(document.querySelectorAll('[data-testid=\"exchange-outcome\"]'))"
+        ".some(n => n.textContent.trim() === 'identifie')",
+        timeout=UI_TIMEOUT_MS,
+    )
+    page.wait_for_function(
+        "() => Array.from(document.querySelectorAll('[data-testid=\"agent-outcome\"]'))"
+        ".some(n => n.textContent.trim() === 'DETECTE')",
+        timeout=UI_TIMEOUT_MS,
+    )
     _shot(page, "discovery-exchange")
 
 

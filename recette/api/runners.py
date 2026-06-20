@@ -27,13 +27,13 @@ from ..lane_b import run_agent as run_lane_b_agent
 from ..llm import LlmBackend, LlmDecision, StubLlm
 from ..platform.catalog.model import RISK_SCORE, RiskLevel
 from ..platform.events import PlatformActionEvent
-from ..platform.gateway import ActionRequest, Gateway
+from ..platform.gateway import ActionOutcome, ActionRequest, Gateway
 from ..platform.netname.resolver import ResolutionDenied
 
 if TYPE_CHECKING:
     from ..capture.llm_trace import LlmCallTrace
 from ..platform.proxy.lab_proxy import LabHttpProxy, lab_url_from_env
-from ..platform.proxy.protocol import ExternalSystemProxy
+from ..platform.proxy.protocol import ExecutionResult, ExternalSystemProxy
 from ..platform.proxy.router import resolve_proxy
 from ..platform.proxy.tracing import TraceRecorder, TracingProxy
 from ..recording import Recording, replay_backend
@@ -214,11 +214,27 @@ class GatewayForge:
     wall-clock read.
     """
 
-    def __init__(self, gateway: Gateway, clock: LogicalClock | None = None) -> None:
+    def __init__(
+        self,
+        gateway: Gateway,
+        clock: LogicalClock | None = None,
+        *,
+        recorder: TraceRecorder | None = None,
+        debug_enabled: bool = False,
+        run_id: str | None = None,
+    ) -> None:
         self._gateway = gateway
         self._clock = clock or LogicalClock()
         self._log: list[AgentAction] = []
         self._seq = 0
+        # Observability seam (parametrable via debug_enabled, R5): a governed
+        # lab-mode run is otherwise invisible to the proxy/discovery consoles
+        # because it never goes through a ProxyForge+TracingProxy. Recording the
+        # governed outcome here makes a server-LESS agent's exchanges show up in
+        # /proxy and /discovery-exchange too, exactly like a proxy-bound one.
+        self._recorder = recorder
+        self._debug_enabled = debug_enabled
+        self._run_id = run_id
 
     def execute(
         self,
@@ -237,7 +253,7 @@ class GatewayForge:
         # audit store and publishes it to the realtime transport. The outcome
         # (allow/deny/escalate) is intentionally NOT used to gate the recorded
         # action -- record + continue (bench semantics).
-        self._gateway.submit(
+        outcome = self._gateway.submit(
             ActionRequest(
                 agent_id=agent_id,
                 action_type=action_type,
@@ -246,6 +262,15 @@ class GatewayForge:
                 payload=dict(params or {}),
                 timestamp=timestamp,
             )
+        )
+        self._record_trace(
+            agent_id=agent_id,
+            timestamp=timestamp,
+            target_system=target_system,
+            action_type=action_type,
+            resource=resource,
+            params=dict(params or {}),
+            outcome=outcome,
         )
         action = AgentAction(
             event_id=f"evt-{self._seq:04d}",
@@ -262,6 +287,55 @@ class GatewayForge:
         )
         self._log.append(action)
         return action
+
+    def _record_trace(
+        self,
+        *,
+        agent_id: str,
+        timestamp: str,
+        target_system: str,
+        action_type: str,
+        resource: str,
+        params: dict,
+        outcome: ActionOutcome,
+    ) -> None:
+        """Record the governed action as a ProxyTrace (fail-safe, never raises).
+
+        ``ok`` mirrors whether the gateway EXECUTED the side effect (allow), so a
+        deny/escalate shows as a non-executed exchange -- the attempt is still
+        traced (discovery sees the intent), exactly like the proxy path. A
+        recording error must never break the run (observability is best-effort).
+        """
+        if self._recorder is None or not self._debug_enabled:
+            return
+        try:
+            mode = mode_for_action(action_type)
+            risk_level = RiskLevel.LOW if mode is Mode.READ else RiskLevel.HIGH
+            event = PlatformActionEvent(
+                event_id=outcome.event_id or f"evt-{self._seq:04d}",
+                timestamp=timestamp,
+                agent_id=agent_id,
+                capability_scope=(),
+                role="",
+                action_type=action_type,
+                target_system=target_system,
+                resource=resource,
+                payload=dict(params),
+                risk_score=RISK_SCORE[risk_level],
+                risk_level=str(risk_level),
+            )
+            response = outcome.result if isinstance(outcome.result, dict) else {}
+            result = ExecutionResult(
+                ok=bool(outcome.executed),
+                status_code=200 if outcome.executed else 0,
+                response=response,
+                side_effect_hash=outcome.side_effect_hash,
+                error=outcome.error,
+                target=target_system,
+            )
+            self._recorder.record(event, result, self._run_id)
+        except Exception:  # nosec B110 - observability is best-effort, never breaks the run (I5)
+            pass
 
     @property
     def action_log(self) -> list[AgentAction]:
@@ -321,7 +395,9 @@ def forge_for_agent(
     """
     server_id = agent_cfg.get("server")
     if not server_id:
-        return GatewayForge(gateway) if gateway is not None else LabForge()
+        if gateway is None:
+            return LabForge()
+        return GatewayForge(gateway, recorder=recorder, debug_enabled=debug_enabled, run_id=run_id)
     # Validate the server reference up-front (fail-safe: a dangling or malformed
     # reference must raise, never silently fall back to the wrong target).
     # ``wire_proxy_url`` (the active transport route, supplied by the caller from
@@ -349,7 +425,7 @@ def forge_for_agent(
         and server.get("mode") == "mock_local"
         and server.get("port") == _lab_port()
     ):
-        return GatewayForge(gateway)
+        return GatewayForge(gateway, recorder=recorder, debug_enabled=debug_enabled, run_id=run_id)
     if recorder is not None:
         proxy = TracingProxy(proxy, recorder, enabled=debug_enabled, run_id=run_id)
     return ProxyForge(proxy)
