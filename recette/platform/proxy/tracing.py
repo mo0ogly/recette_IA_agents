@@ -179,6 +179,13 @@ class TracingProxy:
     def enabled(self) -> bool:
         return self._enabled
 
+    def set_enabled(self, value: bool) -> None:
+        """Flip recording at runtime (operator toggle from the console).
+
+        Recording is a debug view over the I5 boundary; toggling it changes only
+        whether traces are buffered, never the decision path (I4)."""
+        self._enabled = bool(value)
+
     def execute(self, event: PlatformActionEvent) -> ExecutionResult:
         result = self._inner.execute(event)
         if self._enabled:

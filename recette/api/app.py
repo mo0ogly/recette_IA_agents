@@ -281,6 +281,7 @@ def create_app(
     side_effect_proxy: ExternalSystemProxy = TracingProxy(
         base_proxy, trace_recorder, enabled=proxy_debug_enabled
     )
+    app.state.tracing_proxy = side_effect_proxy
     # Wire overlay (OPTIONAL, off by default): the network-level view of the same
     # I5 side effects, fed by the mitmproxy Docker overlay via POST /proxy/wire.
     # The recorder always exists (so the endpoints work); the overlay is only

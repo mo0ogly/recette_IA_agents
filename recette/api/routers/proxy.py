@@ -29,6 +29,28 @@ def get_debug_status(request: Request) -> dict:
     }
 
 
+@router.post("/debug")
+def set_debug(request: Request, body: dict) -> dict:
+    """Toggle side-effect trace recording at runtime (operator action).
+
+    Flips both the app flag (surfaced to the console) and the live TracingProxy
+    so the change takes effect immediately, no restart. Fail-safe: a non-bool
+    ``enabled`` is a 422 (never silently keep the old state). Logged via tracing
+    as an operator action; NOT appended to the canonical event store (it is an
+    ops action, not an agent action)."""
+    import logging
+
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=422, detail="body.enabled (bool) is required")
+    request.app.state.proxy_debug_enabled = enabled
+    proxy = getattr(request.app.state, "tracing_proxy", None)
+    if proxy is not None and hasattr(proxy, "set_enabled"):
+        proxy.set_enabled(enabled)
+    logging.getLogger("recette.proxy").info("operator set proxy debug enabled=%s", enabled)
+    return {"debug_enabled": enabled}
+
+
 @router.get("/traces")
 def list_traces(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
     """Recorded side-effect traces in monotone seq order (oldest first).
