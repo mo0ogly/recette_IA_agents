@@ -17,6 +17,7 @@ import type {
   CatalogSummary,
   DetectScanResult,
   DetectSignatures,
+  DiscoveryOverview,
   AiBackend,
   AiProviderInfo,
   AuditEvent,
@@ -560,6 +561,20 @@ export function scanForObservability(text: string): Promise<DetectScanResult> {
     method: "POST",
     body: JSON.stringify({ text }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Discovery overview (/discovery/overview): the unified operator dashboard
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /discovery/overview: the unified catalog + reperage tally driving the
+ * Discovery dashboard. The endpoint answers with the raw object (like the other
+ * routes in this API), so callers receive the bare DiscoveryOverview directly --
+ * there is no { success, data } envelope to unwrap.
+ */
+export function getDiscoveryOverview(): Promise<DiscoveryOverview> {
+  return request<DiscoveryOverview>("/discovery/overview", { method: "GET" });
 }
 
 // ---------------------------------------------------------------------------

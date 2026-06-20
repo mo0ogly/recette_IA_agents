@@ -1,0 +1,22 @@
+{
+  "catalog": {
+    "total": 5,
+    "with_tools": 4,
+    "tags": 9
+  },
+  "detect": {
+    "tools": 12,
+    "by_category": {
+      "eval": 1,
+      "gateway": 1,
+      "tracing": 10
+    },
+    "by_capability": {
+      "audit": 3,
+      "eval": 2,
+      "gateway": 1,
+      "replay": 2,
+      "tracing": 12
+    }
+  }
+}
