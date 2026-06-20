@@ -1,23 +1,25 @@
 /**
  * Mini-launcher for the proxy page.
  *
- * One screen to "launch and watch it in the proxy": pick a runtime agent OR a
- * recording, launch it, and let the page auto-switch to the sessions source
- * preselected on that run (SessionsPanel reads ?run=). The panel owns only its
- * local selection state; it reports the resulting run id through onLaunched and
- * lets the parent page own the URL (it sets ?source=sessions&run=<run_id>).
+ * One screen to "launch and watch it in the proxy": pick a runtime agent, launch
+ * it, and let the page auto-switch to the sessions source preselected on that run
+ * (SessionsPanel reads ?run=). The panel owns only its local selection state; it
+ * reports the resulting run id through onLaunched and lets the parent page own
+ * the URL (it sets ?source=sessions&run=<run_id>).
  *
- * Reuses the existing typed clients (listAgents / launchLaneB / listRecordings /
- * replayRecording) -- no new client function, no new endpoint.
+ * Agent-only by design: a replayed recording never routes through the tracing
+ * proxy (see recette/api/runners.py), so it produces zero proxy traces and can
+ * never show up in the sessions view. Launching a recording here would be
+ * misleading, so the launcher only drives a runtime agent through launchLaneB.
+ *
+ * Reuses the existing typed clients (listAgents / launchLaneB) -- no new client
+ * function, no new endpoint.
  */
 
 import { useEffect, useState } from "react";
 
-import { launchLaneB, listAgents, listRecordings, replayRecording } from "../../api/client";
-import type { AgentConfig, RecordingMeta } from "../../types/platform";
-
-/** Which kind of subject the launcher targets. */
-type LaunchMode = "agent" | "recording";
+import { launchLaneB, listAgents } from "../../api/client";
+import type { AgentConfig } from "../../types/platform";
 
 interface LaunchPanelProps {
   /** Called with the resulting run id once a launch resolves. */
@@ -25,40 +27,29 @@ interface LaunchPanelProps {
 }
 
 export default function LaunchPanel({ onLaunched }: LaunchPanelProps): JSX.Element {
-  const [mode, setMode] = useState<LaunchMode>("agent");
   const [agents, setAgents] = useState<AgentConfig[]>([]);
-  const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
 
-  // Load the relevant list on mount and whenever the mode changes. Selection is
-  // reset so a stale id from the other mode can never be launched.
+  // Load the runtime agents on mount.
   useEffect(() => {
     let cancelled = false;
-    setSelected("");
-    setError("");
-    const load =
-      mode === "agent"
-        ? listAgents().then((list) => {
-            if (!cancelled) {
-              setAgents(list);
-            }
-          })
-        : listRecordings().then((list) => {
-            if (!cancelled) {
-              setRecordings(list);
-            }
-          });
-    load.catch((err: unknown) => {
-      if (!cancelled) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    });
+    listAgents()
+      .then((list) => {
+        if (!cancelled) {
+          setAgents(list);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, []);
 
   const onLaunch = (): void => {
     if (selected === "" || busy) {
@@ -66,11 +57,7 @@ export default function LaunchPanel({ onLaunched }: LaunchPanelProps): JSX.Eleme
     }
     setBusy(true);
     setError("");
-    const launch =
-      mode === "agent"
-        ? launchLaneB({ agent_id: selected })
-        : replayRecording(selected);
-    launch
+    launchLaneB({ agent_id: selected })
       .then((handle) => {
         onLaunched(handle.run_id);
       })
@@ -85,38 +72,19 @@ export default function LaunchPanel({ onLaunched }: LaunchPanelProps): JSX.Eleme
   return (
     <div className="proxy-subheader" data-testid="proxy-launch-panel">
       <label className="proxy-filter-label">
-        Lancer
+        Agent
         <select
-          aria-label="source"
-          className="proxy-filter-input"
-          value={mode}
-          onChange={(e) => setMode(e.target.value as LaunchMode)}
-        >
-          <option value="agent">agent</option>
-          <option value="recording">recording</option>
-        </select>
-      </label>
-
-      <label className="proxy-filter-label">
-        {mode === "agent" ? "Agent" : "Recording"}
-        <select
-          aria-label={mode}
+          aria-label="agent"
           className="proxy-filter-input"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
         >
           <option value="">--</option>
-          {mode === "agent"
-            ? agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.id}
-                </option>
-              ))
-            : recordings.map((r) => (
-                <option key={r.recording_id} value={r.recording_id}>
-                  {r.recording_id}
-                </option>
-              ))}
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.id}
+            </option>
+          ))}
         </select>
       </label>
 
