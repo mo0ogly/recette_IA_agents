@@ -11,6 +11,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import agentsFixture from "../agents/__fixtures__/agents.fixture.json";
 import backendsFixture from "../agents/__fixtures__/ai-backends.fixture.json";
@@ -53,6 +54,16 @@ import CockpitPage from "./index";
 
 const traces = tracesFixture as ProxyTraceResponse;
 
+// The cockpit now renders a react-router <Link> (the "Voir dans le proxy"
+// deep-link), so every render needs a router context.
+function renderCockpit(): ReturnType<typeof render> {
+  return render(
+    <MemoryRouter>
+      <CockpitPage />
+    </MemoryRouter>,
+  );
+}
+
 describe("CockpitPage network log", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,7 +74,7 @@ describe("CockpitPage network log", () => {
     vi.mocked(listAiBackends).mockResolvedValue([]);
     vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
 
-    render(<CockpitPage />);
+    renderCockpit();
 
     expect(
       await screen.findByText("Logs reseau (lance l'agent pour tracer ses appels)"),
@@ -85,7 +96,7 @@ describe("CockpitPage network log", () => {
     } as unknown as WebSocket);
     vi.mocked(getProxyTraces).mockResolvedValue(traces);
 
-    render(<CockpitPage />);
+    renderCockpit();
 
     // The picker is populated from the fixture; launch the selected agent.
     await screen.findByText(/gh-pr-bot/);
@@ -101,6 +112,33 @@ describe("CockpitPage network log", () => {
     expect(screen.getAllByText("Logs reseau -- run RID123").length).toBeGreaterThan(0);
   });
 
+  it("offers a 'Voir dans le proxy' deep-link to the launched run's session", async () => {
+    const RUN_ID = "RID123";
+    vi.mocked(listAgents).mockResolvedValue(agentsFixture as AgentConfig[]);
+    vi.mocked(listAiBackends).mockResolvedValue(backendsFixture as AiBackend[]);
+    vi.mocked(launchLaneB).mockResolvedValue({ run_id: RUN_ID, status: "pending" });
+    vi.mocked(openRunSocket).mockReturnValue({
+      onmessage: null,
+      onopen: null,
+      onerror: null,
+      close: vi.fn(),
+    } as unknown as WebSocket);
+    vi.mocked(getProxyTraces).mockResolvedValue(traces);
+
+    renderCockpit();
+
+    // No run yet -> no deep-link.
+    await screen.findByText(/gh-pr-bot/);
+    expect(screen.queryByRole("link", { name: /voir dans le proxy/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
+
+    // Once the run id is set, the deep-link targets the proxy session for it.
+    const link = await screen.findByRole("link", { name: /voir dans le proxy/i });
+    expect(link).toHaveAttribute("href", expect.stringContaining("source=sessions"));
+    expect(link).toHaveAttribute("href", expect.stringContaining(`run=${RUN_ID}`));
+  });
+
   it("opens the agent <-> server exchange (request + response) on a trace click", async () => {
     vi.mocked(listAgents).mockResolvedValue(agentsFixture as AgentConfig[]);
     vi.mocked(listAiBackends).mockResolvedValue(backendsFixture as AiBackend[]);
@@ -113,7 +151,7 @@ describe("CockpitPage network log", () => {
     } as unknown as WebSocket);
     vi.mocked(getProxyTraces).mockResolvedValue(traces);
 
-    render(<CockpitPage />);
+    renderCockpit();
     await screen.findByText(/gh-pr-bot/);
     fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
 
@@ -146,7 +184,7 @@ describe("CockpitPage network log", () => {
     } as unknown as WebSocket);
     vi.mocked(getProxyTraces).mockResolvedValue(traces);
 
-    render(<CockpitPage />);
+    renderCockpit();
     await screen.findByText(/gh-pr-bot/);
     fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
 
@@ -170,7 +208,7 @@ describe("CockpitPage network log", () => {
     } as unknown as WebSocket);
     vi.mocked(getProxyTraces).mockResolvedValue(traces);
 
-    render(<CockpitPage />);
+    renderCockpit();
     await screen.findByText(/gh-pr-bot/);
     fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
 
@@ -200,7 +238,7 @@ describe("CockpitPage network log", () => {
     vi.mocked(openRunSocket).mockReturnValue(socket as unknown as WebSocket);
     vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
 
-    render(<CockpitPage />);
+    renderCockpit();
     await screen.findByText(/gh-pr-bot/);
     fireEvent.click(screen.getByRole("button", { name: "Lancer" }));
 

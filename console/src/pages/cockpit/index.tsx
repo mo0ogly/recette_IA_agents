@@ -20,6 +20,7 @@ import {
   useState,
 } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   ApiError,
   getProxyTraces,
@@ -415,6 +416,14 @@ export default function CockpitPage(): JSX.Element {
               <span className="cockpit-run-id">
                 {runId} -- {runStatus}
               </span>
+            )}
+            {runId !== null && (
+              <Link
+                className="cockpit-proxy-link"
+                to={`/proxy?source=sessions&run=${runId}`}
+              >
+                Voir dans le proxy
+              </Link>
             )}
             {effectivePaceMs > 0 && (
               <span className="cockpit-pace-badge" title="Cadence imposee a l'agent (pace_ms)">
