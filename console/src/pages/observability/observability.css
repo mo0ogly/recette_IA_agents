@@ -119,6 +119,30 @@
   color: var(--color-text-muted);
 }
 
+/* Derived run summary: visibility at a glance (counts + I6 risk + targets). */
+.obs-stats {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.obs-stat {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.obs-stat strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.obs-stat-alert strong {
+  color: var(--badge-red-fg);
+}
+
 .obs-spans {
   list-style: none;
   margin: 0;

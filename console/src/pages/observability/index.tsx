@@ -140,6 +140,16 @@ export default function ObservabilityPage(): JSX.Element {
 
   const selectedSummary = traces.find((t) => t.trace_id === selected) ?? null;
 
+  const stats = useMemo(() => {
+    const tools = views.filter((v) => v.operation === "execute_tool");
+    const writes = tools.filter((v) => v.mode === "write");
+    const unapproved = tools.filter((v) => v.approved === false);
+    const targets = Array.from(
+      new Set(tools.map((v) => v.target).filter((t): t is string => Boolean(t))),
+    );
+    return { actions: tools.length, writes: writes.length, unapproved: unapproved.length, targets };
+  }, [views]);
+
   return (
     <section className="page observability-page">
       <div className="page-head">
@@ -194,6 +204,26 @@ export default function ObservabilityPage(): JSX.Element {
                     {selectedSummary.agent_id ?? selectedSummary.recording_id}
                   </span>
                   <code className="obs-trace-rec">{selectedSummary.recording_id}</code>
+                  <div className="obs-stats" data-testid="obs-stats">
+                    <span className="obs-stat">
+                      <strong>{stats.actions}</strong> action(s)
+                    </span>
+                    <span className="obs-stat">
+                      <strong>{stats.writes}</strong> ecriture(s)
+                    </span>
+                    <span
+                      className={
+                        stats.unapproved > 0 ? "obs-stat obs-stat-alert" : "obs-stat"
+                      }
+                    >
+                      <strong>{stats.unapproved}</strong> non approuvee(s)
+                    </span>
+                    {stats.targets.map((t) => (
+                      <span key={t} className="obs-badge obs-badge-target">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
                 </header>
               )}
               <ol className="obs-spans">

@@ -76,6 +76,13 @@ describe("ObservabilityPage", () => {
       expect(screen.getAllByText(approved ? "approuve" : "non approuve").length).toBeGreaterThan(0);
     }
 
+    // The derived run summary gives visibility at a glance (counts + I6 risk).
+    const stats = await screen.findByTestId("obs-stats");
+    const toolCount = trace.spans.filter(
+      (s) => String(s.attributes["gen_ai.operation.name"]) === "execute_tool",
+    ).length;
+    expect(stats).toHaveTextContent(`${toolCount} action(s)`);
+
     // Expanding a span reveals its FULL attribute set (deep per-step visibility).
     const hiddenKey = "gen_ai.tool.call.id";
     expect(screen.queryByText(hiddenKey)).toBeNull(); // collapsed by default
