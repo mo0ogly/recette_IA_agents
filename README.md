@@ -114,8 +114,8 @@ d'agents en detail, chemin d'execution gouverne) :
 
 ## Licence
 
-Source-available sous **PolyForm Noncommercial License 1.0.0** : usage,
-etude, modification et recette libres a des fins **non commerciales**
-(recherche, enseignement, organismes publics, projets personnels). Tout
-usage commercial requiert une licence separee du mainteneur
+Open source / source-available sous **PolyForm Noncommercial License 1.0.0**.
+Usage, etude, modification et recette libres et gratuits a des fins **non
+commerciales** -- principalement la **recherche** et l'**usage personnel**.
+Tout usage commercial requiert une licence separee du mainteneur
 (mo0ogly@proton.me). Texte complet : [LICENSE](LICENSE).
