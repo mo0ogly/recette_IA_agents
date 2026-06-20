@@ -90,6 +90,26 @@ describe("ObservabilityPage", () => {
     expect(await screen.findByText(hiddenKey)).toBeInTheDocument();
   });
 
+  it("filters the trace list by agent/target/recording (R16)", async () => {
+    vi.mocked(listObservabilityTraces).mockResolvedValue(traces);
+    render(
+      <MemoryRouter>
+        <ObservabilityPage />
+      </MemoryRouter>,
+    );
+
+    // All traces visible at first.
+    const firstAgent = traces[0].agent_id ?? traces[0].recording_id;
+    await screen.findByText(firstAgent);
+
+    // Filtering by a string absent from every trace empties the list.
+    fireEvent.change(screen.getByTestId("obs-filter"), {
+      target: { value: "zzz-no-such-agent-zzz" },
+    });
+    expect(await screen.findByTestId("obs-no-match")).toBeInTheDocument();
+    expect(screen.queryByText(firstAgent)).toBeNull();
+  });
+
   it("shows an empty state with a link to the cockpit before any run", async () => {
     vi.mocked(listObservabilityTraces).mockResolvedValue([]);
     render(

@@ -102,6 +102,7 @@ export default function ObservabilityPage(): JSX.Element {
   const [trace, setTrace] = useState<ObservabilityTrace | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState("");
 
   function toggleSpan(spanId: string): void {
     setOpen((prev) => {
@@ -138,6 +139,16 @@ export default function ObservabilityPage(): JSX.Element {
     [trace, byId],
   );
 
+  const filteredTraces = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return traces;
+    return traces.filter((t) =>
+      [t.agent_id, t.recording_id, t.target_system, t.provider]
+        .filter((v): v is string => Boolean(v))
+        .some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [traces, filter]);
+
   const selectedSummary = traces.find((t) => t.trace_id === selected) ?? null;
 
   const stats = useMemo(() => {
@@ -163,7 +174,19 @@ export default function ObservabilityPage(): JSX.Element {
       </p>
       {error && <p className="obs-error">{error}</p>}
       <div className="observability-layout">
-        <ul className="trace-list">
+        <div className="trace-panel">
+          {traces.length > 0 && (
+            <input
+              type="search"
+              className="obs-filter"
+              placeholder="Filtrer (agent, systeme, recording)..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              data-testid="obs-filter"
+              aria-label="Filtrer les traces"
+            />
+          )}
+          <ul className="trace-list">
           {traces.length === 0 && (
             <li className="obs-empty" data-testid="obs-empty">
               Aucune trace pour l&apos;instant.{" "}
@@ -173,7 +196,12 @@ export default function ObservabilityPage(): JSX.Element {
               pour produire une trace.
             </li>
           )}
-          {traces.map((t) => (
+          {traces.length > 0 && filteredTraces.length === 0 && (
+            <li className="obs-empty" data-testid="obs-no-match">
+              Aucune trace ne correspond a "{filter}".
+            </li>
+          )}
+          {filteredTraces.map((t) => (
             <li key={t.trace_id}>
               <button
                 type="button"
@@ -191,7 +219,8 @@ export default function ObservabilityPage(): JSX.Element {
               </button>
             </li>
           ))}
-        </ul>
+          </ul>
+        </div>
 
         <div className="span-tree">
           {trace === null ? (
