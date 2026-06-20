@@ -76,16 +76,34 @@ export default function DiscoveryExchangePage(): JSX.Element {
     return () => clearInterval(timer);
   }, [refresh]);
 
+  const brokerLive = probe?.configured === true;
+
   const launchProc = useCallback(async (): Promise<void> => {
     if (!procAgent) return;
     setLaunchMsg(null);
+    setEbpfError(null);
+    // Coordinate: open the eBPF capture window (broker) and launch the process
+    // INSIDE it, so the kernel tracepoints observe the agent's real connects.
+    // When no broker is configured the capture is skipped (oracle-only).
+    const capturing = brokerLive ? captureProbe({ agents: [procAgent] }) : null;
     try {
+      await new Promise((r) => setTimeout(r, 400));
       const run = await launchProcessRun(procAgent);
       setLaunchMsg(`process lance: ${procAgent} (run ${run.run_id.slice(0, 8)})`);
     } catch (e: unknown) {
       setLaunchMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [procAgent]);
+    if (capturing !== null) {
+      try {
+        const res = await capturing;
+        setEbpfCard(res.scorecard ?? null);
+        setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
+        setSource("ebpf");
+      } catch (e: unknown) {
+        setEbpfError(e instanceof Error ? e.message : String(e));
+      }
+    }
+  }, [procAgent, brokerLive]);
 
   const exchanges = useMemo(() => report?.exchanges ?? [], [report]);
   const runOptions = useMemo(() => distinctRuns(exchanges), [exchanges]);
@@ -266,9 +284,19 @@ export default function DiscoveryExchangePage(): JSX.Element {
             // eBPF source: the broker capture can surface a ghost AGENT (captured
             // on no surface) -- not reconstructable from the live oracle buffers.
             <ul className="dx-agents" data-testid="agents-list">
-              {ebpfCard.false_negatives.length === 0 && (
-                <li className="dx-empty">aucun ghost (eBPF)</li>
-              )}
+              {Object.entries(ebpfCard.detected_per_surface).length === 0 &&
+                ebpfCard.false_negatives.length === 0 && (
+                  <li className="dx-empty">capture eBPF vide</li>
+                )}
+              {Object.entries(ebpfCard.detected_per_surface).map(([surface, n]) => (
+                <li key={surface} className="dx-agent" data-testid={`ebpf-surface-${surface}`}>
+                  <span className="dx-agent-id">{surface}</span>
+                  <span className="dx-badge dx-badge-identifie" data-testid="agent-outcome">
+                    DETECTE
+                  </span>
+                  <span className="dx-surfaces">{n} agent(s) vu(s) (capture noyau)</span>
+                </li>
+              ))}
               {ebpfCard.false_negatives.map((id) => (
                 <li key={id} className="dx-agent" data-testid={`agent-${id}`}>
                   <span className="dx-agent-id">{id}</span>

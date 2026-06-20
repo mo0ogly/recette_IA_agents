@@ -128,6 +128,36 @@ describe("DiscoveryExchangePage", () => {
     expect(vi.mocked(launchProcessRun)).toHaveBeenCalledWith("proc-bot");
   });
 
+  it("coordinates an eBPF capture with the process launch when the broker is live", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(getProbeStatus).mockResolvedValue({
+      configured: true,
+      socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET",
+      mode: "live",
+    });
+    vi.mocked(listAgents).mockResolvedValue([
+      { id: "dx-live-bot", runtime: "lab", ai_mode: "mock", scenario: [{ kind: "final", text: "x" }] },
+    ] as AgentConfig[]);
+    vi.mocked(launchProcessRun).mockResolvedValue({ run_id: "run-xyz", status: "running" });
+    vi.mocked(captureProbe).mockResolvedValue({
+      recording: { status: "ok", recordings: [] },
+      scorecard: {
+        ok: true,
+        total_agents: 1,
+        detected_per_surface: { ebpf_wire: 1 },
+        false_negatives: [],
+      },
+    });
+    render(<DiscoveryExchangePage />);
+    const picker = await screen.findByTestId("dx-proc-agent");
+    fireEvent.change(picker, { target: { value: "dx-live-bot" } });
+    fireEvent.click(screen.getByTestId("dx-launch-proc"));
+    // the kernel detection surfaces from the coordinated capture
+    expect(await screen.findByTestId("ebpf-surface-ebpf_wire")).toHaveTextContent("DETECTE");
+    expect(vi.mocked(captureProbe)).toHaveBeenCalledWith({ agents: ["dx-live-bot"] });
+    expect(vi.mocked(launchProcessRun)).toHaveBeenCalledWith("dx-live-bot");
+  });
+
   it("surfaces a load error without crashing", async () => {
     vi.mocked(getDiscoveryExchange).mockRejectedValue(new Error("exchange down"));
     render(<DiscoveryExchangePage />);
