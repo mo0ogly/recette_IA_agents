@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { clearWireFlows, getWireFlows } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
 import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
@@ -29,6 +29,8 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
+  const [nextStep, setNextStep] = useState<string | null>(null);
+  const [busy, setBusy] = useState<boolean>(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -63,6 +65,20 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
     }
   }, [refresh]);
 
+  const onToggleOverlay = useCallback(async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const res = await controlWireOverlay(enabled === true ? "down" : "up");
+      setNextStep(res.next_step);
+      setError(null);
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [enabled, refresh]);
+
   const lines = useMemo(() => flows.map(wireFlowToLine), [flows]);
   const fails = useMemo(() => wireFailureCount(flows), [flows]);
   const selected = useMemo(
@@ -82,10 +98,25 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
             proxy: <code>{proxyUrl}</code>
           </span>
         )}
+        <button
+          type="button"
+          className="proxy-clear"
+          data-testid="wire-overlay-toggle"
+          disabled={busy}
+          onClick={() => void onToggleOverlay()}
+        >
+          {enabled === true ? "Arreter le reseau (wire)" : "Demarrer le reseau (wire)"}
+        </button>
         <button type="button" className="proxy-clear" onClick={() => void onClear()}>
           Vider le tampon
         </button>
       </header>
+
+      {nextStep !== null && (
+        <p className="proxy-banner" role="status" data-testid="wire-next-step">
+          {nextStep}
+        </p>
+      )}
 
       {enabled === false && (
         <p className="proxy-banner" role="status" data-testid="wire-disabled">

@@ -698,6 +698,16 @@ export function getWireStatus(): Promise<WireStatus> {
   return request<WireStatus>("/proxy/wire/status", { method: "GET" });
 }
 
+/** Start/stop the optional mitmproxy wire overlay (operator action, guarded). */
+export function controlWireOverlay(
+  action: "up" | "down",
+): Promise<{ ok: boolean; action: string; returncode: number; next_step: string | null }> {
+  return request("/proxy/wire/overlay", {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
 /** Discard the wire flow buffer (the append-only audit log is untouched, I1). */
 export function clearWireFlows(): Promise<{ cleared: boolean }> {
   return request<{ cleared: boolean }>("/proxy/wire", { method: "DELETE" });

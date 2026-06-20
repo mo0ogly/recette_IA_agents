@@ -21,10 +21,11 @@ vi.mock("../../api/client", async (importOriginal) => {
     ...actual,
     getWireFlows: vi.fn(),
     clearWireFlows: vi.fn(),
+    controlWireOverlay: vi.fn(),
   };
 });
 
-import { clearWireFlows, getWireFlows } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
 import WirePanel from "./WirePanel";
 
 const fixture = wireFixture as WireFlowResponse;
@@ -72,6 +73,26 @@ describe("WirePanel (R16 contract)", () => {
     expect(detail).toHaveTextContent("open_pr");
     expect(detail).toHaveTextContent('"number":42');
     expect(detail).toHaveTextContent("201");
+  });
+
+  it("starts the overlay and surfaces the honest next_step note", async () => {
+    // Overlay off in the fixture (enabled=false): the toggle must request "up".
+    vi.mocked(controlWireOverlay).mockResolvedValue({
+      ok: true,
+      action: "up",
+      returncode: 0,
+      next_step:
+        "set INSPECT_IA_AGENTS_WIRE_PROXY + trust the CA, then ./recette.sh api restart",
+    });
+    render(<WirePanel />);
+    const toggle = await screen.findByTestId("wire-overlay-toggle");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(controlWireOverlay).toHaveBeenCalledWith("up"));
+    expect(
+      await screen.findByText(
+        /set INSPECT_IA_AGENTS_WIRE_PROXY \+ trust the CA, then \.\/recette\.sh api restart/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("clears the buffer on demand", async () => {
