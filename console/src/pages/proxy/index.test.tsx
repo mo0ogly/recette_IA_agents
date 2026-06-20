@@ -134,6 +134,26 @@ describe("ProxyPage (R16 contract)", () => {
     expect(within(list).getByRole("button")).toHaveTextContent("#1");
   });
 
+  it("filters the list by outcome (ok vs fail)", async () => {
+    const t0 = fixture.traces[0];
+    vi.mocked(getProxyTraces).mockResolvedValue({
+      debug_enabled: true,
+      traces: [
+        { ...t0, seq: 1, ok: true, status_code: 200 },
+        { ...t0, seq: 2, ok: false, status_code: 503 },
+      ],
+    });
+    renderPage();
+    const list = await screen.findByRole("list", { name: "proxy traces" });
+    expect(within(list).getAllByRole("button")).toHaveLength(2);
+    const filterGroup = screen.getByRole("group", { name: "trace filter" });
+    // Selects order: agent_id, target_system, run_id, outcome.
+    const outcomeSelect = within(filterGroup).getAllByRole("combobox")[3];
+    fireEvent.change(outcomeSelect, { target: { value: "fail" } });
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(1));
+    expect(within(list).getByRole("button")).toHaveTextContent("#2");
+  });
+
   it("filters the list by run_id (F3 run <-> traces link)", async () => {
     const t0 = fixture.traces[0];
     vi.mocked(getProxyTraces).mockResolvedValue({

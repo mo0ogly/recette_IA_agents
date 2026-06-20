@@ -37,6 +37,14 @@ describe("traceToLine", () => {
   it("marks a failed trace as fail", () => {
     expect(traceToLine(failing()).outcome).toBe("fail");
   });
+
+  it("exposes structured fields for a scannable line", () => {
+    const line = traceToLine(traces[0]);
+    expect(line.actionType).toBe(traces[0].action_type);
+    expect(line.target).toBe(traces[0].target_system);
+    expect(line.resource).toBe(traces[0].resource);
+    expect(line.statusCode).toBe(traces[0].status_code);
+  });
 });
 
 describe("traceJson", () => {
@@ -79,6 +87,17 @@ describe("filterTraces", () => {
   it("is a pass-through on an empty filter", () => {
     expect(isEmptyFilter({})).toBe(true);
     expect(filterTraces(mixed, {})).toBe(mixed);
+  });
+
+  it("filters by outcome (ok vs fail)", () => {
+    const withFail: ProxyTrace[] = [
+      { ...traces[0], seq: 1, ok: true },
+      { ...traces[0], seq: 2, ok: false, status_code: 503 },
+      { ...traces[0], seq: 3, ok: true },
+    ];
+    expect(isEmptyFilter({ outcome: "fail" })).toBe(false);
+    expect(filterTraces(withFail, { outcome: "fail" }).map((t) => t.seq)).toEqual([2]);
+    expect(filterTraces(withFail, { outcome: "ok" }).map((t) => t.seq)).toEqual([1, 3]);
   });
 
   it("filters by agent_id", () => {

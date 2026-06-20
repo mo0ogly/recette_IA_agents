@@ -151,11 +151,27 @@
   color: var(--badge-red-fg);
 }
 
+.proxy-action {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
 .proxy-label {
   flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.proxy-status {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.proxy-status[data-outcome="fail"] {
+  color: var(--badge-red-fg);
 }
 
 .proxy-viewer {

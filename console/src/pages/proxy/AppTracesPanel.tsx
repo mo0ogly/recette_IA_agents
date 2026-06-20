@@ -78,6 +78,7 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
   const [agentId, setAgentId] = useState("");
   const [targetSystem, setTargetSystem] = useState("");
   const [runId, setRunId] = useState("");
+  const [outcome, setOutcome] = useState<"" | "ok" | "fail">("");
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -116,8 +117,9 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
       agentId: agentId || undefined,
       targetSystem: targetSystem || undefined,
       runId: runId || undefined,
+      outcome: outcome || undefined,
     }),
-    [agentId, targetSystem, runId],
+    [agentId, targetSystem, runId, outcome],
   );
   const shown = useMemo(() => filterTraces(traces, filter), [traces, filter]);
   const agentIds = useMemo(() => distinctValues(traces, "agent_id"), [traces]);
@@ -219,6 +221,18 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
             ))}
           </select>
         </label>
+        <label className="proxy-filter-label">
+          issue
+          <select
+            className="proxy-filter-input"
+            value={outcome}
+            onChange={(e) => setOutcome(e.target.value as "" | "ok" | "fail")}
+          >
+            <option value="">toutes</option>
+            <option value="ok">ok</option>
+            <option value="fail">echec</option>
+          </select>
+        </label>
       </div>
 
       {debugEnabled === false && (
@@ -248,7 +262,13 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
                 <span className="proxy-badge" data-outcome={l.outcome}>
                   {l.outcome}
                 </span>
-                <span className="proxy-label">{l.label}</span>
+                <span className="proxy-action">{l.actionType}</span>
+                <span className="proxy-label" title={`${l.target}/${l.resource}`}>
+                  {l.target}/{l.resource}
+                </span>
+                <span className="proxy-status" data-outcome={l.outcome}>
+                  {l.statusCode}
+                </span>
               </button>
             </li>
           ))}

@@ -11,11 +11,20 @@
 
 import type { ProxyTrace } from "../../types/platform";
 
+/** The two outcome states of a recorded side effect. */
+export type TraceOutcome = "ok" | "fail";
+
 /** A single trace summarised as one console line (list rendering). */
 export interface TraceLine {
   seq: number;
   /** "ok" when the side effect succeeded, else "fail" (drives the badge). */
-  outcome: "ok" | "fail";
+  outcome: TraceOutcome;
+  /** Structured fields for a scannable line (target/resource at a glance). */
+  actionType: string;
+  target: string;
+  resource: string;
+  statusCode: number;
+  /** Flat one-line summary (kept for the dense fallback + stable assertions). */
   label: string;
 }
 
@@ -24,6 +33,10 @@ export function traceToLine(t: ProxyTrace): TraceLine {
   return {
     seq: t.seq,
     outcome: t.ok ? "ok" : "fail",
+    actionType: t.action_type,
+    target: t.target_system,
+    resource: t.resource,
+    statusCode: t.status_code,
     label: `${t.action_type} ${t.target_system}/${t.resource} -> ${t.status_code}`,
   };
 }
@@ -57,6 +70,8 @@ export interface ProxyTraceFilter {
   targetSystem?: string;
   /** Exact match on run_id (F3 run <-> traces link). */
   runId?: string;
+  /** Keep only successful ("ok") or failed ("fail") side effects. */
+  outcome?: TraceOutcome;
 }
 
 /** True when no clause is set: an empty filter is a no-op. */
@@ -64,7 +79,8 @@ export function isEmptyFilter(f: ProxyTraceFilter): boolean {
   return (
     (f.agentId === undefined || f.agentId === "") &&
     (f.targetSystem === undefined || f.targetSystem === "") &&
-    (f.runId === undefined || f.runId === "")
+    (f.runId === undefined || f.runId === "") &&
+    f.outcome === undefined
   );
 }
 
@@ -85,6 +101,9 @@ export function filterTraces(traces: ProxyTrace[], f: ProxyTraceFilter): ProxyTr
       return false;
     }
     if (f.runId !== undefined && f.runId !== "" && t.run_id !== f.runId) {
+      return false;
+    }
+    if (f.outcome !== undefined && (t.ok ? "ok" : "fail") !== f.outcome) {
       return false;
     }
     return true;
