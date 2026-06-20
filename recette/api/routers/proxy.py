@@ -21,6 +21,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ...platform.proxy.reconcile import wire_flow_side_effect_hash
+
 router = APIRouter(prefix="/proxy", tags=["proxy"])
 
 
@@ -294,10 +296,18 @@ def list_wire_flows(request: Request, tail: int | None = None, run_id: str | Non
         flows = [f for f in flows if f.run_id == run_id]
     if tail is not None and tail >= 0:
         flows = flows[-tail:]
+
+    def _enrich(flow_dict: dict) -> dict:
+        # Derived VIEW field: canonical side_effect_hash recomputed from the bytes
+        # so the console can join a wire flow to its app-level exchange (None when
+        # the flow is not a governed-action shape). Recorded WireFlow stays pure;
+        # computed read-only here (I1/I4).
+        return {**flow_dict, "side_effect_hash": wire_flow_side_effect_hash(flow_dict)}
+
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
-        "flows": [f.to_dict() for f in flows],
+        "flows": [_enrich(f.to_dict()) for f in flows],
     }
 
 
