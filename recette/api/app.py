@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -188,10 +189,17 @@ class RestartSafeIdGenerator:
                 highest = max(highest, int(match.group(1)))
         self._base = max(count_base, highest)
         self._n = 0
+        # Concurrent runs in the SAME process (two campaign launches, parallel
+        # Lane B threads) mint ids from this ONE generator. Without a lock the
+        # ``self._n += 1`` read-modify-write races and two threads emit the same
+        # id -> "UNIQUE constraint failed: events.event_id" and a failed run.
+        self._lock = threading.Lock()
 
     def next_id(self) -> str:
-        self._n += 1
-        return f"EV{self._base + self._n:024d}"
+        with self._lock:
+            self._n += 1
+            n = self._n
+        return f"EV{self._base + n:024d}"
 
 
 def create_app(
