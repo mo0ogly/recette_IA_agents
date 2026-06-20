@@ -1289,8 +1289,18 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
         <p>
           Le tracage est <strong>parametrable</strong> (R5) via la variable
           d'environnement <code>INSPECT_IA_AGENTS_PROXY_DEBUG</code> (
-          <code>1/true/on</code>). Desactive, le proxy s'execute sans surcout et
-          aucune trace n'est enregistree — le bandeau l'indique alors clairement.
+          <code>1/true/on</code>) au demarrage, ou directement depuis l'UI via
+          l'<strong>interrupteur d'enregistrement</strong> du sous-header (POST{" "}
+          <code>/proxy/debug</code>, bascule a chaud sans redemarrage). Desactive,
+          le proxy s'execute sans surcout et aucune trace n'est enregistree.
+        </p>
+        <h3>Lancer un agent depuis le proxy</h3>
+        <p>
+          Le <strong>mini-lanceur</strong> en tete de page lance un agent runtime
+          configure et bascule automatiquement sur la source{" "}
+          <strong>sessions</strong> preselectionnee sur ce run — "lancer un agent
+          et le voir live dans le proxy" en un ecran. Depuis le cockpit, le bouton{" "}
+          <strong>Voir dans le proxy</strong> deep-linke un run vers sa session.
         </p>
         <h3>Lire les traces</h3>
         <ul>
@@ -1309,10 +1319,10 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             touche jamais le journal d'audit immuable (I1), qui reste la verite.
           </li>
         </ul>
-        <h3>Le menu des sources : trois altitudes</h3>
+        <h3>Le menu des sources : quatre altitudes</h3>
         <p>
           Le <strong>menu</strong> en haut bascule la <strong>source</strong> —
-          trois vues lecture seule du meme effet de bord gouverne (I5). Chaque
+          quatre vues lecture seule du meme effet de bord gouverne (I5). Chaque
           entree porte un libelle, un indice d'une ligne et une{" "}
           <strong>pastille live</strong> alimentee par le panneau monte (nombre de
           traces / flux / bypass, ou <code>off</code> quand la fonctionnalite
@@ -1329,11 +1339,13 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             <strong>wire (mitmproxy)</strong> : la vue <strong>reseau</strong> —
             les octets reellement sur le fil, captures par une surcouche{" "}
             <strong>mitmproxy</strong> optionnelle (conteneur Docker). Affiche la
-            requete/reponse HTTP(S) brute par echange. Surcouche OFF par defaut :
-            tant qu'elle n'est pas active, le panneau explique comment l'activer
-            (<code>./recette.sh wire up</code> puis exporter{" "}
-            <code>INSPECT_IA_AGENTS_WIRE_PROXY</code> et relancer l'API). Pour le HTTPS
-            des systemes reels, faire confiance au CA mitmproxy
+            requete/reponse HTTP(S) brute par echange. Surcouche OFF par defaut ;
+            un <strong>bouton on/off</strong> la pilote depuis l'UI (POST{" "}
+            <code>/proxy/wire/overlay</code>, deny par defaut sauf{" "}
+            <code>INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL</code>). Sans redemarrage :
+            apres <code>wire up</code>, choisir la route de transport{" "}
+            <strong>wire</strong> suffit a router le trafic lab a travers l'overlay.
+            Pour le HTTPS des systemes reels, faire confiance au CA mitmproxy
             (<code>./recette.sh wire ca</code> {"->"} <code>INSPECT_IA_AGENTS_WIRE_CA</code>).
           </li>
           <li>
@@ -1345,6 +1357,15 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
             <strong>consigner</strong> chaque bypass au journal d'audit comme
             evenement compensatoire (I1, jamais une mutation). Le lab l'OBSERVE,
             il ne le bloque pas.
+          </li>
+          <li>
+            <strong>sessions</strong> : les echanges agent{"<->"}serveur{" "}
+            <strong>groupes en sessions</strong> (par run / agent / agent{"->"}cible).
+            Deplier un echange montre la paire <strong>requete{"<->"}reponse</strong> ;
+            quand l'overlay wire est actif, un badge <strong>wire (octets)</strong>{" "}
+            ouvre les octets reseau bruts de CET echange (joints par{" "}
+            <code>side_effect_hash</code> canonique). Gere les runs concurrents
+            entrelaces ; selection stable par cle ; live en poll 2s.
           </li>
         </ul>
         <h3>Champ par champ d'une trace</h3>
