@@ -54,6 +54,7 @@ def resolve_proxy(
     *,
     real_proxy_factory: RealProxyFactory | None = None,
     wire_proxy_url: str | None = None,
+    run_id: str | None = None,
     containment: bool = False,
 ) -> ExternalSystemProxy:
     """Resolve the proxy for one agent run from the server registry.
@@ -67,7 +68,9 @@ def resolve_proxy(
     impure call-site (which reads the env), keeping this module pure: None ->
     direct, exactly the previous behaviour (I4). real_saas is unaffected (its
     proxy is built by the factory; real targets are HTTPS and would need the
-    overlay CA, out of the phase-1 lab scope).
+    overlay CA, out of the phase-1 lab scope). ``run_id`` (optional) is forwarded
+    to the lab-mode proxies so wire flows correlate to the originating run
+    (transport metadata only, does not enter the decision path, I4).
 
     ``containment`` (Task 6) is the private-DNS CONTAINMENT gate. When True, an
     agent referencing a name NOT in the server allowlist is DENIED fail-safe:
@@ -106,14 +109,19 @@ def resolve_proxy(
         if not isinstance(port, int) or isinstance(port, bool):
             raise ValueError(f"server {server_id!r} (mock_local) requires an integer 'port'")
         return LabHttpProxy(
-            f"http://127.0.0.1:{port}", proxy_url=wire_proxy_url, target_name=target_name
+            f"http://127.0.0.1:{port}",
+            proxy_url=wire_proxy_url,
+            target_name=target_name,
+            run_id=run_id,
         )
     if mode == "declared_url":
         base_url = server.get("base_url")
         if not isinstance(base_url, str) or not base_url:
             raise ValueError(f"server {server_id!r} (declared_url) requires a non-empty 'base_url'")
         # The declared server must implement the lab wire format (module docstring).
-        return LabHttpProxy(base_url, proxy_url=wire_proxy_url, target_name=target_name)
+        return LabHttpProxy(
+            base_url, proxy_url=wire_proxy_url, target_name=target_name, run_id=run_id
+        )
     if mode == "real_saas":
         if real_proxy_factory is None:
             raise ValueError("real_saas execution requires realmode wiring")

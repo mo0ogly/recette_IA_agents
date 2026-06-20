@@ -414,6 +414,7 @@ def forge_for_agent(
         servers,
         default_proxy or LabHttpProxy(),
         wire_proxy_url=wire_proxy_url,
+        run_id=run_id,
         containment=containment,
     )
     # A mock_local server on the canonical lab port is the SAME target the

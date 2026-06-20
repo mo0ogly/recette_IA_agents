@@ -16,6 +16,10 @@ from .protocol import ExecutionResult, side_effect_hash
 
 DEFAULT_LAB_URL = "http://localhost:8082"
 
+# Mirrors DEFAULT_RUN_HEADER in scripts/mitm_wire_addon.py (correlates wire flows
+# to a run).
+WIRE_RUN_HEADER = "x-inspect-run-id"
+
 
 def lab_url_from_env() -> str:
     return os.environ.get("INSPECT_IA_AGENTS_LAB_URL", DEFAULT_LAB_URL)
@@ -66,14 +70,20 @@ class LabHttpProxy:
         timeout: float = 10.0,
         proxy_url: str | None = None,
         target_name: str | None = None,
+        run_id: str | None = None,
     ) -> None:
         # ``proxy_url`` (optional) routes the side effect through the mitmproxy
         # wire overlay; None (default) talks to the lab directly (I4 unchanged).
         # ``target_name`` (optional) is the resolved server name (fqdn) recorded
         # as the trace target for realism; None (default) means the trace falls
         # back to event.target_system, exactly the previous behaviour.
+        # ``run_id`` (optional) is stamped as the WIRE_RUN_HEADER so the wire
+        # overlay correlates the raw flow to the originating run; transport
+        # metadata only -- never enters the decision path (I4) and the lab
+        # ignores an unknown header when wire is off.
+        headers = {WIRE_RUN_HEADER: run_id} if run_id else None
         self._client = StdlibHttpClient(
-            base_url or lab_url_from_env(), timeout=timeout, proxy_url=proxy_url
+            base_url or lab_url_from_env(), timeout=timeout, proxy_url=proxy_url, headers=headers
         )
         self._target_name = target_name
 
