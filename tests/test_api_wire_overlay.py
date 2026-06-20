@@ -2,11 +2,17 @@ import os
 import unittest
 from unittest import mock
 
-from fastapi.testclient import TestClient
+try:
+    from fastapi.testclient import TestClient
 
-from recette.api.app import create_app
+    from recette.api.app import create_app
+
+    _HAS_FASTAPI = True
+except ImportError:  # pragma: no cover - depends on the [api] extra
+    _HAS_FASTAPI = False
 
 
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 class WireOverlayControlTest(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(create_app())
