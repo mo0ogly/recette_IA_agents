@@ -45,6 +45,11 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
         llm: LlmBackend
         if "stub_script" in params:
             llm = build_stub_llm(params["stub_script"])
+        elif agent_cfg.get("ai_mode", "mock") != "real" and agent_cfg.get("scenario"):
+            # A mock agent carries its decisions in its scenario; derive the stub
+            # from it so the proxy launcher (which sends only agent_id) can run a
+            # key-less mock agent, mirroring the campaign runner.
+            llm = build_stub_llm(agent_cfg["scenario"])
         else:
             backend_id = agent_cfg.get("ai_backend_id")
             if not backend_id:
