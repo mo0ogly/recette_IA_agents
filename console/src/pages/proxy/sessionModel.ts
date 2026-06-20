@@ -13,7 +13,7 @@
  * (no cross-contamination) and keeps each session's exchanges in seq order.
  */
 
-import type { ProxyTrace } from "../../types/platform";
+import type { ProxyTrace, WireFlow } from "../../types/platform";
 
 /** How exchanges are bucketed into a session. */
 export type GroupKey = "run" | "agent" | "agent_target";
@@ -24,6 +24,8 @@ export interface Exchange {
   intent: { action_type: string; resource: string; payload: unknown };
   response: { status_code: number; ok: boolean; body: unknown };
   hash: string | null;
+  /** The raw network bytes of this exchange, matched by side_effect_hash; undefined when the wire overlay is off or no flow matched. */
+  wire?: WireFlow;
   /** The raw trace, kept for the "full JSON" Monaco detail. */
   raw: ProxyTrace;
 }
@@ -52,12 +54,13 @@ function keyOf(t: ProxyTrace, key: GroupKey): string {
   return t.run_id ?? "(no run)";
 }
 
-function toExchange(t: ProxyTrace): Exchange {
+function toExchange(t: ProxyTrace, wire?: WireFlow): Exchange {
   return {
     seq: t.seq,
     intent: { action_type: t.action_type, resource: t.resource, payload: t.request_payload },
     response: { status_code: t.status_code, ok: t.ok, body: t.response },
     hash: t.side_effect_hash,
+    wire,
     raw: t,
   };
 }
@@ -67,7 +70,18 @@ function toExchange(t: ProxyTrace): Exchange {
  * (most-recently-active first), tie-break `firstSeq` asc then `key` asc, so the
  * order is total and deterministic. Each session's exchanges are sorted by seq.
  */
-export function groupSessions(traces: ProxyTrace[], key: GroupKey): Session[] {
+export function groupSessions(
+  traces: ProxyTrace[],
+  key: GroupKey,
+  wireFlows?: WireFlow[],
+): Session[] {
+  const wireByHash = new Map<string, WireFlow>();
+  for (const f of wireFlows ?? []) {
+    if (f.side_effect_hash) {
+      wireByHash.set(f.side_effect_hash, f);
+    }
+  }
+
   const buckets = new Map<string, ProxyTrace[]>();
   for (const t of traces) {
     const k = keyOf(t, key);
@@ -82,7 +96,9 @@ export function groupSessions(traces: ProxyTrace[], key: GroupKey): Session[] {
   const sessions: Session[] = [];
   for (const [k, list] of buckets) {
     const sorted = [...list].sort((a, b) => a.seq - b.seq);
-    const exchanges = sorted.map(toExchange);
+    const exchanges = sorted.map((t) =>
+      toExchange(t, t.side_effect_hash ? wireByHash.get(t.side_effect_hash) : undefined),
+    );
     const targets = [...new Set(sorted.map((t) => t.target_system))].sort();
     const agentIds = new Set(sorted.map((t) => t.agent_id));
     sessions.push({

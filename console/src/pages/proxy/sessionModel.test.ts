@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProxyTrace } from "../../types/platform";
+import type { ProxyTrace, WireFlow } from "../../types/platform";
 import { groupSessions, sessionsFailed } from "./sessionModel";
 
 /** Minimal trace factory: only the fields the model reads. */
@@ -118,5 +118,41 @@ describe("groupSessions", () => {
     const sessions = groupSessions(traces, "run");
     expect(sessions.map((s) => s.lastSeq)).toEqual([10, 10]);
     expect(sessions.map((s) => s.key)).toEqual(["r1", "r2"]); // firstSeq 1 < 4
+  });
+});
+
+function wire(over: Partial<WireFlow>): WireFlow {
+  return {
+    seq: 0, method: "POST", scheme: "http", host: "127.0.0.1", port: 9101,
+    path: "/github/execute", status_code: 200, ok: true,
+    content_type: "application/json", request_body: "{}", response_body: "{}",
+    run_id: "r1", side_effect_hash: null,
+    ...over,
+  };
+}
+
+describe("groupSessions wire fusion", () => {
+  it("attaches the wire flow whose side_effect_hash matches the exchange", () => {
+    const traces = [trace({ seq: 1, run_id: "r1", side_effect_hash: "H1" })];
+    const flows = [wire({ seq: 1, run_id: "r1", side_effect_hash: "H1", path: "/p" })];
+    const ex = groupSessions(traces, "run", flows)[0].exchanges[0];
+    expect(ex.wire?.path).toBe("/p");
+  });
+
+  it("leaves wire undefined when no flow hash matches", () => {
+    const traces = [trace({ seq: 1, run_id: "r1", side_effect_hash: "H1" })];
+    const flows = [wire({ seq: 1, side_effect_hash: "OTHER" })];
+    expect(groupSessions(traces, "run", flows)[0].exchanges[0].wire).toBeUndefined();
+  });
+
+  it("leaves wire undefined when wireFlows is omitted", () => {
+    const traces = [trace({ seq: 1, run_id: "r1", side_effect_hash: "H1" })];
+    expect(groupSessions(traces, "run")[0].exchanges[0].wire).toBeUndefined();
+  });
+
+  it("does not attach a flow to an exchange whose hash is null", () => {
+    const traces = [trace({ seq: 1, run_id: "r1", side_effect_hash: null })];
+    const flows = [wire({ side_effect_hash: null, path: "/p" })];
+    expect(groupSessions(traces, "run", flows)[0].exchanges[0].wire).toBeUndefined();
   });
 });
