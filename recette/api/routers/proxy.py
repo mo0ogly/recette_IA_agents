@@ -14,6 +14,8 @@ in-memory ring; it never touches the event store.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
@@ -38,8 +40,6 @@ def set_debug(request: Request, body: dict) -> dict:
     ``enabled`` is a 422 (never silently keep the old state). Logged via tracing
     as an operator action; NOT appended to the canonical event store (it is an
     ops action, not an agent action)."""
-    import logging
-
     enabled = body.get("enabled")
     if not isinstance(enabled, bool):
         raise HTTPException(status_code=422, detail="body.enabled (bool) is required")
