@@ -139,3 +139,46 @@ def _cmd_receipts_verify(path: str, pubkey: str | None, as_json: bool) -> int:
         print(f"chain: BROKEN -- first break at seq {chain['first_break_seq']}")
     print(f"verdict: {'VALID' if ok else 'INVALID'}")
     return 0 if ok else 1
+
+
+def _cmd_receipts_attest(att_path: str, proof_path: str, pubkey: str | None, as_json: bool) -> int:
+    """Verify a SELECTIVE-DISCLOSURE attestation: a signed root + one inclusion
+    proof, WITHOUT the other receipts.
+
+    A third party holds only the signed root attestation
+    (``{chain_head, count, merkle_root}``, GET /proxy/receipts/root-attestation)
+    and ONE disclosed leaf + audit path (GET /proxy/receipts/merkle/proof). This
+    attests that a single side effect crossed the boundary without the batch.
+    Exit 0 only when ALL hold: the root signature is valid, the proof folds to a
+    root, and that root equals the attested ``merkle_root``. Pure (I4), offline."""
+    from ..receipt_export import verify_root_attestation
+    from ..receipt_merkle import verify_inclusion
+
+    attestation = json.loads(Path(att_path).read_text(encoding="utf-8"))
+    proof = json.loads(Path(proof_path).read_text(encoding="utf-8"))
+    if not isinstance(attestation, dict) or not isinstance(proof, dict):
+        print("INVALID: attestation and proof must both be JSON objects", file=sys.stderr)
+        return 1
+    signature = verify_root_attestation(attestation, expected_public_key=pubkey)
+    attested_root = attestation.get("merkle_root", "")
+    # The proof must fold to the SAME root the attestation commits to -- a proof
+    # against any other root proves nothing about this attestation.
+    roots_match = bool(attested_root) and proof.get("root") == attested_root
+    included = verify_inclusion(proof.get("leaf", ""), proof.get("path", []), attested_root)
+    ok = bool(signature["valid"]) and roots_match and included
+    if as_json:
+        verdict = {
+            "signature": signature,
+            "roots_match": roots_match,
+            "included": included,
+            "ok": ok,
+        }
+        print(json.dumps(verdict, indent=2))
+        return 0 if ok else 1
+    print(f"attestation: {att_path}")
+    print(f"proof: {proof_path}")
+    print(f"signature: {'VALID' if signature['valid'] else 'INVALID'} -- {signature['reason']}")
+    print(f"root match: {'YES' if roots_match else 'NO'} (proof root vs attested merkle_root)")
+    print(f"inclusion: {'PROVEN' if included else 'FAILED'} (disclosed leaf folds to root)")
+    print(f"verdict: {'VALID' if ok else 'INVALID'}")
+    return 0 if ok else 1

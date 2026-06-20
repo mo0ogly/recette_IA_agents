@@ -21,6 +21,7 @@ from .cli.discovery_cmds import (
     _cmd_bundle_verify,
     _cmd_discovery,
     _cmd_publish,
+    _cmd_receipts_attest,
     _cmd_receipts_verify,
     _cmd_surface,
 )
@@ -57,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_bundle_verify(args.path, args.pubkey)
     if args.command == "receipts-verify":
         return _cmd_receipts_verify(args.path, args.pubkey, args.json)
+    if args.command == "receipts-attest":
+        return _cmd_receipts_attest(args.attestation, args.proof, args.pubkey, args.json)
     if args.command == "agent":
         if args.agent_cmd == "run":
             return _cmd_agent_run(

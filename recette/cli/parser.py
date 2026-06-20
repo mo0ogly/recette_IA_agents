@@ -47,6 +47,16 @@ def build_parser() -> argparse.ArgumentParser:
     rcv.add_argument("path", help="path to the receipt export JSON envelope")
     rcv.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
     rcv.add_argument("--json", action="store_true", help="emit the JSON verdict instead of text")
+    rca = sub.add_parser(
+        "receipts-attest",
+        help="verify a selective-disclosure attestation (signed root + one inclusion proof)",
+    )
+    rca.add_argument(
+        "--attestation", required=True, help="path to the signed root-attestation JSON"
+    )
+    rca.add_argument("--proof", required=True, help="path to the inclusion-proof JSON")
+    rca.add_argument("--pubkey", default=None, help="pin the expected Ed25519 public key (hex)")
+    rca.add_argument("--json", action="store_true", help="emit the JSON verdict instead of text")
     agent = sub.add_parser("agent", help="Lane B live LLM agents (run / replay / freeze)")
     agent_sub = agent.add_subparsers(dest="agent_cmd", required=True)
     a_run = agent_sub.add_parser("run", help="run a live LLM agent (provider key from env)")
