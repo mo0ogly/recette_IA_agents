@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProxyTrace } from "../../types/platform";
-import { groupSessions, sessionsFailed, type GroupKey } from "./sessionModel";
+import { groupSessions, sessionsFailed } from "./sessionModel";
 
 /** Minimal trace factory: only the fields the model reads. */
 function trace(over: Partial<ProxyTrace>): ProxyTrace {
