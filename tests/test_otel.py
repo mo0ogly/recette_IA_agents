@@ -17,6 +17,7 @@ from recette.otel import (
     AGENT_NAME,
     APPROVED,
     DECISION,
+    FINAL_ANSWER,
     GOAL,
     OP,
     OP_EXECUTE_TOOL,
@@ -221,6 +222,19 @@ class TestRecordingSpansWhy(unittest.TestCase):
         a = to_otlp(recording_spans(self._recording(), "rec-why-1"))
         b = to_otlp(recording_spans(self._recording(), "rec-why-1"))
         self.assertEqual(a, b)
+
+    def test_final_answer_prose_on_root(self) -> None:
+        # Tool-calling models emit no per-step prose; the only reasoning text is
+        # the final answer (an action-less step) -- surfaced on the root span.
+        rec = self._recording()
+        rec.steps.append(
+            RecordedStep(
+                decision=LlmDecision(kind="final", text="The goal has been met."),
+                action=None,
+            ),
+        )
+        root = recording_spans(rec, "rec-why-1")[0]
+        self.assertEqual(root.attributes[FINAL_ANSWER], "The goal has been met.")
 
 
 if __name__ == "__main__":

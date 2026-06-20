@@ -150,6 +150,15 @@
   color: var(--color-text);
 }
 
+/* The model's closing prose (real-run final answer). */
+.obs-final {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 /* The LLM decision text per step (empty for scripted providers). */
 .obs-why {
   margin: 0.1rem 0 0.25rem 1.4rem;

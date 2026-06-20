@@ -58,6 +58,10 @@ APPROVED = "inspect_ia_agents.approved"
 GOAL = "inspect_ia_agents.goal"
 DECISION = "inspect_ia_agents.decision"
 TOOL_ARGS = "gen_ai.tool.call.arguments"
+# The model's closing prose (the final answer). Tool-calling models emit
+# structured calls with no per-step prose, so the only reasoning text a real run
+# produces lives on the final step -- surfaced on the root span.
+FINAL_ANSWER = "inspect_ia_agents.final_answer"
 
 _SYSTEM = "inspect_ia_agents"
 _STEP_NANO = 1_000_000  # logical 1ms per span; deterministic, not wall clock
@@ -245,6 +249,13 @@ def recording_spans(recording: object, seed: str) -> list[GenAiSpan]:
     goal = str(getattr(recording, "goal", "") or "")
     if goal:
         root_attrs[GOAL] = goal
+    # The final-step decision text is the model's closing prose (a real run's only
+    # reasoning text). Pure read from the recording -> deterministic (I4).
+    for step in getattr(recording, "steps", []):
+        if getattr(step, "action", None) is None:
+            final_text = str(getattr(getattr(step, "decision", None), "text", "") or "")
+            if final_text:
+                root_attrs[FINAL_ANSWER] = final_text
     if provider:
         root_attrs[PROVIDER] = provider
     if model:

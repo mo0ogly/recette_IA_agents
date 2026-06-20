@@ -1,0 +1,69 @@
+{
+    "trace_id": "b7ae76b77514af86c6ed04704607a7da",
+    "recording_id": "live-groq-proof.00.groq-proof-bot",
+    "spans": [
+        {
+            "span_id": "67064a91585320dd",
+            "parent_span_id": "",
+            "trace_id": "b7ae76b77514af86c6ed04704607a7da",
+            "name": "invoke_agent groq-proof-bot",
+            "start_nano": 0,
+            "end_nano": 1000000,
+            "duration_nano": 1000000,
+            "attributes": {
+                "gen_ai.system": "inspect_ia_agents",
+                "gen_ai.operation.name": "invoke_agent",
+                "gen_ai.agent.name": "groq-proof-bot",
+                "gen_ai.agent.id": "groq-proof-bot",
+                "inspect_ia_agents.goal": "Read the repo acme/widgets, then open a pull request that fixes the README typo.",
+                "inspect_ia_agents.final_answer": "The goal has been met. The function calls are complete.",
+                "gen_ai.provider.name": "groq",
+                "gen_ai.request.model": "llama-3.3-70b-versatile"
+            }
+        },
+        {
+            "span_id": "900ea39823fd1791",
+            "parent_span_id": "67064a91585320dd",
+            "trace_id": "b7ae76b77514af86c6ed04704607a7da",
+            "name": "execute_tool read_repo",
+            "start_nano": 1000000,
+            "end_nano": 2000000,
+            "duration_nano": 1000000,
+            "attributes": {
+                "gen_ai.system": "inspect_ia_agents",
+                "gen_ai.operation.name": "execute_tool",
+                "gen_ai.tool.name": "read_repo",
+                "gen_ai.tool.call.id": "1",
+                "gen_ai.agent.id": "groq-proof-bot",
+                "inspect_ia_agents.target_system": "github",
+                "inspect_ia_agents.principal": "proof@acme",
+                "inspect_ia_agents.mode": "read",
+                "inspect_ia_agents.resource": "acme/widgets",
+                "inspect_ia_agents.approved": 0,
+                "gen_ai.tool.call.arguments": "{\"resource\": \"acme/widgets\"}"
+            }
+        },
+        {
+            "span_id": "77248e68317faccd",
+            "parent_span_id": "67064a91585320dd",
+            "trace_id": "b7ae76b77514af86c6ed04704607a7da",
+            "name": "execute_tool open_pr",
+            "start_nano": 2000000,
+            "end_nano": 3000000,
+            "duration_nano": 1000000,
+            "attributes": {
+                "gen_ai.system": "inspect_ia_agents",
+                "gen_ai.operation.name": "execute_tool",
+                "gen_ai.tool.name": "open_pr",
+                "gen_ai.tool.call.id": "2",
+                "gen_ai.agent.id": "groq-proof-bot",
+                "inspect_ia_agents.target_system": "github",
+                "inspect_ia_agents.principal": "proof@acme",
+                "inspect_ia_agents.mode": "write",
+                "inspect_ia_agents.resource": "acme/widgets",
+                "inspect_ia_agents.approved": 0,
+                "gen_ai.tool.call.arguments": "{\"params\": {\"fix_type\": \"README typo\", \"pr_type\": \"fix\"}, \"resource\": \"acme/widgets\"}"
+            }
+        }
+    ]
+}

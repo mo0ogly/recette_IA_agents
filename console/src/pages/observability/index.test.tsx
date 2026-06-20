@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import tracesFixture from "./__fixtures__/traces.fixture.json";
 import traceFixture from "./__fixtures__/trace.fixture.json";
+import groqTraceFixture from "./__fixtures__/trace-groq.fixture.json";
 import type {
   ObservabilityTrace,
   ObservabilityTraceSummary,
@@ -99,6 +100,35 @@ describe("ObservabilityPage", () => {
     expect(screen.queryByText(hiddenKey)).toBeNull(); // collapsed by default
     fireEvent.click(screen.getByText(tool1)); // click the tool span line
     expect(await screen.findByText(hiddenKey)).toBeInTheDocument();
+  });
+
+  it("shows the model's final answer from a real Groq run (R16)", async () => {
+    // Real captured payload from a live Groq Lane B run (provider=groq).
+    const groqTrace = groqTraceFixture as unknown as ObservabilityTrace;
+    const summary: ObservabilityTraceSummary = {
+      trace_id: groqTrace.trace_id,
+      recording_id: groqTrace.recording_id,
+      agent_id: "groq-proof-bot",
+      target_system: "github",
+      provider: "groq",
+      span_count: groqTrace.spans.length,
+    };
+    vi.mocked(listObservabilityTraces).mockResolvedValue([summary]);
+    vi.mocked(getObservabilityTrace).mockResolvedValue(groqTrace);
+
+    render(
+      <MemoryRouter>
+        <ObservabilityPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByText("groq-proof-bot"));
+
+    const root = groqTrace.spans.find(
+      (s) => String(s.attributes["gen_ai.operation.name"]) === "invoke_agent",
+    );
+    const finalAnswer = String(root?.attributes["inspect_ia_agents.final_answer"] ?? "");
+    expect(finalAnswer).not.toBe(""); // the fixture must actually carry it
+    expect(await screen.findByTestId("obs-final")).toHaveTextContent(finalAnswer);
   });
 
   it("filters the trace list by agent/target/recording (R16)", async () => {

@@ -167,12 +167,15 @@ export default function ObservabilityPage(): JSX.Element {
     return { actions: tools.length, writes: writes.length, unapproved: unapproved.length, targets };
   }, [views]);
 
-  // The agent objective rides on the root invoke_agent span (the "why" context).
-  const goal = useMemo(() => {
+  // The agent objective + the model's final prose ride on the root span.
+  const { goal, finalAnswer } = useMemo(() => {
     const root = (trace?.spans ?? []).find(
       (s) => String(s.attributes["gen_ai.operation.name"]) === "invoke_agent",
     );
-    return root ? String(root.attributes["inspect_ia_agents.goal"] ?? "") : "";
+    return {
+      goal: root ? String(root.attributes["inspect_ia_agents.goal"] ?? "") : "",
+      finalAnswer: root ? String(root.attributes["inspect_ia_agents.final_answer"] ?? "") : "",
+    };
   }, [trace]);
 
   return (
@@ -250,6 +253,11 @@ export default function ObservabilityPage(): JSX.Element {
                   {goal && (
                     <p className="obs-goal" data-testid="obs-goal">
                       <span className="obs-k">objectif</span> {goal}
+                    </p>
+                  )}
+                  {finalAnswer && (
+                    <p className="obs-final" data-testid="obs-final">
+                      <span className="obs-k">conclusion</span> {finalAnswer}
                     </p>
                   )}
                   <div className="obs-stats" data-testid="obs-stats">
