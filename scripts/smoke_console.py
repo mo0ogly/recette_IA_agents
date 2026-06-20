@@ -359,6 +359,44 @@ def _drive_campaign(page: Page, console: str) -> None:
     print("[3/5] /campaigns: Lancer -> completed")
 
 
+def _drive_proxy_launch(page: Page, console: str, api: str) -> None:
+    """Proxy console convivable loop: toggle debug ON from the UI, launch a
+    key-less mock agent from the in-page launcher, and land on its live session.
+
+    Proves the whole "launch and watch it in the proxy" path in a real browser:
+    the debug toggle flips the backend recorder, the launcher runs a lane_b
+    agent through the gateway-mediated lab (I5), and its side-effect traces show
+    up grouped as that run's session (?source=sessions&run=). The governed
+    server-less agent is used, so it needs no running server."""
+    # Start from a known debug=off state so the UI toggle deterministically turns
+    # recording ON and we can assert the UI -> API wiring.
+    _api("POST", f"{api}/proxy/debug", {"enabled": False})
+    page.goto(f"{console}/proxy", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("proxy-debug-toggle").click()
+    debug_on = False
+    for _ in range(20):
+        _, body = _api("GET", f"{api}/proxy/debug")
+        if isinstance(body, dict) and body.get("debug_enabled"):
+            debug_on = True
+            break
+        page.wait_for_timeout(250)
+    _expect(debug_on, "proxy debug did not turn on from the UI toggle")
+
+    # Launch the server-less governed mock agent from the in-page launcher.
+    panel = page.get_by_test_id("proxy-launch-panel")
+    panel.get_by_label("agent").select_option(GOV_AGENT_ID)
+    panel.get_by_test_id("proxy-launch-btn").click()
+
+    # The page auto-switches to the sessions source preselected on the new run;
+    # the run's side effects appear as a session row within the 2s poll.
+    page.wait_for_url(re.compile(r"source=sessions"), timeout=UI_TIMEOUT_MS)
+    page.get_by_label("sessions").get_by_role("button").first.wait_for(
+        state="visible", timeout=UI_TIMEOUT_MS
+    )
+    _shot(page, "proxy-sessions-launch")
+    print("[*] /proxy: debug toggle ON + launcher -> live session")
+
+
 def _drive_dashboard_campaign(page: Page, console: str) -> None:
     # The dashboard "Campagnes" section: launch the SAME campaign from the
     # control board (not the /campaigns page). This drives runCampaign through
@@ -634,6 +672,9 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # Independent of the server lifecycle: the IA tab drives the LLM
             # backend catalog + per-backend probe wiring.
             _drive_ai_backends(page, console)
+            # The proxy convivable loop: UI debug toggle + in-page launcher ->
+            # the launched agent's live session (server-less governed agent).
+            _drive_proxy_launch(page, console, api)
             # New agent-creation UX: the wizard + executing dry-run, and the
             # previously-missing help modals on /probe and /observability.
             _verify_agent_ui(page, console)
