@@ -7,8 +7,9 @@
 > et que c'est inchange, sans que la plateforme journalise ou expose le contenu brut.
 >
 > Code : `recette/context_receipt.py` (pur, deterministe I4),
-> `recette/receipt_export.py` (export signe Ed25519), endpoints dans
-> `recette/api/routers/proxy.py`, page console `console/src/pages/receipts/`.
+> `recette/receipt_export.py` (export signe Ed25519 + verification), endpoints
+> dans `recette/api/routers/proxy.py`, CLI `recette receipts-verify`
+> (`recette/cli/discovery_cmds.py`), page console `console/src/pages/receipts/`.
 
 ## Pourquoi ca existe
 
@@ -45,16 +46,21 @@ flowchart LR
     E1["GET /proxy/receipts"]
     E2["GET /proxy/receipts/verify"]
     E3["GET /proxy/receipts/export"]
+    E4["POST /proxy/receipts/verify-import\n(re-verifie une enveloppe tierce)"]
   end
-  subgraph EXP["Export signe (recette/receipt_export.py)"]
+  subgraph EXP["Export + verification (recette/receipt_export.py)"]
     S["export_receipts -> enveloppe Ed25519\n(signed:false si pas de cle, fail-safe)"]
+    V["verify_export + verify_chain\n(signature + chaine, pur I4)"]
   end
   UI["Console /receipts\n(console/src/pages/receipts/)"]
+  CLI["CLI: recette receipts-verify\n(hors plateforme, exit 0/1)"]
   G -->|"execute()"| R
   R -->|"snapshot()"| RC --> CH
   CH --> E1 --> UI
   CH --> E2 --> UI
   CH --> S --> E3 --> UI
+  UI -->|"fichier tiers"| E4 --> V
+  S -.->|"enveloppe exportee"| CLI --> V
 ```
 
 Chaque `execute()` cote gateway passe par le `TracingProxy`, qui enregistre un
@@ -80,10 +86,13 @@ recus vide (et la page console affiche l'etat "Aucun recu").
 | `GET /proxy/receipts` | Recus sans contenu, chaines, dans l'ordre `seq` croissant. | `run_id` (filtre une execution), `tail` (N derniers) -- `run_id` applique avant `tail`. |
 | `GET /proxy/receipts/verify` | Recompute la chaine depuis le genesis et signale la premiere rupture. | `run_id` |
 | `GET /proxy/receipts/export` | Enveloppe transferable, signee Ed25519 quand une cle est configuree. | `run_id` |
+| `POST /proxy/receipts/verify-import` | Re-verifie une enveloppe d'export TIERS (signature Ed25519 + chaine de hash), sans rien lui faire confiance. Stateless, pur (I4). | `expected_public_key` (pin le signataire) ; corps = l'enveloppe |
 
-Les trois routes sont en lecture seule et sans contenu (aucun corps n'est jamais
-renvoye). Cote client TypeScript : `getContextReceipts`, `verifyContextReceipts`,
-`exportContextReceipts` dans `console/src/api/client.ts`.
+Les routes GET sont en lecture seule et sans contenu (aucun corps n'est jamais
+renvoye) ; `verify-import` est stateless (ne touche ni l'audit log ni le buffer).
+Cote client TypeScript : `getContextReceipts`, `verifyContextReceipts`,
+`exportContextReceipts`, `verifyImportedReceipts` dans
+`console/src/api/client.ts`.
 
 ### Entrees / sorties
 
@@ -100,6 +109,9 @@ renvoye). Cote client TypeScript : `getContextReceipts`, `verifyContextReceipts`
 - **Sortie de `/proxy/receipts/export`** : enveloppe
   `{"schema": "inspect_ia_agents-receipt-export-v1", "count", "chain_head",
   "receipts", "signed"}`. Si signee, elle ajoute `public_key` et `signature` (hex).
+- **Sortie de `/proxy/receipts/verify-import`** : `{"signature": {"valid", "reason"},
+  "chain": {"ok", "checked", "first_break_seq"}}`. Le verdict est une fonction de
+  l'enveloppe postee seule (rien n'est lu des recorders) ; un corps non-objet -> 422.
 
 ## Export signe (recette/receipt_export.py)
 
@@ -120,15 +132,47 @@ canonique avec Ed25519, le meme mecanisme que le bundle de policy
 Comme les recus sont deja sans contenu, l'export ne transporte aucun corps : il
 rend la piste d'audit verifiable par quiconque detient la cle publique.
 
+## Attestation hors plateforme (echange signe -> verifie)
+
+La boucle complete est : on **signe d'un cote**, on **verifie de l'autre**,
+toujours sans contenu. La verification existe a trois altitudes, toutes adossees a
+la meme paire pure `verify_export` (signature) + `verify_chain` (chaine) :
+
+| Surface | Comment | Pour qui |
+|---------|---------|----------|
+| **Console** | Page `/receipts`, champ `Verifier un export tiers` : on charge un fichier d'enveloppe, le verdict signature/chaine s'affiche. | Operateur dans le cockpit. |
+| **API** | `POST /proxy/receipts/verify-import` (corps = enveloppe, `expected_public_key` optionnel). | Integration machine-a-machine. |
+| **CLI** | `python -m recette receipts-verify <export.json> [--pubkey HEX] [--json]`. | Tiers (auditeur, RSSI, regulateur) avec le seul fichier + la cle publique -- sans console, sans API, sans reseau. |
+
+Le CLI est le jumeau terminal de `verify-import` (`_cmd_receipts_verify` dans
+`recette/cli/discovery_cmds.py`). Il sort **0 si et seulement si** la signature est
+valide ET la chaine intacte -- donc utilisable comme gate dans un pipeline CI /
+d'attestation. La cle publique est embarquee dans l'enveloppe : un verifieur n'a
+besoin d'AUCUN secret (il peut epingler le signataire attendu avec `--pubkey`).
+
+```
+python -m recette receipts-verify export.json
+# export: export.json
+# signature: VALID -- signature valid over canonical payload
+# chain: INTACT -- N receipt(s)
+# verdict: VALID            (exit 0)
+```
+
+Une enveloppe falsifiee (un recu modifie) casse a la fois la signature et la
+chaine -> `verdict: INVALID` (exit 1). Une cle epinglee qui ne correspond pas ->
+signature invalide.
+
 ## Page console
 
 Route `/receipts` (`console/src/App.tsx`), page `console/src/pages/receipts/`.
 Elle charge `getContextReceipts()` + `verifyContextReceipts()`, affiche un badge
 d'integrite de chaine (`chaine verifiee (N)` ou `chaine rompue @ seq ...`), un
 tableau sans contenu (agent, action, cible/ressource, statut, tailles et SHA-256
-tronques) et un bouton `Exporter (signe Ed25519)` qui telecharge l'enveloppe
-`context-receipts-export.json`. La fixture de contrat (R16) vit dans
-`console/src/pages/receipts/__fixtures__/receipts.fixture.json`.
+tronques), un bouton `Exporter (signe Ed25519)` qui telecharge l'enveloppe
+`context-receipts-export.json`, et un champ `Verifier un export tiers` qui lit un
+fichier d'enveloppe (via `FileReader`, sur-safe en test) et affiche le verdict
+combine signature/chaine (`verifyImportedReceipts`). La fixture de contrat (R16)
+vit dans `console/src/pages/receipts/__fixtures__/receipts.fixture.json`.
 
 ## Mode de defaillance (fail-safe)
 
@@ -165,6 +209,14 @@ curl -s http://localhost:8090/proxy/receipts/verify
 curl -s http://localhost:8090/proxy/receipts/export | head
 ```
 
+Verification hors plateforme depuis le terminal (le verifieur n'a besoin que du
+fichier ; la cle publique est dans l'enveloppe) :
+
+```
+curl -s http://localhost:8090/proxy/receipts/export > export.json
+python -m recette receipts-verify export.json --json
+```
+
 Le smoke console couvre la page : `_verify_receipts` dans
 `scripts/smoke_console.py` (via `./recette.sh smoke`).
 
@@ -179,9 +231,12 @@ make recette
 
 Tests dedies : `tests/test_context_receipt.py` (sans contenu, taille/digest
 verifiables, determinisme, chaine + detection de falsification, forme de
-l'endpoint) et `tests/test_receipt_export.py` (non signe fail-safe sans cle,
+l'endpoint), `tests/test_receipt_export.py` (non signe fail-safe sans cle,
 aller-retour signature, falsification rejetee, pinning de cle, payload
-deterministe).
+deterministe), `tests/test_api_receipt_verify_import.py` (endpoint de
+cross-verification : aller-retour signe, falsification, pinning, non-objet 422) et
+`tests/test_cli_receipts_verify.py` (CLI : exit 0 si signe+intact, exit 1 si non
+signe / falsifie / mauvaise cle, sortie `--json`).
 
 ## Liens connexes
 

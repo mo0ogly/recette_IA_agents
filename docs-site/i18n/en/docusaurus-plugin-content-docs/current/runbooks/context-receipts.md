@@ -7,8 +7,9 @@
 > and that it is unchanged, without the platform logging or exposing the raw content.
 >
 > Code: `recette/context_receipt.py` (pure, deterministic I4),
-> `recette/receipt_export.py` (Ed25519 signed export), endpoints in
-> `recette/api/routers/proxy.py`, console page `console/src/pages/receipts/`.
+> `recette/receipt_export.py` (Ed25519 signed export + verification), endpoints
+> in `recette/api/routers/proxy.py`, CLI `recette receipts-verify`
+> (`recette/cli/discovery_cmds.py`), console page `console/src/pages/receipts/`.
 
 ## Why it exists
 
@@ -46,16 +47,21 @@ flowchart LR
     E1["GET /proxy/receipts"]
     E2["GET /proxy/receipts/verify"]
     E3["GET /proxy/receipts/export"]
+    E4["POST /proxy/receipts/verify-import\n(re-verifies a third-party envelope)"]
   end
-  subgraph EXP["Signed export (recette/receipt_export.py)"]
+  subgraph EXP["Export + verification (recette/receipt_export.py)"]
     S["export_receipts -> Ed25519 envelope\n(signed:false if no key, fail-safe)"]
+    V["verify_export + verify_chain\n(signature + chain, pure I4)"]
   end
   UI["Console /receipts\n(console/src/pages/receipts/)"]
+  CLI["CLI: recette receipts-verify\n(off-platform, exit 0/1)"]
   G -->|"execute()"| R
   R -->|"snapshot()"| RC --> CH
   CH --> E1 --> UI
   CH --> E2 --> UI
   CH --> S --> E3 --> UI
+  UI -->|"third-party file"| E4 --> V
+  S -.->|"exported envelope"| CLI --> V
 ```
 
 Each `execute()` on the gateway side goes through the `TracingProxy`, which records a
@@ -81,10 +87,13 @@ receipts (and the console page shows the "No receipt" state).
 | `GET /proxy/receipts` | Content-free receipts, chained, in ascending `seq` order. | `run_id` (filter one execution), `tail` (last N) -- `run_id` applied before `tail`. |
 | `GET /proxy/receipts/verify` | Recomputes the chain from genesis and reports the first break. | `run_id` |
 | `GET /proxy/receipts/export` | Transferable envelope, Ed25519-signed when a key is configured. | `run_id` |
+| `POST /proxy/receipts/verify-import` | Re-verifies a THIRD-PARTY export envelope (Ed25519 signature + hash chain), trusting nothing in it. Stateless, pure (I4). | `expected_public_key` (pin the signer); body = the envelope |
 
-All three routes are read-only and content-free (no body is ever
-returned). On the TypeScript client side: `getContextReceipts`, `verifyContextReceipts`,
-`exportContextReceipts` in `console/src/api/client.ts`.
+The GET routes are read-only and content-free (no body is ever returned);
+`verify-import` is stateless (touches neither the audit log nor the buffer). On
+the TypeScript client side: `getContextReceipts`, `verifyContextReceipts`,
+`exportContextReceipts`, `verifyImportedReceipts` in
+`console/src/api/client.ts`.
 
 ### Inputs / outputs
 
@@ -101,6 +110,9 @@ returned). On the TypeScript client side: `getContextReceipts`, `verifyContextRe
 - **Output of `/proxy/receipts/export`**: envelope
   `{"schema": "inspect_ia_agents-receipt-export-v1", "count", "chain_head",
   "receipts", "signed"}`. If signed, it adds `public_key` and `signature` (hex).
+- **Output of `/proxy/receipts/verify-import`**: `{"signature": {"valid", "reason"},
+  "chain": {"ok", "checked", "first_break_seq"}}`. The verdict is a function of the
+  posted envelope alone (nothing read from the recorders); a non-object body -> 422.
 
 ## Signed export (recette/receipt_export.py)
 
@@ -121,15 +133,47 @@ payload with Ed25519, the same mechanism as the policy bundle
 Since the receipts are already content-free, the export carries no body: it
 makes the audit trail verifiable by anyone holding the public key.
 
+## Off-platform attestation (signed exchange -> verified)
+
+The full loop is: **sign on one side**, **verify on the other**, always
+content-free. Verification exists at three altitudes, all backed by the same pure
+pair `verify_export` (signature) + `verify_chain` (chain):
+
+| Surface | How | For whom |
+|---------|-----|----------|
+| **Console** | `/receipts` page, `Verify a third-party export` field: load an envelope file, the signature/chain verdict is shown. | Operator in the cockpit. |
+| **API** | `POST /proxy/receipts/verify-import` (body = envelope, optional `expected_public_key`). | Machine-to-machine integration. |
+| **CLI** | `python -m recette receipts-verify <export.json> [--pubkey HEX] [--json]`. | Third party (auditor, CISO, regulator) with only the file + the public key -- no console, no API, no network. |
+
+The CLI is the terminal twin of `verify-import` (`_cmd_receipts_verify` in
+`recette/cli/discovery_cmds.py`). It exits **0 if and only if** the signature is
+valid AND the chain intact -- usable as a gate in a CI / attestation pipeline. The
+public key is embedded in the envelope: a verifier needs NO secret (it can pin the
+expected signer with `--pubkey`).
+
+```
+python -m recette receipts-verify export.json
+# export: export.json
+# signature: VALID -- signature valid over canonical payload
+# chain: INTACT -- N receipt(s)
+# verdict: VALID            (exit 0)
+```
+
+A tampered envelope (one modified receipt) breaks both the signature and the
+chain -> `verdict: INVALID` (exit 1). A pinned key that does not match -> invalid
+signature.
+
 ## Console page
 
 Route `/receipts` (`console/src/App.tsx`), page `console/src/pages/receipts/`.
 It loads `getContextReceipts()` + `verifyContextReceipts()`, displays a chain
 integrity badge (`chain verified (N)` or `chain broken @ seq ...`), a
 content-free table (agent, action, target/resource, status, sizes and truncated
-SHA-256) and an `Export (Ed25519 signed)` button that downloads the envelope
-`context-receipts-export.json`. The contract fixture (R16) lives in
-`console/src/pages/receipts/__fixtures__/receipts.fixture.json`.
+SHA-256), an `Export (Ed25519 signed)` button that downloads the envelope
+`context-receipts-export.json`, and a `Verify a third-party export` field that
+reads an envelope file (via `FileReader`, test-safe) and shows the combined
+signature/chain verdict (`verifyImportedReceipts`). The contract fixture (R16)
+lives in `console/src/pages/receipts/__fixtures__/receipts.fixture.json`.
 
 ## Failure mode (fail-safe)
 
@@ -167,6 +211,14 @@ curl -s http://localhost:8090/proxy/receipts/verify
 curl -s http://localhost:8090/proxy/receipts/export | head
 ```
 
+Off-platform verification from the terminal (the verifier needs only the file;
+the public key is in the envelope):
+
+```
+curl -s http://localhost:8090/proxy/receipts/export > export.json
+python -m recette receipts-verify export.json --json
+```
+
 The console smoke covers the page: `_verify_receipts` in
 `scripts/smoke_console.py` (via `./recette.sh smoke`).
 
@@ -180,9 +232,13 @@ make recette
 ```
 
 Dedicated tests: `tests/test_context_receipt.py` (content-free, verifiable
-size/digest, determinism, chain + tamper detection, endpoint shape) and
+size/digest, determinism, chain + tamper detection, endpoint shape),
 `tests/test_receipt_export.py` (unsigned fail-safe without key, signature
-round-trip, tampering rejected, key pinning, deterministic payload).
+round-trip, tampering rejected, key pinning, deterministic payload),
+`tests/test_api_receipt_verify_import.py` (cross-verification endpoint: signed
+round-trip, tampering, pinning, non-object 422) and
+`tests/test_cli_receipts_verify.py` (CLI: exit 0 when signed+intact, exit 1 when
+unsigned / tampered / wrong key, `--json` output).
 
 ## Related links
 
