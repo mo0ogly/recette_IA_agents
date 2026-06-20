@@ -1,10 +1,18 @@
-"""GET /discovery/check -- run the discovery recette and return per-repo detail.
+"""Discovery routes for the console dashboard.
 
-Drives the reference source-scan adapter over the published test repos
-(corpus/repos) and returns, per repo, whether discovery DETECTED the agent's
-source form plus the invariant checks (detection, determinism, ordering). This is
-what the console "Check discovery" button calls to show, in detail, that the
-discovery tool finds each agent's source. Deterministic (I4), read-only.
+``GET /discovery/check`` drives the reference source-scan adapter over the
+published test repos (corpus/repos) and returns, per repo, whether discovery
+DETECTED the agent's source form plus the invariant checks (detection,
+determinism, ordering).
+
+``GET /discovery/overview`` aggregates BOTH discovery sources -- the declarative
+agent-catalog registry (catalog router) and the observability-signature table
+(detect router) -- into one summary for a unified dashboard tile. It reuses the
+existing load/project helpers of those routers (never duplicating their logic),
+so the numbers always agree with ``/catalog/summary`` and ``/detect/signatures``.
+
+Deterministic (I4), read-only. Fail-safe: empty/absent sources collapse to zeros,
+never a 500.
 """
 
 from __future__ import annotations
@@ -13,6 +21,8 @@ from fastapi import APIRouter
 
 from ...discovery_harness import run_discovery_recette
 from ...discovery_scorecard import DiscoveryScorecard
+from .catalog_registry import _load_catalog
+from .detect import _load_signatures
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
 
@@ -45,3 +55,56 @@ def _serialize(card: DiscoveryScorecard) -> dict:
 def check() -> dict:
     """Run the discovery recette over corpus/repos and return the detailed result."""
     return _serialize(run_discovery_recette())
+
+
+def _overview() -> dict:
+    """Aggregate the catalog registry + observability-signature sources.
+
+    Pure projection over the two already-loaded sources: the catalog summary
+    (``_load_catalog`` -> ``total``/``with_tools``/``tags``) and the signature
+    table (``_load_signatures`` -> per-category and per-capability counts).
+    ``by_category`` counts each tool's PRIMARY category; ``by_capability`` counts
+    how many tools cover each capability (audit/replay surface here even though
+    they are never a primary category). Keys are sorted so the same sources yield
+    a byte-stable result (I4). Fail-safe: empty sources -> all zeros.
+    """
+    catalog = _load_catalog()
+    summary = catalog.get("summary", {})
+    tags = summary.get("tags", [])
+    catalog_section = {
+        "total": int(summary.get("total", 0)),
+        "with_tools": int(summary.get("with_tools", 0)),
+        "tags": len(tags) if isinstance(tags, list) else 0,
+    }
+
+    table = _load_signatures()
+    by_category: dict[str, int] = {}
+    by_capability: dict[str, int] = {}
+    for entry in table:
+        category = entry.get("category")
+        if isinstance(category, str):
+            by_category[category] = by_category.get(category, 0) + 1
+        capabilities = entry.get("capabilities")
+        if isinstance(capabilities, list):
+            for capability in capabilities:
+                if isinstance(capability, str):
+                    by_capability[capability] = by_capability.get(capability, 0) + 1
+
+    detect_section = {
+        "tools": len(table),
+        "by_category": {key: by_category[key] for key in sorted(by_category)},
+        "by_capability": {key: by_capability[key] for key in sorted(by_capability)},
+    }
+    return {"catalog": catalog_section, "detect": detect_section}
+
+
+@router.get("/overview")
+def overview() -> dict:
+    """Unified discovery overview for the console dashboard.
+
+    Returns ``{catalog: {total, with_tools, tags}, detect: {tools, by_category,
+    by_capability}}`` aggregated from the catalog registry and the
+    observability-signature table. Fail-safe: empty/absent sources yield zeros,
+    never an error.
+    """
+    return _overview()

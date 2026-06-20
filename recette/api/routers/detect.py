@@ -57,8 +57,9 @@ def _load_signatures() -> list[dict[str, object]]:
     """Load the signature table, fail-safe to an empty list on any error.
 
     Returns the entries in FILE ORDER (the detector relies on it). Each kept
-    entry has a string ``tool``, a string ``category``, and a list of string
-    ``needles``; anything malformed is skipped, never raised.
+    entry has a string ``tool``, a string ``category``, a sorted list of string
+    ``capabilities`` (defaulting to ``[category]`` when the source omits it), and
+    a list of string ``needles``; anything malformed is skipped, never raised.
     """
     path = _signatures_path()
     try:
@@ -87,7 +88,19 @@ def _load_signatures() -> list[dict[str, object]]:
         if not isinstance(needles_raw, list):
             continue
         needles = [n for n in needles_raw if isinstance(n, str)]
-        table.append({"tool": tool, "category": category, "needles": needles})
+        capabilities_raw = entry.get("capabilities")
+        if isinstance(capabilities_raw, list):
+            capabilities = sorted({c for c in capabilities_raw if isinstance(c, str)})
+        else:
+            capabilities = [category]
+        table.append(
+            {
+                "tool": tool,
+                "category": category,
+                "capabilities": capabilities,
+                "needles": needles,
+            }
+        )
     return table
 
 
@@ -123,9 +136,11 @@ class ScanRequest(BaseModel):
 def signatures() -> dict:
     """The catalog of observability tools we can detect.
 
-    Returns ``{tools: [{tool, category, needles[]}], categories: [sorted
-    distinct]}``. Tools are in file order. Fail-safe: an absent/unreadable/
-    malformed signatures file returns empty ``tools`` + ``categories``.
+    Returns ``{tools: [{tool, category, capabilities[], needles[]}], categories:
+    [sorted distinct]}``. ``capabilities`` is sorted and defaults to
+    ``[category]`` when the source omits it. Tools are in file order. Fail-safe:
+    an absent/unreadable/malformed signatures file returns empty ``tools`` +
+    ``categories``.
     """
     table = _load_signatures()
     categories = sorted({str(entry["category"]) for entry in table})
