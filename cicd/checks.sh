@@ -41,6 +41,17 @@ run_local() {
                          ( cd "${REPO_ROOT}/discoveryprobe" \
                            && { [ -f "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"; } \
                            && cargo build --release ) ;;
+        probe-ebpf-build) # Build the PRIVILEGED live-capture pieces: the eBPF
+                         # object (nightly + bpf-linker, bpfel target) and the
+                         # CAP_BPF broker. Loading them needs CAP_BPF at runtime
+                         # (see docs/runbooks/ebpf-live-capture.md); this only
+                         # BUILDS, never loads (no privilege required to compile).
+                         ( cd "${REPO_ROOT}/discoveryprobe" \
+                           && { [ -f "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"; } \
+                           && ( cd discoveryprobe-ebpf && cargo build --release ) \
+                           && cargo build --release -p discoveryprobe-broker \
+                           && ls -l discoveryprobe-ebpf/target/bpfel-unknown-none/release/discoveryprobe-trace \
+                                    target/release/discoveryprobe-broker ) ;;
         console-build) ( cd "${REPO_ROOT}/console" \
                          && node node_modules/.bin/tsc --noEmit \
                          && node node_modules/.bin/vite build ) ;;
