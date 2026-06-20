@@ -3,7 +3,7 @@
 # extras that bnp/system-recette need); fall back to system python3. Override
 # with `make PY=/path/to/python <target>`.
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
-.PHONY: help install install-check validate run discovery report test gates smoke \
+.PHONY: help install install-check hooks validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
         bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb rag-e2e \
@@ -13,6 +13,7 @@ help:
 	@echo "Setup:"
 	@echo "  make install      install the platform (native venv + Docker lab, verified)"
 	@echo "  make install-check report install status, change nothing"
+	@echo "  make hooks        enable the staged-file pre-commit gate (ruff/mypy/bandit, once per clone)"
 	@echo "Local (needs python3 + .venv-pyaudit for gates):"
 	@echo "  make validate     schema-validate the corpus"
 	@echo "  make run          identification recette scorecard"
@@ -48,6 +49,13 @@ install:
 
 install-check:
 	scripts/install.sh --check
+
+# Point git at the versioned .githooks/ pre-commit gate (staged-file ruff format
+# --check + mypy + bandit). Idempotent; run once per clone. Without this, format
+# drift can ship committed and only surface later in `make gates`.
+hooks:
+	git config core.hooksPath .githooks
+	@echo "hooks: core.hooksPath -> .githooks (pre-commit gate active)"
 
 # --- local ---
 validate:
