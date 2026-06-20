@@ -1,0 +1,195 @@
+/**
+ * Discovery x Echange -- overlay the discovery verdict on the REAL exchange.
+ *
+ * Two columns: LEFT the real agent<->server exchange (the proxy hook traces +
+ * wire flows, one row per exchange with an identified/ghost badge); RIGHT what
+ * the discovery core SAW -- per-agent detection (DETECTE/GHOST + surfaces) and
+ * the ghost-exchange count (wire-only traffic discovery could not attribute to
+ * any identified agent). Read-only (I1).
+ *
+ * Source of the verdict: the deterministic surface ORACLE by default
+ * (GET /proxy/discovery-exchange, always available, no CAP_BPF); the real eBPF
+ * broker capture when it is configured (captureProbe) -- the toggle is disabled
+ * with a note when the broker is off (fail-safe). Polls every 2s like the proxy
+ * console.
+ */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { captureProbe, getDiscoveryExchange, getProbeStatus } from "../../api/client";
+import type { DetectionScorecard, ProbeStatus } from "../../api/client";
+import type { ExchangeReport } from "../../types/platform";
+import { agentOutcome, detectedSurfaces, exchangeToLine } from "./exchangeModel";
+import "./discovery-exchange.css";
+
+const POLL_INTERVAL_MS = 2000;
+
+type Source = "oracle" | "ebpf";
+
+export default function DiscoveryExchangePage(): JSX.Element {
+  const [report, setReport] = useState<ExchangeReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<Source>("oracle");
+  const [probe, setProbe] = useState<ProbeStatus | null>(null);
+  const [ebpfCard, setEbpfCard] = useState<DetectionScorecard | null>(null);
+  const [ebpfError, setEbpfError] = useState<string | null>(null);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      setReport(await getDiscoveryExchange());
+      setError(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    getProbeStatus()
+      .then(setProbe)
+      .catch(() => setProbe(null));
+    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  const agentIds = useMemo(() => (report?.agents ?? []).map((a) => a.agent_id), [report]);
+  const brokerReady = probe?.configured === true;
+
+  const runEbpf = useCallback(async (): Promise<void> => {
+    if (!brokerReady || agentIds.length === 0) return;
+    try {
+      const res = await captureProbe({ agents: agentIds });
+      setEbpfCard(res.scorecard ?? null);
+      setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
+    } catch (e: unknown) {
+      setEbpfError(e instanceof Error ? e.message : String(e));
+    }
+  }, [brokerReady, agentIds]);
+
+  const lines = useMemo(
+    () => (report?.exchanges ?? []).map(exchangeToLine),
+    [report],
+  );
+
+  return (
+    <section className="page dx-page">
+      <div className="page-head">
+        <h1>Discovery x Echange</h1>
+        {report !== null && (
+          <span
+            className={`dx-ghost dx-ghost-${report.ghost_exchanges === 0 ? "ok" : "alert"}`}
+            data-testid="dx-ghost-count"
+            title="Echanges wire-only que discovery n'a pu rattacher a aucun agent identifie"
+          >
+            {report.ghost_exchanges} echange(s) ghost
+          </span>
+        )}
+      </div>
+      <p className="dx-note">
+        Superpose ce que le <strong>discovery</strong> a vu sur l&apos;
+        <strong>echange reel</strong> agent &lt;-&gt; serveur. A gauche le trafic reel (hook +
+        wire), a droite le verdict : chaque agent <strong>detecte</strong> (et sur quelles
+        surfaces) ou <strong>ghost</strong>, et chaque echange <strong>identifie</strong> ou
+        wire-only. Lecture seule.
+      </p>
+
+      <div className="dx-source" role="group" aria-label="source du verdict">
+        <button
+          type="button"
+          className="dx-source-btn"
+          data-active={source === "oracle"}
+          onClick={() => setSource("oracle")}
+        >
+          Oracle (defaut)
+        </button>
+        <button
+          type="button"
+          className="dx-source-btn"
+          data-active={source === "ebpf"}
+          disabled={!brokerReady}
+          title={brokerReady ? undefined : "broker eBPF non configure"}
+          onClick={() => {
+            setSource("ebpf");
+            void runEbpf();
+          }}
+        >
+          eBPF {probe ? `(${probe.mode})` : ""}
+        </button>
+        {source === "ebpf" && !brokerReady && (
+          <span className="dx-source-note">broker eBPF indisponible -- oracle reste la source</span>
+        )}
+      </div>
+
+      {error !== null && <p className="dx-error">{error}</p>}
+
+      <div className="dx-grid">
+        <section className="dx-col" aria-label="echange reel">
+          <h2 className="dx-col-title">Echange reel</h2>
+          {report !== null && lines.length === 0 ? (
+            <p className="dx-empty">Aucun echange -- lance un agent (les effets de bord sont traces ici).</p>
+          ) : (
+            <table className="dx-table" data-testid="exchange-table">
+              <thead>
+                <tr>
+                  <th>seq</th>
+                  <th>vue</th>
+                  <th>echange</th>
+                  <th>discovery</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l) => (
+                  <tr key={`${l.kind}-${l.seq}`} data-outcome={l.outcome}>
+                    <td className="dx-num">#{l.seq}</td>
+                    <td className="dx-kind">{l.kind}</td>
+                    <td className="dx-label">{l.label}</td>
+                    <td>
+                      <span className={`dx-badge dx-badge-${l.outcome}`} data-testid="exchange-outcome">
+                        {l.outcome}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <section className="dx-col" aria-label="ce que discovery a vu">
+          <h2 className="dx-col-title">Discovery a vu</h2>
+          {ebpfError !== null && <p className="dx-error">{ebpfError}</p>}
+          {report !== null && report.agents.length === 0 ? (
+            <p className="dx-empty">Aucun agent observe.</p>
+          ) : (
+            <ul className="dx-agents" data-testid="agents-list">
+              {(report?.agents ?? []).map((a) => {
+                const outcome = agentOutcome(a);
+                return (
+                  <li key={a.agent_id} className="dx-agent" data-testid={`agent-${a.agent_id}`}>
+                    <span className="dx-agent-id">{a.agent_id}</span>
+                    <span
+                      className={`dx-badge dx-badge-${outcome === "DETECTE" ? "identifie" : "ghost"}`}
+                      data-testid="agent-outcome"
+                    >
+                      {outcome}
+                    </span>
+                    <span className="dx-surfaces">{detectedSurfaces(a).join(", ") || "aucune surface"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {report !== null && (
+            <p className="dx-scorecard" data-testid="scorecard">
+              {report.scorecard.total_agents} agent(s),{" "}
+              {report.scorecard.false_negatives.length} ghost(s)
+              {source === "ebpf" && ebpfCard !== null && (
+                <> -- eBPF: {ebpfCard.false_negatives.length} ghost(s)</>
+              )}
+            </p>
+          )}
+        </section>
+      </div>
+    </section>
+  );
+}

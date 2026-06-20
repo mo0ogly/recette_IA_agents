@@ -1,0 +1,83 @@
+{
+  "agents": [
+    {
+      "agent_id": "pr-bot",
+      "detected_anywhere": true,
+      "per_surface": [
+        {
+          "detected": false,
+          "surface": "ebpf_wire"
+        },
+        {
+          "detected": true,
+          "surface": "hook_mcp"
+        },
+        {
+          "detected": true,
+          "surface": "hook_sdk"
+        },
+        {
+          "detected": true,
+          "surface": "hook_subprocess"
+        }
+      ]
+    },
+    {
+      "agent_id": "shadow-agent",
+      "detected_anywhere": false,
+      "per_surface": [
+        {
+          "detected": false,
+          "surface": "ebpf_wire"
+        },
+        {
+          "detected": false,
+          "surface": "hook_mcp"
+        },
+        {
+          "detected": false,
+          "surface": "hook_sdk"
+        },
+        {
+          "detected": false,
+          "surface": "hook_subprocess"
+        }
+      ]
+    }
+  ],
+  "debug_enabled": true,
+  "exchanges": [
+    {
+      "action_type": "open_pr",
+      "agent_id": "pr-bot",
+      "identified": true,
+      "kind": "hook",
+      "reason": null,
+      "seq": 1,
+      "target": "github/octo/repo"
+    },
+    {
+      "action_type": null,
+      "agent_id": null,
+      "identified": false,
+      "kind": "wire",
+      "reason": "no_audit_event",
+      "seq": 2,
+      "target": "POST 127.0.0.1:9101/github/execute"
+    }
+  ],
+  "ghost_exchanges": 1,
+  "run_id": "run-ghost",
+  "scorecard": {
+    "detected_per_surface": {
+      "hook_mcp": 1,
+      "hook_sdk": 1,
+      "hook_subprocess": 1
+    },
+    "false_negatives": [
+      "shadow-agent"
+    ],
+    "ok": false,
+    "total_agents": 2
+  }
+}
