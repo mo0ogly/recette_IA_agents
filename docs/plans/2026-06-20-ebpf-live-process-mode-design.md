@@ -112,6 +112,30 @@ is the agent id, captured by the broker by `pid` (precise) and/or `comm`.
 - Making the in-process agent eBPF-observable without a process (impossible by
   the kernel surface definition).
 
+## Findings during implementation (A+B+C shipped)
+
+A+B+C are implemented and verified without CAP_BPF (process entrypoint + replay
+test; launcher live/replay auto-select + `/probe/status` mode; `/runs`
+kind=lane_b_process + UX picker). Two further limitations surfaced that gate a
+*meaningful* live capture (beyond the irreducible one-time cap grant):
+
+1. **No real connects from the in-memory lab.** The process-mode agent runs the
+   deterministic `dry_run_lane_b` against the in-memory `LabForge`, so it makes
+   NO real outbound TCP -- the eBPF `connect` surface would be empty. A
+   meaningful wire capture needs the process to make real connects (bind it to a
+   `mock_local` HTTP server so each action is a real localhost TCP connect, or
+   real_mode). Follow-up: a process-mode variant that uses `ProxyForge` over a
+   real socket.
+2. **Attribution still by `comm`.** The broker manifest matches `comm_marker`;
+   `prctl(PR_SET_NAME)` only renames AFTER exec (the exec event keeps the
+   interpreter name). A generated manifest must carry the agent's real `comm`,
+   or -- preferred -- add a **pid-based** capture request (the launcher knows the
+   child pid). Until then a live capture matches coarsely.
+
+So the shipped A+B+C is the verified scaffolding; a fully meaningful live eBPF
+capture of a dashboard agent additionally needs: the one-time grant + a
+pid/comm-correct manifest + the agent making real connects.
+
 ## Sequencing
 
 B and C are inert/no-op until A lands and caps are granted, so order: A (process
