@@ -59,7 +59,16 @@ def handle(action_type: str, resource: str, payload: dict) -> dict | None:
         if "top_k" in payload:
             value = coerce_positive_number(payload["top_k"])
             if value is None:
-                raise LabActionError(422, f"invalid top_k {payload['top_k']!r}")
+                raise LabActionError(
+                    422,
+                    f"invalid top_k {payload['top_k']!r}: must be a positive number",
+                    code="invalid_top_k",
+                    detail={
+                        "field": "top_k",
+                        "got": payload["top_k"],
+                        "expected": "a positive number",
+                    },
+                )
             top_k = int(value)
         return {**base, "status": "updated", "config": resource, "top_k": top_k}
     if action_type == "export_knowledge_base":

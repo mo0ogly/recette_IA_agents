@@ -14,7 +14,7 @@ from recette.discovery_harness import SURFACE_CORPUS, run_discovery_recette
 
 GITLAB = SURFACE_CORPUS["gitlab"]
 
-DETECTED = ["gl-readonly-reporter", "gl-pr-bot", "gl-admin-overreach"]
+DETECTED = ["gl-readonly-reporter", "gl-pr-bot", "gl-admin-overreach", "gl-supply-chain-compromise"]
 ALL = [*DETECTED, "gl-no-agent"]
 
 

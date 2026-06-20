@@ -13,7 +13,7 @@ from recette.platform.events import ApprovalState, EventKind, PolicyVerdict
 from recette.platform.eventstore.memory_store import InMemoryEventStore
 from recette.platform.gateway import ActionRequest, AgentResolver, Gateway
 from recette.platform.ids import SequenceIdGenerator
-from recette.platform.policy.model import baseline_from_catalog
+from recette.platform.policy.model import PolicyVersion, baseline_from_catalog
 from recette.platform.policy.store import PolicyStore
 from recette.platform.proxy.protocol import ExecutionResult, side_effect_hash
 
@@ -124,6 +124,32 @@ class TestGatewayFlow(unittest.TestCase):
         self.assertFalse(outcome.executed)
         self.assertEqual(self.proxy.calls, [])
         self.assertEqual(len(self.events.read_from(kind=EventKind.ACTION_DENIED)), 1)
+
+    def test_policy_engine_crash_denies_and_audits_platform_error(self) -> None:
+        """Failure-modes: a policy-plane exception -> DENY, audited, never fail-open (I2).
+
+        A normally-ALLOWED action (agent-admin okta list_users) must be refused
+        when the policy plane raises, and the failure must leave an auditable
+        PLATFORM_ERROR plus a reasoned ACTION_DENIED -- no optimistic execution.
+        """
+
+        def boom() -> PolicyVersion:
+            raise RuntimeError("corrupted policy")
+
+        self.policy_store.active = boom  # type: ignore[method-assign]
+        outcome = self.gateway.submit(_request("agent-admin", "okta", "list_users"))
+
+        self.assertEqual(outcome.verdict, PolicyVerdict.DENY)
+        self.assertFalse(outcome.executed)
+        self.assertEqual(self.proxy.calls, [])  # fail-closed: proxy never reached
+        errors = self.events.read_from(kind=EventKind.PLATFORM_ERROR)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("policy evaluation failed", errors[0].payload["error"])
+        denied = self.events.read_from(kind=EventKind.ACTION_DENIED)
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(
+            denied[0].payload["extra"]["deny_reason"], "policy evaluation failed -> deny"
+        )
 
     def test_escalate_blocks_until_approval(self) -> None:
         outcome = self.gateway.submit(_request("agent-admin", "okta", "suspend_user"))

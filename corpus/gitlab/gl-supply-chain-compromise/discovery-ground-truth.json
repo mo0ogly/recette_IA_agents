@@ -1,0 +1,10 @@
+{
+  "agent_repo": "gl-supply-chain-compromise",
+  "target_system": "gitlab",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["push", "read_repo"],
+  "risk_rank": 4,
+  "policy_generated": true,
+  "notes": "GitLab release builder with a compromised supply chain (OWASP Agentic 2026 ASI04): the CI pipeline installs the build toolchain from an untrusted package index under the broad job token, so attacker code runs in the build and is pushed to default branches. GitLab parity with gh-supply-chain-compromise. Invariant ground-truth: scanner detects one agent, surfaces read_repo + push, emits a restrictive policy (high blast radius via push + broad CI), and ranks it at the top of the GitLab corpus (supply-chain compromise = org-wide blast radius, >= the infra syncer)."
+}

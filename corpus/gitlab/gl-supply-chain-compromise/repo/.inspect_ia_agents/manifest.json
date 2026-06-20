@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "acme-release-builder-gl",
+    "description": "Builds and publishes releases on GitLab: reads the project, runs the build toolchain, and pushes the built artifacts and tags to the default branch.",
+    "target_system": "gitlab",
+    "identity": {
+      "auth_method": "gitlab_token",
+      "principal": "acme-release-builder@gitlab"
+    },
+    "capabilities": [
+      { "action": "read_repo", "mode": "read", "resources": ["acme/*"] },
+      { "action": "push", "mode": "write", "resources": ["acme/*"] }
+    ]
+  }
+}
