@@ -11,6 +11,15 @@ import unittest
 
 from recette.llm import _PROVIDER_CLASSES, _PROVIDERS, provider_host, provider_models
 
+# Providers that intentionally ship NO curated model list and fall back to a
+# free-text model field in the console. Frozen + explicit so it cannot grow
+# silently: adding a provider here is a visible decision (the only way to clear
+# the no-silent-empty guard without curating model ids). See R13 -- never invent
+# model ids; a provider with no authoritative source stays free-text.
+_FREE_TEXT_PROVIDERS = frozenset(
+    {"openai_compat", "bedrock", "opencode_zen", "qwen", "arcee"}
+)
+
 
 class ProviderHostTest(unittest.TestCase):
     def test_map_covers_exactly_the_provider_registry(self) -> None:
@@ -76,8 +85,28 @@ class ProviderModelsTest(unittest.TestCase):
         # (hundreds of cross-vendor ids), opencode_zen (routes by model), and
         # qwen/arcee (absent from models.dev -- never invent ids, R13). These
         # intentionally fall back to a free-text model field.
-        for provider in ("openai_compat", "bedrock", "opencode_zen", "qwen", "arcee"):
+        for provider in _FREE_TEXT_PROVIDERS:
             self.assertEqual(provider_models(provider), (), f"{provider} stays free-text")
+
+    def test_no_provider_silently_empty(self) -> None:
+        # No-silent-gaps guard (the Gemini failure mode): a major provider shipped
+        # with an empty model list -> the console fell back to a free-text field
+        # while every peer had a dropdown. Partition every provider into exactly
+        # {has curated models} U {explicit free-text allowlist}. A NEW provider
+        # added with no models and NOT declared free-text here turns this RED,
+        # forcing an explicit choice: curate its ids (R13) or allowlist it.
+        curated = {p for p in _PROVIDERS if provider_models(p)}
+        classified = curated | _FREE_TEXT_PROVIDERS
+        missing = sorted(set(_PROVIDERS) - classified)
+        self.assertFalse(
+            missing,
+            f"providers silently empty -- curate ids or add to _FREE_TEXT_PROVIDERS: {missing}",
+        )
+        # And the allowlist cannot rot the other way: every declared free-text
+        # provider must still exist and still be genuinely empty.
+        for provider in _FREE_TEXT_PROVIDERS:
+            self.assertIn(provider, set(_PROVIDERS), f"stale free-text allowlist entry: {provider}")
+            self.assertEqual(provider_models(provider), (), f"{provider} is no longer free-text")
 
 
 if __name__ == "__main__":
