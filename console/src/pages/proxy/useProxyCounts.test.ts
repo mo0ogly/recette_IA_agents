@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe("useProxyCounts", () => {
-  it("populates a badge for every source from the status payloads", async () => {
+  it("populates app/wire badges and shows reconcile off when there is no wire", async () => {
     mockDebug.mockResolvedValue({ debug_enabled: true, trace_count: 4 });
     mockWire.mockResolvedValue({ enabled: false, proxy_url: null, flow_count: 0 });
     mockReconcile.mockResolvedValue({ ok: false, bypass_count: 2 });
@@ -51,6 +51,21 @@ describe("useProxyCounts", () => {
 
     expect(result.current.app).toEqual({ count: 4, disabled: false });
     expect(result.current.wire).toEqual({ count: 0, disabled: true });
+    // Wire overlay off / no flows -> nothing to reconcile -> "off", not a "2 KO"
+    // verdict that would read as a real bypass over an empty capture.
+    expect(result.current.reconcile).toEqual({ count: 0, disabled: true });
+  });
+
+  it("shows the reconcile verdict once wire has flows to reconcile", async () => {
+    mockDebug.mockResolvedValue({ debug_enabled: true, trace_count: 0 });
+    mockWire.mockResolvedValue({ enabled: true, proxy_url: "http://x", flow_count: 5 });
+    mockReconcile.mockResolvedValue({ ok: false, bypass_count: 2 });
+
+    const { result } = renderHook(() => useProxyCounts({ intervalMs: 1000 }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
     expect(result.current.reconcile).toEqual({ count: 2, failed: 2 });
   });
 

@@ -62,10 +62,18 @@ export default function useProxyCounts(
             next.wire = { count: wire.value.flow_count, disabled: !wire.value.enabled };
           }
           if (reconcile.status === "fulfilled") {
-            next.reconcile = {
-              count: reconcile.value.bypass_count,
-              failed: reconcile.value.bypass_count,
-            };
+            // Reconciliation joins wire flows against the audit log: with no wire
+            // capture there is nothing to reconcile, so a "0 ok" badge would
+            // falsely read as "verified clean". Show "off" instead (like the wire
+            // source), reserving the verdict badge for when flows actually exist.
+            const noWireToReconcile =
+              wire.status === "fulfilled" && (!wire.value.enabled || wire.value.flow_count === 0);
+            next.reconcile = noWireToReconcile
+              ? { count: 0, disabled: true }
+              : {
+                  count: reconcile.value.bypass_count,
+                  failed: reconcile.value.bypass_count,
+                };
           }
           return next;
         });
