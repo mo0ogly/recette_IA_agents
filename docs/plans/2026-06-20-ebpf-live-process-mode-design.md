@@ -150,9 +150,24 @@ pid/comm-correct manifest + the agent making real connects.
    Verified: `test_probe_manifest_gen`. The runbook wires
    `INSPECT_IA_AGENTS_PROBE_MANIFEST` to the generated file.
 
-Remaining (needs CAP_BPF to verify, not blocking): pid-based capture request
-(more precise than comm), and the operator's one-time `probe-grant-caps` for the
-final kernel-capture proof.
+Remaining (not blocking): pid-based capture request (more precise than comm).
+
+### LIVE PROVEN FROM THE UX (2026-06-20)
+
+After the one-time `probe-grant-caps` (caps: `cap_bpf,cap_perfmon,cap_net_admin,
+cap_dac_read_search+ep` -- the last needed because the tracepoint id under
+`/sys/kernel/tracing` is root-only and caps do not bypass filesystem DAC), the
+launcher started the LIVE broker (`/probe/status.mode=live`). From the console
+`/discovery-exchange`, picking `dx-live-bot` and clicking "Lancer (process)"
+launched the process-mode run AND captured it in one window. The Rust eBPF
+broker captured a REAL connect:
+
+    recording: {"agent_id":"dx-live-bot","surfaces":{"ebpf_wire":["connect:127.0.0.1:9101"]}}
+    scorecard: ok, detected_per_surface={ebpf_wire:1}, false_negatives=[]
+
+rendered in the UX as "ebpf_wire DETECTE 1 agent(s) vu(s) (capture noyau)"
+(docs/screenshots/sim/dx-ebpf-live.png). The discovery engine SEES a real agent's
+real network connect, live, entirely from the UX after a one-time host grant.
 
 ## Sequencing
 
