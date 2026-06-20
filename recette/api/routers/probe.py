@@ -211,6 +211,38 @@ def process_capture(request: Request, body: dict[str, Any]) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.post("/process-capture-campaign")
+def process_capture_campaign(request: Request, body: dict[str, Any]) -> dict:
+    """Spawn every step of a campaign as its own process and capture them by PID.
+
+    The campaign analogue of ``/process-capture``: the discovery operator picks a
+    campaign and the launcher runs all its mock-capable agents as OS processes in
+    one eBPF capture window, attributing each by its exact child pid. Returns the
+    aggregate broker recording + ``DetectionScorecard`` (an agent captured on no
+    surface is a GHOST in ``false_negatives``) plus the ``skipped`` steps (real /
+    no-scenario, never faked). 503 when no broker socket; 400 on a bad campaign.
+    """
+    socket_path, _ = _resolve_socket()
+    if not socket_path:
+        raise HTTPException(status_code=503, detail=f"{_SOCKET_ENV} not set and no broker socket")
+    store = request.app.state.config_store
+    campaign = request.app.state.campaign_store.get(str(body.get("campaign_id", "")))
+    if campaign is None:
+        raise HTTPException(status_code=400, detail="unknown campaign_id")
+    duration_ms = body.get("duration_ms", 4000)
+    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or duration_ms <= 0:
+        raise HTTPException(status_code=400, detail="duration_ms must be a positive integer")
+    from ..probe_relay import ProbeUnavailable
+    from ..runners import run_campaign_process_capture
+
+    try:
+        return run_campaign_process_capture(
+            campaign, store, store.list_servers(), socket_path=socket_path, duration_ms=duration_ms
+        )
+    except ProbeUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.post("/capture")
 def capture(body: dict[str, Any]) -> dict:
     """Relay one bounded capture to the broker and score the recording.

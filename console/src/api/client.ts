@@ -1097,6 +1097,26 @@ export interface ProbeCaptureResult {
   scorecard?: DetectionScorecard;
 }
 
+/** POST /probe/process-capture-campaign result: every mock-capable step spawned
+ *  as a process and captured by PID in one window. `agents` were captured,
+ *  `skipped` could not run mock (real / no scenario -- never faked). */
+export interface ProbeCampaignCaptureResult extends ProbeCaptureResult {
+  agents: string[];
+  skipped: Array<{ agent_id: string; reason: string }>;
+}
+
+/** Spawn every step of a campaign as its own process and capture them by PID in
+ *  one eBPF window (the campaign analogue of processCapture). Mock-only. */
+export function processCaptureCampaign(
+  campaignId: string,
+  durationMs?: number,
+): Promise<ProbeCampaignCaptureResult> {
+  return request<ProbeCampaignCaptureResult>("/probe/process-capture-campaign", {
+    method: "POST",
+    body: JSON.stringify({ campaign_id: campaignId, duration_ms: durationMs }),
+  });
+}
+
 /** GET /probe/status: whether the broker socket is configured. `mode` is
  *  "replay" (deterministic replay of corpus surface ground-truth, no CAP_BPF),
  *  "live" (privileged eBPF broker) or "off" (no broker). Surfaced so the console

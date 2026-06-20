@@ -15,7 +15,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..adapters import ReferenceDiscoveryAdapter, ReferenceIdentificationAdapter
 from ..discovery_harness import (
@@ -897,6 +897,113 @@ def run_process_capture(
 
         scorecard = asdict(score_recording(json.dumps(recording)))
     return {"recording": recording, "scorecard": scorecard}
+
+
+def _capturable_step_cfg(agent_cfg: dict, stub_script: list[dict] | None) -> dict | None:
+    """Resolve a campaign step into a process-capturable (mock) agent config.
+
+    A live key never crosses the subprocess (process-capture is mock-only), so a
+    step is capturable only when it can run deterministically: either the agent
+    is already ``ai_mode=mock`` with a scenario, OR the step carries a
+    ``stub_script`` that overrides the scenario and forces mock. Returns the
+    resolved cfg, or ``None`` when the step cannot run mock (honest skip, never a
+    fabricated capture -- R4/R14)."""
+    cfg = dict(agent_cfg)
+    if stub_script:
+        cfg["ai_mode"] = "mock"
+        cfg["scenario"] = stub_script
+        return cfg
+    if cfg.get("ai_mode", "mock") == "real":
+        return None
+    if not cfg.get("scenario"):
+        return None
+    return cfg
+
+
+def run_campaign_process_capture(
+    campaign: dict,
+    store: Any,
+    servers: list[dict],
+    *,
+    socket_path: str,
+    duration_ms: int = 4000,
+) -> dict:
+    """Spawn every capturable campaign step as its own process, capture them all
+    by PID in ONE broker window, score the aggregate.
+
+    The campaign analogue of :func:`run_process_capture`: each step's agent runs
+    as a real OS process (server-bound -> real connects), the launcher knows
+    every child's pid, and the broker attributes by those exact pids. The whole
+    campaign is captured in a single overlapping window so the recording reflects
+    what discovery saw across the run. Steps that cannot run mock are skipped
+    with a reason (never faked). Returns
+    ``{"recording", "scorecard", "agents", "skipped"}``. Fail-safe: a broker
+    error raises ProbeUnavailable.
+    """
+    from ..surface.recording import score_recording
+    from .probe_relay import relay_capture
+
+    steps = campaign.get("steps", []) or []
+    captured: list[str] = []
+    skipped: list[dict] = []
+    agent_pids: dict[str, list[int]] = {}
+    procs: list[subprocess.Popen[str]] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        servers_file: Path | None = None
+        for idx, step in enumerate(steps):
+            agent_id = str(step.get("agent_id") or "")
+            base = store.get_agent(agent_id) if agent_id else None
+            if base is None:
+                skipped.append({"agent_id": agent_id, "reason": "unknown agent"})
+                continue
+            cfg = _capturable_step_cfg(base, step.get("stub_script"))
+            if cfg is None:
+                skipped.append({"agent_id": agent_id, "reason": "not mock-capable"})
+                continue
+            agent_file = Path(tmp) / f"agent-{idx}.json"
+            agent_file.write_text(json.dumps(cfg), encoding="utf-8")
+            argv = [sys.executable, "-m", "recette.agent_proc", "--agent-file", str(agent_file)]
+            if servers and cfg.get("server"):
+                if servers_file is None:
+                    servers_file = Path(tmp) / "servers.json"
+                    servers_file.write_text(json.dumps(servers), encoding="utf-8")
+                argv += ["--servers-file", str(servers_file)]
+            proc = subprocess.Popen(  # nosec B603 - fixed interpreter + module, no shell
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+            )
+            procs.append(proc)
+            captured.append(agent_id)
+            agent_pids.setdefault(agent_id, []).append(proc.pid)
+        recording: dict = {"status": "skipped", "recordings": []}
+        if captured:
+            # One window over every child pid: the campaign runs concurrently
+            # while the broker captures.
+            recording = relay_capture(
+                socket_path=socket_path,
+                agents=sorted(set(captured)),
+                duration_ms=duration_ms,
+                agent_pids=agent_pids,
+            )
+            for proc in procs:
+                try:
+                    proc.wait(timeout=max(5, duration_ms // 1000 + 5))
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+    scorecard = None
+    if recording.get("status") == "ok":
+        from dataclasses import asdict
+
+        scorecard = asdict(score_recording(json.dumps(recording)))
+    return {
+        "recording": recording,
+        "scorecard": scorecard,
+        "agents": sorted(set(captured)),
+        "skipped": skipped,
+    }
 
 
 def build_stub_llm(script: list[dict]) -> StubLlm:

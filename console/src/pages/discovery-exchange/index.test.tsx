@@ -17,8 +17,11 @@ vi.mock("../../api/client", () => ({
   getProbeStatus: vi.fn(),
   captureProbe: vi.fn(),
   listAgents: vi.fn(),
+  listCampaigns: vi.fn(),
   launchProcessRun: vi.fn(),
   processCapture: vi.fn(),
+  processCaptureCampaign: vi.fn(),
+  runCampaign: vi.fn(),
   getProbeMonitor: vi.fn(),
   startProbeMonitor: vi.fn(),
   stopProbeMonitor: vi.fn(),
@@ -31,7 +34,9 @@ import {
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  listCampaigns,
   processCapture,
+  processCaptureCampaign,
   startProbeMonitor,
 } from "../../api/client";
 import DiscoveryExchangePage from "./index";
@@ -45,6 +50,7 @@ describe("DiscoveryExchangePage", () => {
     vi.clearAllMocks();
     vi.mocked(getProbeStatus).mockResolvedValue(probeOff);
     vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listCampaigns).mockResolvedValue([]);
     vi.mocked(getProbeMonitor).mockResolvedValue({
       running: false,
       window_ms: 2000,
@@ -201,6 +207,41 @@ describe("DiscoveryExchangePage", () => {
     // the kernel detection surfaces from the precise pid capture (process-capture)
     expect(await screen.findByTestId("ebpf-surface-ebpf_wire")).toHaveTextContent("DETECTE");
     expect(vi.mocked(processCapture)).toHaveBeenCalledWith("dx-live-bot");
+  });
+
+  it("captures a whole campaign via eBPF by pid from the campaign picker", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(getProbeStatus).mockResolvedValue({
+      configured: true,
+      socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET",
+      mode: "live",
+    });
+    vi.mocked(listCampaigns).mockResolvedValue([
+      { id: "dx-live-camp", description: "live ebpf", steps: [{ agent_id: "dx-live-bot" }] },
+    ]);
+    vi.mocked(processCaptureCampaign).mockResolvedValue({
+      recording: { status: "ok", recordings: [] },
+      scorecard: {
+        ok: true,
+        total_agents: 1,
+        detected_per_surface: { ebpf_wire: 1 },
+        false_negatives: [],
+      },
+      agents: ["dx-live-bot"],
+      skipped: [],
+    });
+    render(<DiscoveryExchangePage />);
+    const picker = (await screen.findByTestId("dx-camp")) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(within(picker).getByRole("option", { name: /dx-live-camp/ })).toBeInTheDocument(),
+    );
+    fireEvent.change(picker, { target: { value: "dx-live-camp" } });
+    fireEvent.click(screen.getByTestId("dx-launch-camp"));
+    expect(await screen.findByTestId("ebpf-surface-ebpf_wire")).toHaveTextContent("DETECTE");
+    await waitFor(() =>
+      expect(screen.getByTestId("dx-camp-msg")).toHaveTextContent(/campagne capturee: 1 agent/),
+    );
+    expect(vi.mocked(processCaptureCampaign)).toHaveBeenCalledWith("dx-live-camp");
   });
 
   it("surfaces a load error without crashing", async () => {

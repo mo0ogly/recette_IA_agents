@@ -23,13 +23,16 @@ import {
   getProbeStatus,
   launchProcessRun,
   listAgents,
+  listCampaigns,
   processCapture,
+  processCaptureCampaign,
+  runCampaign,
   startProbeMonitor,
   stopProbeMonitor,
 } from "../../api/client";
 import type { DetectionScorecard, ProbeMonitorState, ProbeStatus } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
-import type { AgentConfig, ExchangeReport } from "../../types/platform";
+import type { AgentConfig, Campaign, ExchangeReport } from "../../types/platform";
 import {
   agentOutcome,
   agentsForRun,
@@ -58,6 +61,11 @@ export default function DiscoveryExchangePage(): JSX.Element {
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [procAgent, setProcAgent] = useState("");
   const [launchMsg, setLaunchMsg] = useState<string | null>(null);
+  // Campaign launch (eBPF-observable): spawn every campaign step as a process,
+  // capture the whole campaign by PID in one window.
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campId, setCampId] = useState("");
+  const [campMsg, setCampMsg] = useState<string | null>(null);
   // Passive eBPF watch: agents seen on the wire in near-real-time (no per-capture click).
   const [monitor, setMonitor] = useState<ProbeMonitorState | null>(null);
 
@@ -78,6 +86,9 @@ export default function DiscoveryExchangePage(): JSX.Element {
     listAgents()
       .then((a) => setAgents(a.filter((x) => (x.ai_mode ?? "mock") !== "real" && x.scenario)))
       .catch(() => setAgents([]));
+    listCampaigns()
+      .then(setCampaigns)
+      .catch(() => setCampaigns([]));
     const pollMonitor = (): void => {
       getProbeMonitor()
         .then(setMonitor)
@@ -134,6 +145,34 @@ export default function DiscoveryExchangePage(): JSX.Element {
       setLaunchMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [procAgent, brokerLive]);
+
+  const launchCamp = useCallback(async (): Promise<void> => {
+    if (!campId) return;
+    setCampMsg(null);
+    setEbpfError(null);
+    if (brokerLive) {
+      // Spawn every campaign step as a process and capture the whole campaign by
+      // PID in one eBPF window; surface the aggregate scorecard (ghosts included).
+      try {
+        const res = await processCaptureCampaign(campId);
+        setEbpfCard(res.scorecard ?? null);
+        setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
+        setSource("ebpf");
+        const skip = res.skipped.length ? `, ${res.skipped.length} ignore(s)` : "";
+        setCampMsg(`campagne capturee: ${res.agents.length} agent(s)${skip}`);
+      } catch (e: unknown) {
+        setCampMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    // No broker: run the campaign in-process (oracle-only view).
+    try {
+      const run = await runCampaign(campId);
+      setCampMsg(`campagne lancee: ${campId} (run ${run.run_id.slice(0, 8)})`);
+    } catch (e: unknown) {
+      setCampMsg(`echec: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [campId, brokerLive]);
 
   const exchanges = useMemo(() => report?.exchanges ?? [], [report]);
   const runOptions = useMemo(() => distinctRuns(exchanges), [exchanges]);
@@ -261,6 +300,41 @@ export default function DiscoveryExchangePage(): JSX.Element {
         {launchMsg !== null && (
           <span className="dx-launch-msg" data-testid="dx-launch-msg">
             {launchMsg}
+          </span>
+        )}
+      </div>
+
+      <div className="dx-launch" role="group" aria-label="lancer une campagne en mode process">
+        <span className="dx-launch-title">Campagne (eBPF)</span>
+        <select
+          className="dx-filter-input"
+          data-testid="dx-camp"
+          aria-label="campagne process"
+          value={campId}
+          onChange={(e) => setCampId(e.target.value)}
+        >
+          <option value="">campagne...</option>
+          {campaigns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.id} ({c.steps.length})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="dx-source-btn"
+          data-testid="dx-launch-camp"
+          disabled={!campId}
+          onClick={() => void launchCamp()}
+        >
+          Lancer (campagne)
+        </button>
+        <span className="dx-launch-note">
+          lance tous les agents de la campagne comme process OS -&gt; capture eBPF par PID en une fenetre
+        </span>
+        {campMsg !== null && (
+          <span className="dx-launch-msg" data-testid="dx-camp-msg">
+            {campMsg}
           </span>
         )}
       </div>
