@@ -17,6 +17,7 @@ import PageHelp from "../../components/help/PageHelp";
 import type { SourceId, SourceStatus } from "./proxyMenu";
 import SourceMenu from "./SourceMenu";
 import { SOURCE_DESCRIPTORS } from "./sources";
+import useProxyCounts from "./useProxyCounts";
 import "./proxy.css";
 
 /** The registered source ids, for validating the ?source= query param. */
@@ -49,6 +50,19 @@ export default function ProxyPage(): JSX.Element {
 
   const [statusById, setStatusById] = useState<Partial<Record<SourceId, SourceStatus>>>({});
 
+  // Background poll of the lightweight status endpoints fills a badge for EVERY
+  // source, even ones whose panel is closed. The mounted (active) panel reports
+  // a fresher, strict-aware value through onStatus, so it wins for that source.
+  const backgroundCounts = useProxyCounts();
+  const menuStatus = useMemo<Partial<Record<SourceId, SourceStatus>>>(() => {
+    const merged = { ...backgroundCounts };
+    const activeStatus = statusById[source];
+    if (activeStatus !== undefined) {
+      merged[source] = activeStatus;
+    }
+    return merged;
+  }, [backgroundCounts, statusById, source]);
+
   // One stable status setter per registered source, so a panel's polling
   // effect is not torn down and rebuilt on every orchestrator render.
   const onStatusById = useMemo(() => {
@@ -75,7 +89,7 @@ export default function ProxyPage(): JSX.Element {
         sources={SOURCE_DESCRIPTORS}
         active={source}
         onSelect={onSelectSource}
-        statusById={statusById}
+        statusById={menuStatus}
       />
 
       <Suspense
