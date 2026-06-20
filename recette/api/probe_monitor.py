@@ -1,11 +1,11 @@
 """Passive, continuous eBPF monitor -- flag any watched agent the moment it runs.
 
 The bounded ``/probe/capture`` answers "did the kernel see X during this window".
-This monitor turns that into a PASSIVE watch: a background thread loops
-back-to-back broker captures over the watch-list and accumulates live sightings,
-so an operator who just launches an agent sees it appear on the wire in
-near-real-time (latency ~= one window), no per-capture click. The console polls
-``GET /probe/monitor``.
+This monitor turns that into a PASSIVE watch: a background thread opens ONE
+gap-free broker ``watch`` stream (the eBPF probe stays attached, emitting a
+recording line per slice -- nothing lost between slices) and accumulates live
+sightings, so an operator who just launches an agent sees it appear on the wire
+in near-real-time, no per-capture click. The console polls ``GET /probe/monitor``.
 
 This is live measurement, NOT a decision path: it uses threads + the wall clock
 and is non-deterministic by nature (I4 governs the pure judge, not this probe).
@@ -15,9 +15,11 @@ the loop keeps trying; it never fabricates a sighting.
 
 from __future__ import annotations
 
+import json
+import socket
 import threading
 
-from .probe_relay import ProbeUnavailable, relay_capture
+from .probe_relay import ProbeUnavailable, open_watch
 
 
 class ProbeMonitor:
@@ -55,18 +57,51 @@ class ProbeMonitor:
             return True
 
     def _loop(self) -> None:
+        # Gap-free passive stream: ONE broker connection keeps the eBPF probe
+        # attached and emits a recording line per slice (no re-attach, nothing
+        # lost between slices). Reconnect on drop; back off on broker error.
         while not self._stop.is_set():
             try:
-                recording = relay_capture(
+                sock = open_watch(
                     socket_path=self._socket_path,
                     agents=self._agents,
                     duration_ms=self._window_ms,
                 )
-                self._merge(recording)
             except ProbeUnavailable as exc:
                 with self._lock:
                     self._last_error = str(exc)
-                self._stop.wait(1.0)  # back off, keep trying (fail-safe)
+                self._stop.wait(1.0)
+                continue
+            try:
+                self._read_stream(sock)
+            finally:
+                sock.close()
+
+    def _read_stream(self, sock: socket.socket) -> None:
+        """Read newline-delimited recording lines off one watch stream, merging
+        each, until stop or the broker closes the connection."""
+        buf = b""
+        while not self._stop.is_set():
+            try:
+                data = sock.recv(65536)
+            except TimeoutError:
+                continue  # periodic wake so stop is honoured
+            except OSError as exc:
+                with self._lock:
+                    self._last_error = str(exc)
+                return
+            if not data:
+                return  # broker closed -> reconnect
+            buf += data
+            while b"\n" in buf:
+                raw, buf = buf.split(b"\n", 1)
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    self._merge(json.loads(raw.decode("utf-8")))
+                except ValueError:
+                    pass
 
     def _merge(self, recording: dict) -> None:
         with self._lock:

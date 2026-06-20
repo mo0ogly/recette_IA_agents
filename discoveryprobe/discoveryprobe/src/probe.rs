@@ -58,32 +58,13 @@ pub struct Capture {
 /// kernel reported during the window, in capture order; the pure
 /// [`crate::mapping`] turns them into replay-stable recordings.
 pub fn capture(config: &CaptureConfig) -> Result<Capture> {
-    let object = std::fs::read(&config.object_path)
-        .with_context(|| format!("read bpf object {}", config.object_path.display()))?;
-    let mut bpf = Ebpf::load(&object).context("load bpf object")?;
-
-    attach_tracepoint(&mut bpf, EXEC_PROGRAM, EXEC_CATEGORY, EXEC_NAME)?;
-    attach_tracepoint(&mut bpf, CONNECT_PROGRAM, CONNECT_CATEGORY, CONNECT_NAME)?;
-
-    // Take ownership of each ring map so both can be drained in one loop (a
-    // single `map_mut` borrow could not hold two rings at once). The attached
-    // programs stay live because `bpf` is kept in scope until the function ends.
-    let mut exec_ring = take_ring(&mut bpf, EXEC_RING_MAP)?;
-    let mut connect_ring = take_ring(&mut bpf, CONNECT_RING_MAP)?;
-
+    let mut session = Session::attach(&config.object_path)?;
     let deadline = Instant::now() + config.window;
     let mut capture = Capture::default();
     loop {
-        while let Some(item) = exec_ring.next() {
-            if let Some(event) = ExecEvent::from_bytes(&item) {
-                capture.execs.push(event);
-            }
-        }
-        while let Some(item) = connect_ring.next() {
-            if let Some(event) = ConnectEvent::from_bytes(&item) {
-                capture.connects.push(event);
-            }
-        }
+        let slice = session.drain();
+        capture.execs.extend(slice.execs);
+        capture.connects.extend(slice.connects);
         if Instant::now() >= deadline {
             break;
         }
@@ -92,6 +73,52 @@ pub fn capture(config: &CaptureConfig) -> Result<Capture> {
         std::thread::sleep(Duration::from_millis(5));
     }
     Ok(capture)
+}
+
+/// A LIVE attached probe: the tracepoints stay attached for the session's life,
+/// so draining periodically loses nothing between drains (the kernel ring
+/// buffers events). This is the gap-free basis of the passive `watch` stream --
+/// unlike repeated [`capture`] calls, which re-attach (and miss events between
+/// windows). PRIVILEGED (CAP_BPF). Stays attached until dropped.
+pub struct Session {
+    // `_bpf` MUST outlive the rings/programs: dropping it detaches the probe.
+    _bpf: Ebpf,
+    exec_ring: RingBuf<MapData>,
+    connect_ring: RingBuf<MapData>,
+}
+
+impl Session {
+    /// Load the object and attach both tracepoints once.
+    pub fn attach(object_path: &std::path::Path) -> Result<Self> {
+        let object = std::fs::read(object_path)
+            .with_context(|| format!("read bpf object {}", object_path.display()))?;
+        let mut bpf = Ebpf::load(&object).context("load bpf object")?;
+        attach_tracepoint(&mut bpf, EXEC_PROGRAM, EXEC_CATEGORY, EXEC_NAME)?;
+        attach_tracepoint(&mut bpf, CONNECT_PROGRAM, CONNECT_CATEGORY, CONNECT_NAME)?;
+        let exec_ring = take_ring(&mut bpf, EXEC_RING_MAP)?;
+        let connect_ring = take_ring(&mut bpf, CONNECT_RING_MAP)?;
+        Ok(Self {
+            _bpf: bpf,
+            exec_ring,
+            connect_ring,
+        })
+    }
+
+    /// Drain everything currently buffered in both rings (non-blocking).
+    pub fn drain(&mut self) -> Capture {
+        let mut capture = Capture::default();
+        while let Some(item) = self.exec_ring.next() {
+            if let Some(event) = ExecEvent::from_bytes(&item) {
+                capture.execs.push(event);
+            }
+        }
+        while let Some(item) = self.connect_ring.next() {
+            if let Some(event) = ConnectEvent::from_bytes(&item) {
+                capture.connects.push(event);
+            }
+        }
+        capture
+    }
 }
 
 /// Load and attach one tracepoint program by symbol/category/name.

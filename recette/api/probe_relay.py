@@ -17,6 +17,27 @@ class ProbeUnavailable(RuntimeError):
     """The broker socket is not configured, not reachable, or returned garbage."""
 
 
+def open_watch(
+    *, socket_path: str, agents: list[str], duration_ms: int, timeout: float = 2.0
+) -> socket.socket:
+    """Open a gap-free passive stream: connect, send ONE ``watch`` command, and
+    return the connected socket the caller reads newline-delimited recording
+    lines from (one per ``duration_ms`` slice) until it closes the socket.
+
+    The broker keeps the eBPF probe attached for the connection's life, so no
+    event is lost between slices (unlike repeated bounded captures). Raises
+    :class:`ProbeUnavailable` on connect failure (fail-safe)."""
+    request = json.dumps({"command": "watch", "agents": agents, "duration_ms": duration_ms})
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect(socket_path)
+        sock.sendall((request + "\n").encode("utf-8"))
+    except OSError as exc:
+        raise ProbeUnavailable(f"broker socket {socket_path}: {exc}") from exc
+    return sock
+
+
 def relay_capture(
     *,
     socket_path: str,

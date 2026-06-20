@@ -70,7 +70,9 @@ pub fn validate(
     request: &CaptureRequest,
     manifest: &Manifest,
 ) -> Result<ValidatedCapture, RejectReason> {
-    if request.command != "capture" {
+    // "capture" = one bounded window; "watch" = a gap-free passive stream
+    // (same validation: allowlisted agents + bounded slice).
+    if request.command != "capture" && request.command != "watch" {
         return Err(RejectReason::UnknownCommand(request.command.clone()));
     }
     if request.agents.is_empty() {
