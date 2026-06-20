@@ -15,7 +15,7 @@
  * phase 2; the selector renders it disabled until then.
  */
 
-import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
 import { getProxyTraces } from "../../api/client";
@@ -67,6 +67,13 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
   const [detailSeq, setDetailSeq] = useState<number | null>(null);
 
+  // Keep the latest onStatus without making it an effect dependency: a parent
+  // passing an inline callback must not retrigger the status effect (loop guard).
+  const onStatusRef = useRef(onStatus);
+  useEffect(() => {
+    onStatusRef.current = onStatus;
+  }, [onStatus]);
+
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const res = await getProxyTraces();
@@ -90,12 +97,12 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
   const sessions = useMemo(() => groupSessions(traces, groupKey), [traces, groupKey]);
 
   useEffect(() => {
-    onStatus?.({
+    onStatusRef.current?.({
       count: sessions.length,
       failed: sessionsFailed(sessions),
       disabled: debugEnabled === false,
     });
-  }, [sessions, debugEnabled, onStatus]);
+  }, [sessions, debugEnabled]);
 
   const selected: Session | undefined = useMemo(
     () => sessions.find((s) => s.key === selectedKey),

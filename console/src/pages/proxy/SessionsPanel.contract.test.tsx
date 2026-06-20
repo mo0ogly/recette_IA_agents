@@ -44,4 +44,15 @@ describe("SessionsPanel (R16 contract)", () => {
     expect(await screen.findByTestId("exchange-intent")).toBeInTheDocument();
     expect(screen.getByTestId("exchange-response")).toBeInTheDocument();
   });
+
+  it("reports status up via onStatus without looping on a stable ref", async () => {
+    const onStatus = vi.fn();
+    render(<SessionsPanel onStatus={onStatus} />);
+    await screen.findByLabelText("sessions");
+    await waitFor(() => expect(onStatus).toHaveBeenCalled());
+    const callsAfterLoad = onStatus.mock.calls.length;
+    // No state change -> the effect must not keep firing (loop guard).
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onStatus.mock.calls.length).toBe(callsAfterLoad);
+  });
 });
