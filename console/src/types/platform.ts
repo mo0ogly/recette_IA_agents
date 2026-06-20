@@ -929,3 +929,29 @@ export interface AgentRegistry {
   count: number;
   agents: RegistryAgent[];
 }
+
+/** A content-free context receipt: intent metadata + body size/digest, NEVER
+ *  the request/response bodies (privacy-safe boundary audit). */
+export interface ContextReceipt {
+  seq: number | null;
+  event_id: string | null;
+  timestamp: string | null;
+  agent_id: string | null;
+  target_system: string | null;
+  target: string | null;
+  action_type: string | null;
+  resource: string | null;
+  ok: boolean | null;
+  status_code: number | null;
+  side_effect_hash: string | null;
+  run_id: string | null;
+  request_bytes: number;
+  request_sha256: string;
+  response_bytes: number;
+  response_sha256: string;
+}
+
+/** Response of GET /proxy/receipts. */
+export interface ReceiptsResponse {
+  receipts: ContextReceipt[];
+}

@@ -36,6 +36,7 @@ import type {
   ProxyDebugStatus,
   ProxyTraceResponse,
   RealtimeStatus,
+  ReceiptsResponse,
   RecordingMeta,
   ResolveResult,
   RunEvent,
@@ -1315,4 +1316,11 @@ export function getCaptureOtlp(runId: string): Promise<Record<string, unknown>> 
     `/capture/otlp?run_id=${encodeURIComponent(runId)}`,
     { method: "GET" },
   );
+}
+
+/** Content-free context receipts of the recorded side effects (intent + body
+ *  size/digest, never the bodies). Optional run_id / tail narrowing. */
+export function getContextReceipts(runId?: string, tail?: number): Promise<ReceiptsResponse> {
+  const path = withQuery("/proxy/receipts", { run_id: runId, tail });
+  return request<ReceiptsResponse>(path, { method: "GET" });
 }

@@ -1,0 +1,40 @@
+{
+  "receipts": [
+    {
+      "seq": 1,
+      "event_id": "evt-0001",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "agent_id": "gh-pr-bot",
+      "target_system": "github",
+      "target": "api.github.com",
+      "action_type": "open_pr",
+      "resource": "acme/x",
+      "ok": true,
+      "status_code": 201,
+      "side_effect_hash": "h",
+      "run_id": "run-1",
+      "request_bytes": 24,
+      "request_sha256": "d6983a9fb9c578b64214f5a878de70902dd9fc49b8a84f09edd3082204efbe3d",
+      "response_bytes": 13,
+      "response_sha256": "5f8a57a01ffcf921b63c0660345365ef213185b4ba6df47892c4f4e7ff1998c2"
+    },
+    {
+      "seq": 2,
+      "event_id": "evt-0002",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "agent_id": "gh-pr-bot",
+      "target_system": "github",
+      "target": "api.github.com",
+      "action_type": "merge_pr",
+      "resource": "acme/x",
+      "ok": false,
+      "status_code": 403,
+      "side_effect_hash": "h",
+      "run_id": "run-1",
+      "request_bytes": 24,
+      "request_sha256": "d6983a9fb9c578b64214f5a878de70902dd9fc49b8a84f09edd3082204efbe3d",
+      "response_bytes": 13,
+      "response_sha256": "5f8a57a01ffcf921b63c0660345365ef213185b4ba6df47892c4f4e7ff1998c2"
+    }
+  ]
+}

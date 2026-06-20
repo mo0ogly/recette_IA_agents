@@ -62,7 +62,8 @@ export type HelpTopicKey =
   | "control"
   | "metrics"
   | "graph"
-  | "agent_registry";
+  | "agent_registry"
+  | "receipts";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1665,6 +1666,30 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <strong>party</strong> (1p / 3p), <strong>tags</strong>. Absents = affiches{" "}
           <code>—</code>, jamais inventes. Le filtre <em>party</em> distingue le first-party du
           third-party.
+        </p>
+      </>
+    ),
+  },
+  receipts: {
+    title: "Aide — Context receipts",
+    summary:
+      "Audit sans contenu de ce qui a franchi la frontiere agent <-> serveur : intention (agent/cible/action/ressource/issue) + taille et SHA-256 des corps, jamais les corps. RSSI-safe.",
+    body: (
+      <>
+        <p>
+          Chaque effet de bord (un <code>ProxyTrace</code>) est projete en un{" "}
+          <strong>recu sans contenu</strong> : on garde l&apos;<strong>intention</strong> (agent,
+          systeme cible, <code>action_type</code>, ressource, statut) et on remplace les{" "}
+          <strong>corps</strong> requete/reponse par leur <strong>taille en octets</strong> et leur{" "}
+          <strong>SHA-256</strong>. Le contenu lui-meme n&apos;est ni journalise ni expose.
+        </p>
+        <h3>A quoi ca sert</h3>
+        <p>
+          Un auditeur (RSSI) peut prouver <strong>ce qui a traverse</strong> la frontiere et que
+          c&apos;est <strong>inchange</strong> (le digest fait foi), sans que la plateforme ait a
+          reveler des donnees potentiellement sensibles. C&apos;est la lisibilite{" "}
+          <em>privacy-safe</em> : on rend auditable sans exposer. Projection{" "}
+          <strong>lecture seule et deterministe</strong> (SHA-256 sur le JSON canonique).
         </p>
       </>
     ),

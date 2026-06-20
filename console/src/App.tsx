@@ -6,6 +6,7 @@ import ApprovalsPage from "./pages/approvals";
 import AuditPage from "./pages/audit";
 import AgentRegistryPage from "./pages/agent-registry";
 import CatalogPage from "./pages/catalog";
+import ReceiptsPage from "./pages/receipts";
 import ControlPage from "./pages/control";
 import GraphPage from "./pages/graph";
 import MetricsPage from "./pages/metrics";
@@ -115,6 +116,9 @@ export default function App(): JSX.Element {
             Proxy
             <ProxyNavBadge />
           </NavLink>
+          <NavLink to="/receipts" className={navLinkClass}>
+            Receipts
+          </NavLink>
         </nav>
       </header>
       <main className="app-main">
@@ -147,6 +151,7 @@ export default function App(): JSX.Element {
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/observability" element={<ObservabilityPage />} />
           <Route path="/proxy" element={<ProxyPage />} />
+          <Route path="/receipts" element={<ReceiptsPage />} />
         </Routes>
       </main>
     </div>

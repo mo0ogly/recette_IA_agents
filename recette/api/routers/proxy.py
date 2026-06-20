@@ -48,6 +48,25 @@ def list_traces(request: Request, tail: int | None = None, run_id: str | None = 
     }
 
 
+@router.get("/receipts")
+def list_receipts(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
+    """Content-free context receipts of the recorded side effects.
+
+    Same selection as ``/traces`` (run_id then tail) but each entry is the
+    privacy-safe receipt: intent metadata + body byte-size + SHA-256, NEVER the
+    request/response bodies. Lets an auditor prove what crossed the boundary and
+    that it is unchanged without the platform exposing the content (RSSI-safe).
+    """
+    from ...context_receipt import receipt
+
+    traces = request.app.state.proxy_trace_recorder.snapshot()
+    if run_id is not None:
+        traces = [t for t in traces if t.run_id == run_id]
+    if tail is not None and tail >= 0:
+        traces = traces[-tail:]
+    return {"receipts": [receipt(t.to_dict()) for t in traces]}
+
+
 @router.delete("/traces")
 def clear_traces(request: Request) -> dict:
     """Discard the debug trace buffer (the audit log is untouched, I1)."""

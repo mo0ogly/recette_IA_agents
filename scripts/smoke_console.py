@@ -512,6 +512,18 @@ def _verify_registry(page: Page, console: str) -> None:
     _shot(page, "agent-registry")
 
 
+def _verify_receipts(page: Page, console: str) -> None:
+    # The context-receipts page: content-free audit of side effects. After the
+    # campaign run above, the proxy recorded traces -> receipts render.
+    page.goto(f"{console}/receipts", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    # Either the receipts table or the explicit empty state -- both are valid;
+    # assert the page rendered its own content (note text is always present).
+    page.get_by_text("Audit sans contenu", exact=False).first.wait_for(
+        state="visible", timeout=UI_TIMEOUT_MS
+    )
+    _shot(page, "context-receipts")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -545,6 +557,7 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_metrics(page, console)
             _verify_graph(page, console)
             _verify_registry(page, console)
+            _verify_receipts(page, console)
         finally:
             browser.close()
     print("SMOKE PASS")
