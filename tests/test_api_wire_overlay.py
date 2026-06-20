@@ -22,6 +22,12 @@ class WireOverlayControlTest(unittest.TestCase):
             r = self.client.post("/proxy/wire/overlay", json={"action": "sideways"})
         self.assertEqual(r.status_code, 422)
 
+    def test_bad_action_checked_before_gate(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL", None)
+            r = self.client.post("/proxy/wire/overlay", json={"action": "sideways"})
+        self.assertEqual(r.status_code, 422)
+
     def test_up_runs_wire_script_when_allowed(self) -> None:
         with (
             mock.patch.dict(os.environ, {"INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL": "1"}),
