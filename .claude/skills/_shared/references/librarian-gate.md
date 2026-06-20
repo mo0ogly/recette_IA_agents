@@ -35,6 +35,13 @@
                          docs-site/i18n/en/docusaurus-plugin-content-docs/current/ (1:1).
                          Une doc fr nouvelle/modifiee doit AUSSI etre repercutee dans le
                          miroir en (sinon /en/docs sert la version fr ou 404).
+                         IMAGES : Docusaurus NE suit PAS les symlinks pour les assets ;
+                         toute image referencee par un doc du miroir en doit etre une COPIE
+                         reelle sous docs-site/i18n/en/docusaurus-plugin-content-docs/current/screenshots/.
+                         Les sim/*.png sont regeneres par le smoke dans docs/screenshots/sim/
+                         -> recopier dans le miroir en apres un smoke. Vider le cache
+                         (rm -rf docs-site/.docusaurus docs-site/build) si une image
+                         ajoutee reste en chemin brut au lieu de /assets/images/.
 [ ] 9b. DIAGRAMMES (SI MERMAID ARCHITECTURE.md MODIFIE) : les blocs mermaid de
                          docs/ARCHITECTURE.md sont GENERES (source unique Python). Ne jamais
                          editer le mermaid a la main (il serait ecrase). Editer
