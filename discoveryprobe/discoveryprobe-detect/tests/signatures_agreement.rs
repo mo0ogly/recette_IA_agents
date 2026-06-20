@@ -15,6 +15,7 @@ const SHARED: &str = concat!(
 struct LoadedSignature {
     tool: String,
     category: Category,
+    capabilities: Vec<Category>,
     needles: Vec<String>,
 }
 
@@ -32,6 +33,12 @@ fn rust_table_matches_the_shared_signature_json() {
     for (l, r) in loaded.iter().zip(rust.iter()) {
         assert_eq!(l.tool, r.tool, "tool name mismatch");
         assert_eq!(l.category, r.category, "category mismatch for {}", r.tool);
+        assert_eq!(
+            l.capabilities,
+            r.capabilities.to_vec(),
+            "capabilities mismatch for {}",
+            r.tool
+        );
         let r_needles: Vec<String> = r.needles.iter().map(|s| s.to_string()).collect();
         assert_eq!(l.needles, r_needles, "needles mismatch for {}", r.tool);
     }

@@ -40,8 +40,12 @@ pub enum Category {
 pub struct ObservabilitySignature {
     /// The tool's display name.
     pub tool: &'static str,
-    /// Its primary category.
+    /// Its primary category (what `detect` reports for a match).
     pub category: Category,
+    /// Every category the tool covers, sorted (a tracing tool may also offer
+    /// audit + replay). Detection still reports the primary `category`; this is
+    /// the multi-axis view for the catalog. Verified per tool at the source.
+    pub capabilities: &'static [Category],
     /// Distinctive public identifiers (package, import, env var, call marker);
     /// any one present in the source flags the tool.
     pub needles: &'static [&'static str],
@@ -56,21 +60,25 @@ static SIGNATURES: &[ObservabilitySignature] = &[
     ObservabilitySignature {
         tool: "Langfuse",
         category: Category::Tracing,
+        capabilities: &[Category::Audit, Category::Replay, Category::Tracing],
         needles: &["langfuse", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"],
     },
     ObservabilitySignature {
         tool: "LangSmith",
         category: Category::Tracing,
+        capabilities: &[Category::Audit, Category::Replay, Category::Tracing],
         needles: &["langsmith", "LANGSMITH_API_KEY", "LANGSMITH_TRACING"],
     },
     ObservabilitySignature {
         tool: "Traceloop/OpenLLMetry",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &["traceloop", "TRACELOOP_API_KEY", "Traceloop.init"],
     },
     ObservabilitySignature {
         tool: "Arize Phoenix",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &[
             "arize-phoenix",
             "phoenix.otel",
@@ -81,41 +89,49 @@ static SIGNATURES: &[ObservabilitySignature] = &[
     ObservabilitySignature {
         tool: "OpenInference",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &["openinference", "@arizeai/openinference"],
     },
     ObservabilitySignature {
         tool: "AgentOps",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &["agentops", "AGENTOPS_API_KEY"],
     },
     ObservabilitySignature {
         tool: "Helicone",
         category: Category::Gateway,
+        capabilities: &[Category::Gateway, Category::Tracing],
         needles: &["helicone", "HELICONE_API_KEY", "HeliconeManualLogger"],
     },
     ObservabilitySignature {
         tool: "Laminar",
         category: Category::Tracing,
+        capabilities: &[Category::Eval, Category::Tracing],
         needles: &["lmnr", "LMNR_PROJECT_API_KEY", "Laminar.initialize"],
     },
     ObservabilitySignature {
         tool: "Braintrust",
         category: Category::Eval,
+        capabilities: &[Category::Eval, Category::Tracing],
         needles: &["braintrust", "BRAINTRUST_API_KEY"],
     },
     ObservabilitySignature {
         tool: "Literal AI",
         category: Category::Tracing,
+        capabilities: &[Category::Audit, Category::Tracing],
         needles: &["literalai", "LITERAL_API_KEY", "LiteralClient"],
     },
     ObservabilitySignature {
         tool: "HoneyHive",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &["honeyhive", "HoneyHiveTracer", "HH_API_KEY"],
     },
     ObservabilitySignature {
         tool: "OpenTelemetry GenAI",
         category: Category::Tracing,
+        capabilities: &[Category::Tracing],
         needles: &[
             "opentelemetry-instrumentation-openai-v2",
             "opentelemetry-util-genai",
