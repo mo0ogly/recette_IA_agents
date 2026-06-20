@@ -88,6 +88,9 @@ receipts (and the console page shows the "No receipt" state).
 | `GET /proxy/receipts/verify` | Recomputes the chain from genesis and reports the first break. | `run_id` |
 | `GET /proxy/receipts/export` | Transferable envelope, Ed25519-signed when a key is configured. | `run_id` |
 | `POST /proxy/receipts/verify-import` | Re-verifies a THIRD-PARTY export envelope (Ed25519 signature + hash chain), trusting nothing in it. Stateless, pure (I4). | `expected_public_key` (pin the signer); body = the envelope |
+| `GET /proxy/receipts/merkle` | Merkle root committing to all receipts (+ `count`). | `run_id` |
+| `GET /proxy/receipts/merkle/proof` | Inclusion proof of ONE receipt under the root (`{leaf, index, count, root, path}`); unknown `seq` -> 404. | `seq` (required), `run_id` |
+| `GET /proxy/receipts/root-attestation` | Tiny signed commitment `{chain_head, count, merkle_root}`, NO receipts (selective disclosure). Unsigned (fail-safe) with no key. | `run_id` |
 
 The GET routes are read-only and content-free (no body is ever returned);
 `verify-import` is stateless (touches neither the audit log nor the buffer). On
@@ -163,6 +166,42 @@ A tampered envelope (one modified receipt) breaks both the signature and the
 chain -> `verdict: INVALID` (exit 1). A pinned key that does not match -> invalid
 signature.
 
+## Selective disclosure (Merkle: prove ONE side effect, not the batch)
+
+The signed export proves the WHOLE sequence but forces transmitting every
+receipt. To attest that ONE specific side effect crossed WITHOUT revealing the
+others, the repo builds a **Merkle tree** over the receipts
+(`recette/receipt_merkle.py`, pure I4, content-free, RFC 6962 domain separation:
+`0x00` leaf / `0x01` node prefix, second-preimage safe):
+
+- `merkle_root(receipts)` -- one root committing to the whole batch.
+- `inclusion_proof(receipts, index)` -- `{leaf, index, count, root, path}`: the
+  disclosed leaf + the audit path (sibling hashes). A leaf is computable from ONE
+  receipt alone (excludes `prev_hash`/`hash`), so a receipt is disclosed and
+  proven without the others.
+- `verify_inclusion(leaf, path, root)` -- folds the leaf with the path; true iff
+  it reconstructs the root.
+
+The **root attestation** (`export_root_attestation`) signs the commitment
+`{chain_head, count, merkle_root}` ALONE -- no receipts. A third party verifies
+the root's authenticity from that tiny payload, then folds one disclosed leaf to
+that root. It attests a single side effect without ever seeing the others.
+
+Terminal verification (twin of `receipts-verify`, `_cmd_receipts_attest`):
+
+```
+python -m recette receipts-attest --attestation att.json --proof proof.json
+# signature: VALID -- signature valid over canonical payload
+# root match: YES (proof root vs attested merkle_root)
+# inclusion: PROVEN (disclosed leaf folds to root)
+# verdict: VALID            (exit 0)
+```
+
+`receipts-attest` exits **0 iff all three hold**: the root signature is valid, the
+proof folds to a root, and that root equals the attested `merkle_root` (a proof
+against any other root proves nothing here). Pure, offline, the public key is in
+the attestation (verifier needs no secret; `--pubkey` pins the signer).
+
 ## Console page
 
 Route `/receipts` (`console/src/App.tsx`), page `console/src/pages/receipts/`.
@@ -193,9 +232,10 @@ No path degrades toward exposing a body nor toward a fabricated proof.
 - **I1 (immutability)**: the hash chain of receipts is a proof of sequence
   integrity (like the audit log); the buffer is disposable, the durable truth
   remains the append-only event store.
-- **I4 (deterministic replay)**: `receipt`, `chain_receipts`, `canonical_payload`
-  are pure functions (SHA-256 over canonical JSON, genesis `prev_hash`
-  empty) -- no clock, no randomness.
+- **I4 (deterministic replay)**: `receipt`, `chain_receipts`, `canonical_payload`,
+  `merkle_root`, `inclusion_proof`, `canonical_root_payload` are pure functions
+  (SHA-256 over canonical JSON, genesis `prev_hash` empty, fixed Merkle pairing)
+  -- no clock, no randomness.
 - **I5 (mediated side effects)**: receipts project only `ProxyTrace`
   produced at the `ExternalSystemProxy` edge (`TracingProxy`), never a direct
   call.
@@ -238,7 +278,12 @@ round-trip, tampering rejected, key pinning, deterministic payload),
 `tests/test_api_receipt_verify_import.py` (cross-verification endpoint: signed
 round-trip, tampering, pinning, non-object 422) and
 `tests/test_cli_receipts_verify.py` (CLI: exit 0 when signed+intact, exit 1 when
-unsigned / tampered / wrong key, `--json` output).
+unsigned / tampered / wrong key, `--json` output). Selective disclosure:
+`tests/test_receipt_merkle.py` (deterministic + order-sensitive root, every-leaf
+inclusion, leaf excludes chain fields, wrong leaf/root fails, RFC 6962),
+`tests/test_api_receipt_merkle.py` (root + proof + attestation endpoints),
+`tests/test_receipt_root_attestation.py` (signed attestation + end-to-end) and
+`tests/test_cli_receipts_attest.py` (the `receipts-attest` CLI).
 
 ## Related links
 

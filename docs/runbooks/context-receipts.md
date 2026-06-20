@@ -87,6 +87,9 @@ recus vide (et la page console affiche l'etat "Aucun recu").
 | `GET /proxy/receipts/verify` | Recompute la chaine depuis le genesis et signale la premiere rupture. | `run_id` |
 | `GET /proxy/receipts/export` | Enveloppe transferable, signee Ed25519 quand une cle est configuree. | `run_id` |
 | `POST /proxy/receipts/verify-import` | Re-verifie une enveloppe d'export TIERS (signature Ed25519 + chaine de hash), sans rien lui faire confiance. Stateless, pur (I4). | `expected_public_key` (pin le signataire) ; corps = l'enveloppe |
+| `GET /proxy/receipts/merkle` | Racine Merkle engageant tous les recus (+ `count`). | `run_id` |
+| `GET /proxy/receipts/merkle/proof` | Preuve d'inclusion d'UN recu sous la racine (`{leaf, index, count, root, path}`) ; `seq` absent -> 404. | `seq` (requis), `run_id` |
+| `GET /proxy/receipts/root-attestation` | Engagement signe minuscule `{chain_head, count, merkle_root}`, SANS recus (divulgation selective). Non signe (fail-safe) sans cle. | `run_id` |
 
 Les routes GET sont en lecture seule et sans contenu (aucun corps n'est jamais
 renvoye) ; `verify-import` est stateless (ne touche ni l'audit log ni le buffer).
@@ -162,6 +165,43 @@ Une enveloppe falsifiee (un recu modifie) casse a la fois la signature et la
 chaine -> `verdict: INVALID` (exit 1). Une cle epinglee qui ne correspond pas ->
 signature invalide.
 
+## Divulgation selective (Merkle : prouver UN effet de bord, pas le lot)
+
+L'export signe prouve TOUTE la sequence mais oblige a transmettre tous les recus.
+Pour attester qu'**UN** effet de bord precis a traverse sans reveler les autres,
+le repo construit un **arbre de Merkle** sur les recus (`recette/receipt_merkle.py`,
+pur I4, content-free, separation de domaine RFC 6962 : prefixe `0x00` feuille /
+`0x01` noeud, anti-second-preimage) :
+
+- `merkle_root(receipts)` -- une racine unique engageant tout le lot.
+- `inclusion_proof(receipts, index)` -- `{leaf, index, count, root, path}` : la
+  feuille divulguee + le chemin d'audit (hashes freres). Une feuille se calcule a
+  partir d'UN recu seul (exclut `prev_hash`/`hash`), donc un recu se divulgue et
+  se prouve sans les autres.
+- `verify_inclusion(leaf, path, root)` -- replie la feuille avec le chemin ; vrai
+  ssi on reconstruit la racine.
+
+L'**attestation de racine** (`export_root_attestation`) signe le seul engagement
+`{chain_head, count, merkle_root}` -- **sans recus**. Un tiers verifie
+l'authenticite de la racine depuis ce payload minuscule, puis replie une feuille
+divulguee vers cette racine. Il atteste un effet de bord unique sans jamais voir
+les autres.
+
+Verification terminale (jumeau de `receipts-verify`, `_cmd_receipts_attest`) :
+
+```
+python -m recette receipts-attest --attestation att.json --proof proof.json
+# signature: VALID -- signature valid over canonical payload
+# root match: YES (proof root vs attested merkle_root)
+# inclusion: PROVEN (disclosed leaf folds to root)
+# verdict: VALID            (exit 0)
+```
+
+`receipts-attest` sort **0 ssi les trois tiennent** : signature racine valide,
+preuve qui replie vers une racine, et cette racine == `merkle_root` attestee (une
+preuve contre une autre racine ne prouve rien ici). Pur, offline, la cle publique
+est dans l'attestation (verifieur sans secret ; `--pubkey` epingle le signataire).
+
 ## Page console
 
 Route `/receipts` (`console/src/App.tsx`), page `console/src/pages/receipts/`.
@@ -192,9 +232,10 @@ Aucun chemin ne degrade vers l'exposition d'un corps ni vers une preuve fabrique
 - **I1 (immutabilite)** : la chaine de hash des recus est une preuve d'integrite
   de sequence (comme l'audit log) ; le buffer est jettable, la verite durable
   reste l'event store append-only.
-- **I4 (replay deterministe)** : `receipt`, `chain_receipts`, `canonical_payload`
-  sont des fonctions pures (SHA-256 sur du JSON canonique, genesis `prev_hash`
-  vide) -- ni horloge, ni aleatoire.
+- **I4 (replay deterministe)** : `receipt`, `chain_receipts`, `canonical_payload`,
+  `merkle_root`, `inclusion_proof`, `canonical_root_payload` sont des fonctions
+  pures (SHA-256 sur du JSON canonique, genesis `prev_hash` vide, pairing Merkle
+  fixe) -- ni horloge, ni aleatoire.
 - **I5 (effets de bord mediats)** : les recus ne projettent que des `ProxyTrace`
   produits au bord `ExternalSystemProxy` (`TracingProxy`), jamais un appel direct.
 
@@ -236,7 +277,12 @@ aller-retour signature, falsification rejetee, pinning de cle, payload
 deterministe), `tests/test_api_receipt_verify_import.py` (endpoint de
 cross-verification : aller-retour signe, falsification, pinning, non-objet 422) et
 `tests/test_cli_receipts_verify.py` (CLI : exit 0 si signe+intact, exit 1 si non
-signe / falsifie / mauvaise cle, sortie `--json`).
+signe / falsifie / mauvaise cle, sortie `--json`). Divulgation selective :
+`tests/test_receipt_merkle.py` (racine deterministe + ordre-sensible, inclusion de
+chaque feuille, feuille exclut les champs de chaine, mauvaise feuille/racine
+echoue, RFC 6962), `tests/test_api_receipt_merkle.py` (endpoints racine + preuve +
+attestation), `tests/test_receipt_root_attestation.py` (attestation signee +
+bout-en-bout) et `tests/test_cli_receipts_attest.py` (CLI `receipts-attest`).
 
 ## Liens connexes
 
