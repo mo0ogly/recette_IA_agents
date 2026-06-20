@@ -2,141 +2,152 @@
   "debug_enabled": true,
   "traces": [
     {
-      "seq": 1,
-      "event_id": "EV000000000000000001000001",
-      "timestamp": "2026-06-13T03:20:25.419188Z",
-      "agent_id": "ci-bot",
+      "seq": 5,
+      "event_id": "evt-0001",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "agent_id": "sess-cap-bot-b",
       "target_system": "github",
+      "target": "github",
       "action_type": "list_repos",
-      "resource": "acme/widgets",
-      "request_payload": {
-        "visibility": "all"
-      },
+      "resource": "acme/x",
+      "request_payload": {},
       "ok": true,
       "status_code": 200,
-      "side_effect_hash": "ec24c9f1d0f443fbe1336e3158f9b239b9e4fddcaa89ec22c23fd38ab07a0948",
+      "side_effect_hash": "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9",
       "error": null,
-      "run_id": "3f9c1a7be0d24e8fae21c5b09d4477aa",
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
       "response": {
         "action": "list_repos",
-        "repositories": ["acme/widgets/6e23-0", "acme/widgets/6e23-1", "acme/widgets/6e23-2"],
-        "resource": "acme/widgets",
-        "result_id": "6e23711da8ea"
-      }
-    },
-    {
-      "seq": 2,
-      "event_id": "EV000000000000000001000002",
-      "timestamp": "2026-06-13T03:20:25.461044Z",
-      "agent_id": "audit-bot",
-      "target_system": "okta",
-      "action_type": "read_user",
-      "resource": "okta/users/0ub42jq9k1xTn7",
-      "request_payload": {
-        "user_id": "0ub42jq9k1xTn7"
-      },
-      "ok": true,
-      "status_code": 200,
-      "side_effect_hash": "9a1f7c2d4b8e60315fa2c0d97e4b16882d5f0a3c71e9bd44a6c83f2071be59d0",
-      "error": null,
-      "run_id": "b7d2e913f04c4a8d9e16c25af83b7710",
-      "response": {
-        "action": "read_user",
-        "resource": "okta/users/0ub42jq9k1xTn7",
-        "result_id": "a14c92f0e3b7",
-        "status": "ACTIVE"
-      }
-    },
-    {
-      "seq": 3,
-      "event_id": "EV000000000000000001000003",
-      "timestamp": "2026-06-13T03:20:25.502771Z",
-      "agent_id": "ci-bot",
-      "target_system": "github",
-      "action_type": "open_pr",
-      "resource": "acme/widgets",
-      "request_payload": {
-        "title": "Bump dependency lockfile",
-        "head": "ci/lockfile-refresh",
-        "base": "main"
-      },
-      "ok": true,
-      "status_code": 201,
-      "side_effect_hash": "3d72b1ee845c0f9a26d4137cb0e9fa518c64273aa90f1de8b3265c7f04a8e217",
-      "error": null,
-      "run_id": "3f9c1a7be0d24e8fae21c5b09d4477aa",
-      "response": {
-        "action": "open_pr",
-        "resource": "acme/widgets",
-        "result_id": "c08f4a217e6b",
-        "pull_request_number": 482
-      }
-    },
-    {
-      "seq": 4,
-      "event_id": "EV000000000000000001000004",
-      "timestamp": "2026-06-13T03:20:25.544903Z",
-      "agent_id": "audit-bot",
-      "target_system": "okta",
-      "action_type": "list_groups",
-      "resource": "okta/users/0ub42jq9k1xTn7/groups",
-      "request_payload": {
-        "user_id": "0ub42jq9k1xTn7"
-      },
-      "ok": true,
-      "status_code": 200,
-      "side_effect_hash": "6f0a91c3d2b74e58af13c0e96b2a47718d5e0f3c82a9bd14e7c63f9072be41a5",
-      "error": null,
-      "run_id": "b7d2e913f04c4a8d9e16c25af83b7710",
-      "response": {
-        "action": "list_groups",
-        "resource": "okta/users/0ub42jq9k1xTn7/groups",
-        "result_id": "f29b7c104a8e",
-        "groups": ["okta/groups/eng", "okta/groups/all-staff"]
-      }
-    },
-    {
-      "seq": 5,
-      "event_id": "EV000000000000000001000005",
-      "timestamp": "2026-06-13T03:20:25.588317Z",
-      "agent_id": "ci-bot",
-      "target_system": "github",
-      "action_type": "merge_pr",
-      "resource": "acme/widgets",
-      "request_payload": {
-        "pull_request_number": 482,
-        "merge_method": "squash"
-      },
-      "ok": true,
-      "status_code": 200,
-      "side_effect_hash": "1b8e4f72c3a905d6e2147f08bca639d51e7a02c4d8f31be9a76c540b2f9e183d",
-      "error": null,
-      "run_id": "3f9c1a7be0d24e8fae21c5b09d4477aa",
-      "response": {
-        "action": "merge_pr",
-        "resource": "acme/widgets",
-        "result_id": "7a3e91c08d4f",
-        "merged": true,
-        "sha": "f1c2a9e7b3d04582a16e93c70f4b8d215c63702a"
+        "repositories": [
+          "acme/x/e168-0",
+          "acme/x/e168-1",
+          "acme/x/e168-2"
+        ],
+        "resource": "acme/x",
+        "result_id": "e1685ad22870"
       }
     },
     {
       "seq": 6,
-      "event_id": "EV000000000000000001000006",
-      "timestamp": "2026-06-13T03:20:25.631450Z",
-      "agent_id": "audit-bot",
-      "target_system": "okta",
-      "action_type": "deactivate_user",
-      "resource": "okta/users/0ub42jq9k1xTn7",
-      "request_payload": {
-        "user_id": "0ub42jq9k1xTn7"
-      },
-      "ok": false,
-      "status_code": 403,
-      "side_effect_hash": null,
-      "error": "policy denied",
-      "run_id": "b7d2e913f04c4a8d9e16c25af83b7710",
-      "response": {}
+      "event_id": "evt-0001",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "read_repo",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "687f92f619b7f2adbbbcf8abd64466b86d4942026ff1e76ce12aa46cc3edb563",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "read_repo",
+        "repository": {
+          "default_branch": "main",
+          "full_name": "acme/x"
+        },
+        "resource": "acme/x",
+        "result_id": "e63bd1d9263d"
+      }
+    },
+    {
+      "seq": 7,
+      "event_id": "evt-0002",
+      "timestamp": "2023-11-14T22:13:21Z",
+      "agent_id": "sess-cap-bot-b",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "read_repo",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "687f92f619b7f2adbbbcf8abd64466b86d4942026ff1e76ce12aa46cc3edb563",
+      "error": null,
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "response": {
+        "action": "read_repo",
+        "repository": {
+          "default_branch": "main",
+          "full_name": "acme/x"
+        },
+        "resource": "acme/x",
+        "result_id": "e63bd1d9263d"
+      }
+    },
+    {
+      "seq": 8,
+      "event_id": "evt-0002",
+      "timestamp": "2023-11-14T22:13:21Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "open_pr",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "0b6f686ad48bda57e116afb490ada13b3e06892257398edae343478e5567043a",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "open_pr",
+        "pull_request": {
+          "number": 9626,
+          "state": "open"
+        },
+        "resource": "acme/x",
+        "result_id": "b535e8b94f78"
+      }
+    },
+    {
+      "seq": 9,
+      "event_id": "evt-0003",
+      "timestamp": "2023-11-14T22:13:22Z",
+      "agent_id": "sess-cap-bot-b",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "open_issue",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "b10e001005a72a24033ae06b04cd4528c4d659b178effa36b4dd31112db66496",
+      "error": null,
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "response": {
+        "action": "open_issue",
+        "issue": {
+          "number": 8718,
+          "state": "open"
+        },
+        "resource": "acme/x",
+        "result_id": "0c6af39d5bdd"
+      }
+    },
+    {
+      "seq": 10,
+      "event_id": "evt-0003",
+      "timestamp": "2023-11-14T22:13:22Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "merge_pr",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "7ee8ff7a7e4a0cc7a807b30b509fbcb91195e7134692ece71727636899f2e13a",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "merge_pr",
+        "merged": true,
+        "resource": "acme/x",
+        "result_id": "4aab9fe78d85"
+      }
     }
   ]
 }

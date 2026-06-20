@@ -73,7 +73,9 @@ def _api(method: str, url: str, body: dict | None = None) -> tuple[int, dict | l
         url, data=data, headers={"Content-Type": "application/json"}, method=method
     )
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        # nosec B310 -- smoke-only; URL is built from the trusted local API base
+        # (http://127.0.0.1:8090) plus a fixed path, never external/user input.
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
             raw = response.read().decode("utf-8")
             return response.status, json.loads(raw) if raw else {}
     except urllib.error.HTTPError as error:
@@ -512,7 +514,7 @@ def _verify_registry(page: Page, console: str) -> None:
     _shot(page, "agent-registry")
 
 
-def _verify_receipts(page: Page, console: str) -> None:
+def _verify_receipts(page: Page, console: str, api: str) -> None:
     # The context-receipts page: content-free audit of side effects. After the
     # campaign run above, the proxy recorded traces -> receipts render.
     page.goto(f"{console}/receipts", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
@@ -522,6 +524,76 @@ def _verify_receipts(page: Page, console: str) -> None:
         state="visible", timeout=UI_TIMEOUT_MS
     )
     _shot(page, "context-receipts")
+
+    # Off-platform attestation round-trip, driven through the real UI (R14 live
+    # wiring, not /tmp): Export the envelope, then feed that exact file back into
+    # the "Verify a third-party export" input and assert the verdict renders. The
+    # smoke API has no signing key (fail-safe unsigned), so the signature is
+    # reported invalid by design -- the CHAIN verdict is what proves the export
+    # <-> verify-import wiring end to end.
+    status, payload = _api("GET", f"{api}/proxy/receipts")
+    _expect(status == 200, f"GET /proxy/receipts -> {status}")
+    receipt_count = len(payload.get("receipts", [])) if isinstance(payload, dict) else 0
+    if receipt_count == 0:
+        # No side effect was traced this run -> export is disabled by design.
+        # The empty-state path is already asserted above; nothing to round-trip.
+        return
+
+    export_btn = page.get_by_role("button", name=re.compile(r"Exporter \(signe"))
+    export_btn.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    with page.expect_download(timeout=UI_TIMEOUT_MS) as download_info:
+        export_btn.click()
+    export_path = download_info.value.path()
+    _expect(export_path is not None, "export button produced no download")
+
+    page.get_by_test_id("receipts-import-input").set_input_files(str(export_path))
+    verdict = page.get_by_test_id("receipts-import-verdict")
+    verdict.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    text = verdict.inner_text()
+    # The chain of the just-exported receipts is intact -> "Chaine verifiee".
+    _expect(
+        "Chaine verifiee" in text,
+        f"imported-export chain verdict missing (got {text!r})",
+    )
+    _shot(page, "context-receipts-verify-import")
+
+
+def _verify_discovery_exchange(page: Page, console: str, api: str) -> None:
+    # The Discovery x Echange page: the discovery verdict overlaid on the real
+    # exchange. Seed a wire-only flow to a NON-mediated target (no audit event
+    # behind it) so the overlay must surface a ghost exchange next to the real
+    # (hook) exchanges the campaign above produced.
+    status, _ = _api(
+        "POST",
+        f"{api}/proxy/wire",
+        {
+            "method": "POST",
+            "scheme": "http",
+            "host": "evil.smoke.test",
+            "port": 443,
+            "path": "/leak",
+            "status_code": 200,
+            "request_body": "{}",
+            "response_body": "{}",
+        },
+    )
+    _expect(status in (200, 201), f"seed wire ghost flow -> {status}")
+    page.goto(f"{console}/discovery-exchange", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("exchange-table").wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    # the run-level ghost-exchange signal renders (>=1 -- the seeded wire flow)
+    ghost = page.get_by_test_id("dx-ghost-count")
+    ghost.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect(
+        "echange(s) ghost" in ghost.inner_text(),
+        f"ghost-exchange badge missing (got {ghost.inner_text()!r})",
+    )
+    # at least one exchange row is annotated as a ghost (the wire-only flow)
+    page.wait_for_function(
+        "() => Array.from(document.querySelectorAll('[data-testid=\"exchange-outcome\"]'))"
+        ".some(n => n.textContent.trim() === 'ghost')",
+        timeout=UI_TIMEOUT_MS,
+    )
+    _shot(page, "discovery-exchange")
 
 
 def run_smoke(console: str, api: str, server_port: int) -> None:
@@ -557,7 +629,8 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_metrics(page, console)
             _verify_graph(page, console)
             _verify_registry(page, console)
-            _verify_receipts(page, console)
+            _verify_receipts(page, console, api)
+            _verify_discovery_exchange(page, console, api)
         finally:
             browser.close()
     print("SMOKE PASS")
