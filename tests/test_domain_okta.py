@@ -117,6 +117,10 @@ class TestOktaValidation(unittest.TestCase):
         with self.assertRaises(LabActionError) as ctx:
             handle("invite_external_user", "ext", {"email": "not-an-email"})
         self.assertEqual(ctx.exception.status_code, 422)
+        # Structured refusal: machine-readable code + detail, like every domain.
+        self.assertEqual(ctx.exception.code, "invalid_email")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "email")
 
     def test_valid_email_accepted(self) -> None:
         resp = handle("invite_external_user", "ext", {"email": "vendor@partner.com"})
@@ -144,6 +148,9 @@ class TestOktaCoherence(unittest.TestCase):
         with self.assertRaises(LabActionError) as ctx:
             handle("revoke_api_key", "svc", {"key_id": "api_DOESNOTEXIST"})
         self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.code, "unknown_api_key")
+        assert ctx.exception.detail is not None
+        self.assertEqual(ctx.exception.detail["field"], "api_key")
 
     def test_revoke_without_explicit_key_id_is_lenient(self) -> None:
         resp = handle("revoke_api_key", "svc", {})

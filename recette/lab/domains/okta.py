@@ -92,7 +92,12 @@ def _resolve_key_id(payload: dict, dig: str) -> str:
         except ValueError:
             ok = False
     if not ok:
-        raise LabActionError(422, f"unknown api key {text!r}")
+        raise LabActionError(
+            422,
+            f"unknown api key {text!r}",
+            code="unknown_api_key",
+            detail={"field": "api_key", "got": text, "expected": "a known Okta API key id"},
+        )
     return text
 
 
@@ -102,7 +107,12 @@ def _email_field(payload: dict, dig: str) -> str:
     if "email" in payload and str(payload["email"]).strip():
         email = str(payload["email"])
         if not valid_email(email):
-            raise LabActionError(422, f"invalid email {email!r}")
+            raise LabActionError(
+                422,
+                f"invalid email {email!r}",
+                code="invalid_email",
+                detail={"field": "email", "got": email, "expected": "a valid email address"},
+            )
         return email
     return _email("external", dig)
 
