@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProxyTrace, WireFlow } from "../../types/platform";
-import { groupSessions, sessionsFailed } from "./sessionModel";
+import { filterSessionsText, groupSessions, sessionsFailed } from "./sessionModel";
 
 /** Minimal trace factory: only the fields the model reads. */
 function trace(over: Partial<ProxyTrace>): ProxyTrace {
@@ -118,6 +118,23 @@ describe("groupSessions", () => {
     const sessions = groupSessions(traces, "run");
     expect(sessions.map((s) => s.lastSeq)).toEqual([10, 10]);
     expect(sessions.map((s) => s.key)).toEqual(["r1", "r2"]); // firstSeq 1 < 4
+  });
+});
+
+describe("filterSessionsText", () => {
+  it("keeps only sessions/exchanges matching the text", () => {
+    const traces = [
+      trace({ seq: 1, run_id: "r1", action_type: "open_pr", resource: "acme/x" }),
+      trace({ seq: 2, run_id: "r1", action_type: "read_repo", resource: "acme/y" }),
+    ];
+    const sessions = groupSessions(traces, "run");
+    const out = filterSessionsText(sessions, "open_pr");
+    expect(out).toHaveLength(1);
+    expect(out[0].exchanges.map((e) => e.seq)).toEqual([1]);
+  });
+  it("empty text returns sessions unchanged", () => {
+    const sessions = groupSessions([trace({ seq: 1, run_id: "r1" })], "run");
+    expect(filterSessionsText(sessions, "")).toEqual(sessions);
   });
 });
 

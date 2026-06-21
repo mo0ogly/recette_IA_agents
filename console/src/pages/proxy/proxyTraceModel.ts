@@ -72,6 +72,8 @@ export interface ProxyTraceFilter {
   runId?: string;
   /** Keep only successful ("ok") or failed ("fail") side effects. */
   outcome?: TraceOutcome;
+  /** Free text, matched case-insensitively across action_type/resource/request_payload/response/error. */
+  text?: string;
 }
 
 /** True when no clause is set: an empty filter is a no-op. */
@@ -80,7 +82,8 @@ export function isEmptyFilter(f: ProxyTraceFilter): boolean {
     (f.agentId === undefined || f.agentId === "") &&
     (f.targetSystem === undefined || f.targetSystem === "") &&
     (f.runId === undefined || f.runId === "") &&
-    f.outcome === undefined
+    f.outcome === undefined &&
+    (f.text === undefined || f.text === "")
   );
 }
 
@@ -89,6 +92,7 @@ export function filterTraces(traces: ProxyTrace[], f: ProxyTraceFilter): ProxyTr
   if (isEmptyFilter(f)) {
     return traces;
   }
+  const needle = f.text?.toLowerCase();
   return traces.filter((t) => {
     if (f.agentId !== undefined && f.agentId !== "" && t.agent_id !== f.agentId) {
       return false;
@@ -105,6 +109,12 @@ export function filterTraces(traces: ProxyTrace[], f: ProxyTraceFilter): ProxyTr
     }
     if (f.outcome !== undefined && (t.ok ? "ok" : "fail") !== f.outcome) {
       return false;
+    }
+    if (needle) {
+      const hay = `${t.action_type}\n${t.resource}\n${JSON.stringify(t.request_payload)}\n${JSON.stringify(t.response)}\n${t.error ?? ""}`.toLowerCase();
+      if (!hay.includes(needle)) {
+        return false;
+      }
     }
     return true;
   });

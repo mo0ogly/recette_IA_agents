@@ -89,6 +89,7 @@ export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): 
   const [targetSystem, setTargetSystem] = useState("");
   const [runId, setRunId] = useState("");
   const [outcome, setOutcome] = useState<"" | "ok" | "fail">("");
+  const [text, setText] = useState("");
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -151,8 +152,9 @@ export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): 
       targetSystem: targetSystem || undefined,
       runId: runId || undefined,
       outcome: outcome || undefined,
+      text: text || undefined,
     }),
-    [agentId, targetSystem, runId, outcome],
+    [agentId, targetSystem, runId, outcome, text],
   );
   const shown = useMemo(() => filterTraces(traces, filter), [traces, filter]);
   const agentIds = useMemo(() => distinctValues(traces, "agent_id"), [traces]);
@@ -270,6 +272,17 @@ export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): 
             <option value="ok">ok</option>
             <option value="fail">echec</option>
           </select>
+        </label>
+        <label className="proxy-filter-label">
+          recherche
+          <input
+            className="proxy-filter-input"
+            type="search"
+            data-testid="app-filter-text"
+            placeholder="action / resource / payload / reponse"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
         </label>
       </div>
 

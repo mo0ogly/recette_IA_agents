@@ -24,6 +24,7 @@ import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import {
   type Exchange,
+  filterSessionsText,
   type GroupKey,
   groupSessions,
   type Session,
@@ -69,6 +70,7 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   const [detailSeq, setDetailSeq] = useState<number | null>(null);
   const [wireFlows, setWireFlows] = useState<WireFlow[]>([]);
   const [wireSeq, setWireSeq] = useState<number | null>(null);
+  const [searchText, setSearchText] = useState("");
 
   // Deep-link: ?run=<run_id> auto-selects that run's session without a click,
   // so a "Voir dans le proxy" button from the cockpit lands on its exchanges.
@@ -134,6 +136,12 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
     () => groupSessions(traces, groupKey, wireFlows),
     [traces, groupKey, wireFlows],
   );
+  // Free-text narrowing: keep only sessions/exchanges matching the text. Drives
+  // the list + selection so the timeline shows the matching exchanges only.
+  const shownSessions = useMemo(
+    () => filterSessionsText(sessions, searchText),
+    [sessions, searchText],
+  );
 
   useEffect(() => {
     onStatusRef.current?.({
@@ -144,8 +152,8 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   }, [sessions, debugEnabled]);
 
   const selected: Session | undefined = useMemo(
-    () => sessions.find((s) => s.key === selectedKey),
-    [sessions, selectedKey],
+    () => shownSessions.find((s) => s.key === selectedKey),
+    [shownSessions, selectedKey],
   );
   const detail: Exchange | undefined = useMemo(
     () => selected?.exchanges.find((e) => e.seq === detailSeq),
@@ -159,7 +167,7 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   return (
     <section className="proxy-app" data-testid="sessions-panel">
       <div className="proxy-subheader">
-        <span className="proxy-summary">{sessions.length} session(s)</span>
+        <span className="proxy-summary">{shownSessions.length} session(s)</span>
         <label className="proxy-filter-label">
           grouper par
           <select
@@ -191,6 +199,17 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
             </option>
           </select>
         </label>
+        <label className="proxy-filter-label">
+          recherche
+          <input
+            className="proxy-filter-input"
+            type="search"
+            data-testid="sessions-filter-text"
+            placeholder="action / resource"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </label>
       </div>
 
       {debugEnabled === false && (
@@ -203,8 +222,8 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
 
       <div className="proxy-grid">
         <ul className="proxy-list" aria-label="sessions">
-          {sessions.length === 0 && <li className="proxy-empty">aucune session</li>}
-          {sessions.map((s) => (
+          {shownSessions.length === 0 && <li className="proxy-empty">aucune session</li>}
+          {shownSessions.map((s) => (
             <li key={s.key}>
               <button
                 type="button"

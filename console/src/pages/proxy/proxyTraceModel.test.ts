@@ -115,6 +115,24 @@ describe("filterTraces", () => {
   });
 });
 
+describe("filterTraces free text", () => {
+  it("filters by free text across action/resource/payload/response/error", () => {
+    const base = (over: Partial<ProxyTrace>): ProxyTrace => ({
+      seq: 1, event_id: "e", timestamp: "t", agent_id: "a", target_system: "github",
+      action_type: "read_repo", resource: "acme/x", request_payload: {}, ok: true, status_code: 200,
+      side_effect_hash: null, error: null, run_id: "r1", response: {}, ...over });
+    const list = [
+      base({ seq: 1, action_type: "open_pr", resource: "acme/x" }),
+      base({ seq: 2, action_type: "read_repo", response: { note: "merged" } }),
+      base({ seq: 3, error: "policy denied" }),
+    ];
+    expect(filterTraces(list, { text: "open_pr" }).map((t) => t.seq)).toEqual([1]);
+    expect(filterTraces(list, { text: "merged" }).map((t) => t.seq)).toEqual([2]); // response
+    expect(filterTraces(list, { text: "denied" }).map((t) => t.seq)).toEqual([3]); // error
+    expect(filterTraces(list, {}).map((t) => t.seq)).toEqual([1, 2, 3]); // empty pass-through
+  });
+});
+
 describe("distinctValues", () => {
   const mixed: ProxyTrace[] = [
     { ...traces[0], agent_id: "b", target_system: "github" },

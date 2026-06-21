@@ -120,6 +120,26 @@ export function groupSessions(
   return sessions;
 }
 
+/** Narrow sessions to exchanges whose action_type/resource matches `text`
+ *  (case-insensitive). Empty text returns the input unchanged. A session with
+ *  no matching exchange is dropped. Pure (I4). */
+export function filterSessionsText(sessions: Session[], text: string): Session[] {
+  const needle = text.trim().toLowerCase();
+  if (!needle) {
+    return sessions;
+  }
+  const out: Session[] = [];
+  for (const s of sessions) {
+    const exchanges = s.exchanges.filter((e) =>
+      `${e.intent.action_type}\n${e.intent.resource}`.toLowerCase().includes(needle),
+    );
+    if (exchanges.length > 0) {
+      out.push({ ...s, exchanges, total: exchanges.length });
+    }
+  }
+  return out;
+}
+
 /** Total failed exchanges across sessions (drives the menu badge). */
 export function sessionsFailed(sessions: Session[]): number {
   return sessions.reduce((n, s) => n + s.failed, 0);
