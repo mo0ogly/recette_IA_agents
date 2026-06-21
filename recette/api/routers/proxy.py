@@ -22,6 +22,23 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 
 from ...platform.proxy.reconcile import wire_flow_side_effect_hash
+from ...platform.proxy.redact import redact_mapping, redaction_enabled
+
+
+def _redacted_view(d: dict) -> dict:
+    """Redact secret shapes in an emitted VIEW dict, preserving the integrity hash.
+
+    Best-effort masking for the console (default ON, ``INSPECT_IA_AGENTS_PROXY_REDACT``
+    to disable). Transforms the emitted dict only -- never the recorded
+    WireFlow/ProxyTrace objects or the audit log (I1). ``side_effect_hash`` is
+    restored verbatim so the integrity value is never altered."""
+    if not redaction_enabled():
+        return d
+    seh = d.get("side_effect_hash")
+    out = {k: redact_mapping(v) for k, v in d.items()}
+    out["side_effect_hash"] = seh  # never redact the integrity hash
+    return out
+
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
 
@@ -71,7 +88,7 @@ def list_traces(request: Request, tail: int | None = None, run_id: str | None = 
         traces = traces[-tail:]
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
-        "traces": [t.to_dict() for t in traces],
+        "traces": [_redacted_view(t.to_dict()) for t in traces],
     }
 
 
@@ -307,7 +324,7 @@ def list_wire_flows(request: Request, tail: int | None = None, run_id: str | Non
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
-        "flows": [_enrich(f.to_dict()) for f in flows],
+        "flows": [_redacted_view(_enrich(f.to_dict())) for f in flows],
     }
 
 
