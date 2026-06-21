@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WireFlow } from "../../types/platform";
-import { flowsToHar, toJsonl } from "./proxyExport";
+import { byteLen, flowsToHar, toJsonl } from "./proxyExport";
 
 function wire(over: Partial<WireFlow>): WireFlow {
   return {
@@ -18,6 +18,14 @@ describe("toJsonl", () => {
   });
   it("returns empty string for no items", () => {
     expect(toJsonl([])).toBe("");
+  });
+});
+
+describe("byteLen", () => {
+  it("counts UTF-8 bytes, not UTF-16 code units", () => {
+    expect(byteLen("abc")).toBe(3);
+    expect(byteLen("é")).toBe(2);
+    expect(byteLen("😀")).toBe(4);
   });
 });
 

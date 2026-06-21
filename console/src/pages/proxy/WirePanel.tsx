@@ -21,7 +21,7 @@ import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
-import { downloadFile, flowsToHar, toJsonl } from "./proxyExport";
+import { byteLen, downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
   distinctWireValues,
   filterWireFlows,
@@ -32,6 +32,23 @@ import {
 
 const POLL_INTERVAL_MS = 2000;
 
+// The char length a clamped body is truncated to, kept in sync with the backend
+// ring in recette/platform/proxy/wire.py (MAX_BODY_CHARS). A captured body whose
+// length reaches this bound was clamped by the recorder (the backend appends a
+// truncation marker past it), so the panel flags it as truncated.
+const WIRE_BODY_CLAMP = 16_384;
+
+/** Render a body for display: pretty-print valid JSON when requested, else raw.
+ *  Pure (no clock, no I/O); non-JSON falls back to the raw text. */
+function renderBody(body: string, pretty: boolean): string {
+  if (!pretty) return body;
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body; // not JSON -> raw
+  }
+}
+
 export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.Element {
   const [flows, setFlows] = useState<WireFlow[]>([]);
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -40,6 +57,8 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [nextStep, setNextStep] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
+  // Pretty-print toggle for the request/response body panes (display-only).
+  const [pretty, setPretty] = useState(false);
 
   // Filter clauses live in the URL query string (deep-linkable + shareable):
   // host/method/status/q (free text) own their own keys, plus a read of the
@@ -339,13 +358,46 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
               <dd>{selected.status_code}</dd>
               <dt>content-type</dt>
               <dd>{selected.content_type || "-"}</dd>
-              <dt>corps requete</dt>
+              <dt>affichage</dt>
               <dd>
-                <pre className="proxy-wire-body">{selected.request_body || "(vide)"}</pre>
+                <button
+                  type="button"
+                  className="proxy-export"
+                  data-testid="wire-pretty-toggle"
+                  onClick={() => setPretty((p) => !p)}
+                >
+                  {pretty ? "Brut" : "Pretty"}
+                </button>
               </dd>
-              <dt>corps reponse</dt>
+              <dt>
+                corps requete
+                <span className="proxy-wire-size">
+                  {" "}
+                  {byteLen(selected.request_body)} o
+                  {selected.request_body.length >= WIRE_BODY_CLAMP && (
+                    <span data-testid="wire-req-truncated"> (tronque)</span>
+                  )}
+                </span>
+              </dt>
               <dd>
-                <pre className="proxy-wire-body">{selected.response_body || "(vide)"}</pre>
+                <pre className="proxy-wire-body">
+                  {renderBody(selected.request_body, pretty) || "(vide)"}
+                </pre>
+              </dd>
+              <dt>
+                corps reponse
+                <span className="proxy-wire-size">
+                  {" "}
+                  {byteLen(selected.response_body)} o
+                  {selected.response_body.length >= WIRE_BODY_CLAMP && (
+                    <span data-testid="wire-resp-truncated"> (tronque)</span>
+                  )}
+                </span>
+              </dt>
+              <dd>
+                <pre className="proxy-wire-body">
+                  {renderBody(selected.response_body, pretty) || "(vide)"}
+                </pre>
               </dd>
             </dl>
           )}

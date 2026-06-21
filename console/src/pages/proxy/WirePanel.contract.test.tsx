@@ -123,6 +123,18 @@ describe("WirePanel (R16 contract)", () => {
     expect(detail).toHaveTextContent("201");
   });
 
+  it("pretty-prints a JSON body on toggle and shows a UTF-8 size indicator", async () => {
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(within(list).getAllByRole("button")[0]);
+    const detail = await screen.findByTestId("wire-detail");
+    // A byte-size indicator (number followed by " o") is shown for the bodies.
+    expect(detail).toHaveTextContent(/\d+ o/);
+    // Compact JSON request_body: pretty toggle reformats it with indentation.
+    fireEvent.click(screen.getByTestId("wire-pretty-toggle"));
+    await waitFor(() => expect(detail.textContent).toMatch(/\n {2}/));
+  });
+
   it("copies a curl command for the selected flow", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");

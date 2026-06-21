@@ -7,6 +7,11 @@
 
 import type { WireFlow } from "../../types/platform";
 
+/** UTF-8 byte length of a string. */
+export function byteLen(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
 /** One JSON object per line (oldest first). Empty list -> empty string. */
 export function toJsonl(items: readonly unknown[]): string {
   return items.map((it) => JSON.stringify(it)).join("\n");
