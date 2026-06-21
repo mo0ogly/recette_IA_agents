@@ -226,6 +226,20 @@
   grid-column: 1 / -1;
 }
 
+/* DECIDE altitude: the agent's "why" (chosen tool + reasoning) that drove this
+   exchange. Spans both columns above the DID req<->resp pair. */
+.proxy-decision {
+  grid-column: 1 / -1;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent, var(--color-border));
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
 /* Source menu (registry-driven switcher: app traces / wire overlay /
    reconciliation). A segmented group of toggle buttons, each with a hint and a
    live badge fed by the mounted panel's reported status. */

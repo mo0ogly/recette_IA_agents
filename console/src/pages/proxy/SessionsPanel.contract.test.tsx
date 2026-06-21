@@ -13,10 +13,11 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getReconcile } from "../../api/client";
+import { getReconcile, getRunEvents } from "../../api/client";
 import type {
   ProxyTraceResponse,
   ReconcileReport,
+  RunEvent,
   WireFlowResponse,
 } from "../../types/platform";
 import fixture from "./__fixtures__/sessions.fixture.json";
@@ -52,10 +53,23 @@ const ghostReconcile: ReconcileReport = {
   strict: true,
 };
 
+// Ordered tool_call decisions for RUN_WITH_WIRE's three exchanges (real wire
+// shape: type + nested data.{name,args}). Order matches the fixture run's
+// exchanges (list_repos, read_repo, open_issue) so the i-th decision folds onto
+// the i-th exchange.
+const runEvents: RunEvent[] = [
+  { seq: 1, type: "step", data: { index: 0, decision: { text: "enumerate repos" } } },
+  { seq: 2, type: "tool_call", data: { index: 0, name: "list_repos", args: { resource: "acme/x" } } },
+  { seq: 3, type: "step", data: { index: 1, decision: { text: "read the target" } } },
+  { seq: 4, type: "tool_call", data: { index: 1, name: "read_repo", args: { resource: "acme/x" } } },
+  { seq: 5, type: "tool_call", data: { index: 2, name: "open_issue", args: { resource: "acme/x" } } },
+];
+
 vi.mock("../../api/client", () => ({
   getProxyTraces: vi.fn(() => Promise.resolve(fixture as ProxyTraceResponse)),
   getWireFlows: vi.fn(() => Promise.resolve(wireFixture as WireFlowResponse)),
   getReconcile: vi.fn(() => Promise.resolve(okReconcile)),
+  getRunEvents: vi.fn(() => Promise.resolve(runEvents)),
 }));
 
 // Stub Monaco so its rendered value is assertable in jsdom.
@@ -144,6 +158,24 @@ describe("SessionsPanel (R16 contract)", () => {
     fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
     await screen.findByTestId("exchange-intent");
     expect(screen.queryByTestId("exchange-ghost")).not.toBeInTheDocument();
+  });
+
+  it("shows the DECIDE altitude (the why) for an exchange from the run's events", async () => {
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    const decision = await screen.findByTestId("exchange-decision");
+    expect(decision).toHaveTextContent("list_repos");
+    expect(decision).toHaveTextContent("enumerate repos");
+  });
+
+  it("renders gracefully (no decision, no crash) when getRunEvents rejects", async () => {
+    vi.mocked(getRunEvents).mockRejectedValue(new Error("events unavailable"));
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    await screen.findByTestId("exchange-intent");
+    expect(screen.queryByTestId("exchange-decision")).not.toBeInTheDocument();
   });
 
   it("reports status up via onStatus without looping on a stable ref", async () => {

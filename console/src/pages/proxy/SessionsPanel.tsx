@@ -19,10 +19,11 @@ import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, use
 import type { ErrorInfo, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getProxyTraces, getReconcile, getWireFlows } from "../../api/client";
+import { getProxyTraces, getReconcile, getRunEvents, getWireFlows } from "../../api/client";
 import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
+import { type Decision, decisionForIndex, decisionsFromEvents } from "./decisionModel";
 import {
   type Exchange,
   filterSessionsText,
@@ -75,6 +76,9 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   // Hashes of wire flows the reconcile join flags as non-mediated (no matching
   // audit event = a ghost / shadow-AI path). Read-only overlay over the view.
   const [bypassHashes, setBypassHashes] = useState<Set<string>>(new Set());
+  // DECIDE altitude: per-tool_call decisions of the preselected run, in order;
+  // the i-th decision maps to the i-th governed exchange of the session.
+  const [decisions, setDecisions] = useState<Decision[]>([]);
 
   // Deep-link: ?run=<run_id> auto-selects that run's session without a click,
   // so a "Voir dans le proxy" button from the cockpit lands on its exchanges.
@@ -124,6 +128,18 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
         );
       } catch {
         setBypassHashes(new Set());
+      }
+      // DECIDE altitude (the agent's "why"): pull the run's ordered tool_call
+      // decisions when a run is preselected. Optional overlay -- a failure must
+      // never blank the view (it only reads run frames, mutates nothing).
+      if (runParam) {
+        try {
+          setDecisions(decisionsFromEvents(await getRunEvents(runParam)));
+        } catch {
+          setDecisions([]);
+        }
+      } else {
+        setDecisions([]);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -273,11 +289,16 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
             <div className="proxy-viewer-msg">selectionner une session a gauche</div>
           ) : (
             <ul className="proxy-list" aria-label="session exchanges">
-              {selected.exchanges.map((ex) => {
+              {selected.exchanges.map((ex, idx) => {
                 // Bind the optional wire to a const so the copy-curl handler
                 // closure keeps the non-undefined narrowing (TS loses it inside
                 // an onClick closure otherwise).
                 const wire = ex.wire;
+                // Three altitudes -- DECLARE (manifest target/cap on the trace)
+                // / DECIDE (this: the agent's "why", the chosen tool + reasoning)
+                // / DID (intent+response+wire below). The i-th exchange maps to
+                // the i-th tool_call decision of the run, in order.
+                const decision = decisionForIndex(decisions, idx);
                 return (
                 <li key={ex.seq}>
                   <button
@@ -301,6 +322,14 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
                   </button>
                   {expandedSeq === ex.seq && (
                     <div className="proxy-exchange">
+                      {decision !== undefined && (
+                        // DECIDE altitude: the agent's reasoning + chosen tool
+                        // that drove this exchange (graceful: no decision -> no
+                        // block).
+                        <div className="proxy-decision" data-testid="exchange-decision">
+                          decision: {decision.toolName ?? "tool_call"} -- {decision.summary}
+                        </div>
+                      )}
                       {ex.hash !== null && bypassHashes.has(ex.hash) && (
                         // Reconcile flagged this exchange's side effect as having
                         // no matching audit event: a non-mediated (ghost) path.
