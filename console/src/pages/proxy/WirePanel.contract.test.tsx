@@ -48,9 +48,38 @@ describe("WirePanel (R16 contract)", () => {
     expect(screen.getByText(/2 flux, 1 echec/)).toBeInTheDocument();
   });
 
-  it("shows the disabled banner when the overlay is off", async () => {
-    // The captured fixture has enabled=false (no INSPECT_IA_AGENTS_WIRE_PROXY in the
-    // capture env): the panel must explain how to enable it, not show a bare list.
+  it("shows the disabled banner when the overlay is off and no flows arrived", async () => {
+    // enabled=false (no INSPECT_IA_AGENTS_WIRE_PROXY in the capture env) AND an
+    // empty buffer: the panel must explain how to enable it, not show a bare
+    // empty list as a steady state.
+    vi.mocked(getWireFlows).mockResolvedValue({
+      enabled: false,
+      proxy_url: null,
+      flows: [],
+    });
+    render(<WirePanel />);
+    expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
+  });
+
+  it("hides the how-to-enable banner when flows arrived despite the overlay being off", async () => {
+    // Flows can reach the buffer via the transport-route registry even when
+    // INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false). The captured fixture is
+    // exactly that case: enabled=false WITH real flows. The how-to-enable
+    // banner must yield to the actual data, not sit on top of it.
+    render(<WirePanel />);
+    const list = await screen.findByLabelText("wire flows");
+    expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
+    expect(screen.queryByText(/wire up/)).toBeNull();
+    expect(screen.queryByText(/INSPECT_IA_AGENTS_WIRE_PROXY/)).toBeNull();
+    expect(screen.queryByTestId("wire-disabled")).toBeNull();
+  });
+
+  it("shows the how-to-enable banner when the overlay is off and there are no flows", async () => {
+    vi.mocked(getWireFlows).mockResolvedValue({
+      enabled: false,
+      proxy_url: null,
+      flows: [],
+    });
     render(<WirePanel />);
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
   });

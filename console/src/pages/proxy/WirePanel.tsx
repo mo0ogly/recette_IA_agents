@@ -245,7 +245,10 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         </p>
       )}
 
-      {enabled === false && (
+      {/* Flows can arrive via the transport-route registry even when
+          INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
+          how-to-enable banner to actual data. */}
+      {enabled === false && flows.length === 0 && (
         <p className="proxy-banner" role="status" data-testid="wire-disabled">
           Surcouche wire desactivee. Demarrer mitmproxy avec
           <code> ./recette.sh wire up</code>, puis exporter
