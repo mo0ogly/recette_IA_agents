@@ -23,6 +23,7 @@ import type { ErrorInfo, ReactNode } from "react";
 import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
 import type { ProxyTrace } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
+import { downloadFile } from "./proxyExport";
 import {
   distinctValues,
   failureCount,
@@ -145,13 +146,7 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
 
   const onExport = useCallback((): void => {
     // Forensic snapshot of the CURRENTLY shown traces (bounded by the ring).
-    const blob = new Blob([`${tracesToJsonl(shown)}\n`], { type: "application/x-ndjson" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "proxy-traces.jsonl";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadFile(`${tracesToJsonl(shown)}\n`, "proxy-traces.jsonl", "application/x-ndjson");
   }, [shown]);
 
   return (
