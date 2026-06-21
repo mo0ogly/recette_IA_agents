@@ -44,6 +44,18 @@ function renderWire(entries: string[] = ["/proxy"]): void {
   );
 }
 
+/**
+ * The per-flow SELECT buttons (one per flow). Each list row now carries two
+ * buttons -- the select button (`proxy-list-item`) and a "comparer" button --
+ * so the flow count is the count of select buttons, queried by class rather
+ * than the raw button role.
+ */
+function selectButtons(list: HTMLElement): HTMLElement[] {
+  return within(list)
+    .getAllByRole("button")
+    .filter((b) => b.classList.contains("proxy-list-item"));
+}
+
 describe("WirePanel (R16 contract)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,7 +72,7 @@ describe("WirePanel (R16 contract)", () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
     // The fixture has two flows; both lines show up, newest-first ordering kept.
-    expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
+    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
     expect(screen.getByText(/2 flux, 1 echec/)).toBeInTheDocument();
   });
 
@@ -84,7 +96,7 @@ describe("WirePanel (R16 contract)", () => {
     // banner must yield to the actual data, not sit on top of it.
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
+    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
     expect(screen.queryByText(/wire up/)).toBeNull();
     expect(screen.queryByText(/INSPECT_IA_AGENTS_WIRE_PROXY/)).toBeNull();
     expect(screen.queryByTestId("wire-disabled")).toBeNull();
@@ -115,7 +127,7 @@ describe("WirePanel (R16 contract)", () => {
   it("inspects a selected flow's request and response bodies", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     // The first fixture flow is the open_pr request -> 201 success body.
     expect(detail).toHaveTextContent("open_pr");
@@ -126,7 +138,7 @@ describe("WirePanel (R16 contract)", () => {
   it("pretty-prints a JSON body on toggle and shows a UTF-8 size indicator", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     // A byte-size indicator (number followed by " o") is shown for the bodies.
     expect(detail).toHaveTextContent(/\d+ o/);
@@ -138,7 +150,7 @@ describe("WirePanel (R16 contract)", () => {
   it("copies a curl command for the selected flow", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     const copy = await screen.findByTestId("wire-copy-curl");
     fireEvent.click(copy);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
@@ -178,15 +190,15 @@ describe("WirePanel (R16 contract)", () => {
     // request_body carries the "open_pr" token, so it is the only match.
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
+    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
 
     const text = screen.getByTestId("wire-filter-text");
     fireEvent.change(text, { target: { value: "open_pr" } });
 
     await waitFor(() =>
-      expect(within(list).getAllByRole("button").length).toBeLessThan(fixture.flows.length),
+      expect(selectButtons(list).length).toBeLessThan(fixture.flows.length),
     );
-    expect(within(list).getAllByRole("button")).toHaveLength(1);
+    expect(selectButtons(list)).toHaveLength(1);
   });
 
   it("flags a body clamped by the backend (truncation marker) and not a normal body", async () => {
@@ -206,7 +218,7 @@ describe("WirePanel (R16 contract)", () => {
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     await screen.findByTestId("wire-detail");
     expect(screen.getByTestId("wire-req-truncated")).toBeInTheDocument();
   });
@@ -216,7 +228,7 @@ describe("WirePanel (R16 contract)", () => {
     // truncation marker -> no truncated badge.
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     await screen.findByTestId("wire-detail");
     expect(screen.queryByTestId("wire-req-truncated")).toBeNull();
     expect(screen.queryByTestId("wire-resp-truncated")).toBeNull();
@@ -232,7 +244,7 @@ describe("WirePanel (R16 contract)", () => {
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    fireEvent.click(within(list).getAllByRole("button")[0]);
+    fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     expect(detail).toHaveTextContent("42 ms");
   });
@@ -251,7 +263,7 @@ describe("WirePanel (R16 contract)", () => {
     renderWire(["/proxy?source=wire&q=open_pr"]);
     const list = await screen.findByLabelText("wire flows");
     await waitFor(() =>
-      expect(within(list).getAllByRole("button")).toHaveLength(1),
+      expect(selectButtons(list)).toHaveLength(1),
     );
     // The free-text input reflects the URL value (controlled by the query).
     expect(screen.getByTestId("wire-filter-text")).toHaveValue("open_pr");
@@ -264,7 +276,7 @@ describe("WirePanel (R16 contract)", () => {
     renderWire(["/proxy?source=wire&host=127.0.0.1"]);
     const list = await screen.findByLabelText("wire flows");
     await waitFor(() =>
-      expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length),
+      expect(selectButtons(list)).toHaveLength(fixture.flows.length),
     );
     expect(screen.getByDisplayValue("127.0.0.1")).toBeInTheDocument();
   });
@@ -275,5 +287,42 @@ describe("WirePanel (R16 contract)", () => {
     await waitFor(() =>
       expect(screen.getByText("aucun flux")).toBeInTheDocument(),
     );
+  });
+
+  it("diffs two wire flows side by side (select A, compare B)", async () => {
+    // The fixture has two flows that differ (seq/status/bodies): selecting flow
+    // #1 then comparing against flow #2 renders a side-by-side line diff with at
+    // least one differing line (e.g. the seq or the status_code).
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    // Select flow A (first list-item button is its select button).
+    fireEvent.click(selectButtons(list)[0]);
+    await screen.findByTestId("wire-detail");
+    // Compare against flow B (#2) via its per-row compare button.
+    fireEvent.click(screen.getByTestId("wire-compare-2"));
+
+    const diff = await screen.findByTestId("wire-diff");
+    expect(diff).toBeInTheDocument();
+    // A changed line must be present: flow #2's seq value (2) appears only on
+    // the right side of a differing row.
+    const rightCells = within(diff)
+      .getAllByRole("cell")
+      .filter((c) => c.getAttribute("data-side") === "right");
+    expect(rightCells.some((c) => c.textContent?.includes('"seq": 2'))).toBe(true);
+    // And flow #1's seq value (1) appears on the left side of a differing row.
+    const leftCells = within(diff)
+      .getAllByRole("cell")
+      .filter((c) => c.getAttribute("data-side") === "left");
+    expect(leftCells.some((c) => c.textContent?.includes('"seq": 1'))).toBe(true);
+  });
+
+  it("clears the compare selection (X resets the diff)", async () => {
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(selectButtons(list)[0]);
+    fireEvent.click(screen.getByTestId("wire-compare-2"));
+    await screen.findByTestId("wire-diff");
+    fireEvent.click(screen.getByTestId("wire-diff-clear"));
+    await waitFor(() => expect(screen.queryByTestId("wire-diff")).toBeNull());
   });
 });

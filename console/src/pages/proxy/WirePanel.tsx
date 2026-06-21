@@ -21,6 +21,7 @@ import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
+import { lineDiff } from "./diff";
 import { byteLen, downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
   distinctWireValues,
@@ -52,6 +53,9 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
+  // Second selection: the flow to compare the selected one against (a line diff
+  // of their pretty-printed JSON -- e.g. a failing call vs a passing one).
+  const [compareSeq, setCompareSeq] = useState<number | null>(null);
   const [nextStep, setNextStep] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   // Pretty-print toggle for the request/response body panes (display-only).
@@ -134,6 +138,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     try {
       await clearWireFlows();
       setSelectedSeq(null);
+      setCompareSeq(null);
       await refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -168,6 +173,22 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const selected = useMemo(
     () => shown.find((f) => f.seq === selectedSeq) ?? null,
     [shown, selectedSeq],
+  );
+  const compareFlow = useMemo(
+    () => shown.find((f) => f.seq === compareSeq) ?? null,
+    [shown, compareSeq],
+  );
+  // Side-by-side line diff of the two flows' pretty-printed JSON. Pure (I4):
+  // a deterministic function of the two selected flows (no clock, no I/O).
+  const diffRows = useMemo(
+    () =>
+      selected !== null && compareFlow !== null
+        ? lineDiff(
+            JSON.stringify(selected, null, 2),
+            JSON.stringify(compareFlow, null, 2),
+          )
+        : null,
+    [selected, compareFlow],
   );
 
   const onExportJsonl = useCallback((): void => {
@@ -335,6 +356,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
                   <span className="proxy-label">{l.label}</span>
                   <span className="proxy-wire-bar" style={{ width: `${pct}%` }} />
                 </button>
+                <button
+                  type="button"
+                  className="proxy-export proxy-wire-compare-btn"
+                  data-testid={`wire-compare-${l.seq}`}
+                  data-active={l.seq === compareSeq}
+                  onClick={() => setCompareSeq(l.seq)}
+                >
+                  comparer
+                </button>
               </li>
             );
           })}
@@ -415,6 +445,38 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           )}
         </div>
       </div>
+
+      {diffRows !== null && selected !== null && compareFlow !== null && (
+        <div className="proxy-wire-diff" data-testid="wire-diff">
+          <div className="proxy-wire-diff-head">
+            <span>
+              diff: #{selected.seq} vs #{compareFlow.seq}
+            </span>
+            <button
+              type="button"
+              className="proxy-export"
+              data-testid="wire-diff-clear"
+              onClick={() => setCompareSeq(null)}
+            >
+              X
+            </button>
+          </div>
+          <table className="proxy-wire-diff-table">
+            <tbody>
+              {diffRows.map((row, i) => (
+                <tr key={i} className="proxy-wire-diff-row" data-kind={row.kind}>
+                  <td className="proxy-wire-diff-cell" data-side="left">
+                    {row.left}
+                  </td>
+                  <td className="proxy-wire-diff-cell" data-side="right">
+                    {row.right}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
