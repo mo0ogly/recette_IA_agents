@@ -41,3 +41,48 @@ export function wireFlowJson(flows: WireFlow[], seq: number | null): string {
 export function wireFailureCount(flows: WireFlow[]): number {
   return flows.reduce((n, f) => (f.ok ? n : n + 1), 0);
 }
+
+/** Filter over wire flows (all clauses AND; empty = pass-through). */
+export interface WireFlowFilter {
+  host?: string;
+  method?: string;
+  status?: string; // string for select binding; compared to String(status_code)
+  runId?: string;
+  /** Free text, matched case-insensitively in path + request_body + response_body. */
+  text?: string;
+}
+
+export function isEmptyWireFilter(f: WireFlowFilter): boolean {
+  return !f.host && !f.method && !f.status && !f.runId && !f.text;
+}
+
+export function filterWireFlows(flows: WireFlow[], f: WireFlowFilter): WireFlow[] {
+  if (isEmptyWireFilter(f)) {
+    return flows;
+  }
+  const needle = f.text?.toLowerCase();
+  return flows.filter((flow) => {
+    if (f.host && flow.host !== f.host) return false;
+    if (f.method && flow.method !== f.method) return false;
+    if (f.status && String(flow.status_code) !== f.status) return false;
+    if (f.runId && flow.run_id !== f.runId) return false;
+    if (needle) {
+      const hay = `${flow.path}\n${flow.request_body}\n${flow.response_body}`.toLowerCase();
+      if (!hay.includes(needle)) return false;
+    }
+    return true;
+  });
+}
+
+/** Distinct values of a flow field, sorted, for select options. */
+export function distinctWireValues(
+  flows: WireFlow[],
+  key: "host" | "method" | "run_id",
+): string[] {
+  const set = new Set<string>();
+  for (const flow of flows) {
+    const v = key === "run_id" ? flow.run_id : flow[key];
+    if (v) set.add(String(v));
+  }
+  return [...set].sort();
+}
