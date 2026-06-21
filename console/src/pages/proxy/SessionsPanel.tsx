@@ -327,7 +327,7 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
                         // that drove this exchange (graceful: no decision -> no
                         // block).
                         <div className="proxy-decision" data-testid="exchange-decision">
-                          decision: {decision.toolName ?? "tool_call"} -- {decision.summary}
+                          decision: {decision.summary}
                         </div>
                       )}
                       {ex.hash !== null && bypassHashes.has(ex.hash) && (
