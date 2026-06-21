@@ -19,6 +19,7 @@ import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/clie
 import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
+import { wireFlowToCurl } from "./curl";
 import { downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
   distinctWireValues,
@@ -285,6 +286,17 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
             <p className="proxy-viewer-msg">selectionner un flux a gauche</p>
           ) : (
             <dl className="proxy-wire-kv" data-testid="wire-detail">
+              <dt>replay</dt>
+              <dd>
+                <button
+                  type="button"
+                  className="proxy-export"
+                  data-testid="wire-copy-curl"
+                  onClick={() => void navigator.clipboard?.writeText(wireFlowToCurl(selected))}
+                >
+                  Copy curl
+                </button>
+              </dd>
               <dt>requete</dt>
               <dd>
                 {selected.method} {selected.scheme}://{selected.host}:{selected.port}

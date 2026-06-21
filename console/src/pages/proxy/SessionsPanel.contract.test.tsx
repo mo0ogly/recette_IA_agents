@@ -11,7 +11,7 @@
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProxyTraceResponse, WireFlowResponse } from "../../types/platform";
 import fixture from "./__fixtures__/sessions.fixture.json";
@@ -31,6 +31,11 @@ vi.mock("../../api/client", () => ({
 vi.mock("../../components/MonacoJsonViewer", () => ({
   default: ({ value }: { value: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
+
+// jsdom has no clipboard; stub it so the copy-curl path runs.
+beforeEach(() => {
+  Object.assign(navigator, { clipboard: { writeText: vi.fn() } });
+});
 
 afterEach(() => vi.clearAllMocks());
 
@@ -74,6 +79,17 @@ describe("SessionsPanel (R16 contract)", () => {
     // Prove the wire OBJECT is rendered (not just the serialized request_body
     // string): a top-level wire field from the fixture (path) must be present.
     expect(screen.getByText(/\/github\/execute/)).toBeInTheDocument();
+  });
+
+  it("copies a curl command for an exchange with a matched wire flow", async () => {
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    const copy = await screen.findByTestId("exchange-copy-curl");
+    fireEvent.click(copy);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      expect.stringContaining("curl -X"),
+    );
   });
 
   it("preselects the run named in ?run= without a click", async () => {

@@ -22,6 +22,7 @@ import { useSearchParams } from "react-router-dom";
 import { getProxyTraces, getWireFlows } from "../../api/client";
 import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
+import { wireFlowToCurl } from "./curl";
 import {
   type Exchange,
   filterSessionsText,
@@ -254,7 +255,12 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
             <div className="proxy-viewer-msg">selectionner une session a gauche</div>
           ) : (
             <ul className="proxy-list" aria-label="session exchanges">
-              {selected.exchanges.map((ex) => (
+              {selected.exchanges.map((ex) => {
+                // Bind the optional wire to a const so the copy-curl handler
+                // closure keeps the non-undefined narrowing (TS loses it inside
+                // an onClick closure otherwise).
+                const wire = ex.wire;
+                return (
                 <li key={ex.seq}>
                   <button
                     type="button"
@@ -302,10 +308,23 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
                           wire (octets)
                         </button>
                       )}
+                      {wire && (
+                        <button
+                          type="button"
+                          className="proxy-export"
+                          data-testid="exchange-copy-curl"
+                          onClick={() =>
+                            void navigator.clipboard?.writeText(wireFlowToCurl(wire))
+                          }
+                        >
+                          Copy curl
+                        </button>
+                      )}
                     </div>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

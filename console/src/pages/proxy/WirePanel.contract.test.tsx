@@ -38,6 +38,8 @@ describe("WirePanel (R16 contract)", () => {
     // jsdom has no Blob URL plumbing; stub it so the export download path runs.
     (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => "blob:x");
     (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
+    // jsdom has no clipboard; stub it so the copy-curl path runs.
+    Object.assign(navigator, { clipboard: { writeText: vi.fn() } });
   });
 
   it("renders the captured flows without crashing", async () => {
@@ -105,6 +107,17 @@ describe("WirePanel (R16 contract)", () => {
     expect(detail).toHaveTextContent("open_pr");
     expect(detail).toHaveTextContent('"number":42');
     expect(detail).toHaveTextContent("201");
+  });
+
+  it("copies a curl command for the selected flow", async () => {
+    render(<WirePanel />);
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(within(list).getAllByRole("button")[0]);
+    const copy = await screen.findByTestId("wire-copy-curl");
+    fireEvent.click(copy);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      expect.stringContaining("curl -X"),
+    );
   });
 
   it("starts the overlay and surfaces the honest next_step note", async () => {
