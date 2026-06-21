@@ -40,9 +40,9 @@ import ProxyPage from "./index";
 
 const fixture = tracesFixture as ProxyTraceResponse;
 
-function renderPage(): void {
+function renderPage(entries: string[] = ["/proxy"]): void {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={entries}>
       <ProxyPage />
     </MemoryRouter>,
   );
@@ -166,6 +166,26 @@ describe("ProxyPage (R16 contract)", () => {
     fireEvent.change(outcomeSelect, { target: { value: "fail" } });
     await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(1));
     expect(within(list).getByRole("button")).toHaveTextContent("#2");
+  });
+
+  it("opens the app traces pre-filtered by free text from ?q= on first render", async () => {
+    // The default source is the app-traces panel. Its free-text filter (`q`)
+    // is deep-linkable: opening at /proxy?q=open_pr must narrow the list on the
+    // first render with no typing. Two distinct traces, only #2 matches.
+    const t0 = fixture.traces[0];
+    vi.mocked(getProxyTraces).mockResolvedValue({
+      debug_enabled: true,
+      traces: [
+        { ...t0, seq: 1, action_type: "list_repos" },
+        { ...t0, seq: 2, action_type: "open_pr" },
+      ],
+    });
+    renderPage(["/proxy?q=open_pr"]);
+    const list = await screen.findByRole("list", { name: "proxy traces" });
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(1));
+    expect(within(list).getByRole("button")).toHaveTextContent("#2");
+    // The free-text input reflects the URL value (controlled by the query).
+    expect(screen.getByTestId("app-filter-text")).toHaveValue("open_pr");
   });
 
   it("filters the list by run_id (F3 run <-> traces link)", async () => {

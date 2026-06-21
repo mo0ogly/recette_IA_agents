@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
 import ProxySelector from "../../components/ProxySelector";
@@ -39,10 +40,44 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [nextStep, setNextStep] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
-  // Filter clauses (ephemeral UI state): narrow the captured flows by host,
-  // method, status, originating run, or free text. The status reported up via
+
+  // Filter clauses live in the URL query string (deep-linkable + shareable):
+  // host/method/status/q (free text) own their own keys, plus a read of the
+  // page-owned `run`. The derived filter is the single source of truth -- there
+  // is no duplicate local state for these keys. The status reported up via
   // onStatus stays on the FULL buffer, not the filtered view.
-  const [filter, setFilter] = useState<WireFlowFilter>({});
+  const [params, setParams] = useSearchParams();
+  const filter: WireFlowFilter = useMemo(
+    () => ({
+      host: params.get("host") ?? undefined,
+      method: params.get("method") ?? undefined,
+      status: params.get("status") ?? undefined,
+      runId: params.get("run") ?? undefined,
+      text: params.get("q") ?? undefined,
+    }),
+    [params],
+  );
+
+  // Set/delete ONE query key without clobbering the others (notably the
+  // page-owned `source` and `run`): WirePanel only ever writes host/method/
+  // status/q. `replace` keeps filtering out of the back/forward history.
+  const setParam = useCallback(
+    (key: string, value: string): void => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) {
+            next.set(key, value);
+          } else {
+            next.delete(key);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -168,9 +203,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           <select
             className="proxy-filter-input"
             value={filter.host ?? ""}
-            onChange={(e) =>
-              setFilter((p) => ({ ...p, host: e.target.value || undefined }))
-            }
+            onChange={(e) => setParam("host", e.target.value)}
           >
             <option value="">tous</option>
             {hosts.map((h) => (
@@ -185,9 +218,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           <select
             className="proxy-filter-input"
             value={filter.method ?? ""}
-            onChange={(e) =>
-              setFilter((p) => ({ ...p, method: e.target.value || undefined }))
-            }
+            onChange={(e) => setParam("method", e.target.value)}
           >
             <option value="">toutes</option>
             {methods.map((m) => (
@@ -204,19 +235,23 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
             type="text"
             data-testid="wire-filter-status"
             value={filter.status ?? ""}
-            onChange={(e) =>
-              setFilter((p) => ({ ...p, status: e.target.value || undefined }))
-            }
+            onChange={(e) => setParam("status", e.target.value)}
           />
         </label>
         <label className="proxy-filter-label">
           run_id
+          {/* `run` is page-owned (set by the cockpit "Voir dans le proxy"
+              deep-link). This panel READS it to narrow the flows; it only ever
+              SETS run (selecting a run), it never deletes it -- so an empty
+              selection is a no-op rather than clobbering the page's run. */}
           <select
             className="proxy-filter-input"
             value={filter.runId ?? ""}
-            onChange={(e) =>
-              setFilter((p) => ({ ...p, runId: e.target.value || undefined }))
-            }
+            onChange={(e) => {
+              if (e.target.value) {
+                setParam("run", e.target.value);
+              }
+            }}
           >
             <option value="">tous</option>
             {runIds.map((r) => (
@@ -233,9 +268,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
             type="text"
             data-testid="wire-filter-text"
             value={filter.text ?? ""}
-            onChange={(e) =>
-              setFilter((p) => ({ ...p, text: e.target.value || undefined }))
-            }
+            onChange={(e) => setParam("q", e.target.value)}
           />
         </label>
       </div>

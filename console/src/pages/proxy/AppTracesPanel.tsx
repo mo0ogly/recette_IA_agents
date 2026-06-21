@@ -28,6 +28,7 @@ import {
   useState,
 } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
 import type { ProxyTrace } from "../../types/platform";
@@ -83,13 +84,34 @@ export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): 
   const [error, setError] = useState<string | null>(null);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [mode, setMode] = useState<ViewerMode>("trace");
-  // Filter clauses (ephemeral UI state): narrow the list/stream by agent,
-  // target or originating run (F3).
+  // Filter clauses: agent/target/run/outcome stay ephemeral local UI state;
+  // only the free-text `q` lives in the URL query string so a search is
+  // deep-linkable + shareable (/proxy?q=open_pr opens pre-filtered).
   const [agentId, setAgentId] = useState("");
   const [targetSystem, setTargetSystem] = useState("");
   const [runId, setRunId] = useState("");
   const [outcome, setOutcome] = useState<"" | "ok" | "fail">("");
-  const [text, setText] = useState("");
+  const [params, setParams] = useSearchParams();
+  const text = params.get("q") ?? "";
+
+  // Set/delete only the `q` key, never the page-owned `source`/`run`.
+  const setText = useCallback(
+    (value: string): void => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) {
+            next.set("q", value);
+          } else {
+            next.delete("q");
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
 
   const refresh = useCallback(async (): Promise<void> => {
     try {

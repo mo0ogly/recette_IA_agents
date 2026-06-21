@@ -10,6 +10,7 @@
  */
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WireFlowResponse } from "../../types/platform";
@@ -30,6 +31,19 @@ import WirePanel from "./WirePanel";
 
 const fixture = wireFixture as WireFlowResponse;
 
+/**
+ * WirePanel now reads its filter clauses from the URL query string
+ * (useSearchParams), so every render needs a router. `entries` lets a test
+ * open the panel pre-filtered (deep-link) on first render.
+ */
+function renderWire(entries: string[] = ["/proxy"]): void {
+  render(
+    <MemoryRouter initialEntries={entries}>
+      <WirePanel />
+    </MemoryRouter>,
+  );
+}
+
 describe("WirePanel (R16 contract)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,7 +57,7 @@ describe("WirePanel (R16 contract)", () => {
   });
 
   it("renders the captured flows without crashing", async () => {
-    render(<WirePanel />);
+    renderWire();
     const list = await screen.findByLabelText("wire flows");
     // The fixture has two flows; both lines show up, newest-first ordering kept.
     expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
@@ -59,7 +73,7 @@ describe("WirePanel (R16 contract)", () => {
       proxy_url: null,
       flows: [],
     });
-    render(<WirePanel />);
+    renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
   });
 
@@ -68,7 +82,7 @@ describe("WirePanel (R16 contract)", () => {
     // INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false). The captured fixture is
     // exactly that case: enabled=false WITH real flows. The how-to-enable
     // banner must yield to the actual data, not sit on top of it.
-    render(<WirePanel />);
+    renderWire();
     const list = await screen.findByLabelText("wire flows");
     expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
     expect(screen.queryByText(/wire up/)).toBeNull();
@@ -82,7 +96,7 @@ describe("WirePanel (R16 contract)", () => {
       proxy_url: null,
       flows: [],
     });
-    render(<WirePanel />);
+    renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
   });
 
@@ -92,14 +106,14 @@ describe("WirePanel (R16 contract)", () => {
       enabled: true,
       proxy_url: "http://127.0.0.1:8083",
     });
-    render(<WirePanel />);
+    renderWire();
     const url = await screen.findByTestId("wire-proxy-url");
     expect(url).toHaveTextContent("http://127.0.0.1:8083");
     expect(screen.queryByTestId("wire-disabled")).not.toBeInTheDocument();
   });
 
   it("inspects a selected flow's request and response bodies", async () => {
-    render(<WirePanel />);
+    renderWire();
     const list = await screen.findByLabelText("wire flows");
     fireEvent.click(within(list).getAllByRole("button")[0]);
     const detail = await screen.findByTestId("wire-detail");
@@ -110,7 +124,7 @@ describe("WirePanel (R16 contract)", () => {
   });
 
   it("copies a curl command for the selected flow", async () => {
-    render(<WirePanel />);
+    renderWire();
     const list = await screen.findByLabelText("wire flows");
     fireEvent.click(within(list).getAllByRole("button")[0]);
     const copy = await screen.findByTestId("wire-copy-curl");
@@ -129,7 +143,7 @@ describe("WirePanel (R16 contract)", () => {
       next_step:
         "set INSPECT_IA_AGENTS_WIRE_PROXY + trust the CA, then ./recette.sh api restart",
     });
-    render(<WirePanel />);
+    renderWire();
     const toggle = await screen.findByTestId("wire-overlay-toggle");
     fireEvent.click(toggle);
     await waitFor(() => expect(controlWireOverlay).toHaveBeenCalledWith("up"));
@@ -141,7 +155,7 @@ describe("WirePanel (R16 contract)", () => {
   });
 
   it("clears the buffer on demand", async () => {
-    render(<WirePanel />);
+    renderWire();
     await screen.findByLabelText("wire flows");
     fireEvent.click(screen.getByText("Vider le tampon"));
     await waitFor(() => expect(clearWireFlows).toHaveBeenCalledTimes(1));
@@ -150,7 +164,7 @@ describe("WirePanel (R16 contract)", () => {
   it("narrows the flow list when a text filter matches only some flows", async () => {
     // The fixture has two flows on the same host/method/path; only flow #1's
     // request_body carries the "open_pr" token, so it is the only match.
-    render(<WirePanel />);
+    renderWire();
     const list = await screen.findByLabelText("wire flows");
     expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
 
@@ -164,9 +178,42 @@ describe("WirePanel (R16 contract)", () => {
   });
 
   it("exports the shown flows as HAR", async () => {
-    render(<WirePanel />);
+    renderWire();
     await screen.findByLabelText("wire flows");
     fireEvent.click(screen.getByTestId("wire-export-har"));
     expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  it("opens pre-filtered by free text from ?q= on first render (deep-link)", async () => {
+    // Both fixture flows share host/method/path; only flow #1 carries the
+    // "open_pr" token in its request_body. Opening at ?q=open_pr must narrow
+    // the list to that single flow WITHOUT any typing.
+    renderWire(["/proxy?source=wire&q=open_pr"]);
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button")).toHaveLength(1),
+    );
+    // The free-text input reflects the URL value (controlled by the query).
+    expect(screen.getByTestId("wire-filter-text")).toHaveValue("open_pr");
+  });
+
+  it("opens pre-filtered by host from ?host= on first render (deep-link)", async () => {
+    // Both fixture flows are on host 127.0.0.1, so ?host=127.0.0.1 keeps both
+    // and proves the host clause is driven by the URL. A non-matching host
+    // empties the list.
+    renderWire(["/proxy?source=wire&host=127.0.0.1"]);
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length),
+    );
+    expect(screen.getByDisplayValue("127.0.0.1")).toBeInTheDocument();
+  });
+
+  it("empties the list when ?host= matches no flow (deep-link)", async () => {
+    renderWire(["/proxy?source=wire&host=does-not-exist"]);
+    await screen.findByLabelText("wire flows");
+    await waitFor(() =>
+      expect(screen.getByText("aucun flux")).toBeInTheDocument(),
+    );
   });
 });
