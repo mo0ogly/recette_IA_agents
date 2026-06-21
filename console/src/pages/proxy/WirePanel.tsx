@@ -60,6 +60,9 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const [busy, setBusy] = useState<boolean>(false);
   // Pretty-print toggle for the request/response body panes (display-only).
   const [pretty, setPretty] = useState(false);
+  // Follow/tail toggle: when ON (and the page is not paused) the flow list
+  // auto-scrolls to the latest flow after each poll. Display-only, no I4 impact.
+  const [follow, setFollow] = useState(false);
 
   // Filter clauses live in the URL query string (deep-linkable + shareable):
   // host/method/status/q (free text) own their own keys, plus a read of the
@@ -162,6 +165,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // Filtered view drives the list, the detail selection and the exports; the
   // full `flows` set still feeds the select options and the header counts.
   const shown = useMemo(() => filterWireFlows(flows, filter), [flows, filter]);
+  // Auto-scroll the flow list to the latest flow when following (and not
+  // paused), whenever the shown count changes. jsdom has no layout, so this is
+  // a no-op there; the contract test asserts the toggle state, not the pixels.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (follow && !paused && listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [follow, paused, shown.length]);
   const hosts = useMemo(() => distinctWireValues(flows, "host"), [flows]);
   const methods = useMemo(() => distinctWireValues(flows, "method"), [flows]);
   const runIds = useMemo(() => distinctWireValues(flows, "run_id"), [flows]);
@@ -220,6 +232,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           onClick={() => void onToggleOverlay()}
         >
           {enabled === true ? "Arreter le reseau (wire)" : "Demarrer le reseau (wire)"}
+        </button>
+        <button
+          type="button"
+          className="proxy-mode-btn"
+          data-testid="wire-follow"
+          aria-pressed={follow}
+          onClick={() => setFollow((f) => !f)}
+        >
+          {follow ? "Suivi ON" : "Suivi"}
         </button>
         <button type="button" className="proxy-export" onClick={onExportJsonl}>
           Export JSONL
@@ -334,7 +355,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {error !== null && <p className="proxy-error">{error}</p>}
 
       <div className="proxy-grid">
-        <ul className="proxy-list" aria-label="wire flows">
+        <ul className="proxy-list" aria-label="wire flows" ref={listRef}>
           {lines.length === 0 && <li className="proxy-empty">aucun flux</li>}
           {lines.map((l, i) => {
             const dur = shown[i]?.duration_ms ?? 0;

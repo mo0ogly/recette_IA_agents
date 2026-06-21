@@ -325,4 +325,15 @@ describe("WirePanel (R16 contract)", () => {
     fireEvent.click(screen.getByTestId("wire-diff-clear"));
     await waitFor(() => expect(screen.queryByTestId("wire-diff")).toBeNull());
   });
+
+  it("toggles the follow/tail control's pressed state on click", async () => {
+    // The follow toggle starts OFF (aria-pressed=false). Clicking it flips the
+    // state to ON. Pixel scroll is not assertable under jsdom, so this asserts
+    // only the toggle's accessible state.
+    renderWire();
+    const follow = await screen.findByTestId("wire-follow");
+    expect(follow).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(follow);
+    expect(follow).toHaveAttribute("aria-pressed", "true");
+  });
 });
