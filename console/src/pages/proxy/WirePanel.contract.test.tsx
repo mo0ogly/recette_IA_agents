@@ -35,6 +35,9 @@ describe("WirePanel (R16 contract)", () => {
     vi.clearAllMocks();
     vi.mocked(getWireFlows).mockResolvedValue(fixture);
     vi.mocked(clearWireFlows).mockResolvedValue({ cleared: true });
+    // jsdom has no Blob URL plumbing; stub it so the export download path runs.
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => "blob:x");
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
   });
 
   it("renders the captured flows without crashing", async () => {
@@ -100,5 +103,28 @@ describe("WirePanel (R16 contract)", () => {
     await screen.findByLabelText("wire flows");
     fireEvent.click(screen.getByText("Vider le tampon"));
     await waitFor(() => expect(clearWireFlows).toHaveBeenCalledTimes(1));
+  });
+
+  it("narrows the flow list when a text filter matches only some flows", async () => {
+    // The fixture has two flows on the same host/method/path; only flow #1's
+    // request_body carries the "open_pr" token, so it is the only match.
+    render(<WirePanel />);
+    const list = await screen.findByLabelText("wire flows");
+    expect(within(list).getAllByRole("button")).toHaveLength(fixture.flows.length);
+
+    const text = screen.getByTestId("wire-filter-text");
+    fireEvent.change(text, { target: { value: "open_pr" } });
+
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button").length).toBeLessThan(fixture.flows.length),
+    );
+    expect(within(list).getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("exports the shown flows as HAR", async () => {
+    render(<WirePanel />);
+    await screen.findByLabelText("wire flows");
+    fireEvent.click(screen.getByTestId("wire-export-har"));
+    expect(URL.createObjectURL).toHaveBeenCalled();
   });
 });

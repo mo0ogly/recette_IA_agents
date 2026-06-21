@@ -19,7 +19,14 @@ import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/clie
 import ProxySelector from "../../components/ProxySelector";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
-import { wireFailureCount, wireFlowToLine } from "./wireFlowModel";
+import { downloadFile, flowsToHar, toJsonl } from "./proxyExport";
+import {
+  distinctWireValues,
+  filterWireFlows,
+  type WireFlowFilter,
+  wireFailureCount,
+  wireFlowToLine,
+} from "./wireFlowModel";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -31,6 +38,10 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [nextStep, setNextStep] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
+  // Filter clauses (ephemeral UI state): narrow the captured flows by host,
+  // method, status, originating run, or free text. The status reported up via
+  // onStatus stays on the FULL buffer, not the filtered view.
+  const [filter, setFilter] = useState<WireFlowFilter>({});
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -79,12 +90,27 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
     }
   }, [enabled, refresh]);
 
-  const lines = useMemo(() => flows.map(wireFlowToLine), [flows]);
+  // Filtered view drives the list, the detail selection and the exports; the
+  // full `flows` set still feeds the select options and the header counts.
+  const shown = useMemo(() => filterWireFlows(flows, filter), [flows, filter]);
+  const hosts = useMemo(() => distinctWireValues(flows, "host"), [flows]);
+  const methods = useMemo(() => distinctWireValues(flows, "method"), [flows]);
+  const runIds = useMemo(() => distinctWireValues(flows, "run_id"), [flows]);
+  const lines = useMemo(() => shown.map(wireFlowToLine), [shown]);
   const fails = useMemo(() => wireFailureCount(flows), [flows]);
   const selected = useMemo(
-    () => flows.find((f) => f.seq === selectedSeq) ?? null,
-    [flows, selectedSeq],
+    () => shown.find((f) => f.seq === selectedSeq) ?? null,
+    [shown, selectedSeq],
   );
+
+  const onExportJsonl = useCallback((): void => {
+    // Forensic snapshot of the CURRENTLY shown flows (bounded by the ring).
+    downloadFile(`${toJsonl(shown)}\n`, "wire-flows.jsonl", "application/x-ndjson");
+  }, [shown]);
+
+  const onExportHar = useCallback((): void => {
+    downloadFile(flowsToHar(shown), "wire-flows.har", "application/json");
+  }, [shown]);
 
   return (
     <section className="proxy-wire" data-testid="wire-panel">
@@ -107,10 +133,99 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
         >
           {enabled === true ? "Arreter le reseau (wire)" : "Demarrer le reseau (wire)"}
         </button>
+        <button type="button" className="proxy-export" onClick={onExportJsonl}>
+          Export JSONL
+        </button>
+        <button
+          type="button"
+          className="proxy-export"
+          data-testid="wire-export-har"
+          onClick={onExportHar}
+        >
+          Export HAR
+        </button>
         <button type="button" className="proxy-clear" onClick={() => void onClear()}>
           Vider le tampon
         </button>
       </header>
+
+      <div className="proxy-filter" role="group" aria-label="wire filter">
+        <label className="proxy-filter-label">
+          host
+          <select
+            className="proxy-filter-input"
+            value={filter.host ?? ""}
+            onChange={(e) =>
+              setFilter((p) => ({ ...p, host: e.target.value || undefined }))
+            }
+          >
+            <option value="">tous</option>
+            {hosts.map((h) => (
+              <option key={h} value={h}>
+                {h}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="proxy-filter-label">
+          method
+          <select
+            className="proxy-filter-input"
+            value={filter.method ?? ""}
+            onChange={(e) =>
+              setFilter((p) => ({ ...p, method: e.target.value || undefined }))
+            }
+          >
+            <option value="">toutes</option>
+            {methods.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="proxy-filter-label">
+          status
+          <input
+            className="proxy-filter-input"
+            type="text"
+            data-testid="wire-filter-status"
+            value={filter.status ?? ""}
+            onChange={(e) =>
+              setFilter((p) => ({ ...p, status: e.target.value || undefined }))
+            }
+          />
+        </label>
+        <label className="proxy-filter-label">
+          run_id
+          <select
+            className="proxy-filter-input"
+            value={filter.runId ?? ""}
+            onChange={(e) =>
+              setFilter((p) => ({ ...p, runId: e.target.value || undefined }))
+            }
+          >
+            <option value="">tous</option>
+            {runIds.map((r) => (
+              <option key={r} value={r}>
+                {r.slice(0, 12)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="proxy-filter-label">
+          texte
+          <input
+            className="proxy-filter-input"
+            type="text"
+            data-testid="wire-filter-text"
+            value={filter.text ?? ""}
+            onChange={(e) =>
+              setFilter((p) => ({ ...p, text: e.target.value || undefined }))
+            }
+          />
+        </label>
+      </div>
 
       {nextStep !== null && (
         <p className="proxy-banner" role="status" data-testid="wire-next-step">
