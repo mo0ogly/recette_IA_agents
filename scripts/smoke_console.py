@@ -646,6 +646,20 @@ def _verify_discovery_exchange(page: Page, console: str, api: str) -> None:
         timeout=UI_TIMEOUT_MS,
     )
     _shot(page, "discovery-exchange")
+    # Launch a whole CAMPAIGN in process mode from the picker: every step spawns
+    # as an OS process captured by PID (live broker) or runs in-process (replay
+    # fallback). Either way the UX control must wire end-to-end and report back.
+    camp = page.get_by_test_id("dx-camp")
+    camp.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    camp.select_option(CAMPAIGN_ID)
+    page.get_by_test_id("dx-launch-camp").click()
+    msg = page.get_by_test_id("dx-camp-msg")
+    msg.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect(
+        "campagne" in msg.inner_text().lower(),
+        f"campaign launch gave no feedback (got {msg.inner_text()!r})",
+    )
+    _shot(page, "discovery-exchange-campaign")
 
 
 def run_smoke(console: str, api: str, server_port: int) -> None:
