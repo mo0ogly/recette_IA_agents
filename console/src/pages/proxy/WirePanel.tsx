@@ -13,7 +13,7 @@
  * request/response payloads are the point, and a plain pane renders under jsdom.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
 import ProxySelector from "../../components/ProxySelector";
@@ -30,7 +30,7 @@ import {
 
 const POLL_INTERVAL_MS = 2000;
 
-export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
+export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.Element {
   const [flows, setFlows] = useState<WireFlow[]>([]);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
@@ -60,9 +60,21 @@ export default function WirePanel({ onStatus }: SourcePanelProps): JSX.Element {
     }
   }, [onStatus]);
 
+  // Read `paused` from a ref inside the tick so toggling pause does NOT tear
+  // down and re-run the effect (which would re-fire the initial fetch). The
+  // initial fetch runs once on mount; only the recurring tick is gated.
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
+    const timer = setInterval(() => {
+      if (!pausedRef.current) {
+        void refresh();
+      }
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
 

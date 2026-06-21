@@ -200,6 +200,23 @@ describe("ProxyPage (R16 contract)", () => {
     expect(await screen.findByTestId("sessions-panel")).toBeInTheDocument();
   });
 
+  it("pauses the live poll: no refetch while paused", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+      renderPage();
+      // let the initial fetch resolve
+      await vi.advanceTimersByTimeAsync(0);
+      const afterMount = vi.mocked(getProxyTraces).mock.calls.length; // >= 1 (initial)
+      // click Pause
+      fireEvent.click(screen.getByTestId("proxy-pause"));
+      await vi.advanceTimersByTimeAsync(5000); // 2+ poll intervals
+      expect(vi.mocked(getProxyTraces).mock.calls.length).toBe(afterMount); // no extra fetch
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("exports the shown traces as a JSONL download", async () => {
     const createUrl = vi.fn(() => "blob:proxy");
     const revokeUrl = vi.fn();

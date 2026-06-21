@@ -17,7 +17,16 @@
  * branch).
  */
 
-import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
 import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
@@ -68,7 +77,7 @@ class ViewerBoundary extends Component<{ children: ReactNode }, BoundaryState> {
   }
 }
 
-export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Element {
+export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): JSX.Element {
   const [traces, setTraces] = useState<ProxyTrace[]>([]);
   const [debugEnabled, setDebugEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,9 +106,21 @@ export default function AppTracesPanel({ onStatus }: SourcePanelProps): JSX.Elem
     }
   }, [onStatus]);
 
+  // Read `paused` from a ref inside the tick so toggling pause does NOT tear
+  // down and re-run the effect (which would re-fire the initial fetch). The
+  // initial fetch runs once on mount; only the recurring tick is gated.
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
+    const timer = setInterval(() => {
+      if (!pausedRef.current) {
+        void refresh();
+      }
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
 

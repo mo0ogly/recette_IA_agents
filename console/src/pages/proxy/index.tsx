@@ -51,6 +51,11 @@ export default function ProxyPage(): JSX.Element {
 
   const [statusById, setStatusById] = useState<Partial<Record<SourceId, SourceStatus>>>({});
 
+  // Page-level pause of the recurring live poll: when on, the active panel
+  // freezes its interval tick (cold inspection) while the backend ring keeps
+  // filling; resume lets the next tick catch up. The initial fetch still runs.
+  const [paused, setPaused] = useState(false);
+
   // Background poll of the lightweight status endpoints fills a badge for EVERY
   // source, even ones whose panel is closed. The mounted (active) panel reports
   // a fresher, strict-aware value through onStatus, so it wins for that source.
@@ -84,6 +89,20 @@ export default function ProxyPage(): JSX.Element {
       <header className="proxy-header">
         <h1>Proxy</h1>
         <PageHelp topic="proxy" />
+        <button
+          type="button"
+          className="proxy-mode-btn"
+          data-testid="proxy-pause"
+          aria-pressed={paused}
+          onClick={() => setPaused((p) => !p)}
+        >
+          {paused ? "Reprendre" : "Pause"}
+        </button>
+        {paused && (
+          <span className="proxy-badge" data-outcome="off">
+            PAUSE
+          </span>
+        )}
       </header>
 
       <LaunchPanel
@@ -112,7 +131,7 @@ export default function ProxyPage(): JSX.Element {
           <div className="proxy-viewer-msg">chargement {activeDescriptor.label}...</div>
         }
       >
-        <ActivePanel onStatus={onStatusById[activeDescriptor.id]} />
+        <ActivePanel onStatus={onStatusById[activeDescriptor.id]} paused={paused} />
       </Suspense>
     </section>
   );

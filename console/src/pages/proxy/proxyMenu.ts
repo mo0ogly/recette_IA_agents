@@ -39,6 +39,9 @@ export interface SourceStatus {
  *  nothing to report (or has not loaded yet) simply never calls it. */
 export interface SourcePanelProps {
   onStatus?: (status: SourceStatus) => void;
+  /** When true, the panel freezes its recurring poll (cold inspection). The
+   *  initial fetch still runs; only the interval tick is gated. */
+  paused?: boolean;
 }
 
 /**

@@ -58,7 +58,7 @@ class ViewerBoundary extends Component<{ children: ReactNode }, BoundaryState> {
   }
 }
 
-export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Element {
+export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): JSX.Element {
   const [traces, setTraces] = useState<ProxyTrace[]>([]);
   const [debugEnabled, setDebugEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,12 +109,24 @@ export default function SessionsPanel({ onStatus }: SourcePanelProps): JSX.Eleme
     }
   }, [runParam]);
 
+  // Read `paused` from a ref inside the tick so toggling pause does NOT tear
+  // down and re-run the effect (which would re-fire the initial fetch). The
+  // initial fetch runs once on mount; only the recurring tick is gated.
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   useEffect(() => {
     void refresh();
     if (liveMode !== "poll") {
       return;
     }
-    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
+    const timer = setInterval(() => {
+      if (!pausedRef.current) {
+        void refresh();
+      }
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [refresh, liveMode]);
 
