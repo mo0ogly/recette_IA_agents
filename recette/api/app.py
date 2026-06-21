@@ -27,6 +27,7 @@ from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
 from ..platform.proxy.protocol import ExternalSystemProxy
+from ..platform.proxy.rotate import rotate_dir_from_env
 from ..platform.proxy.route import registry_from_env
 from ..platform.proxy.tracing import RingTraceRecorder, TracingProxy, debug_enabled_from_env
 from ..platform.proxy.wire import WireFlowRecorder, wire_proxy_url_from_env
@@ -275,7 +276,12 @@ def create_app(
     # in a bounded in-memory ring (jettable, I1) read back by GET /proxy/traces.
     # Parametrable via INSPECT_IA_AGENTS_PROXY_DEBUG (R5); off => the wrapped proxy is
     # called directly with zero recording overhead.
-    trace_recorder = RingTraceRecorder()
+    # Export-on-rotate (R5): when INSPECT_IA_AGENTS_PROXY_ROTATE_DIR is set, the
+    # entry a ring is about to evict (maxlen) is appended as JSONL before the
+    # deque drops it, so a long run keeps its early packets. Unset => purely
+    # in-memory rings. Fail-safe sink; the audit log stays the durable truth (I1).
+    rotate_dir = rotate_dir_from_env()
+    trace_recorder = RingTraceRecorder(rotate_dir=rotate_dir)
     app.state.proxy_trace_recorder = trace_recorder
     proxy_debug_enabled = debug_enabled_from_env()
     app.state.proxy_debug_enabled = proxy_debug_enabled
@@ -288,7 +294,7 @@ def create_app(
     # The recorder always exists (so the endpoints work); the overlay is only
     # "enabled" when INSPECT_IA_AGENTS_WIRE_PROXY names a proxy URL (R5). OFF keeps
     # the deterministic recette untouched (I4): nothing routes through a proxy.
-    app.state.wire_flow_recorder = WireFlowRecorder()
+    app.state.wire_flow_recorder = WireFlowRecorder(rotate_dir=rotate_dir)
     app.state.wire_proxy_url = wire_proxy_url_from_env()
     # Runtime-selectable transport route (direct vs wire overlay), surfaced in
     # the network-debug consoles. Transport only -- never the decision path (I4).

@@ -28,6 +28,9 @@ import os
 import threading
 from collections import deque
 from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from .rotate import append_jsonl
 
 # The proxy URL an agent's HTTP client routes through when the wire overlay is
 # active (R5: no hardcoded address). Unset/empty => wire OFF, the client talks to
@@ -158,18 +161,32 @@ class WireFlowRecorder:
     the endpoint screens first.
     """
 
-    def __init__(self, capacity: int = DEFAULT_RING_CAPACITY) -> None:
+    def __init__(
+        self, capacity: int = DEFAULT_RING_CAPACITY, *, rotate_dir: Path | None = None
+    ) -> None:
         if capacity <= 0:
             raise ValueError("WireFlowRecorder capacity must be positive")
         self._ring: deque[WireFlow] = deque(maxlen=capacity)
         self._seq = 0
         self._lock = threading.Lock()
+        # When set, the flow about to be evicted by maxlen is appended to this
+        # file BEFORE the deque drops it, so a long run keeps its early packets.
+        # Debug convenience only -- the audit log stays the durable truth (I1).
+        self._rotate_dir = rotate_dir
 
     def record(self, payload: dict) -> WireFlow:
         """Normalize and append one ingested flow; return the stored flow."""
         with self._lock:
             self._seq += 1
             flow = normalize_flow(payload, self._seq)
+            if (
+                self._rotate_dir is not None
+                and self._ring.maxlen is not None
+                and len(self._ring) == self._ring.maxlen
+            ):
+                # The deque is full: this append will evict self._ring[0]. Export
+                # it first so the early packet is retained (fail-safe sink).
+                append_jsonl(self._rotate_dir / "wire-flows.jsonl", self._ring[0].to_dict())
             self._ring.append(flow)
             return flow
 

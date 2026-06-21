@@ -22,10 +22,12 @@ import os
 import threading
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ..events import PlatformActionEvent
 from .protocol import ExecutionResult, ExternalSystemProxy
+from .rotate import append_jsonl
 
 DEBUG_ENV = "INSPECT_IA_AGENTS_PROXY_DEBUG"
 DEFAULT_RING_CAPACITY = 512
@@ -112,12 +114,18 @@ class RingTraceRecorder:
     life so trace ordering is stable even after the ring has wrapped.
     """
 
-    def __init__(self, capacity: int = DEFAULT_RING_CAPACITY) -> None:
+    def __init__(
+        self, capacity: int = DEFAULT_RING_CAPACITY, *, rotate_dir: Path | None = None
+    ) -> None:
         if capacity <= 0:
             raise ValueError("RingTraceRecorder capacity must be positive")
         self._ring: deque[ProxyTrace] = deque(maxlen=capacity)
         self._seq = 0
         self._lock = threading.Lock()
+        # When set, the trace about to be evicted by maxlen is appended to this
+        # file BEFORE the deque drops it, so a long run keeps its early packets.
+        # Debug convenience only -- the audit log stays the durable truth (I1).
+        self._rotate_dir = rotate_dir
 
     def record(
         self, event: PlatformActionEvent, result: ExecutionResult, run_id: str | None = None
@@ -143,6 +151,14 @@ class RingTraceRecorder:
                 run_id=run_id,
                 response=dict(result.response),
             )
+            if (
+                self._rotate_dir is not None
+                and self._ring.maxlen is not None
+                and len(self._ring) == self._ring.maxlen
+            ):
+                # The deque is full: this append will evict self._ring[0]. Export
+                # it first so the early packet is retained (fail-safe sink).
+                append_jsonl(self._rotate_dir / "traces.jsonl", self._ring[0].to_dict())
             self._ring.append(trace)
 
     def snapshot(self) -> list[ProxyTrace]:
