@@ -122,7 +122,14 @@ export function groupSessions(
 
 /** Narrow sessions to exchanges whose action_type/resource matches `text`
  *  (case-insensitive). Empty text returns the input unchanged. A session with
- *  no matching exchange is dropped. Pure (I4). */
+ *  no matching exchange is dropped. Pure (I4).
+ *
+ *  Scope (intentional limitation): the match covers ONLY the exchange's
+ *  `intent.action_type` + `intent.resource`. It does NOT search the request
+ *  payload, the response body, or an error string -- the Exchange model does not
+ *  carry those flattened into a searchable field. This asymmetry vs the
+ *  app-traces text filter (`filterTraces`, which scans
+ *  action/resource/payload/response/error) is deliberate, not an oversight. */
 export function filterSessionsText(sessions: Session[], text: string): Session[] {
   const needle = text.trim().toLowerCase();
   if (!needle) {

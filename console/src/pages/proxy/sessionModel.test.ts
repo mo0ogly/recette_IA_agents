@@ -131,6 +131,16 @@ describe("filterSessionsText", () => {
     const out = filterSessionsText(sessions, "open_pr");
     expect(out).toHaveLength(1);
     expect(out[0].exchanges.map((e) => e.seq)).toEqual([1]);
+    // Narrowing 2 exchanges to 1 must update the session total too.
+    expect(out[0].total).toBe(1);
+  });
+  it("matches case-insensitively on action_type", () => {
+    const traces = [
+      trace({ seq: 1, run_id: "r1", action_type: "open_pr", resource: "acme/x" }),
+      trace({ seq: 2, run_id: "r1", action_type: "read_repo", resource: "acme/y" }),
+    ];
+    const sessions = groupSessions(traces, "run");
+    expect(filterSessionsText(sessions, "OPEN_PR")[0].exchanges.map((e) => e.seq)).toEqual([1]);
   });
   it("empty text returns sessions unchanged", () => {
     const sessions = groupSessions([trace({ seq: 1, run_id: "r1" })], "run");

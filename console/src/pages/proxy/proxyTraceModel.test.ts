@@ -127,6 +127,7 @@ describe("filterTraces free text", () => {
       base({ seq: 3, error: "policy denied" }),
     ];
     expect(filterTraces(list, { text: "open_pr" }).map((t) => t.seq)).toEqual([1]);
+    expect(filterTraces(list, { text: "OPEN_PR" }).map((t) => t.seq)).toEqual([1]); // case-insensitive
     expect(filterTraces(list, { text: "merged" }).map((t) => t.seq)).toEqual([2]); // response
     expect(filterTraces(list, { text: "denied" }).map((t) => t.seq)).toEqual([3]); // error
     expect(filterTraces(list, {}).map((t) => t.seq)).toEqual([1, 2, 3]); // empty pass-through
