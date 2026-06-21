@@ -21,6 +21,7 @@ import type { SourceDescriptor } from "./proxyMenu";
 const WirePanel = lazy(() => import("./WirePanel"));
 const ReconcilePanel = lazy(() => import("./ReconcilePanel"));
 const SessionsPanel = lazy(() => import("./SessionsPanel"));
+const ReplayDiffPanel = lazy(() => import("./ReplayDiffPanel"));
 
 /**
  * The ordered source registry. Order is the menu order. The first entry is the
@@ -50,5 +51,11 @@ export const SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
     label: "sessions",
     hint: "echanges agent<->serveur groupes par session (run/agent/target)",
     Component: SessionsPanel,
+  },
+  {
+    id: "replay-diff",
+    label: "replay-diff",
+    hint: "rejoue un recording et diffe (determinisme I4)",
+    Component: ReplayDiffPanel,
   },
 ] as const;

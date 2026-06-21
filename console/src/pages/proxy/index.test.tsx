@@ -32,6 +32,9 @@ vi.mock("../../api/client", async (importOriginal) => {
     // stub them so the page test does not hit the network and stays deterministic.
     listAgents: vi.fn(() => Promise.resolve([])),
     launchLaneB: vi.fn(),
+    // The replay-diff source loads recordings on mount; stub so selecting it in
+    // the menu does not hit the network.
+    listRecordings: vi.fn(() => Promise.resolve([])),
   };
 });
 
@@ -218,6 +221,13 @@ describe("ProxyPage (R16 contract)", () => {
     fireEvent.click(sessionsButton);
     // The sessions panel mounts (it carries data-testid="sessions-panel").
     expect(await screen.findByTestId("sessions-panel")).toBeInTheDocument();
+  });
+
+  it("exposes the replay-diff source in the menu and renders its panel when selected", async () => {
+    renderPage();
+    const sourceMenu = await screen.findByRole("group", { name: "source" });
+    fireEvent.click(within(sourceMenu).getByText("replay-diff"));
+    expect(await screen.findByTestId("replay-diff-panel")).toBeInTheDocument();
   });
 
   it("pauses the live poll: no refetch while paused", async () => {
