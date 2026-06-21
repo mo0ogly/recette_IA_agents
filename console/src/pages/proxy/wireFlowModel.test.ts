@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WireFlow } from "../../types/platform";
-import { distinctWireValues, filterWireFlows, isEmptyWireFilter } from "./wireFlowModel";
+import { distinctWireValues, filterWireFlows, isEmptyWireFilter, maxDuration } from "./wireFlowModel";
 
 function wire(over: Partial<WireFlow>): WireFlow {
   return { seq:1, method:"POST", scheme:"http", host:"127.0.0.1", port:9101,
@@ -33,5 +33,17 @@ describe("filterWireFlows", () => {
     expect(distinctWireValues(flows, "host")).toEqual(["127.0.0.1","example.com"]);
     expect(distinctWireValues(flows, "method")).toEqual(["GET","POST"]);
     expect(distinctWireValues(flows, "run_id")).toEqual(["r1","r2"]);
+  });
+});
+
+describe("maxDuration", () => {
+  it("returns 0 when no flow carries a duration", () => {
+    expect(maxDuration([wire({ duration_ms: undefined }), wire({ duration_ms: null })])).toBe(0);
+    expect(maxDuration([])).toBe(0);
+  });
+  it("returns the largest duration_ms across flows", () => {
+    expect(
+      maxDuration([wire({ duration_ms: 12.5 }), wire({ duration_ms: 40 }), wire({ duration_ms: null })]),
+    ).toBe(40);
   });
 });

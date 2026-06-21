@@ -222,6 +222,21 @@ describe("WirePanel (R16 contract)", () => {
     expect(screen.queryByTestId("wire-resp-truncated")).toBeNull();
   });
 
+  it("shows the per-exchange latency in the detail pane when duration_ms is set", async () => {
+    // duration_ms is OPS metadata on the wire view only (never a judge input,
+    // I4). When present, the detail pane surfaces it as a latency line.
+    vi.mocked(getWireFlows).mockResolvedValue({
+      enabled: false,
+      proxy_url: null,
+      flows: [{ ...fixture.flows[0], seq: 5, duration_ms: 42 }],
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(within(list).getAllByRole("button")[0]);
+    const detail = await screen.findByTestId("wire-detail");
+    expect(detail).toHaveTextContent("42 ms");
+  });
+
   it("exports the shown flows as HAR", async () => {
     renderWire();
     await screen.findByLabelText("wire flows");

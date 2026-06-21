@@ -42,6 +42,13 @@ export function wireFailureCount(flows: WireFlow[]): number {
   return flows.reduce((n, f) => (f.ok ? n : n + 1), 0);
 }
 
+/** Largest duration_ms across the given flows (0 when none carries one).
+ *  Drives the waterfall bar scale; pure (no clock, no I/O). duration_ms is OPS
+ *  metadata on the view only, never a judge/decision/replay input (I4). */
+export function maxDuration(flows: WireFlow[]): number {
+  return flows.reduce((m, f) => Math.max(m, f.duration_ms ?? 0), 0);
+}
+
 /** Filter over wire flows (all clauses AND; empty = pass-through). */
 export interface WireFlowFilter {
   host?: string;

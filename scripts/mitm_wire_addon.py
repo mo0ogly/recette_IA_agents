@@ -54,6 +54,7 @@ def build_ingest_payload(
     request_body: str,
     response_body: str,
     run_id: str | None,
+    duration_ms: float | None = None,
 ) -> dict:
     """Normalize a flow's fields into the ``POST /proxy/wire`` ingest payload.
 
@@ -73,6 +74,7 @@ def build_ingest_payload(
         "request_body": _clip(request_body),
         "response_body": _clip(response_body),
         "run_id": run_id,
+        "duration_ms": duration_ms,
     }
 
 
@@ -107,6 +109,16 @@ class WireCapture:
             run_id = headers.get(run_header)
         except Exception:  # noqa: BLE001 - missing/odd headers must not crash the hook
             run_id = None
+        # Round-trip latency from the flow timestamps: wall-clock OPS metadata on
+        # the wire view only; it is NEVER an input to a judge/decision/replay
+        # path (I4). None when mitmproxy did not record both ends.
+        start = getattr(req, "timestamp_start", None)
+        end = getattr(resp, "timestamp_end", None)
+        duration_ms = (
+            round((end - start) * 1000, 3)
+            if isinstance(start, (int, float)) and isinstance(end, (int, float))
+            else None
+        )
         payload = build_ingest_payload(
             method=getattr(req, "method", ""),
             scheme=getattr(req, "scheme", ""),
@@ -118,6 +130,7 @@ class WireCapture:
             request_body=_safe_text(req),
             response_body=_safe_text(resp),
             run_id=run_id,
+            duration_ms=duration_ms,
         )
         _post(payload)
 
@@ -135,7 +148,7 @@ def _safe_text(message: object) -> str:
 
 def _safe_content_type(resp: object) -> str:
     try:
-        return resp.headers.get("content-type", "")
+        return resp.headers.get("content-type", "")  # type: ignore[attr-defined]  # mitmproxy duck-types the response
     except Exception:  # noqa: BLE001
         return ""
 

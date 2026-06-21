@@ -110,6 +110,7 @@
 .proxy-list-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   width: 100%;
   text-align: left;
@@ -168,6 +169,18 @@
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
+}
+
+/* Waterfall bar: width encodes the flow's latency relative to the slowest shown
+   flow (layout, not a hardcoded color). duration_ms is OPS metadata on the wire
+   view only, never a judge/decision/replay input (I4). */
+.proxy-wire-bar {
+  flex: 0 0 100%;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  min-width: 0;
 }
 
 .proxy-status[data-outcome="fail"] {

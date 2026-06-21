@@ -666,6 +666,10 @@ export interface WireFlow {
   /** Canonical side_effect_hash recomputed from the bytes, for joining a wire
    *  flow to its app-level exchange; null for a non-governed flow. */
   side_effect_hash: string | null;
+  /** Round-trip latency in ms, computed by the mitm addon from the flow
+   *  timestamps. OPS metadata on the wire VIEW only -- never a judge/decision/
+   *  replay input (I4). Optional so existing object literals stay valid. */
+  duration_ms?: number | null;
 }
 
 /** Response of GET /proxy/wire: the captured flows plus the overlay state. */

@@ -92,6 +92,11 @@ class WireFlow:
     # ProxyTrace.run_id this is run metadata on the view, never a canonical event
     # field and never on the audit log (I1).
     run_id: str | None = None
+    # Round-trip latency in milliseconds, computed by the mitm addon from the
+    # flow timestamps. Wall-clock OPS metadata on the wire VIEW only: it is never
+    # an input to a judge/decision/replay path (I4). None when the addon could
+    # not compute it (no response timestamps).
+    duration_ms: float | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -119,6 +124,11 @@ def normalize_flow(payload: dict, seq: int) -> WireFlow:
         port = 0
     method = str(payload.get("method", "")).upper()
     run_id = payload.get("run_id")
+    raw_dur = payload.get("duration_ms")
+    try:
+        duration_ms = float(raw_dur) if raw_dur is not None else None
+    except (TypeError, ValueError):
+        duration_ms = None
     return WireFlow(
         seq=seq,
         method=method,
@@ -134,6 +144,7 @@ def normalize_flow(payload: dict, seq: int) -> WireFlow:
         request_body=_clamp_body(payload.get("request_body")),
         response_body=_clamp_body(payload.get("response_body")),
         run_id=str(run_id) if isinstance(run_id, str) and run_id else None,
+        duration_ms=duration_ms,
     )
 
 

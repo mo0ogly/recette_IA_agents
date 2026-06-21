@@ -26,6 +26,7 @@ import {
   distinctWireValues,
   filterWireFlows,
   type WireFlowFilter,
+  maxDuration,
   wireFailureCount,
   wireFlowToLine,
 } from "./wireFlowModel";
@@ -160,6 +161,9 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const methods = useMemo(() => distinctWireValues(flows, "method"), [flows]);
   const runIds = useMemo(() => distinctWireValues(flows, "run_id"), [flows]);
   const lines = useMemo(() => shown.map(wireFlowToLine), [shown]);
+  // Waterfall scale: the largest latency among the SHOWN flows. duration_ms is
+  // OPS metadata on the view only, never a judge/decision/replay input (I4).
+  const maxDur = useMemo(() => maxDuration(shown), [shown]);
   const fails = useMemo(() => wireFailureCount(flows), [flows]);
   const selected = useMemo(
     () => shown.find((f) => f.seq === selectedSeq) ?? null,
@@ -311,23 +315,29 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       <div className="proxy-grid">
         <ul className="proxy-list" aria-label="wire flows">
           {lines.length === 0 && <li className="proxy-empty">aucun flux</li>}
-          {lines.map((l) => (
-            <li key={l.seq}>
-              <button
-                type="button"
-                className="proxy-list-item"
-                data-active={l.seq === selectedSeq}
-                data-outcome={l.outcome}
-                onClick={() => setSelectedSeq(l.seq)}
-              >
-                <span className="proxy-seq">#{l.seq}</span>
-                <span className="proxy-badge" data-outcome={l.outcome}>
-                  {l.outcome}
-                </span>
-                <span className="proxy-label">{l.label}</span>
-              </button>
-            </li>
-          ))}
+          {lines.map((l, i) => {
+            const dur = shown[i]?.duration_ms ?? 0;
+            // Width % is layout (relative latency), not a hardcoded color.
+            const pct = maxDur > 0 ? Math.round((dur / maxDur) * 100) : 0;
+            return (
+              <li key={l.seq}>
+                <button
+                  type="button"
+                  className="proxy-list-item"
+                  data-active={l.seq === selectedSeq}
+                  data-outcome={l.outcome}
+                  onClick={() => setSelectedSeq(l.seq)}
+                >
+                  <span className="proxy-seq">#{l.seq}</span>
+                  <span className="proxy-badge" data-outcome={l.outcome}>
+                    {l.outcome}
+                  </span>
+                  <span className="proxy-label">{l.label}</span>
+                  <span className="proxy-wire-bar" style={{ width: `${pct}%` }} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
         <div className="proxy-viewer proxy-wire-detail">
           {selected === null ? (
@@ -352,6 +362,12 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
               </dd>
               <dt>statut</dt>
               <dd>{selected.status_code}</dd>
+              {selected.duration_ms != null && (
+                <>
+                  <dt>latence</dt>
+                  <dd data-testid="wire-duration">{selected.duration_ms} ms</dd>
+                </>
+              )}
               <dt>content-type</dt>
               <dd>{selected.content_type || "-"}</dd>
               <dt>affichage</dt>

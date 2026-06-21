@@ -64,6 +64,39 @@ class BuildIngestPayloadTests(unittest.TestCase):
         self.assertEqual(payload["status_code"], 200)
         self.assertEqual(payload["run_id"], "run-1")
 
+    def test_duration_ms_included_when_given(self) -> None:
+        payload = addon.build_ingest_payload(
+            method="POST",
+            scheme="http",
+            host="localhost",
+            port=8082,
+            path="/github/execute",
+            status_code=200,
+            content_type="application/json",
+            request_body="req",
+            response_body="resp",
+            run_id="run-1",
+            duration_ms=12.5,
+        )
+        self.assertEqual(payload["duration_ms"], 12.5)
+
+    def test_duration_ms_present_as_none_when_omitted(self) -> None:
+        # Key is always present (shape stability), defaulting to None.
+        payload = addon.build_ingest_payload(
+            method="GET",
+            scheme="http",
+            host="h",
+            port=80,
+            path="/",
+            status_code=200,
+            content_type="",
+            request_body="",
+            response_body="",
+            run_id=None,
+        )
+        self.assertIn("duration_ms", payload)
+        self.assertIsNone(payload["duration_ms"])
+
     def test_body_is_clipped(self) -> None:
         big = "y" * (addon.MAX_BODY_CHARS + 50)
         payload = addon.build_ingest_payload(
@@ -86,10 +119,10 @@ class WireCaptureHookTests(unittest.TestCase):
     def setUp(self) -> None:
         self.posted: list[dict] = []
         self._orig_post = addon._post
-        addon._post = self.posted.append  # type: ignore[assignment]
+        addon._post = self.posted.append  # type: ignore[assignment,attr-defined]
 
     def tearDown(self) -> None:
-        addon._post = self._orig_post  # type: ignore[assignment]
+        addon._post = self._orig_post  # type: ignore[assignment,attr-defined]
 
     def test_full_flow_is_posted(self) -> None:
         req = _FakeMessage(
@@ -113,6 +146,29 @@ class WireCaptureHookTests(unittest.TestCase):
         self.assertEqual(sent["status_code"], 201)
         self.assertEqual(sent["run_id"], "run-9")
         self.assertEqual(sent["response_body"], '{"success":true}')
+
+    def test_duration_ms_computed_from_flow_timestamps(self) -> None:
+        # The hook computes round-trip latency from request start / response end
+        # timestamps (wall-clock OPS metadata on the view only, never a judge
+        # input, I4).
+        req = _FakeMessage(
+            "x",
+            method="GET",
+            scheme="http",
+            host="h",
+            port=80,
+            path="/",
+            timestamp_start=100.0,
+        )
+        resp = _FakeMessage("ok", status_code=200, timestamp_end=100.0125)
+        addon.WireCapture().response(_FakeFlow(req, resp))
+        self.assertEqual(self.posted[0]["duration_ms"], 12.5)
+
+    def test_duration_ms_none_when_timestamps_absent(self) -> None:
+        req = _FakeMessage("x", method="GET", scheme="http", host="h", port=80, path="/")
+        resp = _FakeMessage("ok", status_code=200)
+        addon.WireCapture().response(_FakeFlow(req, resp))
+        self.assertIsNone(self.posted[0]["duration_ms"])
 
     def test_missing_response_is_skipped(self) -> None:
         req = _FakeMessage("x", method="GET", host="h", port=80, path="/", scheme="http")

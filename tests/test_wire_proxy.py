@@ -88,6 +88,18 @@ class NormalizeFlowTests(unittest.TestCase):
         self.assertEqual(d["method"], "POST")
         self.assertIn("response_body", d)
 
+    def test_duration_ms_is_kept_when_numeric(self) -> None:
+        # Round-trip latency is OPS metadata on the wire view (never a judge/
+        # decision/replay input, I4); it is coerced to a float when present.
+        self.assertEqual(normalize_flow(_payload(duration_ms=12.5), seq=1).duration_ms, 12.5)
+        self.assertEqual(normalize_flow(_payload(duration_ms="3"), seq=1).duration_ms, 3.0)
+
+    def test_duration_ms_defaults_to_none(self) -> None:
+        self.assertIsNone(normalize_flow(_payload(), seq=1).duration_ms)
+
+    def test_duration_ms_garbage_is_none(self) -> None:
+        self.assertIsNone(normalize_flow(_payload(duration_ms="x"), seq=1).duration_ms)
+
 
 class WireFlowRecorderTests(unittest.TestCase):
     def test_record_assigns_monotone_seq(self) -> None:
