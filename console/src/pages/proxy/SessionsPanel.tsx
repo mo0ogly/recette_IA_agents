@@ -19,7 +19,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, use
 import type { ErrorInfo, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getProxyTraces, getWireFlows } from "../../api/client";
+import { getProxyTraces, getReconcile, getWireFlows } from "../../api/client";
 import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
@@ -72,6 +72,9 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   const [wireFlows, setWireFlows] = useState<WireFlow[]>([]);
   const [wireSeq, setWireSeq] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
+  // Hashes of wire flows the reconcile join flags as non-mediated (no matching
+  // audit event = a ghost / shadow-AI path). Read-only overlay over the view.
+  const [bypassHashes, setBypassHashes] = useState<Set<string>>(new Set());
 
   // Deep-link: ?run=<run_id> auto-selects that run's session without a click,
   // so a "Voir dans le proxy" button from the cockpit lands on its exchanges.
@@ -106,6 +109,21 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
         setWireFlows(w.flows);
       } catch {
         setWireFlows([]);
+      }
+      // Reconcile overlay is optional too: a strict wire<->audit join marks the
+      // ghost (non-mediated) exchanges. A failure must NOT blank the view (I1:
+      // this only reads + marks, it never mutates a recorded effect).
+      try {
+        const rec = await getReconcile(runParam ?? undefined, true);
+        setBypassHashes(
+          new Set(
+            rec.bypass_flows
+              .map((f) => f.side_effect_hash)
+              .filter((h): h is string => !!h),
+          ),
+        );
+      } catch {
+        setBypassHashes(new Set());
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -283,6 +301,17 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
                   </button>
                   {expandedSeq === ex.seq && (
                     <div className="proxy-exchange">
+                      {ex.hash !== null && bypassHashes.has(ex.hash) && (
+                        // Reconcile flagged this exchange's side effect as having
+                        // no matching audit event: a non-mediated (ghost) path.
+                        <span
+                          className="proxy-badge"
+                          data-outcome="fail"
+                          data-testid="exchange-ghost"
+                        >
+                          ghost / non-medie
+                        </span>
+                      )}
                       <pre className="proxy-exchange-side" data-testid="exchange-intent">
                         {JSON.stringify(ex.intent, null, 2)}
                       </pre>

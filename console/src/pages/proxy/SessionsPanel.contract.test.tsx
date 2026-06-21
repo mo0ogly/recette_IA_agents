@@ -13,7 +13,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProxyTraceResponse, WireFlowResponse } from "../../types/platform";
+import { getReconcile } from "../../api/client";
+import type {
+  ProxyTraceResponse,
+  ReconcileReport,
+  WireFlowResponse,
+} from "../../types/platform";
 import fixture from "./__fixtures__/sessions.fixture.json";
 import wireFixture from "./__fixtures__/sessions-wire.fixture.json";
 import SessionsPanel from "./SessionsPanel";
@@ -21,10 +26,36 @@ import SessionsPanel from "./SessionsPanel";
 // The wire fixture's flow shares run_id + side_effect_hash with the FIRST trace
 // (seq 5) of this run, so its first exchange carries the matched wire flow.
 const RUN_WITH_WIRE = "1e9b7889ec614c45894e8c855ea72543";
+// The non-null side_effect_hash of that first exchange (trace seq 5). A reconcile
+// bypass_flow carrying this hash means the exchange is a non-mediated (ghost) path.
+const GHOST_HASH = "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9";
+
+const okReconcile: ReconcileReport = {
+  run_id: RUN_WITH_WIRE,
+  ok: true,
+  bypass_flows: [],
+  audited_run_ids: [],
+  strict: true,
+};
+
+const ghostReconcile: ReconcileReport = {
+  run_id: RUN_WITH_WIRE,
+  ok: false,
+  bypass_flows: [
+    {
+      ...(wireFixture as WireFlowResponse).flows[0],
+      side_effect_hash: GHOST_HASH,
+      bypass_reason: "no_audit_event",
+    },
+  ],
+  audited_run_ids: [],
+  strict: true,
+};
 
 vi.mock("../../api/client", () => ({
   getProxyTraces: vi.fn(() => Promise.resolve(fixture as ProxyTraceResponse)),
   getWireFlows: vi.fn(() => Promise.resolve(wireFixture as WireFlowResponse)),
+  getReconcile: vi.fn(() => Promise.resolve(okReconcile)),
 }));
 
 // Stub Monaco so its rendered value is assertable in jsdom.
@@ -96,6 +127,23 @@ describe("SessionsPanel (R16 contract)", () => {
     const run = (fixture as ProxyTraceResponse).traces[0].run_id!;
     renderPanel({}, `/?run=${run}`);
     expect(await screen.findByLabelText("session exchanges")).toBeInTheDocument();
+  });
+
+  it("marks an exchange ghost / non-mediated when reconcile flags its hash as a bypass", async () => {
+    vi.mocked(getReconcile).mockResolvedValue(ghostReconcile);
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    expect(await screen.findByTestId("exchange-ghost")).toBeInTheDocument();
+  });
+
+  it("shows no ghost badge when reconcile reports no bypass flows", async () => {
+    vi.mocked(getReconcile).mockResolvedValue(okReconcile);
+    renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
+    const timeline = await screen.findByLabelText("session exchanges");
+    fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
+    await screen.findByTestId("exchange-intent");
+    expect(screen.queryByTestId("exchange-ghost")).not.toBeInTheDocument();
   });
 
   it("reports status up via onStatus without looping on a stable ref", async () => {
