@@ -396,6 +396,29 @@ def _drive_proxy_launch(page: Page, console: str, api: str) -> None:
     _shot(page, "proxy-sessions-launch")
     print("[*] /proxy: debug toggle ON + launcher -> live session")
 
+    # Expert-debug toolkit on the always-available app source (no overlay needed):
+    # free-text filter narrows the live trace list, and Pause freezes the poll.
+    page.goto(f"{console}/proxy?source=app", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    traces_list = page.get_by_role("list", name="proxy traces")
+    traces_list.get_by_role("button").first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    before = traces_list.get_by_role("button").count()
+    page.get_by_test_id("app-filter-text").fill("open_pr")
+    # The filter is synchronous (useMemo over fetched traces); the list narrows to
+    # the matching action only.
+    page.wait_for_function(
+        "(n) => document.querySelectorAll('[aria-label=\"proxy traces\"] button').length < n",
+        arg=before,
+        timeout=UI_TIMEOUT_MS,
+    )
+    pause = page.get_by_test_id("proxy-pause")
+    pause.click()
+    _expect(
+        pause.get_attribute("aria-pressed") == "true",
+        "Pause button did not flip aria-pressed",
+    )
+    _shot(page, "proxy-toolkit-filter-pause")
+    print("[*] /proxy: app free-text filter narrows + Pause freezes the poll")
+
 
 def _drive_dashboard_campaign(page: Page, console: str) -> None:
     # The dashboard "Campagnes" section: launch the SAME campaign from the
