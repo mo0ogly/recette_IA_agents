@@ -32,11 +32,7 @@ import {
 
 const POLL_INTERVAL_MS = 2000;
 
-// The char length a clamped body is truncated to, kept in sync with the backend
-// ring in recette/platform/proxy/wire.py (MAX_BODY_CHARS). A captured body whose
-// length reaches this bound was clamped by the recorder (the backend appends a
-// truncation marker past it), so the panel flags it as truncated.
-const WIRE_BODY_CLAMP = 16_384;
+const WIRE_TRUNCATION_MARKER = "...[truncated]"; // appended by recette/platform/proxy/wire.py _clamp_body when a body exceeds MAX_BODY_CHARS
 
 /** Render a body for display: pretty-print valid JSON when requested, else raw.
  *  Pure (no clock, no I/O); non-JSON falls back to the raw text. */
@@ -374,7 +370,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
                 <span className="proxy-wire-size">
                   {" "}
                   {byteLen(selected.request_body)} o
-                  {selected.request_body.length >= WIRE_BODY_CLAMP && (
+                  {selected.request_body.endsWith(WIRE_TRUNCATION_MARKER) && (
                     <span data-testid="wire-req-truncated"> (tronque)</span>
                   )}
                 </span>
@@ -389,7 +385,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
                 <span className="proxy-wire-size">
                   {" "}
                   {byteLen(selected.response_body)} o
-                  {selected.response_body.length >= WIRE_BODY_CLAMP && (
+                  {selected.response_body.endsWith(WIRE_TRUNCATION_MARKER) && (
                     <span data-testid="wire-resp-truncated"> (tronque)</span>
                   )}
                 </span>

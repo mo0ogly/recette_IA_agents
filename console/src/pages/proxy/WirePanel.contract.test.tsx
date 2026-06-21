@@ -189,6 +189,39 @@ describe("WirePanel (R16 contract)", () => {
     expect(within(list).getAllByRole("button")).toHaveLength(1);
   });
 
+  it("flags a body clamped by the backend (truncation marker) and not a normal body", async () => {
+    // The detector keys off the literal marker appended by wire.py _clamp_body,
+    // not a numeric length, so a body ending in the marker is flagged truncated
+    // while a normal short body is not (zero false-positive).
+    vi.mocked(getWireFlows).mockResolvedValue({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        {
+          ...fixture.flows[0],
+          seq: 7,
+          request_body: '{"big":"x"}...[truncated]',
+        },
+      ],
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(within(list).getAllByRole("button")[0]);
+    await screen.findByTestId("wire-detail");
+    expect(screen.getByTestId("wire-req-truncated")).toBeInTheDocument();
+  });
+
+  it("does not flag a normal (non-marker) body as truncated", async () => {
+    // The first fixture flow carries a short, un-clamped request_body, so no
+    // truncation marker -> no truncated badge.
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    fireEvent.click(within(list).getAllByRole("button")[0]);
+    await screen.findByTestId("wire-detail");
+    expect(screen.queryByTestId("wire-req-truncated")).toBeNull();
+    expect(screen.queryByTestId("wire-resp-truncated")).toBeNull();
+  });
+
   it("exports the shown flows as HAR", async () => {
     renderWire();
     await screen.findByLabelText("wire flows");
