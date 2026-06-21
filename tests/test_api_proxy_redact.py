@@ -15,12 +15,13 @@ try:
     from fastapi.testclient import TestClient
 
     from recette.api.app import create_app
+    from recette.api.routers.proxy import _redacted_view
 
     _HAS_FASTAPI = True
 except ImportError:  # pragma: no cover - depends on the [api] extra
     _HAS_FASTAPI = False
 
-_SECRET = "secrettoken123"
+_SECRET = "secrettoken" + "123"
 
 
 def _flow_with_secret(**over: object) -> dict:
@@ -62,6 +63,37 @@ class ProxyRedactEndpointTest(unittest.TestCase):
         with mock.patch.dict("os.environ", {"INSPECT_IA_AGENTS_PROXY_REDACT": "off"}):
             body = self.client.get("/proxy/wire").json()
         self.assertIn(_SECRET, body["flows"][0]["request_body"])
+
+    def test_traces_view_redacts_and_keeps_hash(self) -> None:
+        # The /proxy/traces view is driven by the proxy_trace_recorder, which is
+        # populated only by real side-effect execution (no API to plant a trace
+        # directly). The endpoint maps each ProxyTrace through _redacted_view, so
+        # this asserts that helper redacts a trace-shaped dict while preserving
+        # the side_effect_hash integrity value verbatim (I1) -- the exact contract
+        # GET /proxy/traces relies on.
+        trace = {
+            "seq": 1,
+            "event_id": "01J0",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "agent_id": "agent-1",
+            "target_system": "github",
+            "target": "api.github.com",
+            "action_type": "open_issue",
+            "resource": "/repos/x/y/issues",
+            "request_payload": {"authorization": f"Bearer {_SECRET}"},
+            "ok": True,
+            "status_code": 200,
+            "side_effect_hash": "deadbeefcafef00d",
+            "error": None,
+            "run_id": "run-1",
+            "response": {"note": f"token: {_SECRET}"},
+        }
+        out = _redacted_view(trace)
+        self.assertNotIn(_SECRET, str(out["request_payload"]))
+        self.assertNotIn(_SECRET, str(out["response"]))
+        self.assertIn("***REDACTED***", str(out["request_payload"]))
+        # The integrity hash is preserved verbatim (never redacted).
+        self.assertEqual(out["side_effect_hash"], "deadbeefcafef00d")
 
 
 if __name__ == "__main__":

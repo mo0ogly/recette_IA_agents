@@ -49,6 +49,19 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
         ),
         rf"\1{MASK}",
     ),
+    # Unquoted key:value secret (colon form, no quotes) -- keep the key, mask the
+    # value up to the next whitespace, comma, or closing brace. This is the
+    # YAML/log-line shape (``api_key: myvalue``) the quoted/equals patterns miss.
+    # Naturally idempotent: re-running over ``api_key: ***REDACTED***`` recaptures
+    # the mask and replaces it with itself.
+    (
+        re.compile(
+            r"((?:api[_-]?key|token|secret|password|access[_-]?token)\s*:\s*)"
+            r'([^\s,"}]+)',
+            re.IGNORECASE,
+        ),
+        rf"\1{MASK}",
+    ),
 ]
 
 
