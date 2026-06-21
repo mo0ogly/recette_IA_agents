@@ -40,4 +40,10 @@ describe("flowsToHar", () => {
     expect(e.response.status).toBe(201);
     expect(e.response.content.text).toBe('{"b":2}');
   });
+  it("reports bodySize/content.size in UTF-8 bytes", () => {
+    const har = JSON.parse(flowsToHar([wire({ request_body: "é", response_body: "😀" })]));
+    expect(har.log.entries[0].request.bodySize).toBe(2);    // é = 2 UTF-8 bytes
+    expect(har.log.entries[0].response.bodySize).toBe(4);   // 😀 = 4 UTF-8 bytes
+    expect(har.log.entries[0].response.content.size).toBe(4);
+  });
 });

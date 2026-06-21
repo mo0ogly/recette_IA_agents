@@ -35,7 +35,7 @@ export function flowsToHar(flows: readonly WireFlow[]): string {
           headers: f.content_type ? [{ name: "Content-Type", value: f.content_type }] : [],
           queryString: [],
           headersSize: -1,
-          bodySize: f.request_body.length,
+          bodySize: byteLen(f.request_body),
           postData: f.request_body
             ? { mimeType: f.content_type || "application/octet-stream", text: f.request_body }
             : undefined,
@@ -46,13 +46,13 @@ export function flowsToHar(flows: readonly WireFlow[]): string {
           httpVersion: "HTTP/1.1",
           headers: f.content_type ? [{ name: "Content-Type", value: f.content_type }] : [],
           content: {
-            size: f.response_body.length,
+            size: byteLen(f.response_body),
             mimeType: f.content_type || "application/octet-stream",
             text: f.response_body,
           },
           redirectURL: "",
           headersSize: -1,
-          bodySize: f.response_body.length,
+          bodySize: byteLen(f.response_body),
         },
         cache: {},
         timings: { send: 0, wait: 0, receive: 0 },
