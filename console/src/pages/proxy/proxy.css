@@ -363,8 +363,51 @@
 .proxy-reconcile-table td {
   text-align: left;
   padding: 0.35rem 0.6rem;
-  border-bottom: 1px solid var(--border, #2a2a2a);
+  border-bottom: 1px solid var(--color-border);
 }
 .proxy-reconcile-table code {
   font-family: var(--font-mono, monospace);
+}
+
+/* Side-by-side line diff of two wire flows' pretty-printed JSON (compare a
+   failing call vs a passing one). Changed lines are tinted via existing badge
+   tokens (left = removed/red-ish, right = added/green-ish); no hardcoded color. */
+.proxy-wire-diff {
+  margin-top: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: auto;
+}
+.proxy-wire-diff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.proxy-wire-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.78rem;
+}
+.proxy-wire-diff-cell {
+  width: 50%;
+  vertical-align: top;
+  padding: 0 0.6rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 1px solid var(--color-border);
+}
+.proxy-wire-diff-row[data-kind="left"] .proxy-wire-diff-cell[data-side="left"] {
+  background: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+.proxy-wire-diff-row[data-kind="right"] .proxy-wire-diff-cell[data-side="right"] {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+.proxy-wire-compare-btn[data-active="true"] {
+  outline: 2px solid var(--color-accent);
 }
