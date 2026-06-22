@@ -31,6 +31,21 @@ class BuildEndpointMapTest(unittest.TestCase):
     def test_empty_registry_is_empty_map(self) -> None:
         self.assertEqual(build_endpoint_map([]), {})
 
+    def test_mock_local_without_port_is_skipped(self) -> None:
+        self.assertEqual(build_endpoint_map([{"id": "x", "mode": "mock_local"}]), {})
+
+    def test_declared_url_with_explicit_port(self) -> None:
+        servers: list[dict] = [
+            {"id": "x", "mode": "declared_url", "url": "https://api.example.com:8443"}
+        ]
+        self.assertEqual(build_endpoint_map(servers)["api.example.com:8443"], "x")
+
+    def test_declared_url_without_url_is_skipped(self) -> None:
+        self.assertEqual(build_endpoint_map([{"id": "x", "mode": "declared_url"}]), {})
+
+    def test_server_without_id_is_skipped(self) -> None:
+        self.assertEqual(build_endpoint_map([{"mode": "mock_local", "port": 9101}]), {})
+
 
 class AnnotateSmokeTest(unittest.TestCase):
     """Minimal smoke coverage for the annotate_* exports; the full

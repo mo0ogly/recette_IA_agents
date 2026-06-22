@@ -27,16 +27,16 @@ def build_endpoint_map(servers: list[dict]) -> dict[str, str]:
         mode = server.get("mode")
         if mode == "mock_local" and server.get("port"):
             out[f"127.0.0.1:{int(server['port'])}"] = sid
-        else:
-            url = server.get("url")
-            if not url:
-                continue
+        elif mode in ("declared_url", "real_saas") and server.get("url"):
+            # Both URL-backed modes carry a `url` (host[:port]); default to the
+            # https port when none is given. urlsplit needs a `//` to find the
+            # host, so prepend one for a bare host:port.
+            url = str(server["url"])
             parts = urlsplit(url if "//" in url else f"//{url}")
             host = parts.hostname
-            if not host:
-                continue
-            port = parts.port or _DEFAULT_HTTPS_PORT
-            out[f"{host}:{port}"] = sid
+            if host:
+                port = parts.port or _DEFAULT_HTTPS_PORT
+                out[f"{host}:{port}"] = sid
     return out
 
 
