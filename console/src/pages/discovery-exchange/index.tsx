@@ -30,7 +30,12 @@ import {
   startProbeMonitor,
   stopProbeMonitor,
 } from "../../api/client";
-import type { DetectionScorecard, ProbeMonitorState, ProbeStatus } from "../../api/client";
+import type {
+  DetectionScorecard,
+  ProbeMonitorState,
+  ProbeStatus,
+  WireEndpoint,
+} from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import type { AgentConfig, Campaign, ExchangeReport } from "../../types/platform";
 import {
@@ -56,6 +61,10 @@ export default function DiscoveryExchangePage(): JSX.Element {
   const [probe, setProbe] = useState<ProbeStatus | null>(null);
   const [ebpfCard, setEbpfCard] = useState<DetectionScorecard | null>(null);
   const [ebpfError, setEbpfError] = useState<string | null>(null);
+  // v1 named-wire annotation from the last eBPF capture: per-agent connect
+  // endpoints resolved to their DECLARED server name + the undeclared hosts.
+  const [wireNamed, setWireNamed] = useState<Record<string, WireEndpoint[]>>({});
+  const [undeclaredHosts, setUndeclaredHosts] = useState<string[]>([]);
   // Process-mode launch (eBPF-observable): mock agents that can run as their own
   // OS process so the kernel tracepoints (eBPF source) can attribute them.
   const [agents, setAgents] = useState<AgentConfig[]>([]);
@@ -129,6 +138,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
       try {
         const res = await processCapture(procAgent);
         setEbpfCard(res.scorecard ?? null);
+        setWireNamed(res.wire_named ?? {});
+        setUndeclaredHosts(res.undeclared_hosts ?? []);
         setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
         setSource("ebpf");
         setLaunchMsg(`process capture (pid): ${procAgent}`);
@@ -156,6 +167,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
       try {
         const res = await processCaptureCampaign(campId);
         setEbpfCard(res.scorecard ?? null);
+        setWireNamed(res.wire_named ?? {});
+        setUndeclaredHosts(res.undeclared_hosts ?? []);
         setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
         setSource("ebpf");
         const skip = res.skipped.length ? `, ${res.skipped.length} ignore(s)` : "";
@@ -193,6 +206,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
     try {
       const res = await captureProbe({ agents: agentIds });
       setEbpfCard(res.scorecard ?? null);
+      setWireNamed(res.wire_named ?? {});
+      setUndeclaredHosts(res.undeclared_hosts ?? []);
       setEbpfError(res.scorecard ? null : `broker: ${res.recording.status}`);
     } catch (e: unknown) {
       setEbpfError(e instanceof Error ? e.message : String(e));
@@ -445,6 +460,35 @@ export default function DiscoveryExchangePage(): JSX.Element {
                   <span className="dx-surfaces">aucune surface (eBPF)</span>
                 </li>
               ))}
+              {Object.entries(wireNamed).map(([agentId, endpoints]) => (
+                <li
+                  key={`wire-${agentId}`}
+                  className="dx-agent dx-wire-agent"
+                  data-testid={`wire-agent-${agentId}`}
+                >
+                  <span className="dx-agent-id">{agentId}</span>
+                  <span className="dx-wire-endpoints">
+                    {endpoints.map((ep) => {
+                      const hostPort = ep.raw.replace(/^connect:/, "");
+                      return (
+                        <span key={ep.raw} className="dx-wire-endpoint">
+                          <span className="dx-wire-named">
+                            {ep.name !== null ? `${ep.name} (${hostPort})` : ep.raw}
+                          </span>
+                          {ep.undeclared && (
+                            <span
+                              className="dx-badge dx-badge-ghost dx-wire-undeclared"
+                              data-testid="wire-undeclared"
+                            >
+                              host non declare
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </span>
+                </li>
+              ))}
             </ul>
           ) : report !== null && shownAgents.length === 0 ? (
             <p className="dx-empty">Aucun agent observe.</p>
@@ -475,6 +519,12 @@ export default function DiscoveryExchangePage(): JSX.Element {
               {report.scorecard.false_negatives.length} ghost(s)
               {showEbpf && ebpfCard !== null && (
                 <> -- eBPF: {ebpfCard.false_negatives.length} ghost(s)</>
+              )}
+              {showEbpf && undeclaredHosts.length > 0 && (
+                <span data-testid="dx-undeclared-hosts">
+                  {" "}
+                  -- {undeclaredHosts.length} host(s) non declare(s)
+                </span>
               )}
             </p>
           )}

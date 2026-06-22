@@ -231,3 +231,29 @@
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
+
+.dx-wire-agent {
+  align-items: flex-start;
+}
+
+.dx-wire-endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dx-wire-endpoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dx-wire-named {
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.dx-wire-undeclared {
+  font-size: 0.7rem;
+}

@@ -244,6 +244,43 @@ describe("DiscoveryExchangePage", () => {
     expect(vi.mocked(processCaptureCampaign)).toHaveBeenCalledWith("dx-live-camp");
   });
 
+  it("renders named wire endpoints + an undeclared-host badge from the v1 annotation", async () => {
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(fixture);
+    vi.mocked(getProbeStatus).mockResolvedValue({
+      configured: true,
+      socket_env: "INSPECT_IA_AGENTS_PROBE_SOCKET",
+      mode: "live",
+    });
+    vi.mocked(listAgents).mockResolvedValue([
+      { id: "dx-live-bot", runtime: "lab", ai_mode: "mock", scenario: [{ kind: "final", text: "x" }] },
+    ] as AgentConfig[]);
+    vi.mocked(processCapture).mockResolvedValue({
+      recording: { status: "ok", recordings: [] },
+      scorecard: {
+        ok: true,
+        total_agents: 2,
+        detected_per_surface: { ebpf_wire: 1 },
+        false_negatives: ["leak-bot"],
+      },
+      wire_named: {
+        "dx-live-bot": [{ raw: "connect:127.0.0.1:9101", name: "gh-mock", undeclared: false }],
+        "leak-bot": [{ raw: "connect:203.0.113.7:443", name: null, undeclared: true }],
+      },
+      undeclared_hosts: ["203.0.113.7:443"],
+    });
+    render(<DiscoveryExchangePage />);
+    const picker = await screen.findByTestId("dx-proc-agent");
+    fireEvent.change(picker, { target: { value: "dx-live-bot" } });
+    fireEvent.click(screen.getByTestId("dx-launch-proc"));
+
+    // the connect endpoint resolved to its declared server name
+    const named = await screen.findByTestId("wire-agent-dx-live-bot");
+    expect(within(named).getByText(/gh-mock \(127\.0\.0\.1:9101\)/)).toBeInTheDocument();
+    // the undeclared endpoint carries the distinct badge
+    expect(screen.getByTestId("wire-undeclared")).toHaveTextContent("host non declare");
+    expect(vi.mocked(processCapture)).toHaveBeenCalledWith("dx-live-bot");
+  });
+
   it("surfaces a load error without crashing", async () => {
     vi.mocked(getDiscoveryExchange).mockRejectedValue(new Error("exchange down"));
     render(<DiscoveryExchangePage />);
