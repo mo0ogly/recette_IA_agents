@@ -7,7 +7,7 @@
 
 use std::collections::BTreeSet;
 
-use discoveryprobe_common::{ConnectEvent, ExecEvent, ForkEvent};
+use discoveryprobe_common::{ConnectEvent, ExecEvent, FileEvent, ForkEvent};
 use discoveryprobe_core::{CaptureRecording, ObservationSurface};
 
 /// What the broker launched: an agent and the process command name the kernel
@@ -94,7 +94,7 @@ pub fn recordings_from_execs(
     agents: &[AgentProcessSpec],
     events: &[ExecEvent],
 ) -> Vec<CaptureRecording> {
-    recordings_from_capture(agents, events, &[], &[])
+    recordings_from_capture(agents, events, &[], &[], &[])
 }
 
 /// Build one [`CaptureRecording`] per agent from BOTH captured surfaces of the
@@ -104,9 +104,10 @@ pub fn recordings_from_execs(
 /// equals its marker -- the kernel saw the agent run (`exec:comm:pid`) or dial
 /// out (`connect:a.b.c.d:port`), even inside a container, WITHOUT any in-process
 /// hook. The connect surface is what catches an LLM agent's provider egress
-/// (agentwatch's httpcore view, here at the kernel). An agent with no matching
-/// event gets an empty recording: detected nowhere (the ghost case the surface
-/// recette must surface as a red gate).
+/// (agentwatch's httpcore view, here at the kernel); the open surface is the
+/// data-access view -- which files the agent touched (`open:/path`). An agent
+/// with no matching event gets an empty recording: detected nowhere (the ghost
+/// case the surface recette must surface as a red gate).
 ///
 /// Process-tree attribution: the `forks` edges let a child process's exec or
 /// connect be attributed to the agent that owns the parent pid, so a
@@ -123,6 +124,7 @@ pub fn recordings_from_capture(
     execs: &[ExecEvent],
     connects: &[ConnectEvent],
     forks: &[ForkEvent],
+    files: &[FileEvent],
 ) -> Vec<CaptureRecording> {
     agents
         .iter()
@@ -143,6 +145,14 @@ pub fn recordings_from_capture(
                     recording.observe(
                         ObservationSurface::EbpfWire,
                         format!("connect:{}", dest_of(event)),
+                    );
+                }
+            }
+            for event in files {
+                if spec.matches(event.comm_str(), event.pid) || attributed.contains(&event.pid) {
+                    recording.observe(
+                        ObservationSurface::EbpfWire,
+                        format!("open:{}", event.path_str()),
                     );
                 }
             }
@@ -185,6 +195,22 @@ mod tests {
         }
     }
 
+    fn file(pid: u32, path: &str, name: &str) -> FileEvent {
+        let mut comm = [0u8; discoveryprobe_common::COMM_LEN];
+        let cb = name.as_bytes();
+        let cn = cb.len().min(discoveryprobe_common::COMM_LEN);
+        comm[..cn].copy_from_slice(&cb[..cn]);
+        let mut path_buf = [0u8; discoveryprobe_common::PATH_LEN];
+        let pb = path.as_bytes();
+        let pn = pb.len().min(discoveryprobe_common::PATH_LEN);
+        path_buf[..pn].copy_from_slice(&pb[..pn]);
+        FileEvent {
+            pid,
+            comm,
+            path: path_buf,
+        }
+    }
+
     #[test]
     fn matching_exec_makes_agent_visible_on_ebpf_wire() {
         let agents = [AgentProcessSpec::new("pr-bot-sdk", "pr-bot")];
@@ -207,6 +233,7 @@ mod tests {
             &agents,
             &[exec(4242, "python3")],
             &[connect(4242, [127, 0, 0, 1], 9101, "python3")],
+            &[],
             &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
@@ -249,7 +276,7 @@ mod tests {
     fn matching_connect_makes_agent_visible_with_dest() {
         let agents = [AgentProcessSpec::new("llm-bot-sdk", "llm-bot")];
         let connects = [connect(42, [140, 82, 112, 3], 443, "llm-bot")];
-        let recs = recordings_from_capture(&agents, &[], &connects, &[]);
+        let recs = recordings_from_capture(&agents, &[], &connects, &[], &[]);
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
         assert_eq!(visible, Some(&vec!["connect:140.82.112.3:443".to_string()]));
     }
@@ -261,6 +288,7 @@ mod tests {
             &agents,
             &[exec(7, "llm-bot")],
             &[connect(7, [1, 1, 1, 1], 443, "llm-bot")],
+            &[],
             &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
@@ -277,8 +305,13 @@ mod tests {
     #[test]
     fn connect_from_another_process_does_not_attach_to_agent() {
         let agents = [AgentProcessSpec::new("ghost", "ghost-proc")];
-        let recs =
-            recordings_from_capture(&agents, &[], &[connect(9, [8, 8, 8, 8], 53, "curl")], &[]);
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[connect(9, [8, 8, 8, 8], 53, "curl")],
+            &[],
+            &[],
+        );
         assert!(!recs[0].detected_anywhere());
     }
 
@@ -292,6 +325,7 @@ mod tests {
             &[],
             &[connect(200, [127, 0, 0, 1], 9101, "python3")],
             &[fork(100, 200)],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"connect:127.0.0.1:9101".to_string()));
@@ -306,6 +340,7 @@ mod tests {
             &[],
             &[connect(300, [10, 0, 0, 1], 443, "python3")],
             &[fork(100, 200), fork(200, 300)],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"connect:10.0.0.1:443".to_string()));
@@ -321,6 +356,7 @@ mod tests {
             &[],
             &[connect(200, [8, 8, 8, 8], 53, "python3")],
             &[fork(999, 200)],
+            &[],
         );
         assert!(!recs[0].detected_anywhere());
     }
@@ -334,9 +370,45 @@ mod tests {
             &[exec(100, "python3")],
             &[connect(100, [1, 1, 1, 1], 443, "python3")],
             &[],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"exec:python3:100".to_string()));
         assert!(visible.contains(&"connect:1.1.1.1:443".to_string()));
+    }
+
+    #[test]
+    fn matching_open_surfaces_as_open_path() {
+        let agents = [AgentProcessSpec::new("reader-bot", "reader")];
+        let recs =
+            recordings_from_capture(&agents, &[], &[], &[], &[file(42, "/etc/passwd", "reader")]);
+        let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
+        assert_eq!(visible, Some(&vec!["open:/etc/passwd".to_string()]));
+    }
+
+    #[test]
+    fn open_from_unattributed_pid_is_not_surfaced() {
+        // A file open from a process that is neither the marker nor an
+        // attributed pid does not attach to the agent.
+        let agents = [AgentProcessSpec::with_pids("dx-bot", "dx-bot", vec![100])];
+        let recs =
+            recordings_from_capture(&agents, &[], &[], &[], &[file(9999, "/etc/shadow", "cat")]);
+        assert!(!recs[0].detected_anywhere());
+    }
+
+    #[test]
+    fn child_open_attributed_via_fork_chain() {
+        // Spec pids=[100]; pid 100 forked pid 200; an open from 200 (comm
+        // "python3", NOT the marker) is attributed to the agent via the edge.
+        let agents = [AgentProcessSpec::with_pids("dx-bot", "dx-bot", vec![100])];
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[fork(100, 200)],
+            &[file(200, "/var/lib/data.json", "python3")],
+        );
+        let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
+        assert!(visible.contains(&"open:/var/lib/data.json".to_string()));
     }
 }

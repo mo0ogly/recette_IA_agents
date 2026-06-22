@@ -16,12 +16,15 @@
 //! load or attach anything.
 
 use aya_ebpf::{
-    helpers::{bpf_get_current_comm, bpf_get_current_pid_tgid, bpf_probe_read_user},
+    helpers::{
+        bpf_get_current_comm, bpf_get_current_pid_tgid, bpf_probe_read_user,
+        bpf_probe_read_user_str_bytes,
+    },
     macros::{map, tracepoint},
     maps::RingBuf,
     programs::TracePointContext,
 };
-use discoveryprobe_common::{ConnectEvent, ExecEvent, ForkEvent};
+use discoveryprobe_common::{ConnectEvent, ExecEvent, FileEvent, ForkEvent, PATH_LEN};
 
 /// Ring buffer the userspace loader drains (256 KiB: power-of-two page multiple).
 #[map]
@@ -34,6 +37,15 @@ static CONNECT_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
 /// Ring buffer for process fork (parent->child) edges, drained by the same loader.
 #[map]
 static FORK_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
+
+/// Ring buffer for file-open events, drained by the same loader. `openat` is a
+/// very high-frequency syscall (every shared-library load, config read, etc.),
+/// so this ring can see heavy traffic; the capture is passive (drops on a full
+/// ring) and the userspace mapping filters to the attributed pids, so the
+/// RECORDING stays clean. A pid-allowlist eBPF filter (drop events from
+/// non-agent pids in-kernel) is a possible later optimization, not built here.
+#[map]
+static FILE_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
 
 /// Byte offsets of the `parent_pid` / `child_pid` fields in the
 /// `sched:sched_process_fork` tracepoint record. Standard layout: common header
@@ -54,6 +66,16 @@ const AF_INET: u16 = 2;
 /// uservaddr@24, addrlen@32). Verified against the kernel tracepoint `format`
 /// (root-gated on this host); see docs/migration-provenance.md for the source.
 const USERVADDR_OFFSET: usize = 24;
+
+/// Byte offset of the `filename` (user `const char *`) argument in the
+/// `syscalls:sys_enter_openat` tracepoint record. Standard syscall-enter
+/// layout: common header `0..8`, `__syscall_nr` at `8`, then args from `16`
+/// (dfd@16, filename(ptr)@24, flags@32, mode@40). This is the standard
+/// sys_enter_openat field layout, to be empirically validated by the live
+/// capture (a wrong offset reads a garbage pointer and the user-string read
+/// fails -- never a fake; the verified `format` dump is the source of truth,
+/// see docs/migration-provenance.md).
+const OPENAT_FILENAME_OFFSET: usize = 24;
 
 #[tracepoint]
 pub fn discoveryprobe_exec(ctx: TracePointContext) -> u32 {
@@ -159,6 +181,48 @@ fn try_capture_fork(ctx: &TracePointContext) -> Result<(), i64> {
         parent_pid,
         child_pid,
     });
+    entry.submit(0);
+    Ok(())
+}
+
+#[tracepoint]
+pub fn discoveryprobe_openat(ctx: TracePointContext) -> u32 {
+    // Passive: any read/reserve failure drops the event, never disturbs the
+    // traced process.
+    let _ = try_capture_openat(&ctx);
+    0
+}
+
+fn try_capture_openat(ctx: &TracePointContext) -> Result<(), i64> {
+    // The agent's file access -- which files it touches, the data-access surface
+    // visible at the kernel WITHOUT the agent's cooperation. Read the userspace
+    // `filename` pointer from the tracepoint record, then read the NUL-terminated
+    // user string into a bounded buffer.
+    // Do every FALLIBLE read BEFORE reserving the ring entry: a reserved entry
+    // must be submitted on every path, or the verifier rejects the program for a
+    // reference leak.
+    // SAFETY: `read_at` reads a fixed-size pointer field at a verifier-checked
+    // offset within the tracepoint record the kernel itself populated; the offset
+    // is within the record bounds for sys_enter_openat.
+    let filename = unsafe { ctx.read_at::<*const u8>(OPENAT_FILENAME_OFFSET)? };
+    if filename.is_null() {
+        return Err(0);
+    }
+    let mut path = [0_u8; PATH_LEN];
+    // SAFETY: `bpf_probe_read_user_str_bytes` is the kernel-sanctioned bounded
+    // read of a NUL-terminated userspace string from an eBPF program; a
+    // bad/unmapped address returns Err (propagated by `?`) instead of faulting.
+    // It writes at most `path.len()` bytes and never reads past the buffer.
+    let read = unsafe { bpf_probe_read_user_str_bytes(filename, &mut path)? };
+    // `path` is zero-initialised, so the bytes past `read.len()` stay NUL: the
+    // buffer is the truncated, NUL-padded path the userspace side reads back.
+    let _ = read;
+
+    let pid = (bpf_get_current_pid_tgid() >> 32) as u32;
+    let comm = bpf_get_current_comm()?;
+
+    let mut entry = FILE_EVENTS.reserve::<FileEvent>(0).ok_or(0_i64)?;
+    entry.write(FileEvent { pid, comm, path });
     entry.submit(0);
     Ok(())
 }

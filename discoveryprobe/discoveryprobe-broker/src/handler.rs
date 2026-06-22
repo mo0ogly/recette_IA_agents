@@ -77,6 +77,7 @@ where
         &captured.execs,
         &captured.connects,
         &captured.forks,
+        &captured.files,
     );
     let recordings_json = serde_json::to_string(&recordings)?;
     let recording_sha256 = sha256_hex(recordings_json.as_bytes());
@@ -170,6 +171,7 @@ mod tests {
                     execs: vec![exec(42, "pr-bot")],
                     connects: vec![],
                     forks: vec![],
+                    files: vec![],
                 })
             },
         )
@@ -243,6 +245,7 @@ mod tests {
                     execs: vec![exec(42, "pr-bot")],
                     connects: vec![connect(42, [140, 82, 112, 3], 443, "pr-bot")],
                     forks: vec![],
+                    files: vec![],
                 })
             },
         )

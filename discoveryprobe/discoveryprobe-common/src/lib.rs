@@ -13,6 +13,9 @@
 /// Length of the kernel `comm` field (`TASK_COMM_LEN`, the process name).
 pub const COMM_LEN: usize = 16;
 
+/// Length cap for a captured open path (bounded for the eBPF stack/ring).
+pub const PATH_LEN: usize = 128;
+
 /// One captured process-exec event: which process (`pid`) ran, under what
 /// command name (`comm`). This is the kernel's evidence that an agent process
 /// exists -- the eBPF view of "the agent is running", visible even when the
@@ -163,6 +166,58 @@ impl ForkEvent {
     }
 }
 
+/// One captured file open (`syscalls:sys_enter_openat`): which process
+/// (`pid`/`comm`) opened which `path` (NUL-padded, truncated to PATH_LEN). The
+/// data-access surface -- what files an agent touches, visible at the kernel
+/// without the agent's cooperation.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct FileEvent {
+    /// The process id (thread-group leader) that called `openat`.
+    pub pid: u32,
+    /// The process command name, NUL-padded (`bpf_get_current_comm`).
+    pub comm: [u8; COMM_LEN],
+    /// The opened path, NUL-padded, truncated to [`PATH_LEN`]
+    /// (`bpf_probe_read_user_str_bytes` of the userspace `filename` argument).
+    pub path: [u8; PATH_LEN],
+}
+
+/// Wire size of a serialised [`FileEvent`] -- the exact byte count the kernel
+/// reserves in the ring buffer and the loader reads back.
+pub const FILE_EVENT_SIZE: usize = core::mem::size_of::<FileEvent>();
+
+impl FileEvent {
+    /// Parse one event from raw ring-buffer bytes (native endianness: the
+    /// kernel producer and the userspace consumer share one host). Returns
+    /// `None` if the slice is too short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < FILE_EVENT_SIZE {
+            return None;
+        }
+        let pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let mut comm = [0u8; COMM_LEN];
+        comm.copy_from_slice(&buf[4..4 + COMM_LEN]);
+        let mut path = [0u8; PATH_LEN];
+        let path_start = 4 + COMM_LEN;
+        path.copy_from_slice(&buf[path_start..path_start + PATH_LEN]);
+        Some(Self { pid, comm, path })
+    }
+
+    /// The command name as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn comm_str(&self) -> &str {
+        let end = self.comm.iter().position(|&b| b == 0).unwrap_or(COMM_LEN);
+        core::str::from_utf8(&self.comm[..end]).unwrap_or("")
+    }
+
+    /// The opened path as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn path_str(&self) -> &str {
+        let end = self.path.iter().position(|&b| b == 0).unwrap_or(PATH_LEN);
+        core::str::from_utf8(&self.path[..end]).unwrap_or("")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,5 +333,55 @@ mod tests {
     #[test]
     fn fork_from_bytes_rejects_short_slice() {
         assert!(ForkEvent::from_bytes(&[0u8; FORK_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn make_file(pid: u32, name: &str, path: &str) -> FileEvent {
+        let mut comm = [0u8; COMM_LEN];
+        let cb = name.as_bytes();
+        let cn = cb.len().min(COMM_LEN);
+        comm[..cn].copy_from_slice(&cb[..cn]);
+        let mut path_buf = [0u8; PATH_LEN];
+        let pb = path.as_bytes();
+        let pn = pb.len().min(PATH_LEN);
+        path_buf[..pn].copy_from_slice(&pb[..pn]);
+        FileEvent {
+            pid,
+            comm,
+            path: path_buf,
+        }
+    }
+
+    fn file_to_bytes(ev: &FileEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(FILE_EVENT_SIZE);
+        buf.extend_from_slice(&ev.pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.comm);
+        buf.extend_from_slice(&ev.path);
+        buf
+    }
+
+    #[test]
+    fn file_event_size_is_pid_comm_path() {
+        assert_eq!(FILE_EVENT_SIZE, 4 + COMM_LEN + PATH_LEN);
+    }
+
+    #[test]
+    fn file_from_bytes_round_trips_pid_comm_path() {
+        let ev = make_file(4242, "pr-bot", "/etc/passwd");
+        let parsed = FileEvent::from_bytes(&file_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed.pid, ev.pid);
+        assert_eq!(parsed.comm, ev.comm);
+        assert_eq!(parsed.path, ev.path);
+    }
+
+    #[test]
+    fn file_path_str_trims_at_nul() {
+        let ev = make_file(1, "agent", "/var/lib/secret.json");
+        assert_eq!(ev.path_str(), "/var/lib/secret.json");
+        assert_eq!(ev.comm_str(), "agent");
+    }
+
+    #[test]
+    fn file_from_bytes_rejects_short_slice() {
+        assert!(FileEvent::from_bytes(&[0u8; FILE_EVENT_SIZE - 1]).is_none());
     }
 }
