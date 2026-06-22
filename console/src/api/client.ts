@@ -1091,10 +1091,19 @@ export function processCapture(
   });
 }
 
+/** One annotated endpoint from the v1 named-wire capture result. */
+export interface WireEndpoint {
+  raw: string;
+  name: string | null;
+  undeclared: boolean;
+}
+
 /** POST /probe/capture result: the broker recording + (when ok) its scorecard. */
 export interface ProbeCaptureResult {
   recording: BrokerRecording;
   scorecard?: DetectionScorecard;
+  wire_named?: Record<string, WireEndpoint[]>;
+  undeclared_hosts?: string[];
 }
 
 /** POST /probe/process-capture-campaign result: every mock-capable step spawned
