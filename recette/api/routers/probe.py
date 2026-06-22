@@ -21,10 +21,23 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
 
 router = APIRouter(prefix="/probe", tags=["probe"])
+
+
+def _attach_wire_names(result: dict, request: Request) -> dict:
+    """Attach the v1 named-wire annotation (declared server + undeclared host)
+    to a capture result. Pure/fail-safe: never changes the scorecard, never
+    raises. config_store is the server registry source."""
+    recording = result.get("recording")
+    if isinstance(recording, dict):
+        servers = request.app.state.config_store.list_servers()
+        result.update(annotate_recording(recording, servers))
+    return result
+
 
 _SOCKET_ENV = "INSPECT_IA_AGENTS_PROBE_SOCKET"
 _MODE_ENV = "INSPECT_IA_AGENTS_PROBE_MODE"
@@ -204,8 +217,11 @@ def process_capture(request: Request, body: dict[str, Any]) -> dict:
     from ..runners import run_process_capture
 
     try:
-        return run_process_capture(
-            agent_cfg, store.list_servers(), socket_path=socket_path, duration_ms=duration_ms
+        return _attach_wire_names(
+            run_process_capture(
+                agent_cfg, store.list_servers(), socket_path=socket_path, duration_ms=duration_ms
+            ),
+            request,
         )
     except ProbeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -236,15 +252,22 @@ def process_capture_campaign(request: Request, body: dict[str, Any]) -> dict:
     from ..runners import run_campaign_process_capture
 
     try:
-        return run_campaign_process_capture(
-            campaign, store, store.list_servers(), socket_path=socket_path, duration_ms=duration_ms
+        return _attach_wire_names(
+            run_campaign_process_capture(
+                campaign,
+                store,
+                store.list_servers(),
+                socket_path=socket_path,
+                duration_ms=duration_ms,
+            ),
+            request,
         )
     except ProbeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/capture")
-def capture(body: dict[str, Any]) -> dict:
+def capture(request: Request, body: dict[str, Any]) -> dict:
     """Relay one bounded capture to the broker and score the recording.
 
     Body: ``{"agents": [ids], "duration_ms": <int>}``. Validation here mirrors
@@ -279,4 +302,4 @@ def capture(body: dict[str, Any]) -> dict:
     out: dict = {"recording": recording}
     if recording.get("status") == "ok":
         out["scorecard"] = asdict(score_recording(json.dumps(recording)))
-    return out
+    return _attach_wire_names(out, request)

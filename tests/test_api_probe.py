@@ -23,6 +23,7 @@ try:
     from fastapi.testclient import TestClient
 
     from recette.api.app import create_app
+    from recette.api.config_store import ConfigStore
 
     _HAS_FASTAPI = True
 except ImportError:  # pragma: no cover - only without the [api] extra
@@ -168,6 +169,66 @@ class TestProbeApi(unittest.TestCase):
             self.assertEqual(resp.json()["recording"]["status"], "ok")
         # The env was never set: the fallback alone made the capture work.
         self.assertNotIn(_SOCKET_ENV, os.environ)
+
+
+_BROKER_WIRE = {
+    "status": "ok",
+    "recordings": [
+        {
+            "agent_id": "pr-bot-sdk",
+            # one declared endpoint (a seeded mock_local server on :9151) and one
+            # undeclared host (a connect to an IP not in the server registry).
+            "surfaces": {"ebpf_wire": ["connect:127.0.0.1:9151", "connect:203.0.113.7:443"]},
+        },
+    ],
+    "recording_sha256": "0" * 64,
+}
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class TestProbeCaptureWireNames(unittest.TestCase):
+    """Task 3: /probe/capture attaches the v1 named-wire annotation
+    (declared server name + undeclared host) without touching the scorecard."""
+
+    def setUp(self) -> None:
+        # Isolated ConfigStore (a tmp file) so seeding a server never dirties the
+        # tracked corpus config; mirror the test_api_config_routes pattern.
+        self._tmpdir = tempfile.mkdtemp()
+        store = ConfigStore(Path(self._tmpdir) / "config.json")
+        store.add_server({"id": "wire-gh", "system": "github", "mode": "mock_local", "port": 9151})
+        self.client = TestClient(create_app(config_store=store))
+        self._saved = os.environ.pop(_SOCKET_ENV, None)
+        self._saved_mode = os.environ.pop(_MODE_ENV, None)
+        self._canon = mock.patch(
+            "recette.api.routers.probe._canonical_socket",
+            return_value=Path(tempfile.mkdtemp()) / "absent.sock",
+        )
+        self._canon.start()
+        self.addCleanup(self._canon.stop)
+
+    def tearDown(self) -> None:
+        for env, saved in ((_SOCKET_ENV, self._saved), (_MODE_ENV, self._saved_mode)):
+            if saved is None:
+                os.environ.pop(env, None)
+            else:
+                os.environ[env] = saved
+
+    def test_capture_attaches_named_and_undeclared_wire(self) -> None:
+        broker = _StubBroker(_BROKER_WIRE)
+        self.addCleanup(broker.close)
+        os.environ[_SOCKET_ENV] = broker.path
+        resp = self.client.post(
+            "/probe/capture",
+            json={"agents": ["pr-bot-sdk"], "duration_ms": 2000},
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        # the seeded mock_local server resolves the loopback endpoint to its id
+        self.assertEqual(body["wire_named"]["pr-bot-sdk"][0]["name"], "wire-gh")
+        # the unknown host is flagged in the run-level undeclared list
+        self.assertIn("203.0.113.7:443", body["undeclared_hosts"])
+        # detection behavior is unchanged: the scorecard is still present
+        self.assertIn("scorecard", body)
 
 
 if __name__ == "__main__":
