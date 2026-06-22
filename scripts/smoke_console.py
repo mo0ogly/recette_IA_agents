@@ -683,6 +683,21 @@ def _verify_discovery_exchange(page: Page, console: str, api: str) -> None:
         f"campaign launch gave no feedback (got {msg.inner_text()!r})",
     )
     _shot(page, "discovery-exchange-campaign")
+    # Named-endpoint assertion (graceful): when the eBPF source is active (broker
+    # live), the eBPF column renders per-agent wire endpoints as `wire-agent-<id>`
+    # rows whose text carries the resolved `name (host:port)` form. In replay mode
+    # (no broker, no live capture) those rows are absent -- tolerate that by
+    # skipping rather than failing the smoke.
+    wire_agent = page.query_selector('[data-testid^="wire-agent-"]')
+    if wire_agent is not None:
+        text = wire_agent.inner_text()
+        _expect(
+            "(" in text,
+            f"wire-agent row present but not named (got {text!r})",
+        )
+    else:
+        print("[dx] named wire skipped (replay broker)")
+    _shot(page, "discovery-exchange-named-wire")
 
 
 def run_smoke(console: str, api: str, server_port: int) -> None:
