@@ -7,7 +7,7 @@
 
 use std::collections::BTreeSet;
 
-use discoveryprobe_common::{ConnectEvent, ExecEvent, FileEvent, ForkEvent};
+use discoveryprobe_common::{ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent};
 use discoveryprobe_core::{CaptureRecording, ObservationSurface};
 
 /// What the broker launched: an agent and the process command name the kernel
@@ -94,7 +94,7 @@ pub fn recordings_from_execs(
     agents: &[AgentProcessSpec],
     events: &[ExecEvent],
 ) -> Vec<CaptureRecording> {
-    recordings_from_capture(agents, events, &[], &[], &[])
+    recordings_from_capture(agents, events, &[], &[], &[], &[])
 }
 
 /// Build one [`CaptureRecording`] per agent from BOTH captured surfaces of the
@@ -117,6 +117,10 @@ pub fn recordings_from_execs(
 /// When `forks` is empty or the spec has no pids, attribution reduces to the
 /// prior `comm`/pid match -- behaviour is unchanged.
 ///
+/// The dns surface is the name-resolution view -- which hostnames the agent
+/// resolved (`dns:api.openai.com`), captured at the `sendto` to UDP port 53,
+/// the lookup that precedes the connect.
+///
 /// Pure and deterministic: each recording is normalised (sorted, de-duplicated),
 /// so the same captures serialise byte-for-byte identically (I4).
 pub fn recordings_from_capture(
@@ -125,6 +129,7 @@ pub fn recordings_from_capture(
     connects: &[ConnectEvent],
     forks: &[ForkEvent],
     files: &[FileEvent],
+    dns: &[DnsEvent],
 ) -> Vec<CaptureRecording> {
     agents
         .iter()
@@ -153,6 +158,14 @@ pub fn recordings_from_capture(
                     recording.observe(
                         ObservationSurface::EbpfWire,
                         format!("open:{}", event.path_str()),
+                    );
+                }
+            }
+            for event in dns {
+                if spec.matches(event.comm_str(), event.pid) || attributed.contains(&event.pid) {
+                    recording.observe(
+                        ObservationSurface::EbpfWire,
+                        format!("dns:{}", event.qname_str()),
                     );
                 }
             }
@@ -192,6 +205,22 @@ mod tests {
             dport: port.to_be_bytes(),
             _pad: [0u8; 2],
             comm,
+        }
+    }
+
+    fn dns(pid: u32, qname: &str, name: &str) -> DnsEvent {
+        let mut comm = [0u8; discoveryprobe_common::COMM_LEN];
+        let cb = name.as_bytes();
+        let cn = cb.len().min(discoveryprobe_common::COMM_LEN);
+        comm[..cn].copy_from_slice(&cb[..cn]);
+        let mut qname_buf = [0u8; discoveryprobe_common::QNAME_LEN];
+        let qb = qname.as_bytes();
+        let qn = qb.len().min(discoveryprobe_common::QNAME_LEN);
+        qname_buf[..qn].copy_from_slice(&qb[..qn]);
+        DnsEvent {
+            pid,
+            comm,
+            qname: qname_buf,
         }
     }
 
@@ -235,6 +264,7 @@ mod tests {
             &[connect(4242, [127, 0, 0, 1], 9101, "python3")],
             &[],
             &[],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"exec:python3:4242".to_string()));
@@ -276,7 +306,7 @@ mod tests {
     fn matching_connect_makes_agent_visible_with_dest() {
         let agents = [AgentProcessSpec::new("llm-bot-sdk", "llm-bot")];
         let connects = [connect(42, [140, 82, 112, 3], 443, "llm-bot")];
-        let recs = recordings_from_capture(&agents, &[], &connects, &[], &[]);
+        let recs = recordings_from_capture(&agents, &[], &connects, &[], &[], &[]);
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
         assert_eq!(visible, Some(&vec!["connect:140.82.112.3:443".to_string()]));
     }
@@ -288,6 +318,7 @@ mod tests {
             &agents,
             &[exec(7, "llm-bot")],
             &[connect(7, [1, 1, 1, 1], 443, "llm-bot")],
+            &[],
             &[],
             &[],
         );
@@ -311,6 +342,7 @@ mod tests {
             &[connect(9, [8, 8, 8, 8], 53, "curl")],
             &[],
             &[],
+            &[],
         );
         assert!(!recs[0].detected_anywhere());
     }
@@ -326,6 +358,7 @@ mod tests {
             &[connect(200, [127, 0, 0, 1], 9101, "python3")],
             &[fork(100, 200)],
             &[],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"connect:127.0.0.1:9101".to_string()));
@@ -340,6 +373,7 @@ mod tests {
             &[],
             &[connect(300, [10, 0, 0, 1], 443, "python3")],
             &[fork(100, 200), fork(200, 300)],
+            &[],
             &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
@@ -357,6 +391,7 @@ mod tests {
             &[connect(200, [8, 8, 8, 8], 53, "python3")],
             &[fork(999, 200)],
             &[],
+            &[],
         );
         assert!(!recs[0].detected_anywhere());
     }
@@ -371,6 +406,7 @@ mod tests {
             &[connect(100, [1, 1, 1, 1], 443, "python3")],
             &[],
             &[],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"exec:python3:100".to_string()));
@@ -380,8 +416,14 @@ mod tests {
     #[test]
     fn matching_open_surfaces_as_open_path() {
         let agents = [AgentProcessSpec::new("reader-bot", "reader")];
-        let recs =
-            recordings_from_capture(&agents, &[], &[], &[], &[file(42, "/etc/passwd", "reader")]);
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[],
+            &[file(42, "/etc/passwd", "reader")],
+            &[],
+        );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
         assert_eq!(visible, Some(&vec!["open:/etc/passwd".to_string()]));
     }
@@ -391,8 +433,14 @@ mod tests {
         // A file open from a process that is neither the marker nor an
         // attributed pid does not attach to the agent.
         let agents = [AgentProcessSpec::with_pids("dx-bot", "dx-bot", vec![100])];
-        let recs =
-            recordings_from_capture(&agents, &[], &[], &[], &[file(9999, "/etc/shadow", "cat")]);
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[],
+            &[file(9999, "/etc/shadow", "cat")],
+            &[],
+        );
         assert!(!recs[0].detected_anywhere());
     }
 
@@ -407,8 +455,57 @@ mod tests {
             &[],
             &[fork(100, 200)],
             &[file(200, "/var/lib/data.json", "python3")],
+            &[],
         );
         let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
         assert!(visible.contains(&"open:/var/lib/data.json".to_string()));
+    }
+
+    #[test]
+    fn matching_dns_surfaces_as_dns_qname() {
+        let agents = [AgentProcessSpec::new("llm-bot-sdk", "llm-bot")];
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[dns(42, "api.openai.com", "llm-bot")],
+        );
+        let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire);
+        assert_eq!(visible, Some(&vec!["dns:api.openai.com".to_string()]));
+    }
+
+    #[test]
+    fn dns_from_unattributed_pid_is_not_surfaced() {
+        // A DNS query from a process that is neither the marker nor an
+        // attributed pid does not attach to the agent.
+        let agents = [AgentProcessSpec::with_pids("dx-bot", "dx-bot", vec![100])];
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[dns(9999, "evil.example.com", "cat")],
+        );
+        assert!(!recs[0].detected_anywhere());
+    }
+
+    #[test]
+    fn child_dns_attributed_via_fork_chain() {
+        // Spec pids=[100]; pid 100 forked pid 200; a DNS query from 200 (comm
+        // "python3", NOT the marker) is attributed to the agent via the edge.
+        let agents = [AgentProcessSpec::with_pids("dx-bot", "dx-bot", vec![100])];
+        let recs = recordings_from_capture(
+            &agents,
+            &[],
+            &[],
+            &[fork(100, 200)],
+            &[],
+            &[dns(200, "api.anthropic.com", "python3")],
+        );
+        let visible = recs[0].surfaces.get(&ObservationSurface::EbpfWire).unwrap();
+        assert!(visible.contains(&"dns:api.anthropic.com".to_string()));
     }
 }

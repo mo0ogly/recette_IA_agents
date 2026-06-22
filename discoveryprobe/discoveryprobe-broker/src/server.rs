@@ -145,6 +145,7 @@ fn handle_watch(
             &captured.connects,
             &captured.forks,
             &captured.files,
+            &captured.dns,
         );
         let recordings_json = serde_json::to_string(&recordings)?;
         let resp = BrokerResponse::Ok {

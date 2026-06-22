@@ -16,6 +16,11 @@ pub const COMM_LEN: usize = 16;
 /// Length cap for a captured open path (bounded for the eBPF stack/ring).
 pub const PATH_LEN: usize = 128;
 
+/// Length cap for a captured DNS query name (bounded for the eBPF stack/ring).
+/// A power of two so the kernel-side parse can mask its write index with
+/// `& (QNAME_LEN - 1)` to satisfy the verifier (a constant-bounded buffer).
+pub const QNAME_LEN: usize = 256;
+
 /// One captured process-exec event: which process (`pid`) ran, under what
 /// command name (`comm`). This is the kernel's evidence that an agent process
 /// exists -- the eBPF view of "the agent is running", visible even when the
@@ -218,6 +223,64 @@ impl FileEvent {
     }
 }
 
+/// One captured DNS query (`syscalls:sys_enter_sendto` filtered to a UDP packet
+/// whose destination is `AF_INET:53`): which process (`pid`/`comm`) resolved
+/// which name (`qname`, the dotted query name parsed from the DNS message's
+/// QNAME, NUL-padded, truncated to [`QNAME_LEN`]).
+///
+/// This is the kernel's evidence of an agent's name resolution -- for an LLM
+/// agent, the lookup of its provider host (e.g. `api.openai.com`) BEFORE the
+/// HTTPS dial captured by [`ConnectEvent`]. Seen at the kernel without the
+/// agent's cooperation (the eBPF-wire surface), so a hook-blind ghost is still
+/// caught resolving names.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct DnsEvent {
+    /// The process id (thread-group leader) that called `sendto`.
+    pub pid: u32,
+    /// The process command name, NUL-padded (`bpf_get_current_comm`).
+    pub comm: [u8; COMM_LEN],
+    /// The dotted DNS query name, NUL-padded, truncated to [`QNAME_LEN`]
+    /// (parsed from the DNS message QNAME labels in the `sendto` payload).
+    pub qname: [u8; QNAME_LEN],
+}
+
+/// Wire size of a serialised [`DnsEvent`] -- the exact byte count the kernel
+/// reserves in the ring buffer and the loader reads back.
+pub const DNS_EVENT_SIZE: usize = core::mem::size_of::<DnsEvent>();
+
+impl DnsEvent {
+    /// Parse one event from raw ring-buffer bytes (native endianness: the
+    /// kernel producer and the userspace consumer share one host). Returns
+    /// `None` if the slice is too short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < DNS_EVENT_SIZE {
+            return None;
+        }
+        let pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let mut comm = [0u8; COMM_LEN];
+        comm.copy_from_slice(&buf[4..4 + COMM_LEN]);
+        let mut qname = [0u8; QNAME_LEN];
+        let qname_start = 4 + COMM_LEN;
+        qname.copy_from_slice(&buf[qname_start..qname_start + QNAME_LEN]);
+        Some(Self { pid, comm, qname })
+    }
+
+    /// The command name as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn comm_str(&self) -> &str {
+        let end = self.comm.iter().position(|&b| b == 0).unwrap_or(COMM_LEN);
+        core::str::from_utf8(&self.comm[..end]).unwrap_or("")
+    }
+
+    /// The DNS query name as a string slice, trimmed at the first NUL. Returns
+    /// an empty slice if the bytes are not valid UTF-8.
+    pub fn qname_str(&self) -> &str {
+        let end = self.qname.iter().position(|&b| b == 0).unwrap_or(QNAME_LEN);
+        core::str::from_utf8(&self.qname[..end]).unwrap_or("")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,5 +446,55 @@ mod tests {
     #[test]
     fn file_from_bytes_rejects_short_slice() {
         assert!(FileEvent::from_bytes(&[0u8; FILE_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn make_dns(pid: u32, name: &str, qname: &str) -> DnsEvent {
+        let mut comm = [0u8; COMM_LEN];
+        let cb = name.as_bytes();
+        let cn = cb.len().min(COMM_LEN);
+        comm[..cn].copy_from_slice(&cb[..cn]);
+        let mut qname_buf = [0u8; QNAME_LEN];
+        let qb = qname.as_bytes();
+        let qn = qb.len().min(QNAME_LEN);
+        qname_buf[..qn].copy_from_slice(&qb[..qn]);
+        DnsEvent {
+            pid,
+            comm,
+            qname: qname_buf,
+        }
+    }
+
+    fn dns_to_bytes(ev: &DnsEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(DNS_EVENT_SIZE);
+        buf.extend_from_slice(&ev.pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.comm);
+        buf.extend_from_slice(&ev.qname);
+        buf
+    }
+
+    #[test]
+    fn dns_event_size_is_pid_comm_qname() {
+        assert_eq!(DNS_EVENT_SIZE, 4 + COMM_LEN + QNAME_LEN);
+    }
+
+    #[test]
+    fn dns_from_bytes_round_trips_pid_comm_qname() {
+        let ev = make_dns(4242, "pr-bot", "api.openai.com");
+        let parsed = DnsEvent::from_bytes(&dns_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed.pid, ev.pid);
+        assert_eq!(parsed.comm, ev.comm);
+        assert_eq!(parsed.qname, ev.qname);
+    }
+
+    #[test]
+    fn dns_qname_str_trims_at_nul() {
+        let ev = make_dns(1, "agent", "api.anthropic.com");
+        assert_eq!(ev.qname_str(), "api.anthropic.com");
+        assert_eq!(ev.comm_str(), "agent");
+    }
+
+    #[test]
+    fn dns_from_bytes_rejects_short_slice() {
+        assert!(DnsEvent::from_bytes(&[0u8; DNS_EVENT_SIZE - 1]).is_none());
     }
 }

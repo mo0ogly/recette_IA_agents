@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 use aya::maps::{MapData, RingBuf};
 use aya::programs::TracePoint;
 use aya::Ebpf;
-use discoveryprobe_common::{ConnectEvent, ExecEvent, FileEvent, ForkEvent};
+use discoveryprobe_common::{ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent};
 
 /// The exec tracepoint the exec-capture program attaches to.
 const EXEC_CATEGORY: &str = "sched";
@@ -30,15 +30,20 @@ const FORK_NAME: &str = "sched_process_fork";
 /// The openat tracepoint the file-access program attaches to (same `syscalls`
 /// category as connect).
 const FILE_NAME: &str = "sys_enter_openat";
+/// The sendto tracepoint the DNS-query program attaches to (same `syscalls`
+/// category as connect).
+const DNS_NAME: &str = "sys_enter_sendto";
 /// The program and map symbols, matching `discoveryprobe-ebpf/src/main.rs`.
 const EXEC_PROGRAM: &str = "discoveryprobe_exec";
 const CONNECT_PROGRAM: &str = "discoveryprobe_connect";
 const FORK_PROGRAM: &str = "discoveryprobe_fork";
 const FILE_PROGRAM: &str = "discoveryprobe_openat";
+const DNS_PROGRAM: &str = "discoveryprobe_sendto";
 const EXEC_RING_MAP: &str = "EXEC_EVENTS";
 const CONNECT_RING_MAP: &str = "CONNECT_EVENTS";
 const FORK_RING_MAP: &str = "FORK_EVENTS";
 const FILE_RING_MAP: &str = "FILE_EVENTS";
+const DNS_RING_MAP: &str = "DNS_EVENTS";
 
 /// Where the compiled BPF object lives and how long to capture.
 #[derive(Debug, Clone)]
@@ -64,6 +69,8 @@ pub struct Capture {
     pub forks: Vec<ForkEvent>,
     /// File-open events (the agent touched a file, the data-access surface).
     pub files: Vec<FileEvent>,
+    /// DNS-query events (the agent resolved a name, the name-resolution surface).
+    pub dns: Vec<DnsEvent>,
 }
 
 /// Load + attach both capture programs and collect their events for the window.
@@ -81,6 +88,7 @@ pub fn capture(config: &CaptureConfig) -> Result<Capture> {
         capture.connects.extend(slice.connects);
         capture.forks.extend(slice.forks);
         capture.files.extend(slice.files);
+        capture.dns.extend(slice.dns);
         if Instant::now() >= deadline {
             break;
         }
@@ -103,6 +111,7 @@ pub struct Session {
     connect_ring: RingBuf<MapData>,
     fork_ring: RingBuf<MapData>,
     file_ring: RingBuf<MapData>,
+    dns_ring: RingBuf<MapData>,
 }
 
 impl Session {
@@ -115,16 +124,19 @@ impl Session {
         attach_tracepoint(&mut bpf, CONNECT_PROGRAM, CONNECT_CATEGORY, CONNECT_NAME)?;
         attach_tracepoint(&mut bpf, FORK_PROGRAM, EXEC_CATEGORY, FORK_NAME)?;
         attach_tracepoint(&mut bpf, FILE_PROGRAM, CONNECT_CATEGORY, FILE_NAME)?;
+        attach_tracepoint(&mut bpf, DNS_PROGRAM, CONNECT_CATEGORY, DNS_NAME)?;
         let exec_ring = take_ring(&mut bpf, EXEC_RING_MAP)?;
         let connect_ring = take_ring(&mut bpf, CONNECT_RING_MAP)?;
         let fork_ring = take_ring(&mut bpf, FORK_RING_MAP)?;
         let file_ring = take_ring(&mut bpf, FILE_RING_MAP)?;
+        let dns_ring = take_ring(&mut bpf, DNS_RING_MAP)?;
         Ok(Self {
             _bpf: bpf,
             exec_ring,
             connect_ring,
             fork_ring,
             file_ring,
+            dns_ring,
         })
     }
 
@@ -149,6 +161,11 @@ impl Session {
         while let Some(item) = self.file_ring.next() {
             if let Some(event) = FileEvent::from_bytes(&item) {
                 capture.files.push(event);
+            }
+        }
+        while let Some(item) = self.dns_ring.next() {
+            if let Some(event) = DnsEvent::from_bytes(&item) {
+                capture.dns.push(event);
             }
         }
         capture
