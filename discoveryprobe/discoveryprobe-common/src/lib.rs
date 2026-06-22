@@ -129,6 +129,40 @@ impl ConnectEvent {
     }
 }
 
+/// One captured process fork: a `parent_pid` spawned a `child_pid`
+/// (`sched:sched_process_fork`). Lets the userspace mapping attribute a child
+/// process's activity (exec/connect) to the agent that owns the parent pid --
+/// the process-tree view, so a multi-process agent is not a blind spot.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ForkEvent {
+    /// The parent process id (thread-group leader) that forked.
+    pub parent_pid: u32,
+    /// The child process id created by the fork.
+    pub child_pid: u32,
+}
+
+/// Wire size of a serialised [`ForkEvent`] -- the exact byte count the kernel
+/// reserves in the ring buffer and the loader reads back.
+pub const FORK_EVENT_SIZE: usize = core::mem::size_of::<ForkEvent>();
+
+impl ForkEvent {
+    /// Parse one event from raw ring-buffer bytes (native endianness: the
+    /// kernel producer and the userspace consumer share one host). Returns
+    /// `None` if the slice is too short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < FORK_EVENT_SIZE {
+            return None;
+        }
+        let parent_pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let child_pid = u32::from_ne_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        Some(Self {
+            parent_pid,
+            child_pid,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +251,32 @@ mod tests {
     #[test]
     fn connect_from_bytes_rejects_short_slice() {
         assert!(ConnectEvent::from_bytes(&[0u8; CONNECT_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn fork_to_bytes(ev: &ForkEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(FORK_EVENT_SIZE);
+        buf.extend_from_slice(&ev.parent_pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.child_pid.to_ne_bytes());
+        buf
+    }
+
+    #[test]
+    fn fork_event_size_is_two_pids() {
+        assert_eq!(FORK_EVENT_SIZE, 4 + 4);
+    }
+
+    #[test]
+    fn fork_from_bytes_round_trips_parent_and_child() {
+        let ev = ForkEvent {
+            parent_pid: 100,
+            child_pid: 200,
+        };
+        let parsed = ForkEvent::from_bytes(&fork_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed, ev);
+    }
+
+    #[test]
+    fn fork_from_bytes_rejects_short_slice() {
+        assert!(ForkEvent::from_bytes(&[0u8; FORK_EVENT_SIZE - 1]).is_none());
     }
 }

@@ -139,8 +139,12 @@ fn handle_watch(
     loop {
         std::thread::sleep(slice);
         let captured = session.drain();
-        let recordings =
-            recordings_from_capture(&validated.specs, &captured.execs, &captured.connects);
+        let recordings = recordings_from_capture(
+            &validated.specs,
+            &captured.execs,
+            &captured.connects,
+            &captured.forks,
+        );
         let recordings_json = serde_json::to_string(&recordings)?;
         let resp = BrokerResponse::Ok {
             recordings,

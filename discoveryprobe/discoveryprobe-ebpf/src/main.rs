@@ -21,7 +21,7 @@ use aya_ebpf::{
     maps::RingBuf,
     programs::TracePointContext,
 };
-use discoveryprobe_common::{ConnectEvent, ExecEvent};
+use discoveryprobe_common::{ConnectEvent, ExecEvent, ForkEvent};
 
 /// Ring buffer the userspace loader drains (256 KiB: power-of-two page multiple).
 #[map]
@@ -30,6 +30,20 @@ static EXEC_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
 /// Ring buffer for outbound connect events, drained by the same loader.
 #[map]
 static CONNECT_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
+
+/// Ring buffer for process fork (parent->child) edges, drained by the same loader.
+#[map]
+static FORK_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
+
+/// Byte offsets of the `parent_pid` / `child_pid` fields in the
+/// `sched:sched_process_fork` tracepoint record. Standard layout: common header
+/// `0..8`, then `parent_comm[16]`@8, `parent_pid`@24, `child_comm[16]`@28,
+/// `child_pid`@44. These are the standard sched_process_fork field offsets, to
+/// be empirically validated by the live capture (a wrong offset makes
+/// attribution fail -- never a fake; the verified `format` dump is the source of
+/// truth, see docs/migration-provenance.md).
+const PARENT_PID_OFFSET: usize = 24;
+const CHILD_PID_OFFSET: usize = 44;
 
 /// `AF_INET` -- IPv4 socket family (the only family captured for now).
 const AF_INET: u16 = 2;
@@ -114,6 +128,36 @@ fn try_capture_connect(ctx: &TracePointContext) -> Result<(), i64> {
         dport: port.to_ne_bytes(),
         _pad: [0_u8; 2],
         comm,
+    });
+    entry.submit(0);
+    Ok(())
+}
+
+#[tracepoint]
+pub fn discoveryprobe_fork(ctx: TracePointContext) -> u32 {
+    // Passive: any read/reserve failure drops the event, never disturbs the
+    // traced process.
+    let _ = try_capture_fork(&ctx);
+    0
+}
+
+fn try_capture_fork(ctx: &TracePointContext) -> Result<(), i64> {
+    // Learn the parent->child process edge so the userspace mapping can
+    // attribute a child's exec/connect to the agent that owns the parent pid
+    // (the process-tree view; a multi-process agent is not a blind spot).
+    // Do every FALLIBLE read BEFORE reserving the ring entry: a reserved entry
+    // must be submitted on every path, or the verifier rejects the program for
+    // a reference leak.
+    // SAFETY: `read_at` reads a fixed-size field at a verifier-checked offset
+    // within the tracepoint record the kernel itself populated; both offsets are
+    // within the record bounds for sched_process_fork.
+    let parent_pid = unsafe { ctx.read_at::<u32>(PARENT_PID_OFFSET)? };
+    let child_pid = unsafe { ctx.read_at::<u32>(CHILD_PID_OFFSET)? };
+
+    let mut entry = FORK_EVENTS.reserve::<ForkEvent>(0).ok_or(0_i64)?;
+    entry.write(ForkEvent {
+        parent_pid,
+        child_pid,
     });
     entry.submit(0);
     Ok(())

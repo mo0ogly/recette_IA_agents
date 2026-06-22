@@ -39,7 +39,7 @@ fn main() {
     // both caught on the wire WITHOUT an in-process hook (the ghost case).
     let execs = [exec(4242, "llm-bot")];
     let connects = [connect(4242, [140, 82, 112, 3], 443, "llm-bot")];
-    let recordings = recordings_from_capture(&agents, &execs, &connects);
+    let recordings = recordings_from_capture(&agents, &execs, &connects, &[]);
     // Emit a JSON array of recordings (the shape `recette surface --recording`
     // accepts). Use each recording's own bridge serialiser -- no extra dep.
     let body = recordings

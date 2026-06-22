@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 use aya::maps::{MapData, RingBuf};
 use aya::programs::TracePoint;
 use aya::Ebpf;
-use discoveryprobe_common::{ConnectEvent, ExecEvent};
+use discoveryprobe_common::{ConnectEvent, ExecEvent, ForkEvent};
 
 /// The exec tracepoint the exec-capture program attaches to.
 const EXEC_CATEGORY: &str = "sched";
@@ -24,11 +24,16 @@ const EXEC_NAME: &str = "sched_process_exec";
 /// The connect tracepoint the egress-capture program attaches to.
 const CONNECT_CATEGORY: &str = "syscalls";
 const CONNECT_NAME: &str = "sys_enter_connect";
+/// The fork tracepoint the process-tree program attaches to (same `sched`
+/// category as exec).
+const FORK_NAME: &str = "sched_process_fork";
 /// The program and map symbols, matching `discoveryprobe-ebpf/src/main.rs`.
 const EXEC_PROGRAM: &str = "discoveryprobe_exec";
 const CONNECT_PROGRAM: &str = "discoveryprobe_connect";
+const FORK_PROGRAM: &str = "discoveryprobe_fork";
 const EXEC_RING_MAP: &str = "EXEC_EVENTS";
 const CONNECT_RING_MAP: &str = "CONNECT_EVENTS";
+const FORK_RING_MAP: &str = "FORK_EVENTS";
 
 /// Where the compiled BPF object lives and how long to capture.
 #[derive(Debug, Clone)]
@@ -50,6 +55,8 @@ pub struct Capture {
     pub execs: Vec<ExecEvent>,
     /// Outbound TCP connect events (the agent dialed out, e.g. an LLM provider).
     pub connects: Vec<ConnectEvent>,
+    /// Process fork (parent->child) edges, for process-tree attribution.
+    pub forks: Vec<ForkEvent>,
 }
 
 /// Load + attach both capture programs and collect their events for the window.
@@ -65,6 +72,7 @@ pub fn capture(config: &CaptureConfig) -> Result<Capture> {
         let slice = session.drain();
         capture.execs.extend(slice.execs);
         capture.connects.extend(slice.connects);
+        capture.forks.extend(slice.forks);
         if Instant::now() >= deadline {
             break;
         }
@@ -85,6 +93,7 @@ pub struct Session {
     _bpf: Ebpf,
     exec_ring: RingBuf<MapData>,
     connect_ring: RingBuf<MapData>,
+    fork_ring: RingBuf<MapData>,
 }
 
 impl Session {
@@ -95,12 +104,15 @@ impl Session {
         let mut bpf = Ebpf::load(&object).context("load bpf object")?;
         attach_tracepoint(&mut bpf, EXEC_PROGRAM, EXEC_CATEGORY, EXEC_NAME)?;
         attach_tracepoint(&mut bpf, CONNECT_PROGRAM, CONNECT_CATEGORY, CONNECT_NAME)?;
+        attach_tracepoint(&mut bpf, FORK_PROGRAM, EXEC_CATEGORY, FORK_NAME)?;
         let exec_ring = take_ring(&mut bpf, EXEC_RING_MAP)?;
         let connect_ring = take_ring(&mut bpf, CONNECT_RING_MAP)?;
+        let fork_ring = take_ring(&mut bpf, FORK_RING_MAP)?;
         Ok(Self {
             _bpf: bpf,
             exec_ring,
             connect_ring,
+            fork_ring,
         })
     }
 
@@ -115,6 +127,11 @@ impl Session {
         while let Some(item) = self.connect_ring.next() {
             if let Some(event) = ConnectEvent::from_bytes(&item) {
                 capture.connects.push(event);
+            }
+        }
+        while let Some(item) = self.fork_ring.next() {
+            if let Some(event) = ForkEvent::from_bytes(&item) {
+                capture.forks.push(event);
             }
         }
         capture

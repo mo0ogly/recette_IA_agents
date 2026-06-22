@@ -72,7 +72,12 @@ where
     })?;
 
     let captured = capture(&validated.specs, validated.duration)?;
-    let recordings = recordings_from_capture(&validated.specs, &captured.execs, &captured.connects);
+    let recordings = recordings_from_capture(
+        &validated.specs,
+        &captured.execs,
+        &captured.connects,
+        &captured.forks,
+    );
     let recordings_json = serde_json::to_string(&recordings)?;
     let recording_sha256 = sha256_hex(recordings_json.as_bytes());
 
@@ -164,6 +169,7 @@ mod tests {
                 Ok(Capture {
                     execs: vec![exec(42, "pr-bot")],
                     connects: vec![],
+                    forks: vec![],
                 })
             },
         )
@@ -236,6 +242,7 @@ mod tests {
                 Ok(Capture {
                     execs: vec![exec(42, "pr-bot")],
                     connects: vec![connect(42, [140, 82, 112, 3], 443, "pr-bot")],
+                    forks: vec![],
                 })
             },
         )
