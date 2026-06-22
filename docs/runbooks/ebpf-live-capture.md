@@ -30,6 +30,25 @@ A broker rebuild drops the file-caps -> re-run `probe-grant-caps`. The manual
 operator-socket path below stays valid (e.g. a broker on a different socket) but
 is no longer required.
 
+## Captured surfaces (what the engine sees)
+
+The discoveryprobe kernel program attaches these tracepoints; every observation
+lands on the single `ebpf_wire` surface as a prefixed token (the userspace
+mapping attributes it to an agent by exact pid, comm marker, OR the fork chain):
+
+| Tracepoint | Token | Meaning |
+|------------|-------|---------|
+| `sched:sched_process_exec` | `exec:{comm}:{pid}` | the agent process ran |
+| `syscalls:sys_enter_connect` | `connect:{ip}:{port}` | outbound TCP egress (v1 names it to the declared server; an undeclared host is a hardened ghost) |
+| `sched:sched_process_fork` | (no token) | parent->child edge: a CHILD process's activity is attributed to the agent that owns the parent pid (process-tree / ppid) |
+| `syscalls:sys_enter_openat` | `open:{path}` | a file the agent opened (data-access surface) |
+| `syscalls:sys_enter_sendto` (UDP :53) | `dns:{qname}` | a DNS name the agent resolved |
+
+The mapping is pure/deterministic (I4): the same capture serialises byte-stable.
+`openat` is high-frequency -- the capture is passive (drops on a full ring) and
+the mapping filters to attributed pids, so the recording stays clean (a
+pid-allowlist eBPF filter is a possible later optimisation).
+
 ## Why a runbook (not automated)
 
 The default platform launches the **replay** broker (Python,

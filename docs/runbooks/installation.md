@@ -134,7 +134,11 @@ curl -s -X POST http://127.0.0.1:8090/probe/process-capture -H 'content-type: ap
 
 Depuis l'UX : page **Discovery x Echange**, toggle source **eBPF (live)**, ou
 lancer un agent en **Mode process (eBPF)** -- le verdict DETECTE/GHOST vient du
-broker live, en regard du vrai echange (proxy) a gauche.
+broker live, en regard du vrai echange (proxy) a gauche. Le moteur voit, sur la
+surface `ebpf_wire` : `exec:` (process), `connect:` (egress, nomme au serveur
+declare), `open:` (acces fichier), `dns:` (nom resolu), et les liens
+parent->enfant (`sched_process_fork`) pour attribuer un process enfant a l'agent.
+Detail : [ebpf-live-capture.md](ebpf-live-capture.md).
 
 > Important : un **rebuild du broker** (`probe-ebpf-build` / `discovery-build`)
 > remet a zero les file-caps -> relancer `./recette.sh probe-grant-caps`. C'est la
