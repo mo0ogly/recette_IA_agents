@@ -324,3 +324,71 @@ The lab prepares and scores; enforcement is a separate layer.
 | `tests/test_wire_routing.py` | proxy_url + ca_bundle seam; resolve_proxy threading; Slack wire env |
 | `tests/test_mitm_addon.py` | addon flow normalization + fail-safe guards (no mitmproxy runtime) |
 | `console/src/pages/proxy/WirePanel.contract.test.tsx` | R16 panel contract (real fixture, enabled/disabled) |
+
+## Expert-debug toolkit (cockpit for debugging an agent comm)
+
+Beyond the views, the `/proxy` console is a cockpit for debugging an agent
+communication. Everything is client-side, pure (I4) and read-only (I1); the two
+backend exceptions (latency, redaction) are VIEW transforms that never touch the
+audit log.
+
+### Record, freeze, export
+- **Recording toggle** ("app traces" source sub-header): `POST /proxy/debug
+  {enabled}` -- start/stop hot, no restart.
+- **Pause / Resume** (page-level button, `PAUSE` badge): freezes the poll of all
+  3 sources to inspect cold; the backend ring keeps running, Resume catches up.
+- **Follow (tail -f)** on the wire list: auto-scroll to the latest flow (off when
+  paused).
+- **Export**: `Export JSONL` on any source + `Export HAR` on wire (importable in
+  devtools/Charles/Fiddler). Exports the current filter.
+- **Copy as curl** per wire flow / per exchange: replays the call in one paste
+  (safe shell escaping).
+
+### Target the packets of interest
+- **Filters + search**: wire (host/method/status/run + text in path+bodies), app
+  traces (agent/target/run/outcome + text), sessions (run/agent/target grouping +
+  text). Filters are **deep-linkable** in the URL
+  (`/proxy?source=wire&host=...&q=...`), shareable.
+- **Pretty-print** of bodies + a **size indicator (UTF-8 bytes)** + a
+  `(truncated)` marker when the body was clamped.
+
+### See the detail + correlate
+- **Latency** per exchange: `WireFlow.duration_ms` (computed by the mitm addon) +
+  a waterfall bar. Wall-clock metadata on the wire view, never in the judge (I4).
+- **Diff** two wire flows side by side (failure vs success).
+- **Secret redaction** (default ON, `INSPECT_IA_AGENTS_PROXY_REDACT`): masks
+  `Bearer`/`ghp_`/`sk-`/`xox`/`AKIA` + known `key:value` pairs on `GET
+  /proxy/wire` + `/proxy/traces`. The audit log stays intact (I1),
+  `side_effect_hash` preserved. Best-effort; the content-free receipts remain the
+  cryptographic path.
+- **Ghost / non-mediated badge** on a session exchange whose wire flow has no
+  audit event (strict reconcile within the session).
+
+### Read the agent at 3 altitudes (legibility-first)
+Per exchange in the sessions view: **DECLARED** (manifest: target/capability) /
+**DECIDED** (the LLM action-log: the chosen tool + the "why", via `GET
+/runs/{id}/events`) / **DID** (application intent + server response + wire bytes).
+See `docs/screenshots/sim/proxy-three-altitude-decision.png`.
+
+### Replay-diff (regression debug, determinism I4)
+The 5th source **replay-diff** replays a recording twice and diffs the
+action-logs: an **IDENTICAL (I4)** badge if byte-stable, otherwise a left/right
+line + `regression`. Proof on a real recording (`camp-pr.00.gh-pr-bot`) in
+`docs/screenshots/sim/proxy-replay-diff.png`.
+
+### Persistence (long run)
+`INSPECT_IA_AGENTS_PROXY_ROTATE_DIR`: the entry evicted from the bounded ring is
+written to JSONL before the deque drops it (fail-safe), so a long run keeps its
+first packets. A debug convenience, not a second event store (I1).
+
+### Reference screenshots
+- `proxy-sessions-launch.png` -- launch an agent and land on its live session.
+- `proxy-toolkit-filter-pause.png` -- text filter + Pause.
+- `proxy-three-altitude-decision.png` -- the 3 altitudes per exchange.
+- `proxy-replay-diff.png` -- replay-diff IDENTICAL (I4) on a real recording.
+
+### Deferred (infra-gated, not built -- honest)
+- **Live eBPF source in the session**: needs `CAP_BPF` + a probe; the `recording
+  -> recette/surface` bridge exists for the recorded path.
+- **SSE `/proxy/stream`**: known SSE-hang gotcha; the 2s poll + pause cover the
+  need. Poll stays the deterministic default.
