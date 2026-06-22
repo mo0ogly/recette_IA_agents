@@ -3,6 +3,7 @@ server, flag an undeclared host. Pure (I4) -- no clock, byte-stable on replay.""
 
 from __future__ import annotations
 
+import json
 import unittest
 
 from recette.surface.netmap import (
@@ -47,33 +48,59 @@ class BuildEndpointMapTest(unittest.TestCase):
         self.assertEqual(build_endpoint_map([{"mode": "mock_local", "port": 9101}]), {})
 
 
-class AnnotateSmokeTest(unittest.TestCase):
-    """Minimal smoke coverage for the annotate_* exports; the full
-    behavior matrix lives in Task 2's tests."""
-
-    def test_annotate_connect_resolves_declared_and_flags_undeclared(self) -> None:
+class AnnotateConnectTest(unittest.TestCase):
+    def test_known_endpoint_resolves_to_declared_name(self) -> None:
         m = build_endpoint_map(SERVERS)
-        known = annotate_connect("connect:127.0.0.1:9101", m)
-        self.assertEqual(known["name"], "gh-mock")
-        self.assertFalse(known["undeclared"])
-        ghost = annotate_connect("connect:10.0.0.5:8443", m)
-        self.assertIsNone(ghost["name"])
-        self.assertTrue(ghost["undeclared"])
+        self.assertEqual(
+            annotate_connect("connect:127.0.0.1:9101", m),
+            {"raw": "connect:127.0.0.1:9101", "name": "gh-mock", "undeclared": False},
+        )
 
-    def test_annotate_recording_collects_undeclared_hosts(self) -> None:
-        recording = {
+    def test_unknown_endpoint_is_flagged_undeclared(self) -> None:
+        m = build_endpoint_map(SERVERS)
+        self.assertEqual(
+            annotate_connect("connect:203.0.113.7:443", m),
+            {"raw": "connect:203.0.113.7:443", "name": None, "undeclared": True},
+        )
+
+    def test_non_connect_token_passes_through_unflagged(self) -> None:
+        m = build_endpoint_map(SERVERS)
+        self.assertEqual(
+            annotate_connect("exec:dx-live-bot:42", m),
+            {"raw": "exec:dx-live-bot:42", "name": None, "undeclared": False},
+        )
+
+
+class AnnotateRecordingTest(unittest.TestCase):
+    def _recording(self) -> dict:
+        # Two agents in non-sorted order to also exercise stable output (I4).
+        return {
             "recordings": [
                 {
-                    "agent_id": "a1",
-                    "surfaces": {
-                        "ebpf_wire": [
-                            "connect:127.0.0.1:9101",
-                            "connect:10.0.0.5:8443",
-                        ]
-                    },
-                }
+                    "agent_id": "dx-live-bot",
+                    "surfaces": {"ebpf_wire": ["connect:127.0.0.1:9101"]},
+                },
+                {
+                    "agent_id": "leak-bot",
+                    "surfaces": {"ebpf_wire": ["connect:203.0.113.7:443"]},
+                },
             ]
         }
-        out = annotate_recording(recording, SERVERS)
-        self.assertEqual(out["undeclared_hosts"], ["10.0.0.5:8443"])
-        self.assertEqual(len(out["wire_named"]["a1"]), 2)
+
+    def test_groups_named_endpoints_per_agent_and_lists_undeclared(self) -> None:
+        out = annotate_recording(self._recording(), SERVERS)
+        self.assertEqual(out["wire_named"]["dx-live-bot"][0]["name"], "gh-mock")
+        self.assertIs(out["wire_named"]["leak-bot"][0]["undeclared"], True)
+        self.assertEqual(out["undeclared_hosts"], ["203.0.113.7:443"])
+
+    def test_replay_is_byte_stable(self) -> None:
+        rec = self._recording()
+        first = json.dumps(annotate_recording(rec, SERVERS), sort_keys=True)
+        second = json.dumps(annotate_recording(rec, SERVERS), sort_keys=True)
+        self.assertEqual(first, second)
+
+    def test_skipped_recording_is_empty_annotation(self) -> None:
+        self.assertEqual(
+            annotate_recording({"status": "skipped", "recordings": []}, SERVERS),
+            {"wire_named": {}, "undeclared_hosts": []},
+        )
