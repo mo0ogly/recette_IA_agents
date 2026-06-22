@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import json
+import subprocess  # nosec B404 - spawns our own python child, fixed argv, no shell
 import sys
 from pathlib import Path
 
@@ -46,6 +47,40 @@ def set_process_comm(name: str) -> bool:
         return libc.prctl(_PR_SET_NAME, buf, 0, 0, 0) == 0
     except (OSError, AttributeError, ValueError):
         return False
+
+
+def _fork_connect_probe(target: str) -> None:
+    """Best-effort eBPF fork-surface probe: spawn a CHILD process that makes one
+    real TCP connect to ``host:port`` then exits. The child's connect is observed
+    by the kernel under the CHILD pid; the sched_process_fork edge links it to
+    THIS (parent) process, so the discoveryprobe mapping attributes it to the
+    agent via the fork chain. Observability-only: never affects the judged run,
+    never raises."""
+    try:
+        host, _, port = target.partition(":")
+        if not host or not port.isdigit():
+            return
+        child = subprocess.Popen(  # nosec B603 - fixed interpreter, no shell, args from config
+            [
+                sys.executable,
+                "-c",
+                "import socket,sys;\n"
+                "h,p=sys.argv[1],int(sys.argv[2])\n"
+                "try:\n"
+                "    s=socket.create_connection((h,p),timeout=2); s.close()\n"
+                "except OSError:\n"
+                "    pass",
+                host,
+                port,
+            ],
+        )
+        # Reap it within the capture window without blocking the agent run long.
+        try:
+            child.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            child.kill()
+    except (OSError, ValueError):
+        return
 
 
 def run_agent_process(agent_cfg: dict, servers: list[dict] | None = None) -> dict:
@@ -125,6 +160,10 @@ def main(argv: list[str] | None = None) -> int:
 
     comm = args.name or str(agent_cfg.get("id") or "agent")
     set_process_comm(comm)
+
+    probe = agent_cfg.get("fork_connect_probe")
+    if isinstance(probe, str) and probe:
+        _fork_connect_probe(probe)
 
     try:
         result = run_agent_process(agent_cfg, servers)

@@ -1475,6 +1475,23 @@
           "text": "done"
         }
       ]
+    },
+    {
+      "id": "dx-fork-bot",
+      "runtime": "lab",
+      "ai_mode": "mock",
+      "principal": "dx@acme",
+      "target_system": "github",
+      "capability_scope": [
+        "read_repo"
+      ],
+      "scenario": [
+        {
+          "kind": "final",
+          "text": "fork probe"
+        }
+      ],
+      "fork_connect_probe": "127.0.0.1:9101"
     }
   ],
   "ai_backends": [
