@@ -347,3 +347,70 @@ et score ; l'enforcement est une couche separee.
 | `tests/test_wire_routing.py` | couture proxy_url + ca_bundle ; threading de resolve_proxy ; env wire Slack |
 | `tests/test_mitm_addon.py` | normalisation de flow de l'addon + gardes fail-safe (sans runtime mitmproxy) |
 | `console/src/pages/proxy/WirePanel.contract.test.tsx` | contrat de panneau R16 (fixture reelle, active/desactive) |
+
+## Toolkit expert-debug (cockpit de debug d'une comm agent)
+
+Au-dela des vues, la console `/proxy` est un cockpit pour debugger une
+communication d'agent. Tout est client-side, pur (I4) et lecture seule (I1) ;
+les deux exceptions backend (latence, redaction) sont des transformations de
+VUE qui ne touchent jamais le log d'audit.
+
+### Enregistrer, figer, exporter
+- **Toggle d'enregistrement** (sous-header source "traces app") : `POST
+  /proxy/debug {enabled}` -- start/stop a chaud, sans redemarrage.
+- **Pause / Reprendre** (bouton page-level, badge `PAUSE`) : fige le poll des 3
+  sources pour inspecter a froid ; le ring backend continue, Reprendre rattrape.
+- **Suivi (tail -f)** sur la liste wire : auto-scroll vers le dernier flux (off
+  quand en pause).
+- **Export** : `Export JSONL` sur toute source + `Export HAR` sur wire
+  (importable devtools/Charles/Fiddler). Exporte le filtre courant.
+- **Copy as curl** par flux wire / par echange : rejoue l'appel en un coller
+  (echappement shell sur).
+
+### Cibler les paquets d'interet
+- **Filtres + recherche** : wire (host/method/status/run + texte dans
+  path+bodies), traces app (agent/target/run/outcome + texte), sessions
+  (groupement run/agent/target + texte). Les filtres sont **deep-linkables**
+  dans l'URL (`/proxy?source=wire&host=...&q=...`), partageables.
+- **Pretty-print** des bodies + indicateur de **taille (octets UTF-8)** +
+  marqueur `(tronque)` quand le body a ete clampe.
+
+### Voir le detail + correler
+- **Latence** par echange : `WireFlow.duration_ms` (calcule par l'addon mitm) +
+  barre waterfall. Metadata wall-clock sur la vue wire, jamais dans le juge (I4).
+- **Diff** deux flux wire cote a cote (echec vs succes).
+- **Redaction secrets** (defaut ON, `INSPECT_IA_AGENTS_PROXY_REDACT`) : masque
+  `Bearer`/`ghp_`/`sk-`/`xox`/`AKIA` + `cle:valeur` connus sur `GET /proxy/wire`
+  + `/proxy/traces`. Le log d'audit reste intact (I1), `side_effect_hash`
+  preserve. Best-effort ; les receipts content-free restent la voie crypto.
+- **Badge ghost / non-medie** sur un echange de session dont le flux wire n'a pas
+  d'evenement d'audit (reconcile strict dans la session).
+
+### Lire l'agent sur 3 altitudes (legibility-first)
+Par echange dans la vue sessions : **DECLARE** (manifest : target/capability) /
+**DECIDE** (l'action-log LLM : le tool choisi + le "pourquoi", via
+`GET /runs/{id}/events`) / **FAIT** (intention applicative + reponse serveur +
+octets wire). Voir `docs/screenshots/sim/proxy-three-altitude-decision.png`.
+
+### Replay-diff (debug de regression, determinisme I4)
+La 5e source **replay-diff** rejoue un recording deux fois et diffe les
+action-logs : badge **IDENTIQUE (I4)** si byte-stable, sinon une ligne
+left/right + `regression`. Preuve sur un vrai recording (`camp-pr.00.gh-pr-bot`)
+dans `docs/screenshots/sim/proxy-replay-diff.png`.
+
+### Persistance (long run)
+`INSPECT_IA_AGENTS_PROXY_ROTATE_DIR` : l'entree evincee du ring borne est
+ecrite en JSONL avant que la deque la drope (fail-safe), donc un long run garde
+ses premiers paquets. Convenance debug, pas un second event store (I1).
+
+### Captures de reference
+- `proxy-sessions-launch.png` -- lancer un agent et atterrir sur sa session live.
+- `proxy-toolkit-filter-pause.png` -- filtre texte + Pause.
+- `proxy-three-altitude-decision.png` -- les 3 altitudes par echange.
+- `proxy-replay-diff.png` -- replay-diff IDENTIQUE (I4) sur un recording reel.
+
+### Differe (infra-gated, non construit -- honnete)
+- **Source eBPF live dans la session** : besoin de `CAP_BPF` + une sonde ; le
+  bridge `recording -> recette/surface` existe pour le chemin enregistre.
+- **SSE `/proxy/stream`** : gotcha SSE-hang connu ; le poll 2s + pause couvrent
+  le besoin. Poll reste le defaut deterministe.
