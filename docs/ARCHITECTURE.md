@@ -86,12 +86,12 @@ flowchart TB
     RM["RunManager<br/>runs en threads, frames bufferisees"]
     CFG["ConfigStore<br/>agents + ai-backends (JSON atomique)"]
     CSTORE["CampaignStore + RecordingStore<br/>campagnes + enregistrements"]
-    TPL["Campaign templates<br/>17 modeles predefinis"]
+    TPL["Campaign templates<br/>35 modeles predefinis"]
   end
 
   subgraph ENGINE["Moteur recette (recette/)"]
     LANEB["lane_b.run_agent<br/>boucle decide -> act"]
-    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>8 providers live (cle env, R8)"]
+    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>31 providers live (cle env, R8)"]
     FORGE["GitForge<br/>LabForge (defaut) / RealForge"]
     REC["Recording<br/>artefact rejouable (I4)"]
     HARN["Harnais + Scorecards<br/>harness.py, discovery_harness.py"]
@@ -305,7 +305,7 @@ flowchart TB
 | Point de captation | Ce que discovery peut en deduire | Ce que la recette fournit comme terrain | Verifie par |
 |---|---|---|---|
 | **Statique (source)** : scan du repo avant que l'agent tourne | identite declaree, `target_system`, capabilities declarees, surface CI/CD (permissions larges = bump de risque) | 20 sources sur 5 surfaces (`corpus/repos`, `gitlab`, `temporal`, `openapi`, `manifests`), dont 5 vrais negatifs `no-agent` | `python -m recette discovery` -- detection, dedup, couverture des actions, ordre de risque, determinisme |
-| **Runtime (serveur)** : observer ce qui arrive sur le systeme cible | identite REELLEMENT utilisee (principal/token), actions reelles, ressources touchees, frequence | agents lancables a la demande (cockpit, campagnes) contre le lab :8082 ; **access log JSONL cote serveur** (`INSPECT_IA_AGENTS_LAB_ACCESS_LOG` : une ligne `{event_id, target_system, action_type, resource, status}` par requete recue -- la matiere brute qu'un sniffer/collecteur discovery consommerait) ; 17 templates gradues legit/suspect/destructive | signaux `api_traffic` + `credential_usage` du `ReferenceDiscoveryAdapter` : un agent est detectable des sa PREMIERE action observable |
+| **Runtime (serveur)** : observer ce qui arrive sur le systeme cible | identite REELLEMENT utilisee (principal/token), actions reelles, ressources touchees, frequence | agents lancables a la demande (cockpit, campagnes) contre le lab :8082 ; **access log JSONL cote serveur** (`INSPECT_IA_AGENTS_LAB_ACCESS_LOG` : une ligne `{event_id, target_system, action_type, resource, status}` par requete recue -- la matiere brute qu'un sniffer/collecteur discovery consommerait) ; 35 templates gradues legit/suspect/destructive | signaux `api_traffic` + `credential_usage` du `ReferenceDiscoveryAdapter` : un agent est detectable des sa PREMIERE action observable |
 | **Evenementiel (audit)** : consommer le flux/log d'evenements | la totalite : ecart declare/reel, approbations manquantes (I6), spam, hash des effets de bord | recordings persistes par campagne + event store hash-chaine du chemin gouverne | signal `event_stream` ; replay `IDENTIQUE` prouve que la trace consommee est fidele |
 
 ### 4.3 Du signal capte au verdict : mapping vers les 4 dimensions
@@ -559,7 +559,7 @@ par plateforme.
 Le `no-agent` est aussi important que les positifs : sans lui, on ne mesure
 pas les faux positifs du scanner.
 
-### 6.3 Agents de campagne (17 templates, 3 profils, 12 systemes)
+### 6.3 Agents de campagne (35 templates, 3 profils, 11 systemes)
 
 Les templates (`recette/api/campaign_templates.py`) sont des agents mock
 prets a l'emploi, nommes par usage, qui couvrent le catalogue multi-systemes.
@@ -719,7 +719,7 @@ Statut de phase (limitations assumees, documentees dans le plan) :
   du buffer realtime degrade -- hors chemin de decision (I4).
 - **Double source de policy en transition** : l'oracle du corpus garde son
   `ESCALATE_ACTIONS` legacy (git) ; le policy engine versionne couvre le
-  catalogue 12 systemes. Convergence = follow-up note.
+  catalogue 16 systemes. Convergence = follow-up note.
 
 Lien avec la recette : ce chemin gouverne est aussi un GENERATEUR de matiere
 de test -- chaque action d'agent y laisse des evenements `policy_decision` /
