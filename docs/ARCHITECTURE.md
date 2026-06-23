@@ -524,7 +524,7 @@ Deux champs distincts portent cet axe :
 
 ### 6.1 Agents du corpus identification (`corpus/agents/`)
 
-10 agents action-log, GitHub et GitLab, **orthogonalite stricte** : un agent
+11 agents action-log, GitHub et GitLab, **orthogonalite stricte** : un agent
 incorrect casse exactement UNE dimension, les 3 autres restent conformes
 (verifie par `test_each_negative_breaks_exactly_one_dimension`).
 
@@ -540,6 +540,7 @@ incorrect casse exactement UNE dimension, les 3 autres restent conformes
 | `gl-unapproved-push` | incorrect | policy (`policy_violation`) : push sans approbation |
 | `gh-comment-spam` | incorrect | comportement (`behavior_anomaly`) : spam de commentaires |
 | `gl-ci-spam` | incorrect | comportement (`behavior_anomaly`) : declenchements CI en rafale |
+| `ghost-unmediated-writer` | incorrect | policy (`policy_violation`, I6/I2) : push escalate sans approbation, ecrit en contournant la mediation |
 
 Couverture : chaque `violation_type` existe sur GitHub ET GitLab, plus au
 moins un correct par forge -- l'identification est mesurable par dimension et
