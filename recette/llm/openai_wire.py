@@ -86,10 +86,16 @@ class OpenAiLlm:
         self._client = client
 
     def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:
-        body = {
+        body: dict = {
             "model": self._model,
             "messages": _to_openai_messages(system, history),
-            "tools": [
+        }
+        # Only send `tools` when there is at least one. A strict OpenAI-compatible
+        # gateway (SKYNET/vLLM) rejects an empty `tools: []` with HTTP 400
+        # ("tools must not be an empty array"); omitting the key is valid on every
+        # provider, so this is the portable shape (a toolless agent/team member).
+        if tools:
+            body["tools"] = [
                 {
                     "type": "function",
                     "function": {
@@ -99,8 +105,7 @@ class OpenAiLlm:
                     },
                 }
                 for t in tools
-            ],
-        }
+            ]
         resp = self._client.post(type(self).CHAT_PATH, json=body)
         resp.raise_for_status()
         return _parse_openai(resp.json())

@@ -270,6 +270,15 @@ class TestOpenAiCompat(unittest.TestCase):
         self.assertEqual(decision.tool_name, "read_repo")
         self.assertEqual(decision.tool_args, {"resource": "acme/x"})
 
+    def test_empty_tools_omits_the_key(self) -> None:
+        # A strict OpenAI-compatible gateway (SKYNET/vLLM) rejects "tools": [] with
+        # HTTP 400. A toolless call must omit the key entirely, not send an empty array.
+        client = _StubClient({"choices": [{"message": {"content": "done"}}]})
+        llm = OpenAiCompatLlm(model="m", base_url="http://h/v1", client=client)
+        llm.decide(system="s", history=[Message(role="user", content="go")], tools=[])
+        assert client.last_body is not None
+        self.assertNotIn("tools", client.last_body)
+
     def test_no_api_key_required(self) -> None:
         # Local OpenAI-compatible servers (Ollama) have no key; must construct keyless.
         old = os.environ.pop("OPENAI_API_KEY", None)
