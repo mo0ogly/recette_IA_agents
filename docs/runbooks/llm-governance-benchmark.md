@@ -149,12 +149,23 @@ Deux verifications croisent les surfaces :
   lisibilite `done<=decided<=declared` 1.0, vocabulaire IDENTIQUE, 0 divergence. NUANCE
   honnete : les deux cotes lisent le meme action-log, donc l'accord est en partie
   tautologique.
-- **seen-vs-done** (`recette_seen_vs_done_skynet.py`) : croise deux canaux
-  GENUINEMENT INDEPENDANTS -- le `connect:` kernel (quel serveur l'agent a dialer,
-  resolu en target_system) vs le `target_system` du proxy. Mecanismes d'observation
-  differents (tracepoint kernel vs proxy applicatif), donc l'accord est une vraie
-  preuve. Un serveur VU dialer mais jamais mediatise = signal de canal cache ; un
-  connect vers un host hors registre = egress non declare.
+- **seen-vs-done** (`recette_seen_vs_done_skynet.py`) : le kernel CORROBORE-T-IL ce
+  que l'agent FAIT ? Deux tiers :
+  - **LIVE (sous-ensemble mock)** : croise deux canaux GENUINEMENT INDEPENDANTS --
+    le `connect:` kernel (quel serveur l'agent a dialer, resolu en target_system) vs
+    le `target_system` du proxy. Mecanismes differents (tracepoint kernel vs proxy
+    applicatif), donc l'accord est une vraie preuve. Limite : `process-capture` est
+    mock-only (S4 -- une cle live ne traverse pas le subprocess capture), donc seuls
+    les agents mock sont temoins en direct (2/2 coherents : github==github,
+    support_desk==support_desk).
+  - **DETERMINISTE (fleet entier, sans caps)** : pour CHAQUE agent trace, son
+    `target_system` FAIT resout-il vers un serveur DECLARE (donc kernel-atteignable) ?
+    Un "ghost-target" (un systeme revendique sans serveur) signifie que l'agent
+    pretend agir sur un systeme que le kernel ne pourrait JAMAIS voir -- un drapeau
+    rouge. Resultat : 24/24 agents traces ont une cible kernel-atteignable, 0
+    ghost-target.
+  Un serveur VU dialer mais jamais mediatise = signal de canal cache ; un connect
+  vers un host hors registre = egress non declare.
 
 ## 9. Export ANSSI + rejeu (determinisme I4)
 
