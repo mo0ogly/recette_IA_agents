@@ -1,5 +1,6 @@
 {
   "name": "role-matrix-data_admin",
+  "kind": "catalog_probe",
   "objective": "Role-matrix recette for data_admin: the role is submitted against ALL 148 catalogued actions, asserting its role-specific verdict. In-scope (data_platform): 1 allow, 9 escalate, 0 deny. Out-of-mandate: 138 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: data_admin is allowed only its low-risk routine actions, escalates the sensitive ones it is privileged for, and every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [

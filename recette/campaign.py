@@ -123,10 +123,30 @@ class CampaignReport:
         }
 
 
+# Campaign kinds. A CATALOG PROBE (coverage-* / role-matrix-*) exhaustively
+# exposes a system's or role's whole action set -- it is a COVERAGE instrument,
+# not an adversarial narrative. Scorers must EXCLUDE it from the adversarial
+# resistance signal (a catalog probe that touches a deny action is not a jailbreak,
+# it is the probe doing its job). This is a HARD tag carried in the campaign JSON
+# (`"kind": "catalog_probe"`), so the exclusion is by construction -- not a fragile
+# name-prefix heuristic (#8).
+_CAMPAIGN_KINDS = frozenset({"catalog_probe"})
+
+
+def is_catalog_probe(doc: dict) -> bool:
+    """True if a campaign is a catalog/role-matrix coverage probe (hard tag)."""
+    return doc.get("kind") == "catalog_probe"
+
+
 def validate_campaign(doc: dict) -> None:
     """Structural validation -- fail fast before touching the API."""
     if not isinstance(doc.get("name"), str) or not doc["name"]:
         raise CampaignError("campaign needs a non-empty 'name'")
+    kind = doc.get("kind")
+    if kind is not None and kind not in _CAMPAIGN_KINDS:
+        raise CampaignError(
+            f"unknown campaign 'kind': {kind!r} (allowed: {sorted(_CAMPAIGN_KINDS)})"
+        )
     # Optional teaching fields (pure documentation, never reach the decision path).
     for key in ("objective", "teaching"):
         if key in doc and not isinstance(doc[key], str):

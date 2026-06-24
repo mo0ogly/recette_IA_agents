@@ -1,5 +1,6 @@
 {
   "name": "coverage-product_cms",
+  "kind": "catalog_probe",
   "objective": "Coverage recette for the product_cms domain: the privileged role product_admin exercises every one of its 10 catalogued actions, asserting the documented posture (1 allow, 9 escalate, 0 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
   "teaching": "The product_admin gets a verdict matching the risk, never a blanket grant: a low-risk routine action is allowed (least-privilege), a sensitive action escalates to a human (I6), a pure-deny action stays denied for everyone. The whole sweep is replayable for audit (I4).",
   "agents": [
