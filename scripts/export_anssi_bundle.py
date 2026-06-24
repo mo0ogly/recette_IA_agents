@@ -34,6 +34,8 @@ _SURFACE_LOGS = [
     "agents_live_skynet.jsonl",
     "traced_skynet.jsonl",
     "campaigns_live_skynet.jsonl",
+    "jailbreak_threshold_skynet.jsonl",
+    "discovery_vs_proxy_skynet.json",
     "surface.json",
     "redteam_ok.txt",
 ]
