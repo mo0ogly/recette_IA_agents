@@ -97,11 +97,23 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
     return providers.find((p) => p.id === provider)?.default_model ?? "";
   }
 
+  /** The per-model base_url for provider+model from the catalog's model_endpoints
+   * (SKYNET routes each model at its own URL), or "" when the provider has a
+   * single host. Lets the form auto-fill base_url so the route is never typed. */
+  function endpointFor(provider: string, model: string): string {
+    return providers.find((p) => p.id === provider)?.model_endpoints?.[model] ?? "";
+  }
+
   /** Switch provider and reset the model to the new provider's default (or empty
    * when it curates none). Kills the stale-model bug (e.g. a groq model lingering
-   * after switching to mistral). */
+   * after switching to mistral). Also auto-fills base_url from the default
+   * model's per-model endpoint when the provider routes per model (SKYNET). */
   function selectProvider(provider: string): void {
-    setForm((p) => ({ ...p, provider, model: defaultModelFor(provider) }));
+    setForm((p) => {
+      const model = defaultModelFor(provider);
+      const endpoint = endpointFor(provider, model);
+      return { ...p, provider, model, ...(endpoint ? { base_url: endpoint } : {}) };
+    });
   }
   const [tests, setTests] = useState<Record<string, TestState>>({});
   // Per-backend free-text prompt draft and its last answer, keyed by backend id.
@@ -428,12 +440,20 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
               placeholder={
                 form.provider === "bedrock"
                   ? "https://bedrock-runtime.us-east-1.amazonaws.com"
-                  : "http://localhost:11434/v1"
+                  : form.provider === "skynet"
+                    ? "https://api.skynet.cossi.internet/<model>/v1"
+                    : "http://localhost:11434/v1"
               }
               value={form.base_url}
               onChange={(e) => setForm((p) => ({ ...p, base_url: e.target.value }))}
               required={baseUrlMode === "required"}
             />
+            {form.provider === "skynet" && (
+              <span className="agents-key-hint" data-testid="skynet-hint">
+                SKYNET route chaque modele a son URL : choisir un modele remplit la Base URL
+                automatiquement. Seuls les modeles de chat sont listes (reranker / embeddings exclus).
+              </span>
+            )}
           </div>
         )}
         <div className="agents-form-row">
@@ -442,12 +462,11 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
             <select
               id="backend-model"
               value={modelIsCustom ? CUSTOM_MODEL : form.model}
-              onChange={(e) =>
-                setForm((p) => ({
-                  ...p,
-                  model: e.target.value === CUSTOM_MODEL ? "" : e.target.value,
-                }))
-              }
+              onChange={(e) => {
+                const model = e.target.value === CUSTOM_MODEL ? "" : e.target.value;
+                const endpoint = endpointFor(form.provider, model);
+                setForm((p) => ({ ...p, model, ...(endpoint ? { base_url: endpoint } : {}) }));
+              }}
             >
               {providerModels.map((m) => (
                 <option key={m} value={m}>

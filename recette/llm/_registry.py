@@ -115,7 +115,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
 
 # Providers with NO canonical host: the target is whatever base_url the backend
 # was configured with (the class default must not leak into the allowlist).
-_BASE_URL_DRIVEN_PROVIDERS = frozenset({"openai_compat"})
+_BASE_URL_DRIVEN_PROVIDERS = frozenset({"openai_compat", "skynet"})
 
 
 def provider_host(provider: str, base_url: str | None = None) -> str | None:
@@ -212,7 +212,11 @@ def build_llm(
     if provider == "cerebras":
         return CerebrasLlm(model=model, client=client, api_key=api_key)
     if provider == "skynet":
-        return SkynetLlm(model=model, client=client, api_key=api_key)
+        if not base_url and client is None:
+            raise ValueError(
+                "skynet requires base_url (https://api.skynet.cossi.internet/<model>/v1)"
+            )
+        return SkynetLlm(model=model, base_url=base_url or "", client=client, api_key=api_key)
     if provider == "bedrock":
         # base_url optionally overrides the region host (default us-east-1).
         return BedrockLlm(model=model, client=client, base_url=base_url, api_key=api_key)

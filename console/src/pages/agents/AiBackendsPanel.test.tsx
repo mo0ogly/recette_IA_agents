@@ -85,9 +85,22 @@ const ALL_PROVIDERS = [
   "kilocode",
   "alibaba_coding_plan",
   "qwen",
+  "cerebras",
+  "skynet",
   "bedrock",
   "openai_compat",
 ];
+
+// SKYNET routes each chat model at its own URL; the catalog ships this map so the
+// console auto-fills base_url when a model is picked (mirrors the backend).
+const SKYNET_ENDPOINTS: Record<string, string> = {
+  "openai/gpt-oss-120b": "https://api.skynet.cossi.internet/gpt-oss-120b/v1",
+  "Foundation-Sec-8B-Reasoning-Q4_K_M.gguf": "https://api.skynet.cossi.internet/foundationsec/v1",
+  "GLM-4.6V-Q4_K_M-00001-of-00002.gguf": "https://api.skynet.cossi.internet/glm46v/v1",
+  "gemma-4-31B-it-BF16-00001-of-00002.gguf": "https://api.skynet.cossi.internet/gemma/v1",
+  "qwen3.6-35b-a3b": "https://api.skynet.cossi.internet/qwen3.6/v1",
+  "mistralai/Voxtral-Mini-3B-2507": "https://api.skynet.cossi.internet/voxtral/v1",
+};
 
 /** The catalog the mocked /config/ai-providers returns -- mirrors what the real
  * backend serves from recette.llm._PROVIDERS, so the dropdown lists every id. */
@@ -100,6 +113,8 @@ const PROVIDER_MODELS: Record<string, string[]> = {
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
   mistral: ["mistral-large-latest", "mistral-small-latest"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
+  cerebras: ["gpt-oss-120b", "zai-glm-4.7"],
+  skynet: Object.keys(SKYNET_ENDPOINTS),
 };
 
 const PROVIDER_CATALOG: AiProviderInfo[] = ALL_PROVIDERS.map((id): AiProviderInfo => {
@@ -109,9 +124,14 @@ const PROVIDER_CATALOG: AiProviderInfo[] = ALL_PROVIDERS.map((id): AiProviderInf
     env_key: id === "openai_compat" ? null : `${id.toUpperCase()}_API_KEY`,
     key_required: id !== "openai_compat",
     base_url:
-      id === "openai_compat" ? "required" : id === "bedrock" ? "optional" : null,
+      id === "openai_compat" || id === "skynet"
+        ? "required"
+        : id === "bedrock"
+          ? "optional"
+          : null,
     models,
     default_model: models.length > 0 ? models[0] : null,
+    model_endpoints: id === "skynet" ? SKYNET_ENDPOINTS : {},
   };
 });
 
@@ -536,6 +556,37 @@ describe("AiBackendsPanel", () => {
       .map((o) => (o as HTMLOptionElement).value);
     expect(options).toContain("mistral-small-latest");
     expect(options).not.toContain("claude-opus-4-8");
+  });
+
+  it("skynet: model dropdown lists chat routes and auto-fills the per-model base_url", async () => {
+    renderPanel();
+    await waitFor(() => expect(listAiProviders).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText("Provider"), {
+      target: { value: "skynet" },
+    });
+
+    // base_url auto-filled from the default model's per-model endpoint.
+    const baseUrl = (await screen.findByLabelText("Base URL")) as HTMLInputElement;
+    expect(baseUrl.value).toBe("https://api.skynet.cossi.internet/gpt-oss-120b/v1");
+
+    // The dropdown lists the 6 chat routes; the two non-chat routes are absent.
+    const model = screen.getByLabelText("Model") as HTMLSelectElement;
+    const options = within(model)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(options).toContain("openai/gpt-oss-120b");
+    expect(options).toContain("qwen3.6-35b-a3b");
+    expect(options).not.toContain("jinaai/jina-reranker-m0");
+
+    // Picking another model re-points base_url to that model's route.
+    fireEvent.change(model, { target: { value: "qwen3.6-35b-a3b" } });
+    expect((screen.getByLabelText("Base URL") as HTMLInputElement).value).toBe(
+      "https://api.skynet.cossi.internet/qwen3.6/v1",
+    );
+
+    // The SKYNET-specific help is shown.
+    expect(screen.getByTestId("skynet-hint")).toBeInTheDocument();
   });
 
   it("curated dropdown offers a custom path that reveals a free-text input", async () => {

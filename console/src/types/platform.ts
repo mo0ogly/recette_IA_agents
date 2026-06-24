@@ -447,6 +447,11 @@ export interface AiProviderInfo {
   /** The model preselected when this provider is picked (first of `models`), or
    * null when no models are curated. */
   default_model: string | null;
+  /** Per-model base_url map for providers that route each model at its own URL
+   * (SKYNET: api.skynet.cossi.internet/<model>/v1). When a listed model is
+   * picked, the console auto-fills base_url from this map so the operator never
+   * hand-types the route. Empty `{}` for providers with a single host. */
+  model_endpoints: Record<string, string>;
 }
 
 /** A configured AI backend an agent can be bound to. */

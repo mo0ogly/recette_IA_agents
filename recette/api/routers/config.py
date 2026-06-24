@@ -75,8 +75,25 @@ _PROVIDER_ENV_KEY = {
 # Providers that take a base_url alongside the key. "required" means the backend
 # cannot resolve without it (openai_compat: the host IS the provider); "optional"
 # means it overrides a sensible default (bedrock: the region host).
+# SKYNET routes each model at its own base_url (api.skynet.cossi.internet/<slug>/v1).
+# This map lets the console auto-fill base_url when a SKYNET model is picked, so the
+# operator never hand-types the per-model route. Keys match _PROVIDER_MODELS["skynet"]
+# (the 6 chat-capable routes, verified live, R13); the two non-chat routes are absent.
+_SKYNET = "https://api.skynet.cossi.internet"
+_PROVIDER_MODEL_ENDPOINTS: dict[str, dict[str, str]] = {
+    "skynet": {
+        "openai/gpt-oss-120b": f"{_SKYNET}/gpt-oss-120b/v1",
+        "Foundation-Sec-8B-Reasoning-Q4_K_M.gguf": f"{_SKYNET}/foundationsec/v1",
+        "GLM-4.6V-Q4_K_M-00001-of-00002.gguf": f"{_SKYNET}/glm46v/v1",
+        "gemma-4-31B-it-BF16-00001-of-00002.gguf": f"{_SKYNET}/gemma/v1",
+        "qwen3.6-35b-a3b": f"{_SKYNET}/qwen3.6/v1",
+        "mistralai/Voxtral-Mini-3B-2507": f"{_SKYNET}/voxtral/v1",
+    },
+}
+
 _PROVIDER_BASE_URL = {
     "openai_compat": "required",
+    "skynet": "required",
     "bedrock": "optional",
 }
 
@@ -105,6 +122,9 @@ def _provider_catalog() -> list[dict]:
                 # empty when none are curated -> the UI offers a free-text field.
                 "models": models,
                 "default_model": models[0] if models else None,
+                # Per-model base_url map (SKYNET routes per model); {} for the
+                # rest. The console auto-fills base_url from the picked model.
+                "model_endpoints": _PROVIDER_MODEL_ENDPOINTS.get(provider, {}),
             }
         )
     return catalog

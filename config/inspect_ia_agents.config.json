@@ -1503,7 +1503,8 @@
     {
       "id": "skynet-gpt-oss-120b",
       "provider": "skynet",
-      "model": "openai/gpt-oss-120b"
+      "model": "openai/gpt-oss-120b",
+      "base_url": "https://api.skynet.cossi.internet/gpt-oss-120b/v1"
     }
   ],
   "servers": [

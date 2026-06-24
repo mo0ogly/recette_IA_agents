@@ -234,6 +234,20 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
         "gpt-oss-120b",
         "zai-glm-4.7",
     ),
+    # SKYNET internal vLLM gateway: the 6 CHAT-capable routes, verified live
+    # against /v1/chat/completions (R13). The two non-chat routes
+    # (jina-reranker-m0 -> rerank, llama-embed-nemotron-8b -> embeddings) return
+    # 404 on chat/completions and are intentionally excluded -- they cannot drive
+    # an agent. Each id is the exact id reported by that route's /v1/models; the
+    # matching per-model base_url lives in the config router's endpoint map.
+    "skynet": (
+        "openai/gpt-oss-120b",
+        "Foundation-Sec-8B-Reasoning-Q4_K_M.gguf",
+        "GLM-4.6V-Q4_K_M-00001-of-00002.gguf",
+        "gemma-4-31B-it-BF16-00001-of-00002.gguf",
+        "qwen3.6-35b-a3b",
+        "mistralai/Voxtral-Mini-3B-2507",
+    ),
     "minimax": (
         "MiniMax-M2",
         "MiniMax-M2.1",
