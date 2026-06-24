@@ -262,8 +262,8 @@ children.push(new Paragraph({ children: [new PageBreak()] }));
 children.push(H1("Annexe A -- Brancher une IA interne (ex. SKYNET)"));
 children.push(P("N'importe quelle IA interne peut servir de **cerveau** aux agents (mode `ai_mode = real`) : c'est elle qui decide les actions dans la boucle Lane B. Exemple avec **SKYNET** :"));
 children.push(...img("00_skynet_serves_agents", "Figure 10 -- Une IA interne (SKYNET) sert les decisions ; le banc execute, capte et score"));
-children.push(NLI("Declarer l'IA comme **ai-backend** (provider `openai_compat` + `base_url` + cle en env, R8 ; le banc stocke provider+modele, la cle est lue au run)."));
-children.push(NLI("Mettre un agent en `ai_mode = real`, `ai_backend_id = <skynet>`, cible `server -> mock_local` (trafic observable)."));
+children.push(NLI("Declarer l'IA comme **ai-backend**. Pour SKYNET : provider dedie `skynet` (wire OpenAI, host canonique `chat.skynet.cossi.internet/api`, modele `gpt-oss-120b`, cle `SKYNET_API_KEY` en env/secret store, R8). Pour une IA OpenAI-compatible sans host fige : provider `openai_compat` + `base_url`. Le banc stocke provider+modele ; la cle est lue au run."));
+children.push(NLI("Mettre un agent en `ai_mode = real`, `ai_backend_id = skynet-gpt-oss-120b`, cible `server -> mock_local` (trafic observable)."));
 children.push(NLI("Lancer en Lane B ; le run est enregistre (non-deterministe -> replay byte-identique)."));
 children.push(NLI("Recetter : discovery (la sonde voit-elle l'agent ?) + identification (4 dimensions), lire les scorecards."));
 
