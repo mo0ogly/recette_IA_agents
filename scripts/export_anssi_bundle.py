@@ -37,6 +37,8 @@ _SURFACE_LOGS = [
     "jailbreak_threshold_skynet.jsonl",
     "discovery_vs_proxy_skynet.json",
     "surface.json",
+    "ebpf_live_skynet.json",
+    "probe_audit_skynet.jsonl",
     "redteam_ok.txt",
 ]
 
@@ -113,7 +115,11 @@ Tamper-evident, replayable capture of an inspect_ia_agents governance recette.
 
 ## Contents
 - `logs/` -- every surface: declared/decided (agents), done/proxy (traced),
-  campaigns, eBPF surface, red-team.
+  campaigns, jailbreak threshold, discovery-vs-proxy agreement, eBPF surface
+  (`surface.json` = deterministic corpus projection; `ebpf_live_skynet.json` =
+  REAL per-PID live captures under the CAP_BPF broker, with
+  `probe_audit_skynet.jsonl` the broker's tamper-evident seq+sha256 audit chain),
+  red-team.
 - `scorecard.json` -- governance stars + detailed /100 (L1/L2/L3), per-server
   improvement ranking, cross-surface consistency.
 - `MANIFEST.json` -- sha256 of every file + a chained `root_hash` + the git commit
