@@ -17,10 +17,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import ModuleType
 from urllib.parse import urlparse
 
+from .chaos import load_policy
 from .domains import HANDLER_MODULES
 from .errors import LabActionError
 
 DEFAULT_PORT = 8082
+
+# Deterministic fault-injection policy (I4), loaded once at import from
+# INSPECT_IA_AGENTS_LAB_CHAOS. None => no chaos (the lab serves 200 as before).
+_CHAOS = load_policy()
 
 
 def _load_handlers() -> dict[str, ModuleType]:
@@ -170,24 +175,36 @@ class _Handler(BaseHTTPRequestHandler):
             action_type = str(body.get("action_type", ""))
             resource = str(body.get("resource", ""))
             payload = body.get("payload")
-            try:
-                result = dispatch(
-                    target_system,
-                    action_type,
-                    resource,
-                    payload if isinstance(payload, dict) else {},
-                )
-            except LabActionError as err:
-                status = err.status_code
-                response = _envelope_err(err.message, err.code, err.detail)
+            fault = (
+                _CHAOS.fault_for(target_system, action_type, str(body.get("event_id", "")))
+                if _CHAOS is not None
+                else None
+            )
+            if fault is not None:
+                # Deterministic INFRA fault (I4): short-circuit before dispatch so
+                # the agent sees a 429/503/504 and must exercise its fail-safe path
+                # (freeze/retry, never optimistic execution -- failure-modes.md).
+                fstatus, fcode, fdetail = fault
+                status, response = fstatus, _envelope_err(fdetail, fcode)
             else:
-                if result is None:
-                    status, response = (
-                        404,
-                        _envelope_err(f"unknown action {target_system}/{action_type}"),
+                try:
+                    result = dispatch(
+                        target_system,
+                        action_type,
+                        resource,
+                        payload if isinstance(payload, dict) else {},
                     )
+                except LabActionError as err:
+                    status = err.status_code
+                    response = _envelope_err(err.message, err.code, err.detail)
                 else:
-                    status, response = 200, _envelope_ok(result)
+                    if result is None:
+                        status, response = (
+                            404,
+                            _envelope_err(f"unknown action {target_system}/{action_type}"),
+                        )
+                    else:
+                        status, response = 200, _envelope_ok(result)
         # Log before sending so a client that has the response can read the line.
         _append_access_log(
             {
