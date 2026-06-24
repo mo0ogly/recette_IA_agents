@@ -378,15 +378,27 @@ class CerebrasLlm(_VersionedWireVendor):
     ENV_KEY = "CEREBRAS_API_KEY"
 
 
-class SkynetLlm(_VersionedWireVendor):
-    """SKYNET internal LLM -- OpenAI wire at chat.skynet.cossi.internet/api.
+class SkynetLlm(OpenAiCompatLlm):
+    """SKYNET internal vLLM gateway -- OpenAI wire, per-model base_url.
 
-    BASE_URL ends in /api (no /v1), so the request path appends only
-    /chat/completions, yielding chat.skynet.cossi.internet/api/chat/completions
-    (the endpoint documented for the OpenAI-compatible IDE plugins). Key:
-    SKYNET_API_KEY (token starting with sk-), travels as the bearer
-    Authorization header, stored write-only in the per-backend secret store.
+    Each model is served at its own route ``https://api.skynet.cossi.internet/
+    <model>/v1`` (e.g. gpt-oss-120b, glm46v, qwen3.6), so the backend supplies
+    the per-model ``base_url`` like openai_compat -- there is no single canonical
+    host. The body ``model`` is the id reported by ``/v1/models`` (e.g.
+    ``openai/gpt-oss-120b``). The key SKYNET_API_KEY (a UUID token) travels as the
+    bearer Authorization header, stored write-only in the per-backend secret
+    store. Surfaces as the first-class ``skynet`` provider on /ai-backends.
     """
 
-    BASE_URL = "https://chat.skynet.cossi.internet/api"
     ENV_KEY = "SKYNET_API_KEY"
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        base_url: str,
+        client: _PostClient | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        key = api_key or os.environ.get(self.ENV_KEY)
+        super().__init__(model=model, base_url=base_url, client=client, api_key=key)

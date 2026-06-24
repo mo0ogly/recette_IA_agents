@@ -286,6 +286,38 @@ class TestOpenAiCompat(unittest.TestCase):
         self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1"), "http://h")
         self.assertEqual(OpenAiCompatLlm._normalize_base_url("http://h/v1/"), "http://h")
 
+
+class TestSkynet(unittest.TestCase):
+    """SKYNET internal gateway -- per-model base_url, SKYNET_API_KEY bearer."""
+
+    def test_per_model_base_url_posts_to_chat_completions(self) -> None:
+        # base_url .../gpt-oss-120b/v1 -> effective .../gpt-oss-120b/v1/chat/completions.
+        client = _StubClient({"choices": [{"message": {"content": "ok"}}]})
+        llm = SkynetLlm(
+            model="openai/gpt-oss-120b",
+            base_url="https://api.skynet.cossi.internet/gpt-oss-120b/v1",
+            client=client,
+        )
+        out = llm.decide(system="s", history=[Message(role="user", content="go")], tools=TOOLS)
+        self.assertEqual(client.last_path, "/v1/chat/completions")
+        self.assertEqual(out.kind, "final")
+
+    def test_resolves_key_from_skynet_env_var(self) -> None:
+        old = os.environ.get("SKYNET_API_KEY")
+        os.environ["SKYNET_API_KEY"] = "uuid-token"
+        try:
+            llm = SkynetLlm(
+                model="openai/gpt-oss-120b",
+                base_url="https://api.skynet.cossi.internet/gpt-oss-120b/v1",
+            )
+            self.assertEqual(llm._client.headers["Authorization"], "Bearer uuid-token")  # type: ignore[attr-defined]
+            self.assertEqual(SkynetLlm.ENV_KEY, "SKYNET_API_KEY")
+        finally:
+            if old is None:
+                os.environ.pop("SKYNET_API_KEY", None)
+            else:
+                os.environ["SKYNET_API_KEY"] = old
+
     def test_base_url_v1_suffix_normalized(self) -> None:
         # ".../v1" and bare base must both end up posting to /v1/chat/completions
         client = _StubClient({"choices": []})
@@ -469,7 +501,6 @@ class TestOpenAiWireVendors(unittest.TestCase):
         ),
         (QwenLlm, "https://portal.qwen.ai/v1", "QWEN_API_KEY"),
         (CerebrasLlm, "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
-        (SkynetLlm, "https://chat.skynet.cossi.internet/api", "SKYNET_API_KEY"),
     )
 
     def test_each_vendor_declares_base_url_and_env_key(self) -> None:
