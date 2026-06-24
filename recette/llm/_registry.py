@@ -30,6 +30,7 @@ from .openai_wire import (
     OpencodeZenLlm,
     OpenRouterLlm,
     QwenLlm,
+    SkynetLlm,
     StepfunLlm,
     TogetherLlm,
     XaiLlm,
@@ -67,6 +68,7 @@ _PROVIDERS = (
     "alibaba_coding_plan",
     "qwen",
     "cerebras",
+    "skynet",
     "bedrock",
     "openai_compat",
 )
@@ -105,6 +107,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
     "alibaba_coding_plan": AlibabaCodingPlanLlm,
     "qwen": QwenLlm,
     "cerebras": CerebrasLlm,
+    "skynet": SkynetLlm,
     "bedrock": BedrockLlm,
     "openai_compat": OpenAiCompatLlm,
 }
@@ -208,6 +211,8 @@ def build_llm(
         return QwenLlm(model=model, client=client, api_key=api_key)
     if provider == "cerebras":
         return CerebrasLlm(model=model, client=client, api_key=api_key)
+    if provider == "skynet":
+        return SkynetLlm(model=model, client=client, api_key=api_key)
     if provider == "bedrock":
         # base_url optionally overrides the region host (default us-east-1).
         return BedrockLlm(model=model, client=client, base_url=base_url, api_key=api_key)

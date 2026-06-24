@@ -1499,6 +1499,11 @@
       "id": "groq-llama",
       "provider": "groq",
       "model": "llama-3.3-70b-versatile"
+    },
+    {
+      "id": "skynet-gpt-oss-120b",
+      "provider": "skynet",
+      "model": "openai/gpt-oss-120b"
     }
   ],
   "servers": [
