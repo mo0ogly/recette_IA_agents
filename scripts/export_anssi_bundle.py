@@ -36,6 +36,7 @@ _SURFACE_LOGS = [
     "campaigns_live_skynet.jsonl",
     "jailbreak_threshold_skynet.jsonl",
     "discovery_vs_proxy_skynet.json",
+    "seen_vs_done_skynet.json",
     "surface.json",
     "ebpf_live_skynet.json",
     "probe_audit_skynet.jsonl",
