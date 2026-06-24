@@ -85,9 +85,15 @@ def _mock_agents() -> list[str]:
 
 
 def _summarize(rec: dict) -> dict:
-    """Condense one capture for the human eye without dropping the raw surface."""
+    """Condense one capture for the human eye. DENOISE first (#1): drop the
+    interpreter boot-noise open() tokens (venv / sys-lib) so the stored surface is
+    legible, while REPORTING how many were dropped (no silent truncation, R20).
+    The agent behaviour (connect/dns/fork + repo opens) is preserved verbatim."""
+    from recette.surface.netmap import denoise_recording
+
+    denoised = denoise_recording(rec)
     out = []
-    for r in rec.get("recordings", []):
+    for r in denoised.get("recordings", []):
         wire = r.get("surfaces", {}).get("ebpf_wire", [])
         out.append(
             {
@@ -96,12 +102,14 @@ def _summarize(rec: dict) -> dict:
                 "dns": [w for w in wire if w.startswith("dns:")],
                 "n_open": sum(1 for w in wire if w.startswith("open:")),
                 "n_events": len(wire),
+                "boot_noise_dropped": r.get("ebpf_wire_dropped", 0),
                 "ebpf_wire": wire,
             }
         )
     return {
         "status": rec.get("status"),
         "recording_sha256": rec.get("recording_sha256"),
+        "denoise": denoised.get("denoise", {}),
         "agents": out,
     }
 

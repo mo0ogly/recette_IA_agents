@@ -90,6 +90,64 @@ class AnnotateRecordingSurfacesTest(unittest.TestCase):
         self.assertEqual(out["undeclared_hosts"], [])
 
 
+class DenoiseTest(unittest.TestCase):
+    """#1: drop interpreter boot-noise open() tokens, keep behaviour + count."""
+
+    def test_drops_venv_and_syslib_keeps_rest(self) -> None:
+        from recette.surface.netmap import denoise_ebpf_wire
+
+        tokens = [
+            "connect:127.0.0.1:9101",
+            "open:/usr/lib/libc.so",  # sys-lib -> drop
+            "open:/a/site-packages/m.py",  # venv -> drop
+            "open:/home/x/recette/agent.py",  # repo -> keep
+            "open:/etc/hosts",  # etc -> keep
+            "dns:okta.acme.internal",
+            "fork:42",
+        ]
+        kept, dropped = denoise_ebpf_wire(tokens)
+        self.assertEqual(dropped, 2)
+        self.assertEqual(
+            kept,
+            [
+                "connect:127.0.0.1:9101",
+                "open:/home/x/recette/agent.py",
+                "open:/etc/hosts",
+                "dns:okta.acme.internal",
+                "fork:42",
+            ],
+        )
+
+    def test_order_preserved_and_pure(self) -> None:
+        from recette.surface.netmap import denoise_ebpf_wire
+
+        toks = ["open:/usr/lib/a.so", "connect:1.2.3.4:443", "open:/lib64/b.so"]
+        self.assertEqual(denoise_ebpf_wire(toks), denoise_ebpf_wire(toks))
+
+    def test_denoise_recording_reports_tally(self) -> None:
+        from recette.surface.netmap import denoise_recording
+
+        rec = {
+            "recordings": [
+                {
+                    "agent_id": "bot",
+                    "surfaces": {"ebpf_wire": ["open:/usr/lib/x.so", "connect:127.0.0.1:9101"]},
+                }
+            ]
+        }
+        out = denoise_recording(rec)
+        self.assertEqual(out["recordings"][0]["ebpf_wire_dropped"], 1)
+        self.assertEqual(out["recordings"][0]["surfaces"]["ebpf_wire"], ["connect:127.0.0.1:9101"])
+        self.assertEqual(
+            out["denoise"], {"kept": 1, "dropped": 1, "categories_dropped": ["sys-lib", "venv"]}
+        )
+
+    def test_malformed_returned_as_is(self) -> None:
+        from recette.surface.netmap import denoise_recording
+
+        self.assertEqual(denoise_recording({"x": 1}), {"x": 1})
+
+
 class BuildEndpointMapTest(unittest.TestCase):
     def test_mock_local_maps_loopback_port_to_id(self) -> None:
         m = build_endpoint_map(SERVERS)
