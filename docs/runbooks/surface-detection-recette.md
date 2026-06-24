@@ -43,20 +43,29 @@ python -m recette surface
 ```
 
 Affiche la scorecard de detection (JSON) et sort avec le code 0 si et seulement si
-chaque agent est detecte sur au moins une surface. Exemple de sortie (2 sujets) :
+chaque agent est detecte sur au moins une surface. Exemple de sortie (4 sujets) :
 
 ```
 {
-  "detected_per_surface": {"ebpf_wire": 2, "hook_mcp": 1, "hook_sdk": 1, "hook_subprocess": 1},
+  "detected_per_surface": {"ebpf_wire": 3, "hook_mcp": 2, "hook_sdk": 2, "hook_subprocess": 2},
   "false_negatives": [],
   "ok": true,
-  "total_agents": 2
+  "total_agents": 4
 }
 ```
 
-`ebpf_wire` detecte les deux ; les surfaces hook ne detectent que le PR bot
-conforme (1/2) -- le ghost est l'angle mort des hooks. `false_negatives` liste tout
-agent vu nulle part (l'echec de la these) ; une liste non vide sort avec le code 1.
+Le corpus these couvre quatre patterns distincts (#9) :
+
+- `pr-bot-sdk` -- agent conforme via SDK : visible sur hook ET wire.
+- `ghost-direct-db` -- ghost a egress natif vers une DB : wire seulement (angle mort hook).
+- `exfil-to-sink` -- ghost exfiltrant vers le sink honeypot `shadow-db.acme.internal:9113`
+  (#3) : wire seulement, la raison d'etre de la tripwire d'egress.
+- `hook-only-mock` -- agent via hook contre la forge mock (aucun egress reseau) :
+  visible sur les surfaces hook, correctement ABSENT du wire (l'inverse du ghost).
+
+`ebpf_wire` detecte les trois agents a egress (3/4) ; les surfaces hook detectent
+les deux agents a `proxy_trace` (2/4). `false_negatives` liste tout agent vu nulle
+part (l'echec de la these) ; une liste non vide sort avec le code 1.
 
 Ce gate tourne a l'interieur de `make recette` (c'est une dependance de la cible
 `recette`) : un agent simule que la sonde discovery ne verrait sur AUCUNE surface fait passer

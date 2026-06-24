@@ -10,10 +10,12 @@ from recette.surface.detect import ReferenceSurfaceDiscoveryAdapter, detect_agen
 
 
 class TestSurfaceCorpus(unittest.TestCase):
-    def test_two_subjects_load(self) -> None:
+    def test_subjects_load(self) -> None:
+        # The thesis corpus broadened (#9): the two originals plus a ghost
+        # exfiltrating to the honeypot sink and a hook-only (wire-invisible) agent.
         subjects = load_surface_subjects()
         ids = sorted(s["agent_id"] for s in subjects)
-        self.assertEqual(ids, ["ghost-direct-db", "pr-bot-sdk"])
+        self.assertEqual(ids, ["exfil-to-sink", "ghost-direct-db", "hook-only-mock", "pr-bot-sdk"])
 
     def test_reference_adapter_matches_each_ground_truth(self) -> None:
         for subject in load_surface_subjects():

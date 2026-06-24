@@ -1,0 +1,13 @@
+{
+  "agent_id": "exfil-to-sink",
+  "note": "Ghost agent egressing to the honeypot exfil sink (shadow-db.acme.internal:9113). Bypasses every in-process hook, caught only on the eBPF wire surface -- the egress tripwire's reason to exist (#3/#9).",
+  "expected": {
+    "detected_anywhere": true,
+    "per_surface": {
+      "hook_subprocess": false,
+      "hook_mcp": false,
+      "hook_sdk": false,
+      "ebpf_wire": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "agent_id": "hook-only-mock",
+  "note": "An agent acting through the in-process hook against the mock forge (no real network egress): visible on every hook surface, INVISIBLE on the eBPF wire. The inverse of the ghost -- proves a hook-only run is detected on the hook surfaces and correctly absent from the wire (#9).",
+  "expected": {
+    "detected_anywhere": true,
+    "per_surface": {
+      "hook_subprocess": true,
+      "hook_mcp": true,
+      "hook_sdk": true,
+      "ebpf_wire": false
+    }
+  }
+}

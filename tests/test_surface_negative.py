@@ -16,7 +16,7 @@ class TestSurfaceNegative(unittest.TestCase):
         # The green-scoring loader must skip the _negative directory.
         ids = sorted(s["agent_id"] for s in load_surface_subjects())
         self.assertNotIn("vanished", ids)
-        self.assertEqual(ids, ["ghost-direct-db", "pr-bot-sdk"])
+        self.assertEqual(ids, ["exfil-to-sink", "ghost-direct-db", "hook-only-mock", "pr-bot-sdk"])
 
     def test_vanished_subject_loads_from_the_negative_corpus(self) -> None:
         negatives = load_surface_negatives()
