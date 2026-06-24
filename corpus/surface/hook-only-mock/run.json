@@ -1,0 +1,6 @@
+{
+  "proxy_traces": [
+    {"action_type": "read_repo", "resource": "acme/web"}
+  ],
+  "wire_flows": []
+}

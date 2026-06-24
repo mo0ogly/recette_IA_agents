@@ -19,7 +19,7 @@ class TestSurfaceCli(unittest.TestCase):
         self.assertEqual(rc, 0)
         payload = json.loads(buf.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["total_agents"], 2)
+        self.assertEqual(payload["total_agents"], 4)  # thesis corpus broadened (#9)
 
 
 if __name__ == "__main__":
