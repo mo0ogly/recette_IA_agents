@@ -49,6 +49,22 @@ The mapping is pure/deterministic (I4): the same capture serialises byte-stable.
 the mapping filters to attributed pids, so the recording stays clean (a
 pid-allowlist eBPF filter is a possible later optimisation).
 
+### Denoise (#1) -- drop interpreter boot noise, keep behaviour
+
+A real per-PID capture is ~95% `open:` BOOT NOISE: the interpreter loading shared
+libraries and walking `site-packages` (247/248 tokens in the reference run). That
+noise drowns the 1-2 tokens that carry agent behaviour (the `connect:`/`dns:`).
+Dropping it IN-KERNEL by path prefix is exactly the string-compare that blew the
+verifier budget (see the `sendto` fix), so the denoise is done in pure userspace:
+`recette/surface/netmap.py::denoise_recording` drops `open:` tokens categorised
+`venv`/`sys-lib` and KEEPS everything else (connect, dns, fork, exec, repo/etc
+opens). It REPORTS the dropped count -- no silent truncation (R20): each agent
+carries `ebpf_wire_dropped` and the run a `denoise` tally. The stored researcher
+artifact (`scripts/run_ebpf_live_capture_skynet.py` -> `ebpf_live_skynet.json`) is
+denoised; the live console still shows the raw stream. Live proof: a `dx-live-bot`
+capture went from ~210 tokens to ~80 kept (130 boot-noise dropped), `connect:`
+preserved. Pure (I4), tested in `tests/test_surface_netmap.py` (DenoiseTest).
+
 ## Why a runbook (not automated)
 
 The default platform launches the **replay** broker (Python,

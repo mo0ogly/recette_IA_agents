@@ -141,6 +141,64 @@ def _path_category(path: str) -> str:
     return "other"
 
 
+# open() categories that are interpreter/loader BOOT NOISE, not agent behaviour:
+# shared libraries and the venv/site-packages import walk. A real per-PID capture
+# is ~95% these (247/248 in the reference run). Dropping them in-kernel by path
+# prefix is what blew the verifier budget (string compare), so the denoise is done
+# here in pure userspace -- and it REPORTS the dropped count (no silent truncation,
+# R20): a denoised recording carries an `ebpf_wire_dropped` tally.
+_NOISE_OPEN_CATEGORIES = frozenset({"venv", "sys-lib"})
+
+
+def denoise_ebpf_wire(tokens: list[str]) -> tuple[list[str], int]:
+    """Drop boot-noise open() tokens (venv / sys-lib), keep everything else
+    (connect, dns, fork, exec, repo/etc/other opens). Returns (kept, dropped).
+    Pure and order-preserving (I4)."""
+    kept: list[str] = []
+    dropped = 0
+    for token in tokens:
+        if token.startswith("open:") and _path_category(token[len("open:") :]) in (
+            _NOISE_OPEN_CATEGORIES
+        ):
+            dropped += 1
+            continue
+        kept.append(token)
+    return kept, dropped
+
+
+def denoise_recording(recording: dict) -> dict:
+    """Return a copy of a broker recording with boot-noise open() tokens dropped
+    from every agent's ebpf_wire, plus a per-agent `ebpf_wire_dropped` tally and a
+    run-level `denoise` summary. Pure, fail-safe (a malformed recording is returned
+    as-is). Makes the stored researcher artifact legible without losing the count."""
+    recs = recording.get("recordings")
+    if not isinstance(recs, list):
+        return recording
+    out_recs = []
+    total_kept = 0
+    total_dropped = 0
+    for rec in recs:
+        surfaces = rec.get("surfaces") if isinstance(rec, dict) else None
+        if not isinstance(surfaces, dict) or "ebpf_wire" not in surfaces:
+            out_recs.append(rec)
+            continue
+        kept, dropped = denoise_ebpf_wire([str(t) for t in surfaces.get("ebpf_wire") or []])
+        total_kept += len(kept)
+        total_dropped += dropped
+        new_rec = dict(rec)
+        new_rec["surfaces"] = {**surfaces, "ebpf_wire": kept}
+        new_rec["ebpf_wire_dropped"] = dropped
+        out_recs.append(new_rec)
+    out = dict(recording)
+    out["recordings"] = out_recs
+    out["denoise"] = {
+        "kept": total_kept,
+        "dropped": total_dropped,
+        "categories_dropped": sorted(_NOISE_OPEN_CATEGORIES),
+    }
+    return out
+
+
 def annotate_recording(recording: dict, servers: list[dict]) -> dict:
     """Per-agent named wire annotations + run-level signals across ALL surfaces.
     Pure, deterministic, fail-safe (a malformed recording -> empty annotation).
