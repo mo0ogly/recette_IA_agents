@@ -376,3 +376,17 @@ class CerebrasLlm(_VersionedWireVendor):
 
     BASE_URL = "https://api.cerebras.ai/v1"
     ENV_KEY = "CEREBRAS_API_KEY"
+
+
+class SkynetLlm(_VersionedWireVendor):
+    """SKYNET internal LLM -- OpenAI wire at chat.skynet.cossi.internet/api.
+
+    BASE_URL ends in /api (no /v1), so the request path appends only
+    /chat/completions, yielding chat.skynet.cossi.internet/api/chat/completions
+    (the endpoint documented for the OpenAI-compatible IDE plugins). Key:
+    SKYNET_API_KEY (token starting with sk-), travels as the bearer
+    Authorization header, stored write-only in the per-backend secret store.
+    """
+
+    BASE_URL = "https://chat.skynet.cossi.internet/api"
+    ENV_KEY = "SKYNET_API_KEY"

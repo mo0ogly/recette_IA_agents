@@ -35,6 +35,7 @@ from recette.llm import (
     OpencodeZenLlm,
     OpenRouterLlm,
     QwenLlm,
+    SkynetLlm,
     StepfunLlm,
     StubLlm,
     TogetherLlm,
@@ -130,7 +131,7 @@ class TestMinimax(unittest.TestCase):
 
     def test_uses_bearer_auth_not_x_api_key(self) -> None:
         llm = MinimaxLlm(model="MiniMax-M3", api_key="mk")
-        headers = llm._client.headers
+        headers = llm._client.headers  # type: ignore[attr-defined]
         self.assertEqual(headers["Authorization"], "Bearer mk")
         self.assertIn("anthropic-version", headers)
         self.assertNotIn("x-api-key", headers)
@@ -158,8 +159,8 @@ class TestMinimax(unittest.TestCase):
         self.assertEqual(MinimaxCnLlm.BASE_URL, "https://api.minimaxi.com/anthropic")
         self.assertEqual(MinimaxCnLlm.ENV_KEY, "MINIMAX_CN_API_KEY")
         llm = MinimaxCnLlm(model="m", api_key="ck")
-        self.assertEqual(llm._client.headers["Authorization"], "Bearer ck")
-        self.assertNotIn("x-api-key", llm._client.headers)
+        self.assertEqual(llm._client.headers["Authorization"], "Bearer ck")  # type: ignore[attr-defined]
+        self.assertNotIn("x-api-key", llm._client.headers)  # type: ignore[attr-defined]
 
 
 class TestBedrock(unittest.TestCase):
@@ -177,7 +178,7 @@ class TestBedrock(unittest.TestCase):
 
     def test_uses_bearer_auth(self) -> None:
         llm = BedrockLlm(model="m", api_key="bk")
-        self.assertEqual(llm._client.headers["Authorization"], "Bearer bk")
+        self.assertEqual(llm._client.headers["Authorization"], "Bearer bk")  # type: ignore[attr-defined]
 
     def test_decide_posts_converse_path_and_parses_tool_use(self) -> None:
         payload = {
@@ -202,7 +203,7 @@ class TestBedrock(unittest.TestCase):
     def test_base_url_overrides_region_host(self) -> None:
         host = "https://bedrock-runtime.eu-west-1.amazonaws.com"
         llm = BedrockLlm(model="m", base_url=host, api_key="bk")
-        self.assertEqual(llm._client.base_url, host)
+        self.assertEqual(llm._client.base_url, host)  # type: ignore[attr-defined]
 
 
 class TestOpenAi(unittest.TestCase):
@@ -468,6 +469,7 @@ class TestOpenAiWireVendors(unittest.TestCase):
         ),
         (QwenLlm, "https://portal.qwen.ai/v1", "QWEN_API_KEY"),
         (CerebrasLlm, "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
+        (SkynetLlm, "https://chat.skynet.cossi.internet/api", "SKYNET_API_KEY"),
     )
 
     def test_each_vendor_declares_base_url_and_env_key(self) -> None:

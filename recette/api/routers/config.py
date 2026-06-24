@@ -68,6 +68,7 @@ _PROVIDER_ENV_KEY = {
     "alibaba_coding_plan": "ALIBABA_CODING_PLAN_API_KEY",
     "qwen": "QWEN_API_KEY",
     "cerebras": "CEREBRAS_API_KEY",
+    "skynet": "SKYNET_API_KEY",
     "bedrock": "AWS_BEARER_TOKEN_BEDROCK",
 }
 

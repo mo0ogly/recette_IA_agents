@@ -65,6 +65,7 @@ from .openai_wire import (
     OpencodeZenLlm,
     OpenRouterLlm,
     QwenLlm,
+    SkynetLlm,
     StepfunLlm,
     TogetherLlm,
     XaiLlm,
@@ -113,6 +114,7 @@ __all__ = [
     "AlibabaCodingPlanLlm",
     "QwenLlm",
     "CerebrasLlm",
+    "SkynetLlm",
     # gemini wire
     "GeminiLlm",
     # bedrock wire
