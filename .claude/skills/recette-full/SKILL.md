@@ -144,6 +144,34 @@ RECORDED, not replayed -- never claim replay-equality for them (I4). A negative
 corpus agent driven by a real LLM may not reproduce its scripted violation -- that
 is expected; the deterministic pass owns the ground-truth verdict.
 
+### Capture ALL the surfaces (legibility-first -- this is the product, not a debug aid)
+
+A live pass is INCOMPLETE until every surface is captured to
+`docs/tracking/recette/`, because the recette team judges agents it did not write:
+a surface not captured is a surface not recettable (CLAUDE.md legibility-first).
+The full sweep of live runners, each emitting one surface file:
+
+| Surface | Runner | Output (in `docs/tracking/recette/`) |
+|---------|--------|--------------------------------------|
+| DECIDED (action-log) | `scripts/run_agents_live_skynet.py` | `agents_live_skynet.jsonl` |
+| DONE summary | `scripts/run_traced_skynet.py` | `traced_skynet.jsonl` |
+| **DONE raw -- the proxy log** | `scripts/run_traced_skynet.py` | **`proxy_traces_skynet.jsonl`** |
+| Campaigns | `scripts/run_campaigns_live_skynet.py` | `campaigns_live_skynet.jsonl` |
+| Adversarial threshold | `scripts/run_jailbreak_threshold_skynet.py` | `jailbreak_threshold_skynet.jsonl` |
+| SEEN (eBPF live) | `scripts/run_ebpf_live_capture_skynet.py` | `ebpf_live_skynet.json` + `probe_audit_skynet.jsonl` |
+| Cross-surface | `scripts/recette_discovery_vs_proxy_skynet.py` | `discovery_vs_proxy_skynet.json` |
+
+The **raw proxy log** (`proxy_traces_skynet.jsonl`, one line per side effect) is
+the legibility-first "what it DID" surface and is NON-NEGOTIABLE: it carries the
+full agent<->server exchange -- `request_payload` (the intent), `response` (what
+the target answered), `side_effect_hash`, `event_id`, `timestamp`, `run_id`. The
+summary in `traced_skynet.jsonl` is for scoring; the raw log is what a third party
+(an ANSSI researcher) reads to understand and REPLAY the exchange. Do not ship a
+live pass that kept only the summary -- that was the gap fixed on 2026-06-24
+(`run_traced_skynet.py` used to drop `request_payload`/`response`, keeping only
+`response_keys`). If `request_payload` is `{}` that is fine and expected: the
+intent lives in `action_type`/`resource`, not the body (CLAUDE.md).
+
 ## Governance scorecard -- rate the LLM (stars + detailed score)
 
 After a live pass, score the LLM brain with `scripts/recette_govscore.py` (pure,
@@ -186,6 +214,39 @@ improvement backlog. Then print a short report to the user:
 - Improvement backlog: <count> axes (P1: <top item>)
 - RETEX: docs/tracking/recette/RETEX_recette-full_<date>.md
 ```
+
+## Export for ANSSI researchers (analysis + REPLAY) -- part of "done"
+
+A live pass that scored an LLM is not delivered until its evidence is packaged for
+an external researcher to ANALYSE and REPLAY (the standing requirement). Build the
+tamper-evident bundle AFTER all surfaces are captured:
+
+```
+python3 scripts/export_anssi_bundle.py --llm <provider/model>
+```
+
+The bundle (`docs/tracking/recette/anssi_bundle_<llm>/`) carries every surface
+under `logs/` -- including the **raw proxy log** `proxy_traces_skynet.jsonl` (the
+full request+response exchange) and the eBPF live captures + their broker audit
+chain -- plus `scorecard.json`, a `MANIFEST.json` (sha256 per file + a chained
+`root_hash` + the git commit), and a `README.md` with the replay recipe.
+
+Two replay guarantees the researcher can run, both stated in the README:
+- **Score/decision replay** -- pure (I4): `recette_govscore.py` recomputes the same
+  stars from the logs; `recette agent replay <recording>` reproduces the LLM
+  decisions via ReplayLlm (no key, no live call).
+- **Exchange replay** -- the mock lab is deterministic (I4): the same
+  (agent, action_type, resource) request yields the same response + `side_effect_hash`
+  (verified 46/46 across two independent live passes). Replay the LLM DECISIONS via
+  ReplayLlm to fix the requests, and every response + hash reproduces; diff against
+  `proxy_traces_skynet.jsonl` (equal hash = equal effect). This is why the raw proxy
+  log MUST be in the bundle: without it there is nothing to replay against. A fresh
+  LIVE brain may decide different requests, so a live re-run is not a byte replay (R14).
+
+Verify the bundle integrity before handing it off: recompute each file's sha256,
+fold into `root_hash`, compare to `MANIFEST.root_hash` (any altered byte changes
+the root). LIVE captures are RECORDED, not byte-replay-stable (R14) -- the audit
+chain proves the capture ran; never claim a live eBPF capture replays identically.
 
 ## Security layers (from the framework -- apply them)
 

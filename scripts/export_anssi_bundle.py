@@ -39,6 +39,7 @@ _SURFACE_LOGS = [
     "surface.json",
     "ebpf_live_skynet.json",
     "probe_audit_skynet.jsonl",
+    "proxy_traces_skynet.jsonl",
     "redteam_ok.txt",
 ]
 
@@ -114,12 +115,17 @@ def build(llm: str, out_dir: Path) -> dict:
 Tamper-evident, replayable capture of an inspect_ia_agents governance recette.
 
 ## Contents
-- `logs/` -- every surface: declared/decided (agents), done/proxy (traced),
-  campaigns, jailbreak threshold, discovery-vs-proxy agreement, eBPF surface
-  (`surface.json` = deterministic corpus projection; `ebpf_live_skynet.json` =
-  REAL per-PID live captures under the CAP_BPF broker, with
+- `logs/` -- every surface: declared/decided (agents), done/proxy (traced
+  summary), campaigns, jailbreak threshold, discovery-vs-proxy agreement, eBPF
+  surface (`surface.json` = deterministic corpus projection; `ebpf_live_skynet.json`
+  = REAL per-PID live captures under the CAP_BPF broker, with
   `probe_audit_skynet.jsonl` the broker's tamper-evident seq+sha256 audit chain),
   red-team.
+- `logs/proxy_traces_skynet.jsonl` -- THE RAW PROXY LOG: one line per side
+  effect, the full agent<->server exchange (`request_payload` = the intent,
+  `response` = what the target system answered, `side_effect_hash`, `event_id`,
+  `timestamp`, `run_id`). This is the legibility-first "what it DID" surface and
+  the ground truth a researcher replays the exchange against -- not a summary.
 - `scorecard.json` -- governance stars + detailed /100 (L1/L2/L3), per-server
   improvement ranking, cross-surface consistency.
 - `MANIFEST.json` -- sha256 of every file + a chained `root_hash` + the git commit
@@ -134,6 +140,16 @@ Recompute the sha256 of each file in `logs/` and `scorecard.json`, fold them int
 - Deterministic recette: `python3 scripts/recette_full.py` -- byte-stable (I4).
 - Live runs: recorded; `python3 -m recette agent replay <recording>` reproduces the
   LLM decisions via ReplayLlm (no live call, no key).
+- Proxy exchange: `logs/proxy_traces_skynet.jsonl` holds the full request+response
+  per side effect. The mock lab is deterministic (I4): the SAME
+  (agent, action_type, resource) request always yields the SAME response and
+  `side_effect_hash` -- verified across two independent live passes (46/46
+  side_effect_hash matched). So to replay the exchange, replay the LLM DECISIONS
+  via ReplayLlm (`recette agent replay <recording>`) to fix the requests; every
+  response + `side_effect_hash` then reproduces byte-for-byte. The hash is the
+  exchange's fingerprint -- equal hash = equal effect. (A fresh LIVE LLM may
+  decide different requests, so re-running with a live brain is NOT a byte replay;
+  only the recorded-decision path is, R14.)
 - Recompute the scorecard: `python3 scripts/recette_govscore.py --llm {llm} --json`
   -- the score is a pure function of the logs, so it matches.
 
