@@ -75,8 +75,20 @@ if [ "${#RS[@]}" -gt 0 ]; then
     done
 
     for cdir in "${!CRATE_DIRS[@]}"; do
+      # An eBPF program crate is `#![no_main]` (and `#![no_std]`): it has no host
+      # test/bench harness, so `cargo clippy --all-targets` fails to compile the
+      # `test` target ("can't find crate for `test`", missing `#[panic_handler]`)
+      # -- an environment fault, not a real lint. For such a crate, clippy only
+      # the default target (the crate's `.cargo/config` pins the bpf target);
+      # `--all-targets` stays on for every normal crate (keeps test/bench linted).
+      CLIPPY_TARGETS="--all-targets"
+      if grep -rqs -- '#!\[no_main\]' "${cdir}/src" 2>/dev/null; then
+        CLIPPY_TARGETS=""
+        printf '[pre-commit] %s is no_main (eBPF) -- clippy default target only\n' \
+          "${cdir#"$REPO_ROOT"/}" >&2
+      fi
       printf '[pre-commit] clippy in %s\n' "${cdir#"$REPO_ROOT"/}" >&2
-      if ! ( cd "$cdir" && cargo clippy --all-targets --all-features -- -D warnings ) \
+      if ! ( cd "$cdir" && cargo clippy ${CLIPPY_TARGETS} --all-features -- -D warnings ) \
             >/tmp/precommit-clippy.txt 2>&1; then
         printf '[pre-commit][FAIL] cargo clippy in %s:\n' "$cdir" >&2
         grep -E '^(warning|error)' /tmp/precommit-clippy.txt | head -15 >&2
