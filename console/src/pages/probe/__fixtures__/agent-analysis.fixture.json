@@ -1,0 +1,60 @@
+{
+  "status": null,
+  "recording_sha256": null,
+  "agent_analysis": [
+    {
+      "agent_id": "dx-live-bot",
+      "identified": true,
+      "seen_kinds": [
+        "connect",
+        "open"
+      ],
+      "planned": {
+        "systems": [
+          "gh-mock"
+        ],
+        "scope": [
+          "open_pr",
+          "read_repo"
+        ]
+      },
+      "said": null,
+      "done": {
+        "dialed_servers": [
+          "gh-mock"
+        ],
+        "undeclared_egress": [],
+        "undeclared_dns": [],
+        "process_spawned": false,
+        "sensitive_opens": [
+          "/tmp/tmpqou9vmke/agent.json",
+          "/tmp/tmpqou9vmke/servers.json"
+        ]
+      },
+      "coherent": true,
+      "logging_recommendations": [
+        {
+          "severity": "info",
+          "log": "connect to declared server gh-mock",
+          "why": "the legitimate side-effect wire -- log for the audit trail"
+        },
+        {
+          "severity": "info",
+          "log": "file access /tmp/tmpqou9vmke/agent.json",
+          "why": "non-library file access -- log for the data-access audit"
+        },
+        {
+          "severity": "info",
+          "log": "file access /tmp/tmpqou9vmke/servers.json",
+          "why": "non-library file access -- log for the data-access audit"
+        }
+      ],
+      "analysis": "coherent: planned systems ['gh-mock'], dialed ['gh-mock'], undeclared egress 0, undeclared dns 0, no spawn. Top severity: info."
+    }
+  ],
+  "undeclared_hosts": [],
+  "surface_summary": {
+    "connect": 1,
+    "open": 276
+  }
+}

@@ -21,6 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ...surface.agent_analysis import analyze_recording
 from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
@@ -29,13 +30,36 @@ router = APIRouter(prefix="/probe", tags=["probe"])
 
 
 def _attach_wire_names(result: dict, request: Request) -> dict:
-    """Attach the v1 named-wire annotation (declared server + undeclared host)
-    to a capture result. Pure/fail-safe: never changes the scorecard, never
-    raises. config_store is the server registry source."""
+    """Attach the v1 named-wire annotation AND the discovery's per-agent analysis
+    (the discovery's job: PLANNED vs SAID vs DONE coherence + logging
+    recommendations) to a capture result. Pure/fail-safe: never changes the
+    scorecard, never raises. config_store is the server registry source."""
     recording = result.get("recording")
-    if isinstance(recording, dict):
-        servers = request.app.state.config_store.list_servers()
-        result.update(annotate_recording(recording, servers))
+    if not isinstance(recording, dict):
+        return result
+    store = request.app.state.config_store
+    servers = store.list_servers()
+    annotated = annotate_recording(recording, servers)
+    result.update(annotated)
+    # The discovery's job: for every agent seen, compare what it was PLANNED to do
+    # (declared scope + systems) vs what it DID (the kernel wire) and recommend what
+    # to log, so the integrated console can report it in detail.
+    declared_by_agent: dict[str, dict] = {}
+    for agent_id in annotated.get("wire_named", {}):
+        agent = store.get_agent(str(agent_id)) or {}
+        scope = [
+            c if isinstance(c, str) else c.get("action") for c in agent.get("capability_scope", [])
+        ]
+        # netmap resolves a dialed endpoint to the SERVER id (e.g. gh-mock), so the
+        # PLANNED set is the agent's BOUND server id -- the one it is allowed to
+        # dial -- not the target_system (github). A dialed server id outside this
+        # set is capability/network drift.
+        bound = agent.get("server")
+        declared_by_agent[str(agent_id)] = {
+            "scope": [s for s in scope if s],
+            "systems": [bound] if bound else [],
+        }
+    result["agent_analysis"] = analyze_recording(annotated, declared_by_agent=declared_by_agent)
     return result
 
 

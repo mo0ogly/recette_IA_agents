@@ -13,6 +13,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
 import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
 import LlmTracePanel from "./LlmTracePanel";
+import AgentAnalysisPanel from "./AgentAnalysisPanel";
 import PageHelp from "../../components/help/PageHelp";
 import "./probe.css";
 
@@ -303,6 +304,8 @@ export default function ProbePage(): JSX.Element {
               <AgentCard key={rec.agent_id} recording={rec} />
             ))}
           </div>
+
+          <AgentAnalysisPanel analysis={result.agent_analysis} />
 
           <div className="probe-raw-head">
             <h2 className="probe-subtitle">Recording brut (ce que la sonde a vu)</h2>
