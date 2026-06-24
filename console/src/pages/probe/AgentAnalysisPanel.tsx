@@ -32,6 +32,8 @@ function Column({ title, items }: { title: string; items: string[] }): JSX.Eleme
 function AgentReport({ a }: { a: AgentAnalysis }): JSX.Element {
   const done: string[] = [
     ...a.done.dialed_servers.map((s) => `dial ${s}`),
+    ...(a.done.doh_egress ?? []).map((s) => `DoH ${s}:443`),
+    ...(a.done.credential_opens ?? []).map((p) => `CREDENTIAL ${p}`),
     ...a.done.undeclared_egress.map((s) => `EGRESS ${s}`),
     ...a.done.undeclared_dns.map((s) => `DNS ${s}`),
     ...(a.done.process_spawned ? ["spawned a child process"] : []),

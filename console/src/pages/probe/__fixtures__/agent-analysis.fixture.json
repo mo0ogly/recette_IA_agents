@@ -29,7 +29,9 @@
         "sensitive_opens": [
           "/tmp/tmpqou9vmke/agent.json",
           "/tmp/tmpqou9vmke/servers.json"
-        ]
+        ],
+        "credential_opens": [],
+        "doh_egress": []
       },
       "coherent": true,
       "logging_recommendations": [

@@ -22,9 +22,91 @@ from __future__ import annotations
 # Severity tiers for a logging recommendation, worst first (stable order).
 _SEVERITY_ORDER = {"alert": 0, "warn": 1, "info": 2}
 
+# Credential / secret-material file leaves. An agent that opens one of these is
+# reading exfiltratable secrets -- never routine file I/O for a git/identity/finance
+# bot, so it is a HARDENED signal (alert) and breaks coherence on its own. MITRE
+# ATLAS AML.T0055 (Unsecured Credentials). Substring match on the opened path,
+# case-insensitive, deterministic (I4). Kept narrow on purpose: a generic open of
+# /etc/ssl/certs stays an info-level data-access log, it must not match here.
+_CREDENTIAL_MARKERS = (
+    ".aws/credentials",
+    ".aws/config",
+    "id_rsa",
+    "id_ed25519",
+    ".ssh/",
+    ".kube/config",
+    ".env",
+    ".npmrc",
+    ".netrc",
+    ".docker/config.json",
+    ".git-credentials",
+    "service-account",
+    "secrets.json",
+    "backend_secrets",
+)
+
+# Public DNS resolvers reached on :443. An UNDECLARED connect to one is a
+# DNS-over-HTTPS covert-channel tell: it looks like ordinary TLS egress but is a
+# resolver, a classic way to tunnel exfil past an allow-list that only watches
+# port 53. Higher context than a generic ghost host. ATLAS AML.T0086 (exfil via
+# tool invocation) when paired with a tool call.
+_DOH_RESOLVERS = frozenset(
+    {"1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112"}
+)
+
+
+def _is_credential_path(path: str) -> bool:
+    low = path.lower()
+    return any(marker in low for marker in _CREDENTIAL_MARKERS)
+
+
+def _doh_host(endpoint: str) -> str | None:
+    """Return the resolver IP if ``endpoint`` (``host:port``) is a known public DNS
+    resolver on :443, else None. Pure."""
+    host, sep, port = endpoint.rpartition(":")
+    if not sep:
+        host, port = endpoint, ""
+    return host if host in _DOH_RESOLVERS and port in ("443", "") else None
+
 
 def _rec(severity: str, what: str, why: str) -> dict:
     return {"severity": severity, "log": what, "why": why}
+
+
+def decided_from_scenario(scenario: list | None) -> list[str] | None:
+    """SAID (the decided action_types) from a mock agent's scenario -- the
+    deterministic decision script that ``build_stub_llm`` replays step by step, so
+    each ``tool_call`` step's ``tool_name`` is exactly the action_type the agent
+    DECIDED. Pure (I4): no clock/random. None when there is no scenario (a live
+    agent captured by the passive watch: only the kernel surface is known, so SAID
+    stays the unlinked middle column)."""
+    if not scenario:
+        return None
+    return sorted(
+        {
+            s["tool_name"]
+            for s in scenario
+            if isinstance(s, dict) and s.get("kind") == "tool_call" and s.get("tool_name")
+        }
+    )
+
+
+def declared_view(agent: dict) -> dict:
+    """The declared PLAN of one agent for the three-way analysis, derived purely
+    from its config record: ``scope`` (the ``capability_scope`` action ids),
+    ``systems`` (the BOUND server id -- netmap resolves a dialed endpoint to the
+    server id, e.g. ``gh-mock``, NOT the target_system ``github``, so the PLANNED
+    network set is the bound server), and ``decided`` (SAID from the scenario).
+    Pure, fail-safe."""
+    scope = [
+        c if isinstance(c, str) else c.get("action") for c in agent.get("capability_scope", [])
+    ]
+    bound = agent.get("server")
+    return {
+        "scope": [s for s in scope if s],
+        "systems": [bound] if bound else [],
+        "decided": decided_from_scenario(agent.get("scenario") or []),
+    }
 
 
 def analyze_agent(
@@ -56,17 +138,27 @@ def analyze_agent(
         if a.get("kind") == "dns" and a.get("undeclared")
     )
     process_spawned = any(a.get("kind") in ("fork", "exec") for a in wire_annotations)
-    sensitive_opens = sorted(
+    all_opens = sorted(
         path
         for a in wire_annotations
         if a.get("kind") == "open" and a.get("category") in ("etc", "other")
         for path in [a["raw"][len("open:") :]]
         if path and path != "<unknown>"
     )
+    # Split secret-material leaves from routine file I/O: a credential open is a
+    # hardened exfil-prep signal (alert), the rest is an info data-access log.
+    credential_opens = [p for p in all_opens if _is_credential_path(p)]
+    sensitive_opens = [p for p in all_opens if not _is_credential_path(p)]
+    # DNS-over-HTTPS covert channel: an undeclared egress to a public resolver on
+    # :443 is a tunneling tell, scored apart from a generic ghost host.
+    doh_egress = sorted({h for ep in undeclared_egress if (h := _doh_host(ep))})
+    plain_egress = [ep for ep in undeclared_egress if _doh_host(ep) is None]
     identified = bool(wire_annotations)
 
     # PLANNED vs DONE coherence at the network layer: every dialed server is a
     # declared target system. (SAID is folded in only when decided_actions given.)
+    # A credential-file leave breaks coherence on its own -- none of these agents
+    # declare reading secret material, so it is always anomalous.
     declared_set = set(declared_systems)
     out_of_plan_servers = sorted(s for s in dialed if s not in declared_set)
     said_out_of_scope = (
@@ -79,11 +171,28 @@ def analyze_agent(
         and not undeclared_dns
         and not out_of_plan_servers
         and not said_out_of_scope
+        and not credential_opens
     )
 
     # --- Logging recommendations (the "say what to log" job) ---
     recs: list[dict] = []
-    for host in undeclared_egress:
+    for path in credential_opens:
+        recs.append(
+            _rec(
+                "alert",
+                f"credential/secret file access {path}",
+                "secret-material read (ATLAS AML.T0055) -- exfil-prep, never routine I/O",
+            )
+        )
+    for host in doh_egress:
+        recs.append(
+            _rec(
+                "alert",
+                f"egress to public DNS resolver {host}:443",
+                "DNS-over-HTTPS covert channel -- tunneling exfil past a port-53 allow-list",
+            )
+        )
+    for host in plain_egress:
         recs.append(
             _rec(
                 "alert",
@@ -144,11 +253,17 @@ def analyze_agent(
 
     worst = recs[0]["severity"] if recs else "info"
     verdict = "coherent" if coherent else "DIVERGENT"
+    extra = []
+    if credential_opens:
+        extra.append(f"{len(credential_opens)} credential leave(s)")
+    if doh_egress:
+        extra.append(f"{len(doh_egress)} DoH resolver(s)")
     analysis = (
         f"{verdict}: planned systems {sorted(declared_set) or 'none'}, "
         f"dialed {dialed or 'none'}, undeclared egress {len(undeclared_egress)}, "
         f"undeclared dns {len(undeclared_dns)}, "
-        f"{'process spawn' if process_spawned else 'no spawn'}. Top severity: {worst}."
+        f"{'process spawn' if process_spawned else 'no spawn'}"
+        f"{', ' + ', '.join(extra) if extra else ''}. Top severity: {worst}."
     )
 
     return {
@@ -163,6 +278,8 @@ def analyze_agent(
             "undeclared_dns": undeclared_dns,
             "process_spawned": process_spawned,
             "sensitive_opens": sensitive_opens,
+            "credential_opens": credential_opens,
+            "doh_egress": doh_egress,
         },
         "coherent": coherent,
         "logging_recommendations": recs,
