@@ -29,6 +29,36 @@ so the UX is wired to the live API automatically. State (pids/ports) lives in
 `.run/` (`api.pid`, `api.port`, `console.pid`, `lab.pid`). Launching a service
 outside the script leaves `.run/` inconsistent and breaks `status`/`stop`.
 
+## Command surface (interactive menu + CLI -- full parity)
+
+Two ways to drive it, same underlying `cicd/*.sh`:
+
+- **Interactive:** `./recette.sh` (no arg) opens a menu of 10 category
+  submenus; each lists its actions and `0` returns to the top. The menu is in
+  full parity with the CLI -- every action below is reachable from a submenu.
+- **Non-interactive:** `./recette.sh <cmd> [args]` for scripts/CI.
+
+| Category (submenu) | CLI form | What it does |
+|--------------------|----------|--------------|
+| Docker lab | `up\|down\|restart\|rebuild\|ps\|logs\|shell` | docker-compose lab lifecycle |
+| API governed | `api start\|stop\|restart\|status\|logs` | governed API on :8090 |
+| Checks | `test\|gates\|report` (`test --docker`) | unittest, ruff/mypy/bandit, report |
+| Git | `git status\|pull\|push\|sync` | repo helpers (R21-aware) |
+| Platform + Console | `platform up\|down\|restart\|status\|purge`, `console start\|stop\|status\|logs` | lab mock + API + vite UX |
+| Campaigns | `campaign list\|run <name> [--json]` | action campaigns (recursive, see below) |
+| Recette & Discovery | `validate`, `run`, `discovery`, `smoke`, `discovery-build`, `probe-ebpf-build`, `probe-grant-caps` | schema-validate, identification scorecard, discovery scorecard, e2e smoke, native Rust + eBPF builds |
+| Proxy overlays | `wire up\|down\|status\|logs`, `llm-proxy up\|down\|status\|logs` | optional mitmproxy wire-interception + LiteLLM gateway (Docker) |
+| Console & Docs | `console-build\|console-test`, `docs-build\|docs-serve` | React tsc+vite/vitest, Docusaurus fr+en |
+| Cleanup | `platform purge` | stop+free local web servers (API/lab/console) |
+
+**Campaigns are discovered recursively.** Campaign files live under
+`campaigns/` AND its subgroups (`campaigns/{bnp,coverage,multidomain,rag,role-matrix}/`).
+`campaign list`, the menu picker, and `campaign run <name>` all resolve
+recursively: list/picker show the group-relative path (`bnp/sec-1-soc-compromise`),
+and `run` accepts a bare short name, a `group/name`, a filename, or a path. Do
+NOT reintroduce a top-level-only glob/`-maxdepth 1` -- it silently hides the
+nested campaigns (regression fixed 2026-06-24).
+
 ## The rule (BLOCKING)
 
 1. **Never hand-launch a project service.** No raw `npm run dev`, `npx vite`,
