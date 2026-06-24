@@ -49,6 +49,29 @@ The mapping is pure/deterministic (I4): the same capture serialises byte-stable.
 the mapping filters to attributed pids, so the recording stays clean (a
 pid-allowlist eBPF filter is a possible later optimisation).
 
+### Live DNS token (#2) -- needs a local resolver (operator infra)
+
+The lab dials its servers over **loopback** (`127.0.0.1:910x`), so a real capture
+shows `connect:` but **no `dns:`** token: there is no name to resolve, so the
+kernel never emits a `sendto` to :53. The DNS OBSERVABILITY is fully built and
+tested regardless -- the `sendto`/DNS eBPF program (verifier-fixed), the netmap
+`dns:` classification + `undeclared_dns` exfil tripwire (#4), and the app-layer
+private-DNS resolver + `containment` allowlist (`recette/platform/netname/`,
+tests `test_netname_resolver` / `test_proxy_containment` / `test_resolution_denied_event`)
+that already denies an undeclared NAME with an audited `resolution_denied` event.
+That app-layer named-wire + exfil-deny is the level the recette judges, and it is
+deterministic (I4).
+
+To make a capture emit a real kernel `dns:` token you need the agent to do an
+actual `getaddrinfo` that reaches a DNS server (an `/etc/hosts` entry answers
+locally via NSS and emits NO :53 query, so it does NOT produce a `dns:` token).
+That requires a **local resolver daemon** answering the lab fqdns
+(`*.acme.internal -> 127.0.0.1`) and the agent's resolver pointed at it -- operator
+infra (binds :53, needs privilege), in the same class as `probe-grant-caps`. This
+is the only remaining piece; the engines that OBSERVE and JUDGE the DNS surface
+are already in place. Until then, the named-wire is exercised at the app layer
+(resolver + containment), not the kernel `dns:` token.
+
 ### Denoise (#1) -- drop interpreter boot noise, keep behaviour
 
 A real per-PID capture is ~95% `open:` BOOT NOISE: the interpreter loading shared
