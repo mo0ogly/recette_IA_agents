@@ -2,7 +2,7 @@
 
 A governed customer-notification channel, distinct from the internal slack
 workspace domain: comms covers outbound notifications to customers (e.g. a fraud
-hold notice). Promoted from the BNP scenario EXTRA_SPECS into the committed
+hold notice). Promoted from the BANQUE scenario EXTRA_SPECS into the committed
 catalog. The privileged role is comms_admin; the single sensitive action
 escalates for it and is denied for everyone else (deny-by-default). Criticality
 (Annex C axis) is the AgentRail default posture; see catalog/model.py::Criticality.

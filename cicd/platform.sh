@@ -433,7 +433,7 @@ campaign_list() {
 }
 
 _campaign_file() {
-    # accept a bare name (identity-offboarding), a subdir name (bnp/sec-1-...),
+    # accept a bare name (identity-offboarding), a subdir name (banque/sec-1-...),
     # a file name, or an absolute/relative path. Resolves recursively so
     # campaigns nested under campaigns/<group>/ are reachable by short name.
     local name="$1"

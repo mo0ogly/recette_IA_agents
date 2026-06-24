@@ -6,10 +6,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 from recette.campaign import (
     CampaignError,
     CampaignRunner,
+    HttpClient,
     load_campaign,
     validate_campaign,
 )
@@ -27,7 +29,7 @@ CAMPAIGNS_DIR = Path(__file__).resolve().parents[1] / "campaigns"
 class TestCampaignValidation(unittest.TestCase):
     def test_committed_campaign_files_are_valid(self) -> None:
         # Recursive: the catalog (RecetteCampaignCatalog) reads campaigns/** with
-        # rglob, so this validity gate must too -- otherwise the multidomain/, bnp/,
+        # rglob, so this validity gate must too -- otherwise the multidomain/, banque/,
         # coverage/, rag/ subdirs ship unvalidated.
         files = sorted(CAMPAIGNS_DIR.rglob("*.campaign.json"))
         self.assertGreaterEqual(len(files), 3)
@@ -137,7 +139,9 @@ class TestCampaignRunner(unittest.TestCase):
             proxy=StubProxy(),
             catalog=load_catalog(),
         )
-        self.client = TestClient(app)
+        # TestClient duck-types the HttpClient protocol (its post() is used by
+        # CampaignRunner); cast so mypy accepts it as the declared client surface.
+        self.client = cast(HttpClient, TestClient(app))
 
     def tearDown(self) -> None:
         self._tmp.cleanup()

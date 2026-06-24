@@ -1,19 +1,19 @@
-"""Run the 6 BNP security scenarios as governed campaigns and check verdicts.
+"""Run the 6 BANQUE security scenarios as governed campaigns and check verdicts.
 
 This harness does NOT touch any LLM: every action flows through the real gateway
 (policy decide -> deny / escalate -> pending / allow -> execute), so the test
-proves the governance posture (ALLOW/ESCALATE/DENY) the BNP scenarios claim.
+proves the governance posture (ALLOW/ESCALATE/DENY) the BANQUE scenarios claim.
 
 It layers two things on top of the committed catalog, in memory only:
-  1. five extra ActionSpec (the BNP actions not yet in the 11 committed domains:
+  1. five extra ActionSpec (the BANQUE actions not yet in the 11 committed domains:
      okta.revoke_long_lived_token, okta.assume_delegation, cloud.isolate_host,
      github.read_cicd_secrets, and a new mcp.invoke_tool);
-  2. a custom policy bundle "bnp-v1" granting the contextual ALLOW/ESCALATE the
+  2. a custom policy bundle "banque-v1" granting the contextual ALLOW/ESCALATE the
      scenarios require for the defensive / scoped roles (e.g. a SOC agent ALLOWs
      reversible containment). Everything else falls through to catalog
      deny-by-default.
 
-Usage: python3 scripts/run_bnp_scenarios.py [--dir campaigns/bnp]
+Usage: python3 scripts/run_banque_scenarios.py [--dir campaigns/banque]
 Exit code 0 if every campaign matches its expectations and the audit chain is
 intact, 1 otherwise.
 """
@@ -26,9 +26,9 @@ import tempfile
 from pathlib import Path
 from typing import cast
 
-# Make recette importable when run as a script (python3 scripts/run_bnp_scenarios.py):
+# Make recette importable when run as a script (python3 scripts/run_banque_scenarios.py):
 # sys.path[0] is then scripts/, not the repo root. Mirrors scripts/smoke_*.py so
-# `make bnp` works without the package being pip-installed.
+# `make banque` works without the package being pip-installed.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -44,7 +44,7 @@ from recette.platform.policy.model import PolicyRule, PolicyVersion, baseline_fr
 from recette.platform.policy.store import PolicyStore
 from recette.platform.proxy.protocol import ExecutionResult, side_effect_hash
 
-BUNDLE_VERSION = "bnp-v1"
+BUNDLE_VERSION = "banque-v1"
 
 
 def _esc_spec(
@@ -77,7 +77,7 @@ def _deny_spec(target: str, action: str, risk: RiskLevel, description: str) -> A
     )
 
 
-# BNP actions absent from the 11 committed domains (added in memory only).
+# BANQUE actions absent from the 11 committed domains (added in memory only).
 EXTRA_SPECS: tuple[ActionSpec, ...] = (
     _esc_spec(
         "okta",
@@ -193,7 +193,7 @@ def build_bundle(catalog: Catalog) -> PolicyVersion:
     base = baseline_from_catalog(catalog, version=BUNDLE_VERSION)
     extra = tuple(
         PolicyRule(
-            rule_id=f"bnp.{target}.{action}.{role}",
+            rule_id=f"banque.{target}.{action}.{role}",
             target_system=target,
             action_type=action,
             role=role,
@@ -206,8 +206,8 @@ def build_bundle(catalog: Catalog) -> PolicyVersion:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="run_bnp_scenarios")
-    parser.add_argument("--dir", default="campaigns/bnp")
+    parser = argparse.ArgumentParser(prog="run_banque_scenarios")
+    parser.add_argument("--dir", default="campaigns/banque")
     args = parser.parse_args(argv)
 
     from fastapi.testclient import TestClient

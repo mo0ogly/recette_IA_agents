@@ -1,6 +1,6 @@
 """compliance domain action specs -- regulatory / KYC workflows.
 
-A governed compliance system (KYC review workflows), promoted from the BNP
+A governed compliance system (KYC review workflows), promoted from the BANQUE
 scenario EXTRA_SPECS into the committed catalog. The privileged role is
 compliance_admin; the single sensitive action escalates for it and is denied for
 everyone else (deny-by-default). Criticality (Annex C axis) is the AgentRail

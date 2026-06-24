@@ -29,7 +29,7 @@ ce qu'il **decide** (action-log, le "pourquoi" par etape), et ce qu'il **fait** 
 |---------|--------|
 | Actions gouvernees (catalogue) | **148** sur **16** systemes |
 | Referentiel Annex C (actions sensibles) | **124** |
-| Campagnes de recette | **55** (bnp 10, coverage 16, role-matrix 15, multidomain 7, rag 4, top-level 3) |
+| Campagnes de recette | **55** (banque 10, coverage 16, role-matrix 15, multidomain 7, rag 4, top-level 3) |
 | Agents runtime (cockpit) | **33** |
 | Sujets d'identification git (corpus) | **11** correct + incorrect |
 | Sujets MAF (corpus) | **5** |
@@ -127,19 +127,44 @@ Argumentaire complet pour presentation interne :
 ## Installation et demarrage
 
 Prerequis : **Python >= 3.11**, **Node.js + npm >= 20**, `bash`/`curl`/`ss`.
-Guide complet : [docs/runbooks/installation.md](docs/runbooks/installation.md).
+Guide complet (Docker, modes reels, depannage) :
+[docs/runbooks/installation.md](docs/runbooks/installation.md).
+
+**1. Cloner + installer le coeur Python** (offline, lab simule par defaut) :
 
 ```
-python3 -m venv .venv && .venv/bin/pip install -U pip && .venv/bin/pip install -e '.[api]'
+git clone <repo-url> cyber_lab_agents_ia && cd cyber_lab_agents_ia
+python3 -m venv .venv && .venv/bin/pip install -U pip && .venv/bin/pip install -e '.[bundle,api]'
 ```
 
-Tout se pilote par `./recette.sh` (menu interactif ou CLI). Une seule commande lance
-**le serveur applicatif** (API gouvernee `:8090`) **et les serveurs appeles par les
-agents** (lab mock `:8082` + serveurs par-domaine `:9101`-`:9113`) ; puis la console :
+`[bundle,api]` = le jeu que construit l'image Docker (R22). Le coeur recette ne
+depend que de `jsonschema` ; tout le reste est un **extra optionnel**, a n'ajouter
+que si la fonction est utilisee :
+
+| Extra | Quand l'ajouter |
+|-------|-----------------|
+| `api` | console + API HTTP (FastAPI/uvicorn) -- requis pour le cockpit |
+| `bundle` | verification Ed25519 des bundles de policy |
+| `real` | forge reelle GitHub/GitLab (`PyGithub`, `python-gitlab`) au lieu du lab |
+| `temporal` | executer les workflows Temporal du corpus |
+| `maf` | importer des specs MAF declaratives en YAML |
+| `postgres` / `nats` | event store / transport temps reel Phase 2 |
+| `redteam` | attaquant PyRIT (lourd ~939 MB, hors image de base) |
+
+**2. Lancer la plateforme + la console** -- tout se pilote par `./recette.sh`
+(menu interactif ou CLI). Une seule commande leve **le serveur applicatif** (API
+gouvernee `:8090`) **et les serveurs appeles par les agents** (lab mock `:8082` +
+serveurs par-domaine `:9101`-`:9113`) ; puis la console :
 
 ```
 ./recette.sh platform up
 ./recette.sh console start
+```
+
+**3. Verifier l'installation** (offline, aucune cle LLM requise) :
+
+```
+./recette.sh test
 ```
 
 Ouvrir le **cockpit** sur **http://localhost:5173**. Onglet **Cockpit** : choisir un

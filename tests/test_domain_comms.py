@@ -1,6 +1,6 @@
 """comms domain (customer communication): catalog spec + lab handler tests.
 
-comms is a promoted scenario domain (BNP fraud-investigation): one governed
+comms is a promoted scenario domain (BANQUE fraud-investigation): one governed
 outbound-notification action, escalate for comms_admin, deny otherwise.
 """
 

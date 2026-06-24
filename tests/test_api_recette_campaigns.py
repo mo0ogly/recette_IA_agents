@@ -47,8 +47,8 @@ class TestRecetteCampaignCatalog(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)
-        (root / "bnp").mkdir()
-        (root / "bnp" / "demo.campaign.json").write_text(json.dumps(_CAMPAIGN), encoding="utf-8")
+        (root / "banque").mkdir()
+        (root / "banque" / "demo.campaign.json").write_text(json.dumps(_CAMPAIGN), encoding="utf-8")
         # An invalid file must be surfaced, not crash the listing.
         (root / "broken.campaign.json").write_text("{ not json", encoding="utf-8")
         self.catalog = RecetteCampaignCatalog(root)
@@ -57,7 +57,7 @@ class TestRecetteCampaignCatalog(unittest.TestCase):
         items = self.catalog.list()
         self.assertEqual(len(items), 2)
         valid = next(c for c in items if c["id"] == "demo-fraud")
-        self.assertEqual(valid["family"], "bnp")
+        self.assertEqual(valid["family"], "banque")
         self.assertEqual(valid["action_count"], 1)
         self.assertEqual(valid["agent_count"], 1)
         self.assertEqual(valid["objective"], "prove a wire fraud is escalated")
@@ -68,7 +68,7 @@ class TestRecetteCampaignCatalog(unittest.TestCase):
         doc = self.catalog.get("demo-fraud")
         self.assertIsNotNone(doc)
         assert doc is not None
-        self.assertEqual(doc["family"], "bnp")
+        self.assertEqual(doc["family"], "banque")
         self.assertEqual(doc["actions"][0]["expect"], "escalate")
 
     def test_get_unknown_is_none(self) -> None:

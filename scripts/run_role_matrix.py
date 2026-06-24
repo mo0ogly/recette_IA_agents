@@ -7,7 +7,7 @@ deny-by-default). This proves that for each defined role and each catalogued
 action the engine returns exactly ActionSpec.verdict_for_role(role) -- the
 role-specific posture, including capability_overreach denial.
 
-Unlike run_bnp_scenarios.py this harness adds NO extra specs and NO contextual
+Unlike run_banque_scenarios.py this harness adds NO extra specs and NO contextual
 grant bundle: it validates the committed governance posture as shipped.
 
 Usage: python3 scripts/run_role_matrix.py [--dir campaigns/role-matrix]

@@ -1,14 +1,14 @@
-# AgentRail x BNP doc v4.5 alignment -- Implementation Plan
+# AgentRail x BANQUE doc v4.5 alignment -- Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make the BNP Design Partner doc v4.5 coherent with the repo ground truth and current standards: remap OWASP tags to Agentic 2026, add 6 sensitive governed actions to the referential (118 -> 124), reframe the 94% citation as an identity-crypto differentiator, and tighten the gain ranges / risk column.
+**Goal:** Make the BANQUE Design Partner doc v4.5 coherent with the repo ground truth and current standards: remap OWASP tags to Agentic 2026, add 6 sensitive governed actions to the referential (118 -> 124), reframe the 94% citation as an identity-crypto differentiator, and tighten the gain ranges / risk column.
 
 **Architecture:** Two phases. Phase 1 is repo-side and test-driven: the action catalog (`recette/platform/catalog/domains/*`) is the source of truth; `scripts/gen_annex_c_referential.py` holds `ANNEX_C_SOURCE` (a hardcoded tuple of Annex C rows) and ENRICHES each row from the catalog to produce `corpus/referentials/annex-c-governed-actions.json`. An action reaches the referential only if it is in BOTH the catalog AND `ANNEX_C_SOURCE`. Phase 2 edits the .docx (outside the repo, in `~/Downloads`) to match, verified by pandoc re-render + grep.
 
 **Tech Stack:** Python stdlib (unittest), the governed-action catalog, `scripts/gen_annex_c_referential.py`, pandoc + the `docx` skill for the Word file.
 
-**Design:** `docs/plans/2026-06-15-agentrail-bnp-doc-v4.5-alignment-design.md`
+**Design:** `docs/plans/2026-06-15-agentrail-banque-doc-v4.5-alignment-design.md`
 
 ---
 
@@ -220,7 +220,7 @@ Expected: PASS, count == 124, category counts match.
 
 ## PHASE 2 -- docx: align tags, Annex C, synthesis, 94%, gains
 
-> The file is `~/Downloads/AgentRail_BNPParibas_Design_Partner_v4.5.docx` (outside
+> The file is `~/Downloads/AgentRail_BANQUEParibas_Design_Partner_v4.5.docx` (outside
 > the repo). Use the `docx` skill (Skill tool) for structured edits; python-docx
 > may be installed in a disposable venv (authorized, memory:docker-disposable-env-installs-ok).
 > After EACH task, re-render and grep to verify: `pandoc -t markdown <file> | grep ...`.
@@ -283,7 +283,7 @@ a differentiator (design decision 1). Suggested text:
 > leaks"). AgentRail repond precisement a ce mode d'echec en liant chaque action
 > a une identite d'agent cryptographique (Ed25519, non hallucinable) : la
 > mediation runtime ET la liaison d'identite verifiee. Valeur a mesurer sur le
-> perimetre BNP en pilote.
+> perimetre BANQUE en pilote.
 
 Verify: `pandoc -t markdown <file> | grep -i 'integrity leak\|Ed25519\|2603.19328'`.
 

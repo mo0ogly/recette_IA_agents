@@ -1,6 +1,6 @@
 """compliance domain (KYC / regulatory): catalog spec + lab handler tests.
 
-compliance is a promoted scenario domain (BNP kyc-compliance): one governed
+compliance is a promoted scenario domain (BANQUE kyc-compliance): one governed
 KYC-review action, escalate for compliance_admin, deny otherwise.
 """
 

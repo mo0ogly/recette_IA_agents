@@ -1,6 +1,6 @@
 """Run the multi-domain composed campaigns as governed campaigns and check verdicts.
 
-Like scripts/run_bnp_scenarios.py, this harness touches no LLM: every action flows
+Like scripts/run_banque_scenarios.py, this harness touches no LLM: every action flows
 through the real gateway (policy decide -> deny / escalate -> pending / allow ->
 execute), proving the governance posture (ALLOW/ESCALATE/DENY) each campaign claims.
 

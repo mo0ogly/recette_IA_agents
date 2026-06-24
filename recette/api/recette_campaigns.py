@@ -38,7 +38,7 @@ def _campaign_id(doc: dict, path: Path) -> str:
 
 def _summary(doc: dict, path: Path, root: Path) -> dict:
     rel = path.relative_to(root)
-    # Family = first path segment (bnp, coverage, role-matrix, rag) or "root".
+    # Family = first path segment (banque, coverage, role-matrix, rag) or "root".
     family = rel.parts[0] if len(rel.parts) > 1 else "root"
     return {
         "id": _campaign_id(doc, path),

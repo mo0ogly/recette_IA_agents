@@ -1,12 +1,12 @@
 # inspect_ia_agents recette -- local + Docker lab targets.
 # Use the project venv when present (it carries recette + the [api]/[bundle]
-# extras that bnp/system-recette need); fall back to system python3. Override
+# extras that banque/system-recette need); fall back to system python3. Override
 # with `make PY=/path/to/python <target>`.
 PY ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 .PHONY: help install install-check hooks validate run discovery report test gates smoke \
         api docker-build lab lab-down docker-test docker-gates \
         platform-lab platform-e2e platform-down console \
-        bnp role-matrix role-matrix-live coverage-guard rag rag-live rag-kb rag-e2e \
+        banque role-matrix role-matrix-live coverage-guard rag rag-live rag-kb rag-e2e \
         system-recette system-recette-live surface recette
 
 help:
@@ -19,7 +19,7 @@ help:
 	@echo "  make run          identification recette scorecard"
 	@echo "  make discovery    discovery recette (offline reference oracle, all surfaces)"
 	@echo "  make report       aggregate report (identification + all discovery surfaces)"
-	@echo "  make bnp          run the BNP governed-campaign harness (verdict check)"
+	@echo "  make banque          run the BANQUE governed-campaign harness (verdict check)"
 	@echo "  make role-matrix  run the role x action matrix harness (every role x every action)"
 	@echo "  make role-matrix-live  drive each role over its domain via a live Groq LLM"
 	@echo "  make coverage-guard    fail if ANY recette dimension has a gap (single gate)"
@@ -27,7 +27,7 @@ help:
 	@echo "  make rag-live     drive the poisoned knowledge base against a live Groq LLM"
 	@echo "  make rag-kb       list the operator knowledge base (CRUD off the agent path)"
 	@echo "  make rag-e2e      deterministic loop: reset -> apply scenario -> gateway blocks -> reset"
-	@echo "  make recette      full governed recette: guard + validate + run + discovery + bnp + role-matrix + rag"
+	@echo "  make recette      full governed recette: guard + validate + run + discovery + banque + role-matrix + rag"
 	@echo "  make test         full unittest suite"
 	@echo "  make gates        strict ruff + mypy + bandit (.venv-pyaudit)"
 	@echo "  make api          run the Track U API (uvicorn, needs the [api] extra)"
@@ -70,8 +70,8 @@ discovery:
 report:
 	$(PY) -m recette report
 
-bnp:
-	$(PY) scripts/run_bnp_scenarios.py
+banque:
+	$(PY) scripts/run_banque_scenarios.py
 
 role-matrix:
 	$(PY) scripts/run_role_matrix.py
@@ -103,7 +103,7 @@ system-recette:
 system-recette-live:
 	$(PY) scripts/run_system_recette.py --live
 
-recette: coverage-guard validate run discovery bnp role-matrix rag system-recette surface
+recette: coverage-guard validate run discovery banque role-matrix rag system-recette surface
 	@echo "recette: ALL PASS"
 
 test:

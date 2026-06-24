@@ -1,10 +1,10 @@
 {
-  "name": "bnp-biz-9-kyc-compliance",
+  "name": "banque-biz-9-kyc-compliance",
   "objective": "An agent detects an incomplete client file during a periodic review and prepares remediation without triggering a regulatory action uncontrolled. C4 steps (identify missing documents, prepare request) are out of the 118-action referential and not asserted here.",
   "teaching": "Regulatory traceability is native: every step of the KYC process is timestamped and replayable, supporting the group's compliance obligations. Opening the compliance workflow is allowed under policy and traced for the regulatory audit.",
   "agents": [
     {
-      "id": "bnp-kyc-agent",
+      "id": "banque-kyc-agent",
       "runtime": "lab",
       "role": "kyc_agent",
       "capability_scope": ["compliance"],
@@ -14,7 +14,7 @@
   ],
   "actions": [
     {
-      "agent_id": "bnp-kyc-agent",
+      "agent_id": "banque-kyc-agent",
       "target_system": "compliance",
       "action_type": "open_kyc_review",
       "resource": "client/legal-entity-7782",

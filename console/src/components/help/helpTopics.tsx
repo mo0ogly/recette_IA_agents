@@ -149,7 +149,7 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           agent ou un sujet) : l&apos;<strong>objectif</strong> et la{" "}
           <strong>pedagogie</strong>, la liste des <strong>actions</strong> avec
           leur verdict attendu et leur justification, les <strong>agents</strong>
-          semes, et le JSON brut. Une famille (bnp, coverage, role-matrix, rag)
+          semes, et le JSON brut. Une famille (banque, coverage, role-matrix, rag)
           regroupe les campagnes par origine. Un fichier invalide est signale en
           rouge, jamais masque.
         </p>

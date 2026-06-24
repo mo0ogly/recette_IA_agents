@@ -1,6 +1,6 @@
-"""Live Groq recette of ALL BNP campaigns: the model drives, the gateway governs.
+"""Live Groq recette of ALL BANQUE campaigns: the model drives, the gateway governs.
 
-For every campaign in campaigns/bnp/, this exposes exactly that campaign's
+For every campaign in campaigns/banque/, this exposes exactly that campaign's
 actions as tools (built directly from the campaign, bypassing the Lane B
 build_tools catalog so even mcp/comms/compliance/github-gov actions are
 reachable), runs a live Groq agent, and submits each action the model calls
@@ -9,13 +9,13 @@ expected verdict.
 
 The governance verdict is deterministic given (role, action); Groq only chooses
 WHICH action to attempt. So this proves a live model exercises the governed path
-and lands the BNP-expected verdict -- without scripting the action list.
+and lands the BANQUE-expected verdict -- without scripting the action list.
 
 NON-deterministic (live model): a campaign step the model never proposes is
 reported as "not reached", not a failure. A forbidden action that EXECUTES is a
 hard failure (exit 1). Key via per-backend secret store (R8), env fallback.
 
-Usage: python3 scripts/run_bnp_live_all.py [--model llama-3.3-70b-versatile]
+Usage: python3 scripts/run_banque_live_all.py [--model llama-3.3-70b-versatile]
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from run_bnp_scenarios import (  # noqa: E402
+from run_banque_scenarios import (  # noqa: E402
     BUNDLE_VERSION,
     _StubProxy,
     build_bundle,
@@ -117,8 +117,8 @@ def _drive(llm: LlmBackend, doc: dict, tools: list[ToolSpec], max_steps: int) ->
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="run_bnp_live_all")
-    parser.add_argument("--dir", default="campaigns/bnp")
+    parser = argparse.ArgumentParser(prog="run_banque_live_all")
+    parser.add_argument("--dir", default="campaigns/banque")
     parser.add_argument("--model", default="llama-3.3-70b-versatile")
     parser.add_argument("--backend-id", default="groq-llama-3.3-70b")
     parser.add_argument("--max-steps", type=int, default=6)

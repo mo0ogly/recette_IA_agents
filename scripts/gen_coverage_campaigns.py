@@ -9,7 +9,7 @@ engine/catalog produce the documented verdict for each one.
 
 No EXTRA_SPECS/EXTRA_RULES needed: baseline_from_catalog already materializes the
 privileged-role rule for every governed action, and pure-deny rows fall to the
-catalog default. So run_bnp_scenarios.py validates these as-is.
+catalog default. So run_banque_scenarios.py validates these as-is.
 
 Usage: python3 scripts/gen_coverage_campaigns.py [--out campaigns/coverage]
 """

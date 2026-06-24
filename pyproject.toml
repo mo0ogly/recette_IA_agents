@@ -88,7 +88,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Diagram i18n map: fr->en label lines are long unsplittable string literals.
 "scripts/diagrams/architecture_i18n.py" = ["E501"]
 # Script entrypoint: recette imports follow a sys.path bootstrap (run-as-script).
-"scripts/run_bnp_scenarios.py" = ["E402"]
+"scripts/run_banque_scenarios.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

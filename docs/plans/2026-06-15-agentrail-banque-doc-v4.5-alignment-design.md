@@ -1,8 +1,8 @@
-# Design: align AgentRail x BNP Paribas Design Partner doc (v4.5) with the code + standards
+# Design: align AgentRail x BANQUE Paribas Design Partner doc (v4.5) with the code + standards
 
 Date: 2026-06-15
 Status: APPROVED (brainstorm)
-Source doc: `~/Downloads/AgentRail_BNPParibas_Design_Partner_v4.5.docx` (outside repo)
+Source doc: `~/Downloads/AgentRail_BANQUEParibas_Design_Partner_v4.5.docx` (outside repo)
 Repo ground truth: `corpus/referentials/annex-c-governed-actions.json`, `recette/platform/catalog/domains/*`
 
 ## Objective
@@ -11,7 +11,7 @@ The v4.5 partner doc added: a C1-C4 criticality model (1.1), a "niveau de
 risque" column, MITRE/OWASP tags per use case, 12 governed use cases (UC01-12),
 pilot KPIs (1.4), and a 118-action referential synthesis (1.5, detail in Annex
 C). Brainstorm verdict: the content is strong but has three credibility/coherence
-gaps that a BNP technical reviewer (RSSI, conformite) would catch. This design
+gaps that a BANQUE technical reviewer (RSSI, conformite) would catch. This design
 fixes them. Scope chosen by the operator: critique credibility + align with code
 + enrich.
 

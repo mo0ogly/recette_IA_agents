@@ -1,11 +1,11 @@
 {
-  "family": "bnp",
-  "name": "bnp-biz-8-fraud-investigation",
+  "family": "banque",
+  "name": "banque-biz-8-fraud-investigation",
   "objective": "A monitoring agent detects an atypical card transaction sequence and works the case end to end. Only the act with direct customer impact (an amount above the autonomy threshold) is escalated; the rest runs immediately. C4 steps (qualify alert, open case) are out of the 118-action referential and not asserted here.",
   "teaching": "The agent handles the case in minutes; the human steps in only on the customer-impacting act, with a full decision context provided by inspect_ia_agents. Regulatory traceability is native: every step is timestamped and replayable.",
   "agents": [
     {
-      "id": "bnp-fraud-monitor",
+      "id": "banque-fraud-monitor",
       "runtime": "lab",
       "role": "fraud_monitor",
       "capability_scope": [
@@ -18,7 +18,7 @@
   ],
   "actions": [
     {
-      "agent_id": "bnp-fraud-monitor",
+      "agent_id": "banque-fraud-monitor",
       "target_system": "finance",
       "action_type": "freeze_operation",
       "resource": "operation/card-tx-88213",
@@ -31,7 +31,7 @@
       "rationale": "C3 amount above the autonomy threshold (5000 EUR) -> escalate: queued in Temporal, analyst validation, then execution."
     },
     {
-      "agent_id": "bnp-fraud-monitor",
+      "agent_id": "banque-fraud-monitor",
       "target_system": "comms",
       "action_type": "notify_customer",
       "resource": "customer/4471",

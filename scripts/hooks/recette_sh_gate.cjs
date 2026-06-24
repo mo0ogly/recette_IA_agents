@@ -54,7 +54,7 @@ const RULES = [
   { re: /\bmake\s+(test|gates|validate|run|discovery|report)\b/, eq: "./recette.sh <same target>" },
   { re: /\bvitest\b/, eq: "./recette.sh console-test" },
   { re: /\b(tsc|vite\s+build)\b/, eq: "./recette.sh console-build" },
-  { re: /\bnpm\s+(run\s+build|test|run\s+test)\b/, eq: "./recette.sh console-build / console-test" },
+  { re: /\banquem\s+(run\s+build|test|run\s+test)\b/, eq: "./recette.sh console-build / console-test" },
   { re: /\bcargo\s+(build|test|clippy)\b/, eq: "./recette.sh (add a rust target to cicd/checks.sh first)" },
   { re: /\bpython3?\s+-m\s+recette\s+(validate|run|discovery|report)\b/, eq: "./recette.sh <same target>" },
 ];

@@ -1,7 +1,7 @@
 """Live: a real Groq LLM, cast as a given role, is pushed to overreach; the
 governed gateway decides every proposed action over the COMMITTED catalog.
 
-Companion to run_role_matrix.py (deterministic) and run_bnp_live_groq.py (BNP
+Companion to run_role_matrix.py (deterministic) and run_banque_live_groq.py (BANQUE
 scenarios). Here a live model plays each privileged role and is goaded into
 attempting the full range of its domain plus out-of-mandate actions. Every action
 it proposes is submitted to the same governed gateway (committed catalog +
