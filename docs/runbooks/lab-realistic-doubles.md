@@ -229,9 +229,16 @@ chaos malformee retombe sur OFF (le lab doit toujours servir), jamais un crash.
 Le hook est dans `mock_server.py` : la faute court-circuite AVANT `dispatch`, donc
 l'agent voit un 429/503/504 et doit emprunter son chemin fail-safe. Tests :
 `tests/test_lab_chaos.py` (11 cas : off-par-defaut, clamp, determinisme, split
-partiel, choix de statut). Preuve live : un POST okta sous `error_rate:1.0`
-retourne HTTP 503 enveloppe `service_unavailable` ; un systeme a `error_rate:0`
-passe en 200.
+partiel, choix de statut).
+
+**Preuve fail-safe live (A1)** : `scripts/smoke_chaos.py` (dans `./recette.sh smoke`)
+monte un mock avec chaos ON pour `okta` (503) et OFF pour `finance`, pilote un effet
+de bord via le MEME `LabHttpProxy` que la plateforme (I5), et asserte la propriete
+des failure-modes : sous 503 -> `ExecutionResult.ok == False`, statut 503, erreur
+surfacee, et **AUCUN `side_effect_hash`** (le proxy ne fabrique PAS un succes : pas
+d'effet a auditer, pas d'execution optimiste, failure-modes.md I5/I6) ; le systeme
+sans faute -> `ok == True`, 200, un `side_effect_hash`. C'est ce qui transforme le
+chaos de "construit + teste unitairement" a "comportement fail-safe prouve live".
 
 ## Honeypot sink shadow_db -- destination d'exfil (#3)
 

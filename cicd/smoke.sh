@@ -45,6 +45,15 @@ hdr "SMOKE e2e lab"
 _rc=0
 "$(py)" "${REPO_ROOT}/scripts/smoke_lab.py" --api "http://${API_HOST}:${API_PORT}" "$@" || _rc=$?
 
+# Chaos fail-safe smoke (A1): self-contained (spins its own mock server), proves
+# the governed proxy surfaces an INFRA fault instead of fabricating success.
+# Independent of the API, so it runs even if the lab smoke above had issues.
+hdr "SMOKE chaos fail-safe"
+_rc_chaos=0
+"$(py)" "${REPO_ROOT}/scripts/smoke_chaos.py" || _rc_chaos=$?
+[ "${_rc_chaos}" -eq 0 ] && ok "CHAOS SMOKE PASS" || err "CHAOS SMOKE FAIL (exit ${_rc_chaos})"
+[ "${_rc}" -eq 0 ] && _rc="${_rc_chaos}"
+
 if [ "${_rc}" -eq 0 ]; then
     ok "SMOKE PASS"
 else
