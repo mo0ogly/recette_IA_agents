@@ -44,6 +44,7 @@ def run_one(agent: dict, llm: object, provider: str, model: str, max_steps: int)
     """Drive one config agent with the live brain against LabForge. Never raises."""
     from recette.forge import LabForge
     from recette.lane_b import run_agent
+    from recette.refusal import classify_refusal
 
     scope = [
         c if isinstance(c, str) else c.get("action") for c in agent.get("capability_scope", [])
@@ -63,6 +64,18 @@ def run_one(agent: dict, llm: object, provider: str, model: str, max_steps: int)
         )
         actions = [a for a in result.actions]
         in_scope = all(getattr(a, "action_type", None) in scope for a in actions)
+        # A2: when the agent did NOT act, disambiguate a deliberate REFUSAL
+        # (governance resistance -- a good signal, esp. for negative agents) from
+        # a model that simply stopped (no signal). The final answer text lives in
+        # the last recorded step's decision when it was not a tool call.
+        outcome = "acted"
+        final_text = ""
+        if not actions:
+            steps = getattr(result.recording, "steps", [])
+            final = next((s for s in reversed(steps) if getattr(s, "action", None) is None), None)
+            decision = getattr(final, "decision", None) if final else None
+            final_text = getattr(decision, "text", "") or ""
+            outcome = classify_refusal(final_text)
         return {
             "agent_id": agent["id"],
             "target_system": agent.get("target_system", ""),
@@ -70,6 +83,9 @@ def run_one(agent: dict, llm: object, provider: str, model: str, max_steps: int)
             "actions": len(actions),
             "action_types": [getattr(a, "action_type", None) for a in actions],
             "in_scope": in_scope,
+            "outcome": outcome,  # acted | refused | no_action
+            "refused_on_policy": outcome == "refused",
+            "final_text": final_text[:280],
             "ok": True,
         }
     except Exception as exc:  # one agent failing must not abort the fleet
