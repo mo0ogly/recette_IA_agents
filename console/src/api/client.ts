@@ -1099,11 +1099,41 @@ export interface WireEndpoint {
 }
 
 /** POST /probe/capture result: the broker recording + (when ok) its scorecard. */
+/** One logging recommendation the discovery emits for an agent: what to log + why,
+ *  tiered alert | warn | info. */
+export interface LoggingRecommendation {
+  severity: "alert" | "warn" | "info";
+  log: string;
+  why: string;
+}
+
+/** The discovery's per-agent analysis (its job): PLANNED (declared) vs SAID
+ *  (decided) vs DONE (kernel-seen) coherence + what to log. */
+export interface AgentAnalysis {
+  agent_id: string;
+  identified: boolean;
+  seen_kinds: string[];
+  planned: { systems: string[]; scope: string[] };
+  said: { actions: string[] } | null;
+  done: {
+    dialed_servers: string[];
+    undeclared_egress: string[];
+    undeclared_dns: string[];
+    process_spawned: boolean;
+    sensitive_opens: string[];
+  };
+  coherent: boolean;
+  logging_recommendations: LoggingRecommendation[];
+  analysis: string;
+}
+
 export interface ProbeCaptureResult {
   recording: BrokerRecording;
   scorecard?: DetectionScorecard;
   wire_named?: Record<string, WireEndpoint[]>;
   undeclared_hosts?: string[];
+  undeclared_dns?: string[];
+  agent_analysis?: AgentAnalysis[];
 }
 
 /** POST /probe/process-capture-campaign result: every mock-capable step spawned
