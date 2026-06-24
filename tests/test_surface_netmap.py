@@ -9,6 +9,7 @@ import unittest
 from recette.surface.netmap import (
     annotate_connect,
     annotate_recording,
+    annotate_token,
     build_endpoint_map,
 )
 
@@ -17,6 +18,76 @@ SERVERS: list[dict] = [
     {"id": "okta-mock", "system": "okta", "mode": "mock_local", "port": 9102},
     {"id": "real-oai", "system": "openai", "mode": "declared_url", "url": "https://api.openai.com"},
 ]
+
+
+class AnnotateTokenKindsTest(unittest.TestCase):
+    """#4: all surface kinds are classified, not just connect."""
+
+    EM = {"127.0.0.1:9102": "okta-mock"}
+    DNS = {"okta.acme.internal"}
+
+    def test_connect_declared_and_undeclared(self) -> None:
+        a = annotate_token("connect:127.0.0.1:9102", self.EM, self.DNS)
+        self.assertEqual((a["kind"], a["name"], a["undeclared"]), ("connect", "okta-mock", False))
+        b = annotate_token("connect:8.8.8.8:443", self.EM, self.DNS)
+        self.assertEqual((b["kind"], b["undeclared"]), ("connect", True))
+
+    def test_dns_known_and_exfil(self) -> None:
+        ok = annotate_token("dns:okta.acme.internal", self.EM, self.DNS)
+        self.assertEqual((ok["kind"], ok["undeclared"]), ("dns", False))
+        # a subdomain of a declared name is allowed
+        sub = annotate_token("dns:api.okta.acme.internal", self.EM, self.DNS)
+        self.assertFalse(sub["undeclared"])
+        bad = annotate_token("dns:evil.attacker.com", self.EM, self.DNS)
+        self.assertEqual((bad["kind"], bad["undeclared"]), ("dns", True))
+
+    def test_open_category(self) -> None:
+        self.assertEqual(annotate_token("open:/usr/lib/x.so", {}, set())["category"], "sys-lib")
+        self.assertEqual(
+            annotate_token("open:/a/site-packages/m.py", {}, set())["category"], "venv"
+        )
+        self.assertEqual(annotate_token("open:/x/recette/y.py", {}, set())["category"], "repo")
+        self.assertEqual(annotate_token("open:/etc/hosts", {}, set())["category"], "etc")
+
+    def test_fork_is_process_signal(self) -> None:
+        a = annotate_token("fork:1234", {}, set())
+        self.assertEqual((a["kind"], a["category"]), ("fork", "process"))
+
+    def test_unknown_kind_passes_through(self) -> None:
+        a = annotate_token("weird:thing", {}, set())
+        self.assertEqual((a["kind"], a["undeclared"]), ("other", False))
+
+
+class AnnotateRecordingSurfacesTest(unittest.TestCase):
+    """#4: recording-level signals across surfaces (dns exfil, fork, summary)."""
+
+    def test_dns_exfil_and_fork_and_summary(self) -> None:
+        servers = [
+            {"id": "okta-mock", "mode": "mock_local", "port": 9102, "fqdn": "okta.acme.internal"}
+        ]
+        recording = {
+            "recordings": [
+                {
+                    "agent_id": "bot",
+                    "surfaces": {
+                        "ebpf_wire": [
+                            "connect:127.0.0.1:9102",
+                            "dns:okta.acme.internal",
+                            "dns:exfil.evil.com",
+                            "open:/usr/lib/x.so",
+                            "fork:99",
+                        ]
+                    },
+                }
+            ]
+        }
+        out = annotate_recording(recording, servers)
+        self.assertEqual(out["undeclared_dns"], ["exfil.evil.com"])
+        self.assertEqual(out["process_signals"], {"bot": 1})
+        self.assertEqual(out["surface_summary"], {"connect": 1, "dns": 2, "fork": 1, "open": 1})
+        # v1 contract preserved
+        self.assertIn("bot", out["wire_named"])
+        self.assertEqual(out["undeclared_hosts"], [])
 
 
 class BuildEndpointMapTest(unittest.TestCase):
@@ -100,7 +171,15 @@ class AnnotateRecordingTest(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_skipped_recording_is_empty_annotation(self) -> None:
+        # The v1 contract keys stay present + empty; the #4 additive keys
+        # (undeclared_dns / process_signals / surface_summary) are empty too.
         self.assertEqual(
             annotate_recording({"status": "skipped", "recordings": []}, SERVERS),
-            {"wire_named": {}, "undeclared_hosts": []},
+            {
+                "wire_named": {},
+                "undeclared_hosts": [],
+                "undeclared_dns": [],
+                "process_signals": {},
+                "surface_summary": {},
+            },
         )
