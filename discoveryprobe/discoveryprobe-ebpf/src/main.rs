@@ -24,7 +24,9 @@ use aya_ebpf::{
     maps::RingBuf,
     programs::TracePointContext,
 };
-use discoveryprobe_common::{ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent, PATH_LEN, QNAME_LEN};
+use discoveryprobe_common::{
+    ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent, PATH_LEN, QNAME_LEN,
+};
 
 /// Ring buffer the userspace loader drains (256 KiB: power-of-two page multiple).
 #[map]
@@ -106,14 +108,17 @@ const DNS_PORT_BE: u16 = 53u16.to_be();
 /// arcount) before the QNAME labels begin.
 const DNS_HEADER_LEN: usize = 12;
 
-/// Maximum number of QNAME labels the bounded parse will walk. A constant so
-/// the verifier sees a fixed loop bound; 8 labels covers realistic hostnames
-/// (`a.b.c.d.e.f.g.h`), and a longer name is simply truncated (passive).
-const MAX_LABELS: usize = 8;
+/// Maximum number of payload bytes the QNAME parse will walk in its single
+/// fixed-trip loop. A constant so the verifier sees a fixed loop bound; 128
+/// bytes covers realistic hostnames (a DNS name is at most 253 bytes, but real
+/// API/agent hosts are far shorter), and a longer name is simply truncated
+/// (passive). Kept small enough that the flat parse stays well under the
+/// verifier instruction budget on a strict (kernel 6.17) verifier.
+const MAX_QNAME_BYTES: usize = 128;
 
 /// Maximum bytes of a single DNS label per the RFC (a length byte is 6 bits of
-/// length when the top two bits are 0). The parse bounds each label copy to
-/// this AND to the remaining output buffer.
+/// length when the top two bits are 0). A length byte above this is a
+/// compression pointer or malformed, and stops the parse.
 const MAX_LABEL_LEN: usize = 63;
 
 #[tracepoint]
@@ -312,61 +317,63 @@ fn try_capture_dns(ctx: &TracePointContext) -> Result<(), i64> {
         return Err(0);
     }
 
-    // 3. Walk the length-prefixed labels into a dotted name, ALL bounds constant
-    // so the verifier accepts every read offset and copy length. `out_len` and
-    // every index are masked with `& (QNAME_LEN - 1)` (QNAME_LEN is a power of
-    // two) so each write is provably inside `qname`. `payload_off` runs over the
-    // payload starting at the header; it is bounded by `MAX_LABELS * (1 +
-    // MAX_LABEL_LEN)` which is a small constant.
+    // 3. Walk the length-prefixed labels into a dotted name with a SINGLE
+    // fixed-trip loop over the payload bytes. The payload offset is the loop
+    // index plus the header length (`DNS_HEADER_LEN + i`), so the walk advances
+    // exactly one byte per iteration. This flat form keeps the verifier state
+    // small: the earlier nested form (outer label loop x inner copy loop, with a
+    // running `out_len` accumulator and four break points) exploded to >1M
+    // instructions / ~20k states on the kernel 6.17 verifier and the program was
+    // rejected ("BPF program is too large"). One loop, one branch on
+    // `label_remaining`, removes that combinatorial blow-up while preserving the
+    // dotted-name output and the passive-truncation semantics.
+    //
+    // `out_len` index is masked with `& (QNAME_LEN - 1)` (QNAME_LEN is a power
+    // of two) so every write is provably inside `qname`. The trip count
+    // `MAX_QNAME_BYTES` bounds the payload walk to a small constant; a longer
+    // name is simply truncated (passive).
     let mut qname = [0u8; QNAME_LEN];
     let mut out_len: usize = 0;
-    let mut payload_off: usize = DNS_HEADER_LEN;
+    // Bytes still to copy in the current label; 0 means the next byte read is a
+    // length byte (the start of a new label).
+    let mut label_remaining: usize = 0;
     let mut parsed_any = false;
 
-    for _ in 0..MAX_LABELS {
-        // Read the label length byte at the running payload offset.
-        // SAFETY: fallible userspace read; a bad address returns Err. The
-        // offset is bounded by a small constant (MAX_LABELS * 64).
-        let len_byte = unsafe { bpf_probe_read_user::<u8>(buff.wrapping_add(payload_off))? };
-        let label_len = len_byte as usize;
-        if label_len == 0 {
-            // Root label: end of QNAME.
+    for i in 0..MAX_QNAME_BYTES {
+        if out_len >= QNAME_LEN - 1 {
+            // Leave room for the trailing NUL.
             break;
         }
-        if label_len > MAX_LABEL_LEN {
-            // Compression pointer (top bits set) or malformed length: stop.
-            break;
-        }
-        if parsed_any {
-            // Separator between labels. Mask the index to a constant bound.
-            let idx = out_len & (QNAME_LEN - 1);
-            qname[idx] = b'.';
-            out_len += 1;
-        }
-        // Copy `label_len` bytes, but the loop trip count is a CONSTANT
-        // (MAX_LABEL_LEN); inner steps past `label_len` are skipped, and every
-        // write index is masked to a constant bound for the verifier.
-        let mut i: usize = 0;
-        while i < MAX_LABEL_LEN {
-            if i >= label_len {
+        // SAFETY: fallible userspace read at a constant-bounded offset: the
+        // index `i` is bounded by MAX_QNAME_BYTES, so the offset stays within
+        // DNS_HEADER_LEN + MAX_QNAME_BYTES.
+        let payload_off = DNS_HEADER_LEN + i;
+        let byte = unsafe { bpf_probe_read_user::<u8>(buff.wrapping_add(payload_off))? };
+
+        if label_remaining == 0 {
+            // `byte` is a label-length byte.
+            if byte == 0 {
+                // Root label: end of QNAME.
                 break;
             }
-            // Leave room for the trailing NUL: stop one short of the buffer.
-            if out_len >= QNAME_LEN - 1 {
+            if byte as usize > MAX_LABEL_LEN {
+                // Compression pointer (top bits set) or malformed length: stop.
                 break;
             }
-            let src_off = payload_off + 1 + i;
-            // SAFETY: fallible userspace read at a constant-bounded offset.
-            let byte = unsafe { bpf_probe_read_user::<u8>(buff.wrapping_add(src_off))? };
+            if parsed_any {
+                // Separator between labels. Mask the index to a constant bound.
+                let idx = out_len & (QNAME_LEN - 1);
+                qname[idx] = b'.';
+                out_len += 1;
+            }
+            label_remaining = byte as usize;
+            parsed_any = true;
+        } else {
+            // `byte` is a label content byte. Mask the index to a constant bound.
             let idx = out_len & (QNAME_LEN - 1);
             qname[idx] = byte;
             out_len += 1;
-            i += 1;
-        }
-        parsed_any = true;
-        payload_off += 1 + label_len;
-        if out_len >= QNAME_LEN - 1 {
-            break;
+            label_remaining -= 1;
         }
     }
 
