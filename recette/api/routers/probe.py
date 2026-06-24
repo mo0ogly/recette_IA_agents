@@ -21,7 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ...surface.agent_analysis import analyze_recording
+from ...surface.agent_analysis import analyze_recording, declared_view
 from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
@@ -44,21 +44,13 @@ def _attach_wire_names(result: dict, request: Request) -> dict:
     # The discovery's job: for every agent seen, compare what it was PLANNED to do
     # (declared scope + systems) vs what it DID (the kernel wire) and recommend what
     # to log, so the integrated console can report it in detail.
-    declared_by_agent: dict[str, dict] = {}
-    for agent_id in annotated.get("wire_named", {}):
-        agent = store.get_agent(str(agent_id)) or {}
-        scope = [
-            c if isinstance(c, str) else c.get("action") for c in agent.get("capability_scope", [])
-        ]
-        # netmap resolves a dialed endpoint to the SERVER id (e.g. gh-mock), so the
-        # PLANNED set is the agent's BOUND server id -- the one it is allowed to
-        # dial -- not the target_system (github). A dialed server id outside this
-        # set is capability/network drift.
-        bound = agent.get("server")
-        declared_by_agent[str(agent_id)] = {
-            "scope": [s for s in scope if s],
-            "systems": [bound] if bound else [],
-        }
+    # declared_view derives the PLANNED set (bound server id, not target_system) and
+    # cables SAID (decided action_types) from each agent's scenario -- pure (I4),
+    # tested in tests.test_agent_analysis without importing this router.
+    declared_by_agent: dict[str, dict] = {
+        str(agent_id): declared_view(store.get_agent(str(agent_id)) or {})
+        for agent_id in annotated.get("wire_named", {})
+    }
     result["agent_analysis"] = analyze_recording(annotated, declared_by_agent=declared_by_agent)
     return result
 

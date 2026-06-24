@@ -49,6 +49,8 @@ describe("AgentAnalysisPanel", () => {
           undeclared_dns: [],
           process_spawned: false,
           sensitive_opens: [],
+          credential_opens: [],
+          doh_egress: [],
         },
         coherent: false,
         logging_recommendations: [
@@ -66,6 +68,47 @@ describe("AgentAnalysisPanel", () => {
     expect(screen.getByText("ALERT")).toBeInTheDocument();
     expect(
       screen.getByText("egress connect to UNDECLARED host 8.8.8.8:443"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders credential-leave and DoH-tunnel signals in the DONE column", () => {
+    const hardened: AgentAnalysis[] = [
+      {
+        agent_id: "exfil-bot",
+        identified: true,
+        seen_kinds: ["connect", "open"],
+        planned: { systems: ["gh-mock"], scope: ["read_repo"] },
+        said: { actions: ["read_repo"] },
+        done: {
+          dialed_servers: ["gh-mock"],
+          undeclared_egress: ["8.8.8.8:443"],
+          undeclared_dns: [],
+          process_spawned: false,
+          sensitive_opens: [],
+          credential_opens: ["/home/bot/.aws/credentials"],
+          doh_egress: ["8.8.8.8"],
+        },
+        coherent: false,
+        logging_recommendations: [
+          {
+            severity: "alert",
+            log: "credential/secret file access /home/bot/.aws/credentials",
+            why: "secret-material read (ATLAS AML.T0055) -- exfil-prep, never routine I/O",
+          },
+          {
+            severity: "alert",
+            log: "egress to public DNS resolver 8.8.8.8:443",
+            why: "DNS-over-HTTPS covert channel -- tunneling exfil past a port-53 allow-list",
+          },
+        ],
+        analysis: "DIVERGENT: 1 credential leave(s), 1 DoH resolver(s).",
+      },
+    ];
+    render(<AgentAnalysisPanel analysis={hardened} />);
+    expect(screen.getByText("CREDENTIAL /home/bot/.aws/credentials")).toBeInTheDocument();
+    expect(screen.getByText("DoH 8.8.8.8:443")).toBeInTheDocument();
+    expect(
+      screen.getByText("credential/secret file access /home/bot/.aws/credentials"),
     ).toBeInTheDocument();
   });
 });

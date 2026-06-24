@@ -1121,6 +1121,8 @@ export interface AgentAnalysis {
     undeclared_dns: string[];
     process_spawned: boolean;
     sensitive_opens: string[];
+    credential_opens: string[];
+    doh_egress: string[];
   };
   coherent: boolean;
   logging_recommendations: LoggingRecommendation[];
