@@ -1,0 +1,19 @@
+flowchart LR
+  subgraph RECETTE["Plateforme de recette (ce repo)"]
+    CORPUS["Corpus ground-truth<br/>agents + repos"]
+    PLATFORM["Plateforme d'execution<br/>console + API + lab simule"]
+    HARNESS["Harnais<br/>discovery + identification"]
+    SCORE["Scorecards<br/>detection rate, accuracy par dimension"]
+  end
+  subgraph SUT["Outils sous test (externes, equipe discovery)"]
+    DISCO["Outil Discovery<br/>scanner de repos"]
+    IDENT["Outil Identification<br/>juge 4 dimensions"]
+  end
+  CORPUS --> HARNESS
+  PLATFORM -->|"agents vivants, traces"| HARNESS
+  HARNESS -->|"sujets a verite connue"| DISCO
+  HARNESS -->|"action-logs + manifests"| IDENT
+  DISCO -->|"detections"| HARNESS
+  IDENT -->|"verdicts"| HARNESS
+  HARNESS --> SCORE
+  CORPUS -.->|"verite attendue"| SCORE

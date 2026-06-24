@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph AGENT["Agent vivant (servi par SKYNET)"]
+    PROC["process agent<br/>(pid, comm, fork-chain)"]
+  end
+  subgraph KERN["Noyau Linux -- tracepoints eBPF"]
+    T1["sched_process_exec<br/>exec:{comm}:{pid}"]
+    T2["sys_enter_connect<br/>connect:{ip}:{port}"]
+    T3["sys_enter_sendto :53<br/>dns:{qname}"]
+    T4["sys_enter_openat<br/>open:{path}"]
+  end
+  subgraph PROBE["discoveryprobe (Rust + aya)"]
+    BROKER["broker priv-separe<br/>seul a porter CAP_BPF"]
+    MAP["mapping pur (I4)<br/>attribue par pid / comm / ppid"]
+    SURF["surface ebpf_wire<br/>tokens deterministes"]
+  end
+  SCORE["DetectionScorecard<br/>(meme scorecard que le hook/wire)"]
+  CONF["Conformite : sonde-reference<br/>vs outil discovery REEL de l'equipe"]
+  PROC --> T1 & T2 & T3 & T4
+  T1 & T2 & T3 & T4 --> BROKER
+  BROKER --> MAP --> SURF --> SCORE
+  SCORE --> CONF

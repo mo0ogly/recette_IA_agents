@@ -1,0 +1,8 @@
+flowchart LR
+  DECL["DECLARE<br/>(captation statique :<br/>manifest, scope, principal)"]
+  OBS["OBSERVE<br/>(captation runtime + audit :<br/>actions, principal reel, approbations)"]
+  DECL -->|"principal declare vs principal observe"| D1["Dim 1 : Identite (I3)"]
+  DECL -->|"scope declare vs actions observees"| D2["Dim 2 : Capabilities"]
+  OBS -->|"actions escalate avec/sans approved"| D3["Dim 3 : Policy (I6)"]
+  OBS -->|"frequence, repetition, hors-role"| D4["Dim 4 : Comportement"]
+  D1 & D2 & D3 & D4 --> V["Verdict correct/incorrect<br/>vs ground-truth"]

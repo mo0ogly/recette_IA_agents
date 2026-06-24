@@ -1,0 +1,14 @@
+{
+  "name": "inspect-ia-agents-deck",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Source for the inspect_ia_agents presentation decks (technical + plain-language).",
+  "scripts": {
+    "build": "node build.js",
+    "build:simple": "node build-simple.js",
+    "build:all": "node build.js && node build-simple.js"
+  },
+  "dependencies": {
+    "docx": "9.6.1"
+  }
+}

@@ -1,0 +1,24 @@
+flowchart TB
+  AGENT["Agent / console / curl"] --> GW
+  subgraph CONTROL["Control Plane"]
+    GW["Gateway (gateway.py)<br/>resolve agent -> normalize -><br/>PlatformActionEvent"]
+    POL["Policy Engine (policy/)<br/>decide(event, policy) PURE<br/>deny-by-default, versions"]
+    APP["Approvals (approvals/)<br/>state machine<br/>pending->approved/denied/timeout"]
+    GW --> POL
+    POL -->|"escalate"| APP
+  end
+  subgraph DATA["Data Plane"]
+    PROXY["ExternalSystemProxy (proxy/)<br/>seul contact externe<br/>produit side_effect_hash"]
+    LAB2["Lab mock :8082<br/>16 domaines, handlers purs (doubles realistes)"]
+    PROXY --> LAB2
+  end
+  subgraph AUDIT["Audit Plane"]
+    ES["EventStore SQLite<br/>INSERT-only, triggers anti-UPDATE/DELETE<br/>hash chain, WAL"]
+  end
+  SCHED["Scheduler (G8)<br/>opt-in INSPECT_IA_AGENTS_SCHEDULER<br/>hors decision (I4), fail-safe"]
+  POL -->|"allow / approved"| PROXY
+  POL -->|"deny"| ES
+  GW -->|"chaque transition"| ES
+  PROXY -->|"action_executed + hash"| ES
+  SCHED -->|"sweep timeouts -> TIMEOUT (I6)"| APP
+  SCHED -.->|"flush realtime buffer (vue derivee I1)"| PROXY

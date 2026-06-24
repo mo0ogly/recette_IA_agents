@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph AGENTS["Agents (Lane B)"]
+    A1["Agent mock<br/>scenario stocke"]
+    A2["Agent IA reelle<br/>ai_backend + cle env"]
+  end
+  ROUTE{"binding server<br/>de l'agent ?"}
+  REG["Registre de serveurs (config)<br/>mock_local / declared_url / real_saas"]
+  subgraph SRV["Serveurs en face"]
+    direction TB
+    LF["LabForge<br/>in-memory, in-process"]
+    LAB["Mock servers mock_local (config-driven, 12 serveurs :9101-9112)<br/>16 domaines: github gitlab okta finance support_desk slack cloud<br/>hris legal_dms product_cms data_platform crm knowledge_base mcp comms compliance<br/>doubles realistes (champs metier, 422 si invalide), deterministes<br/>POST /system/execute, access log JSONL + /health"]
+    DECL["Serveur declare (declared_url)<br/>meme contrat wire que le lab"]
+    REAL["SaaS reels (real_saas)<br/>pas de proxy encore : run FAIL<br/>jamais de fallback (I5)"]
+  end
+  subgraph DPLANE["Discovery / Enrichment Plane"]
+    DM["Mock discovery :8081<br/>sources / scan-runs / risks"]
+    DR["Service discovery REEL<br/>du collegue (http_adapter)"]
+  end
+  A1 --> ROUTE
+  A2 --> ROUTE
+  ROUTE -->|"aucun"| LF
+  ROUTE -->|"server=id"| REG
+  REG -->|"ProxyForge, vrai HTTP"| LAB
+  REG -->|"ProxyForge, vrai HTTP"| DECL
+  REG -.->|"ValueError"| REAL
+  GW2["Gateway gouvernee<br/>(section 8)"] -->|"proxy I5, HTTP"| LAB
+  HARN2["Harnais discovery"] -->|"memes routes REST"| DM
+  HARN2 -->|"INSPECT_IA_AGENTS_DISCOVERY_URL"| DR

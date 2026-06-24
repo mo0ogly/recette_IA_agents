@@ -1,0 +1,24 @@
+flowchart TB
+  subgraph T1["1. AVANT execution -- surface statique (source)"]
+    SRC["Repo / artefact publie"]
+    S1["manifest .inspect_ia_agents/manifest.json"]
+    S2["code : import du SDK github/gitlab"]
+    S3["temporalio : @activity.defn (AST)"]
+    S4["openapi.json : operationId"]
+    S5["manifest MCP"]
+    SRC --- S1 & S2 & S3 & S4 & S5
+  end
+  subgraph T2["2. PENDANT execution -- surface runtime (serveur/reseau)"]
+    W1["trafic API vers le systeme cible"]
+    W2["usage de credentials : QUEL principal,<br/>QUEL token appelle"]
+    W3["frequence / pattern d'appels"]
+  end
+  subgraph T3["3. APRES / EN CONTINU -- surface evenementielle (audit)"]
+    E1["action-log ordonne (AgentAction)"]
+    E2["recordings rejouables (I4)"]
+    E3["event store gouverne :<br/>policy_decision, approval_state,<br/>side_effect_hash (I1)"]
+  end
+  DISCO2["Moteur discovery"]
+  T1 -->|"identite + capabilities DECLAREES"| DISCO2
+  T2 -->|"identite + actions REELLES"| DISCO2
+  T3 -->|"comportement complet, rejouable"| DISCO2
