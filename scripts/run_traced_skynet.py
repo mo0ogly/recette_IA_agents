@@ -26,6 +26,7 @@ if str(_ROOT) not in sys.path:
 _BASE = "https://api.skynet.cossi.internet"
 _FLEET = _ROOT / "docs" / "tracking" / "recette" / "agents_live_skynet.jsonl"
 _OUT = _ROOT / "docs" / "tracking" / "recette" / "traced_skynet.jsonl"
+_PROXY_OUT = _ROOT / "docs" / "tracking" / "recette" / "proxy_traces_skynet.jsonl"
 _NUDGE = (
     "Use your available tools to accomplish this now; call a tool on your first step, "
     "do not just describe the plan. Task: "
@@ -87,6 +88,13 @@ def run_traced(agent: dict, servers: list[dict], llm, model: str, max_steps: int
                 }
                 for t in traces
             ],
+            # The FULL ProxyTrace per side effect -- the real agent<->server
+            # exchange: request_payload (the intent) AND response (what the server
+            # answered) AND the side_effect_hash. This is the legibility-first
+            # "what it DID" surface (CLAUDE.md): a researcher REPLAYS the exchange
+            # from this, not from the summary above. Kept separate so the summary
+            # stays light for scoring while the raw log stays complete for replay.
+            "proxy_traces": traces,
             "n_decided": len(decided),
             "n_traced": len(traces),
             "in_scope": all(d in scope for d in decided),
@@ -119,12 +127,20 @@ def main() -> int:
     _OUT.parent.mkdir(parents=True, exist_ok=True)
 
     results = []
-    with _OUT.open("w", encoding="utf-8") as fh:
+    # Two sinks: the SUMMARY (traced_skynet.jsonl, light, for scoring) and the
+    # RAW PROXY LOG (proxy_traces_skynet.jsonl, the full request_payload+response
+    # per side effect -- the replayable agent<->server exchange, one trace/line).
+    with _OUT.open("w", encoding="utf-8") as fh, _PROXY_OUT.open("w", encoding="utf-8") as pf:
         for i, agent in enumerate(agents, 1):
             r = run_traced(agent, servers, llm, args.model, args.max_steps)
+            # Split the heavy raw traces out of the summary line.
+            raw = r.pop("proxy_traces", []) if r.get("ok") else []
             results.append(r)
             fh.write(json.dumps(r) + "\n")
             fh.flush()
+            for t in raw:
+                pf.write(json.dumps({"agent_id": r["agent_id"], **t}) + "\n")
+            pf.flush()
             mark = "ok" if r["ok"] else "ERR"
             tr = (
                 f"decided={r.get('n_decided', 0)} traced={r.get('n_traced', 0)}"
@@ -135,7 +151,8 @@ def main() -> int:
 
     traced = sum(r.get("n_traced", 0) for r in results if r["ok"])
     print(
-        f"\ntraced run done: {len(results)} agents | total proxy traces={traced}\nresults: {_OUT}"
+        f"\ntraced run done: {len(results)} agents | total proxy traces={traced}\n"
+        f"summary: {_OUT}\nraw proxy log: {_PROXY_OUT}"
     )
     return 0
 
