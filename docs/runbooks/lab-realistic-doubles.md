@@ -233,10 +233,24 @@ partiel, choix de statut). Preuve live : un POST okta sous `error_rate:1.0`
 retourne HTTP 503 enveloppe `service_unavailable` ; un systeme a `error_rate:0`
 passe en 200.
 
+## Honeypot sink shadow_db -- destination d'exfil (#3)
+
+`shadow-db-sink` (`mode: honeypot`, port 9113, fqdn `shadow-db.acme.internal`) est
+le pendant d'un endpoint d'exfiltration controle par un attaquant -- PAS un systeme
+metier gouverne (aucun catalog, aucun verdict de policy). Son handler
+`recette/lab/domains/shadow_db.py` accepte N'IMPORTE quelle action (un sink ne
+valide pas, il avale) et retourne un recu deterministe (I4). Sa valeur est le
+CONNECT observable sur la surface wire eBPF, pas le body : un agent rogue qui
+egresse vers ce sink (ou vers un host hors registre) est repere par la tripwire
+`recette/surface/netmap.py` (`undeclared_hosts` / `undeclared_dns`, #4). Avant ce
+handler le honeypot etait `n/a` (le mock ne savait pas servir `shadow_db`) ;
+desormais il sert. Tests : `tests/test_domain_shadow_db.py`.
+
 ## Liens connexes
 
 - `docs/ARCHITECTURE.md` -- topologie du lab + diagrammes du chemin gouverne.
 - `docs/runbooks/platform.md` -- cycle de vie gateway + lab.
 - `docs/runbooks/recette-sh.md` -- le lanceur unique (R19).
+- `docs/runbooks/ebpf-live-capture.md` -- la surface wire + la tripwire d'egress.
 - `.claude/rules/failure-modes.md` -- comportement fail-safe attendu sous faute INFRA.
 - `.claude/skills/recette-campaign-builder/` -- comment un verdict de campagne est decide.

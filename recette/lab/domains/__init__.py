@@ -25,4 +25,8 @@ HANDLER_MODULES: dict[str, str] = {
     "mcp": "mcp",
     "comms": "comms",
     "compliance": "compliance",
+    # Honeypot exfil sink (#3): the attacker-controlled egress DESTINATION double.
+    # Not a governed business system -- a place a rogue agent can egress data TO so
+    # the wire surface + the egress tripwire have a concrete target to observe.
+    "shadow_db": "shadow_db",
 }
