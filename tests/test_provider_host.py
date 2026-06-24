@@ -10,6 +10,7 @@ from __future__ import annotations
 import unittest
 
 from recette.llm import _PROVIDER_CLASSES, _PROVIDERS, provider_host, provider_models
+from recette.llm._registry import _BASE_URL_DRIVEN_PROVIDERS
 
 # Providers that intentionally ship NO curated model list and fall back to a
 # free-text model field in the console. Frozen + explicit so it cannot grow
@@ -42,10 +43,11 @@ class ProviderHostTest(unittest.TestCase):
 
     def test_every_mapped_provider_derives_a_host_or_needs_base_url(self) -> None:
         # Every provider with a fixed BASE_URL resolves; only the base_url-driven
-        # ones (openai_compat) may be None without an override.
+        # ones (openai_compat, skynet) may be None without an override -- they have
+        # no canonical host, so the host comes from the per-backend base_url.
         for provider in _PROVIDERS:
             host = provider_host(provider)
-            if provider == "openai_compat":
+            if provider in _BASE_URL_DRIVEN_PROVIDERS:
                 self.assertIsNone(host)
             else:
                 self.assertIsNotNone(host, f"{provider}: no host derived")

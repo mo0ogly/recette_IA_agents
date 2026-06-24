@@ -56,12 +56,12 @@ flowchart TB
     RM["RunManager<br/>runs en threads, frames bufferisees"]
     CFG["ConfigStore<br/>agents + ai-backends (JSON atomique)"]
     CSTORE["CampaignStore + RecordingStore<br/>campagnes + enregistrements"]
-    TPL["Campaign templates<br/>17 modeles predefinis"]
+    TPL["Campaign templates<br/>35 modeles predefinis"]
   end
 
   subgraph ENGINE["Moteur recette (recette/)"]
     LANEB["lane_b.run_agent<br/>boucle decide -> act"]
-    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>8 providers live (cle env, R8)"]
+    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>32 providers live (cle env, R8)"]
     FORGE["GitForge<br/>LabForge (defaut) / RealForge"]
     REC["Recording<br/>artefact rejouable (I4)"]
     HARN["Harnais + Scorecards<br/>harness.py, discovery_harness.py"]
