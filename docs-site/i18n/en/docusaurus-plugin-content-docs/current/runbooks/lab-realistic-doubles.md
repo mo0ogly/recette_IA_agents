@@ -233,10 +233,24 @@ split, status choice). Live proof: an okta POST under `error_rate:1.0` returns
 HTTP 503 with a `service_unavailable` envelope; a system at `error_rate:0`
 passes through 200.
 
+## Honeypot sink shadow_db -- the exfil destination (#3)
+
+`shadow-db-sink` (`mode: honeypot`, port 9113, fqdn `shadow-db.acme.internal`) is
+the double of an attacker-controlled exfiltration endpoint -- NOT a governed
+business system (no catalog, no policy verdicts). Its handler
+`recette/lab/domains/shadow_db.py` accepts ANY action (a sink does not validate, it
+swallows) and returns a deterministic receipt (I4). Its value is the CONNECT
+observable on the eBPF wire surface, not the body: a rogue agent egressing to this
+sink (or to a host outside the registry) is caught by the
+`recette/surface/netmap.py` tripwire (`undeclared_hosts` / `undeclared_dns`, #4).
+Before this handler the honeypot was `n/a` (the mock could not serve `shadow_db`);
+now it serves. Tests: `tests/test_domain_shadow_db.py`.
+
 ## Related
 
 - `docs/ARCHITECTURE.md` -- lab topology + governed path diagrams.
 - `docs/runbooks/platform.md` -- gateway + lab lifecycle.
 - `docs/runbooks/recette-sh.md` -- the single launcher (R19).
+- `docs/runbooks/ebpf-live-capture.md` -- the wire surface + the egress tripwire.
 - `.claude/rules/failure-modes.md` -- expected fail-safe behaviour under an INFRA fault.
 - `.claude/skills/recette-campaign-builder/` -- how a campaign verdict is decided.
