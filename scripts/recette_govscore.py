@@ -22,10 +22,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_DIR = _ROOT / "docs" / "tracking" / "recette"
+# Sibling scripts (the discovery-vs-proxy analyzer) live in this directory; make
+# them importable whether govscore is run as a file or imported.
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _load(directory: Path, name: str) -> list[dict]:
@@ -110,15 +115,22 @@ def score(directory: Path, llm: str) -> dict:
         reverse=True,
     )
 
-    # --- discovery vs proxy: do they observe the same action_types? ---
-    proxy_actions = sorted(
-        {t.get("action_type") for r in ok_traced for t in r.get("done_traces", [])}
-    )
+    # --- discovery vs proxy on the SAME live runs (computed, not a placeholder) ---
+    # The decision-log surface (what discovery would attribute) vs the mediated
+    # side-effect surface (what the proxy recorded). Agreement on the same runs is
+    # the cross-surface coherence the operator asked for.
+    from recette_discovery_vs_proxy_skynet import analyze as _dvp_analyze
+
+    dvp = _dvp_analyze(traced)
     discovery_note = (
+        f"same-runs discovery-vs-proxy ({dvp['agents']} agents): detection parity "
+        f"{dvp['detection_parity_rate']}, legibility chain done<=decided<=declared "
+        f"{dvp['legibility_chain_rate']}, action-type vocabulary "
+        f"{'IDENTICAL' if dvp['action_types_agree'] else 'DIVERGENT'} "
+        f"({len(dvp['proxy_action_types'])} types), divergences="
+        f"{len(dvp['decided_not_done']) + len(dvp['done_not_decided'])}. "
         f"surface corpus saw {surf.get('total_agents', '?')} agents, "
-        f"false-negatives={len(surf.get('false_negatives', []))}; proxy observed "
-        f"{len(proxy_actions)} distinct action_types live. A full discovery-vs-proxy "
-        "match needs the discovery scanner run over the SAME live runs (axis)."
+        f"false-negatives={len(surf.get('false_negatives', []))}."
     )
 
     return {
