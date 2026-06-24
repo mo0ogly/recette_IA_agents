@@ -338,18 +338,19 @@ def _render_report(report: CampaignReport) -> str:
 
 def _cmd_list(args: argparse.Namespace) -> int:
     directory = Path(args.dir)
-    files = sorted(directory.glob("*.campaign.json"))
+    files = sorted(directory.rglob("*.campaign.json"))
     if not files:
         print(f"no campaign files in {directory}/")
         return 0
     for path in files:
+        rel = path.relative_to(directory)
         try:
             doc = load_campaign(path)
-            print(f"{path.name}: {doc['name']} ({len(doc['actions'])} actions)")
+            print(f"{rel}: {doc['name']} ({len(doc['actions'])} actions)")
             if doc.get("objective"):
                 print(f"    {doc['objective']}")
         except (CampaignError, json.JSONDecodeError) as exc:
-            print(f"{path.name}: INVALID ({exc})")
+            print(f"{rel}: INVALID ({exc})")
     return 0
 
 

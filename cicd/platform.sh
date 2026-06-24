@@ -433,13 +433,21 @@ campaign_list() {
 }
 
 _campaign_file() {
-    # accept a bare name (identity-offboarding), a file name, or a path
+    # accept a bare name (identity-offboarding), a subdir name (bnp/sec-1-...),
+    # a file name, or an absolute/relative path. Resolves recursively so
+    # campaigns nested under campaigns/<group>/ are reachable by short name.
     local name="$1"
     if [ -f "${name}" ]; then echo "${name}"; return 0; fi
     if [ -f "${CAMPAIGNS_DIR}/${name}" ]; then echo "${CAMPAIGNS_DIR}/${name}"; return 0; fi
     if [ -f "${CAMPAIGNS_DIR}/${name}.campaign.json" ]; then
         echo "${CAMPAIGNS_DIR}/${name}.campaign.json"; return 0
     fi
+    # recursive fallback: match <name>.campaign.json anywhere under campaigns/
+    local hit
+    hit="$(find "${CAMPAIGNS_DIR}" -name "${name}.campaign.json" -print -quit 2>/dev/null)"
+    if [ -n "${hit}" ]; then echo "${hit}"; return 0; fi
+    hit="$(find "${CAMPAIGNS_DIR}" -path "*/${name}" -print -quit 2>/dev/null)"
+    if [ -n "${hit}" ]; then echo "${hit}"; return 0; fi
     return 1
 }
 
@@ -469,15 +477,16 @@ campaign_menu() {
     # interactive picker for the recette.sh menu
     local files=()
     while IFS= read -r f; do files+=("$f"); done \
-        < <(find "${CAMPAIGNS_DIR}" -maxdepth 1 -name '*.campaign.json' | sort)
+        < <(find "${CAMPAIGNS_DIR}" -name '*.campaign.json' | sort)
     if [ "${#files[@]}" -eq 0 ]; then
         warn "aucune campagne dans ${CAMPAIGNS_DIR}"
         return 0
     fi
-    hdr "Choisir une campagne"
-    local i
+    hdr "Choisir une campagne (${#files[@]} disponibles)"
+    local i rel
     for i in "${!files[@]}"; do
-        echo -e "   ${GREEN}$((i + 1)))${NC} $(basename "${files[$i]}")"
+        rel="${files[$i]#"${CAMPAIGNS_DIR}/"}"
+        printf "   ${GREEN}%3s)${NC} %s\n" "$((i + 1))" "${rel%.campaign.json}"
     done
     echo -n "  Choix : "
     local c; read -r c

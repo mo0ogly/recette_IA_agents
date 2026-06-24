@@ -42,80 +42,271 @@ SMOKE_SH="${CICD_DIR}/smoke.sh"
 WIRE_SH="${CICD_DIR}/wire.sh"
 LLM_PROXY_SH="${CICD_DIR}/llm_proxy.sh"
 
-show_menu() {
+# --- submenu helpers ---------------------------------------------------------
+# _pause: wait for the operator after an action ran inside a submenu.
+_pause() { echo; read -rp "  Entree pour continuer..." _; }
+
+# _opt: render one numbered submenu option.
+_opt() { printf "  ${GREEN}%2s)${NC} %s\n" "$1" "$2"; }
+
+show_main_menu() {
     hdr "inspect_ia_agents recette - gestion"
-    echo -e "  ${BOLD}Docker lab${NC}"
-    echo -e "   ${GREEN}1)${NC} Statut global"
-    echo -e "   ${GREEN}2)${NC} Demarrer le lab (up)"
-    echo -e "   ${GREEN}3)${NC} Arreter le lab (down)"
-    echo -e "   ${GREEN}4)${NC} Redemarrer le lab"
-    echo -e "   ${GREEN}5)${NC} Rebuild image"
-    echo -e "   ${GREEN}6)${NC} Logs lab"
-    echo -e "  ${BOLD}API Track U${NC}"
-    echo -e "   ${GREEN}7)${NC} API start"
-    echo -e "   ${GREEN}8)${NC} API stop"
-    echo -e "   ${GREEN}9)${NC} API statut"
-    echo -e "  ${BOLD}Checks${NC}"
-    echo -e "  ${GREEN}10)${NC} Tests (local)"
-    echo -e "  ${GREEN}11)${NC} Gates (local)"
-    echo -e "  ${GREEN}12)${NC} Report (local)"
-    echo -e "  ${GREEN}13)${NC} Tests (docker)"
-    echo -e "  ${BOLD}Git${NC}"
-    echo -e "  ${GREEN}14)${NC} Git statut"
-    echo -e "  ${GREEN}15)${NC} Git pull"
-    echo -e "  ${GREEN}16)${NC} Git push"
-    echo -e "  ${GREEN}17)${NC} Git sync (fetch + etat)"
-    echo -e "  ${BOLD}Plateforme gouvernee${NC}"
-    echo -e "  ${GREEN}18)${NC} Plateforme up (lab mock + API)"
-    echo -e "  ${GREEN}19)${NC} Plateforme down"
-    echo -e "  ${GREEN}20)${NC} Plateforme statut"
-    echo -e "  ${GREEN}21)${NC} Console UX start (http://localhost:${CONSOLE_PORT})"
-    echo -e "  ${GREEN}22)${NC} Console UX stop"
-    echo -e "  ${BOLD}Campagnes${NC}"
-    echo -e "  ${GREEN}23)${NC} Lister les campagnes"
-    echo -e "  ${GREEN}24)${NC} Lancer une campagne"
-    echo -e "  ${BOLD}Nettoyage${NC}"
-    echo -e "  ${GREEN}25)${NC} Purger les serveurs web locaux (API, lab, console)"
+    _opt 1 "Docker lab"
+    _opt 2 "API gouvernee"
+    _opt 3 "Checks (tests / gates / report)"
+    _opt 4 "Git"
+    _opt 5 "Plateforme gouvernee + Console UX"
+    _opt 6 "Campagnes"
+    _opt 7 "Recette & Discovery"
+    _opt 8 "Proxy overlays (Docker, optionnel)"
+    _opt 9 "Console & Docs (build / test)"
+    _opt 10 "Nettoyage"
     echo
-    echo -e "   ${GREEN}0)${NC} Quitter"
+    _opt 0 "Quitter"
     echo
     echo -n "  Choix : "
 }
 
-menu_loop() {
+submenu_docker() {
     while true; do
-        show_menu
+        hdr "Docker lab"
+        _opt 1 "Statut global"
+        _opt 2 "Demarrer le lab (up)"
+        _opt 3 "Arreter le lab (down)"
+        _opt 4 "Redemarrer le lab"
+        _opt 5 "Rebuild image"
+        _opt 6 "Logs lab"
+        _opt 7 "ps (conteneurs)"
+        _opt 8 "shell (conteneur)"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
-            1)  "${STATUS_SH}" ;;
-            2)  "${DOCKER_SH}" up ;;
-            3)  "${DOCKER_SH}" down ;;
-            4)  "${DOCKER_SH}" restart ;;
-            5)  "${DOCKER_SH}" rebuild ;;
-            6)  "${DOCKER_SH}" logs ;;
-            7)  "${API_SH}" start ;;
-            8)  "${API_SH}" stop ;;
-            9)  "${API_SH}" status ;;
-            10) "${CHECKS_SH}" test ;;
-            11) "${CHECKS_SH}" gates ;;
-            12) "${CHECKS_SH}" report ;;
-            13) "${CHECKS_SH}" test --docker ;;
-            14) "${GIT_SH}" status ;;
-            15) "${GIT_SH}" pull ;;
-            16) "${GIT_SH}" push ;;
-            17) "${GIT_SH}" sync ;;
-            18) "${PLATFORM_SH}" up ;;
-            19) "${PLATFORM_SH}" down ;;
-            20) "${PLATFORM_SH}" status ;;
-            21) "${PLATFORM_SH}" console start ;;
-            22) "${PLATFORM_SH}" console stop ;;
-            23) "${PLATFORM_SH}" campaign list ;;
-            24) "${PLATFORM_SH}" campaign menu ;;
-            25) "${PLATFORM_SH}" purge ;;
-            0|q|Q) info "Bye"; exit 0 ;;
-            *)  warn "choix invalide" ;;
+            1) "${STATUS_SH}"; _pause ;;
+            2) "${DOCKER_SH}" up; _pause ;;
+            3) "${DOCKER_SH}" down; _pause ;;
+            4) "${DOCKER_SH}" restart; _pause ;;
+            5) "${DOCKER_SH}" rebuild; _pause ;;
+            6) "${DOCKER_SH}" logs; _pause ;;
+            7) "${DOCKER_SH}" ps; _pause ;;
+            8) "${DOCKER_SH}" shell; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
         esac
-        echo; read -rp "  Entree pour continuer..." _
+    done
+}
+
+submenu_api() {
+    while true; do
+        hdr "API gouvernee"
+        _opt 1 "API start"
+        _opt 2 "API stop"
+        _opt 3 "API restart"
+        _opt 4 "API statut"
+        _opt 5 "API logs"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${API_SH}" start; _pause ;;
+            2) "${API_SH}" stop; _pause ;;
+            3) "${API_SH}" restart; _pause ;;
+            4) "${API_SH}" status; _pause ;;
+            5) "${API_SH}" logs; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_checks() {
+    while true; do
+        hdr "Checks"
+        _opt 1 "Tests (local)"
+        _opt 2 "Gates (local)"
+        _opt 3 "Report (local)"
+        _opt 4 "Tests (docker)"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${CHECKS_SH}" test; _pause ;;
+            2) "${CHECKS_SH}" gates; _pause ;;
+            3) "${CHECKS_SH}" report; _pause ;;
+            4) "${CHECKS_SH}" test --docker; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_git() {
+    while true; do
+        hdr "Git"
+        _opt 1 "Git statut"
+        _opt 2 "Git pull"
+        _opt 3 "Git push"
+        _opt 4 "Git sync (fetch + etat)"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${GIT_SH}" status; _pause ;;
+            2) "${GIT_SH}" pull; _pause ;;
+            3) "${GIT_SH}" push; _pause ;;
+            4) "${GIT_SH}" sync; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_platform() {
+    while true; do
+        hdr "Plateforme gouvernee + Console UX"
+        _opt 1 "Plateforme up (lab mock + API)"
+        _opt 2 "Plateforme down"
+        _opt 3 "Plateforme restart"
+        _opt 4 "Plateforme statut"
+        _opt 5 "Console UX start (http://localhost:${CONSOLE_PORT})"
+        _opt 6 "Console UX stop"
+        _opt 7 "Console UX statut"
+        _opt 8 "Console UX logs"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${PLATFORM_SH}" up; _pause ;;
+            2) "${PLATFORM_SH}" down; _pause ;;
+            3) "${PLATFORM_SH}" restart; _pause ;;
+            4) "${PLATFORM_SH}" status; _pause ;;
+            5) "${PLATFORM_SH}" console start; _pause ;;
+            6) "${PLATFORM_SH}" console stop; _pause ;;
+            7) "${PLATFORM_SH}" console status; _pause ;;
+            8) "${PLATFORM_SH}" console logs; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_campaign() {
+    while true; do
+        hdr "Campagnes"
+        _opt 1 "Lister les campagnes"
+        _opt 2 "Lancer une campagne"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${PLATFORM_SH}" campaign list; _pause ;;
+            2) "${PLATFORM_SH}" campaign menu; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_recette() {
+    while true; do
+        hdr "Recette & Discovery"
+        _opt 1 "Validate (schema corpus + repos)"
+        _opt 2 "Run identification (scorecard 4 dimensions)"
+        _opt 3 "Discovery (adapter reference)"
+        _opt 4 "Smoke e2e (API + lab mock + replay)"
+        _opt 5 "Build moteurs Rust discovery (cargo)"
+        _opt 6 "Build sonde eBPF + broker CAP_BPF"
+        _opt 7 "Grant CAP_BPF au broker (sudo, one-time)"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${CHECKS_SH}" validate; _pause ;;
+            2) "${CHECKS_SH}" run; _pause ;;
+            3) "${CHECKS_SH}" discovery; _pause ;;
+            4) "${SMOKE_SH}"; _pause ;;
+            5) "${CHECKS_SH}" discovery-build; _pause ;;
+            6) "${CHECKS_SH}" probe-ebpf-build; _pause ;;
+            7) "${CHECKS_SH}" probe-grant-caps; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_proxy() {
+    while true; do
+        hdr "Proxy overlays (Docker, optionnel)"
+        _opt 1 "Wire interception (mitmproxy) up"
+        _opt 2 "Wire interception down"
+        _opt 3 "Wire interception statut"
+        _opt 4 "Wire interception logs"
+        _opt 5 "LLM-proxy (LiteLLM) up"
+        _opt 6 "LLM-proxy down"
+        _opt 7 "LLM-proxy statut"
+        _opt 8 "LLM-proxy logs"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${WIRE_SH}" up; _pause ;;
+            2) "${WIRE_SH}" down; _pause ;;
+            3) "${WIRE_SH}" status; _pause ;;
+            4) "${WIRE_SH}" logs; _pause ;;
+            5) "${LLM_PROXY_SH}" up; _pause ;;
+            6) "${LLM_PROXY_SH}" down; _pause ;;
+            7) "${LLM_PROXY_SH}" status; _pause ;;
+            8) "${LLM_PROXY_SH}" logs; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_console_docs() {
+    while true; do
+        hdr "Console & Docs"
+        _opt 1 "Console build (tsc + vite)"
+        _opt 2 "Console test (vitest)"
+        _opt 3 "Docs build (Docusaurus fr+en)"
+        _opt 4 "Docs serve"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${CHECKS_SH}" console-build; _pause ;;
+            2) "${CHECKS_SH}" console-test; _pause ;;
+            3) "${CHECKS_SH}" docs-build; _pause ;;
+            4) "${CHECKS_SH}" docs-serve; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+submenu_cleanup() {
+    while true; do
+        hdr "Nettoyage"
+        _opt 1 "Purger les serveurs web locaux (API, lab, console)"
+        echo; _opt 0 "Retour"; echo -n "  Choix : "
+        local c; read -r c
+        case "${c}" in
+            1) "${PLATFORM_SH}" purge; _pause ;;
+            0|q|Q) return ;;
+            *) warn "choix invalide"; _pause ;;
+        esac
+    done
+}
+
+menu_loop() {
+    while true; do
+        show_main_menu
+        local c; read -r c
+        case "${c}" in
+            1)  submenu_docker ;;
+            2)  submenu_api ;;
+            3)  submenu_checks ;;
+            4)  submenu_git ;;
+            5)  submenu_platform ;;
+            6)  submenu_campaign ;;
+            7)  submenu_recette ;;
+            8)  submenu_proxy ;;
+            9)  submenu_console_docs ;;
+            10) submenu_cleanup ;;
+            0|q|Q) info "Bye"; exit 0 ;;
+            *)  warn "choix invalide"; _pause ;;
+        esac
     done
 }
 
