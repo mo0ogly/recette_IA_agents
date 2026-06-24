@@ -1,0 +1,19 @@
+{
+  "skill_name": "recette-full",
+  "evals": [
+    {
+      "id": 0,
+      "name": "merge-gate-retex",
+      "prompt": "Avant de merger, verifie que tout le corpus recette passe (schemas, identification, discovery, sonde/surface, redteam, maf, rag) et fais-moi un RETEX avec les axes d'amelioration. Reste sur la passe deterministe (pas de LLM live).",
+      "expected_output": "Runs the deterministic recette sweep over every subsystem, reports per-subsystem PASS/FAIL with evidence, and writes a RETEX with an improvement-axes section.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "subsystem-audit-axes",
+      "prompt": "Fais un audit complet des sous-systemes de recette et liste-moi les axes d'amelioration priorises. Je veux voir chaque sous-systeme (campagnes, agents, discovery, proxy, redteam) avec son verdict et une preuve. Mode deterministe uniquement.",
+      "expected_output": "A complete subsystem audit (deterministic), each subsystem with a verdict + evidence, ending in a prioritized improvement backlog (quick win / notable / refactor).",
+      "files": []
+    }
+  ]
+}
