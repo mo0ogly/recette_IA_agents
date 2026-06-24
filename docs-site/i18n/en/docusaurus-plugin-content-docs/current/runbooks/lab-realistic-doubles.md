@@ -187,9 +187,56 @@ Every handler is a pure function of its inputs (I4). No `time`/`datetime.now`/
 invalid call always raises the same status + message. See
 `.claude/rules/determinism-replay.md`.
 
+## INFRA fault injection (chaos) -- recette of the failure-modes
+
+By default the lab returns 200 (business success) or business 4xx
+(`LabActionError`, e.g. 422 invalid input, invoice already paid). It NEVER had an
+INFRA failure -- so the whole `.claude/rules/failure-modes.md` spec (a dependency
+down => the agent must FREEZE/retry, never execute optimistically, I5/I6) was
+unrecettable: a dependency that never fails never exercises fail-safe behaviour.
+
+`recette/lab/chaos.py` adds a **deterministic** (I4), **off-by-default** (R5
+config-first) INFRA fault layer, enabled via `INSPECT_IA_AGENTS_LAB_CHAOS` (inline
+JSON or a path to a JSON file):
+
+```json
+{
+  "seed": "rec-2026-06-24",
+  "systems": {
+    "okta":    {"error_rate": 0.25, "statuses": [429, 503]},
+    "finance": {"error_rate": 0.5,  "statuses": [503, 504]},
+    "*":       {"error_rate": 0.1,  "statuses": [503]}
+  }
+}
+```
+
+- `error_rate` (0..1, clamped) = the fraction of a system's requests that fault.
+- `statuses` = the pool of injectable INFRA statuses: **429** rate-limit, **503**
+  service unavailable (also models a connection reset seen by the caller), **504**
+  upstream timeout. Timeout is MODELLED as 504 **without a real `sleep`**, so the
+  deterministic suite stays fast and byte-stable -- real latency belongs to a
+  live-only mode, never the decision/judge path.
+- `"*"` = the default applied to any system without an explicit entry. A system
+  with no entry and no `"*"` never faults.
+
+**Determinism (I4)**: the fault decision is a PURE function of
+`(seed, event_id, target_system, action_type)` -- no clock, no random. The same
+logical event always faults (or not) identically, and the chosen status is stable.
+Since `event_id` is sequence-derived here, the fault pattern is reproducible run to
+run (so replayable by a researcher). A malformed chaos config falls back to OFF
+(the lab must keep serving), never a crash.
+
+The hook is in `mock_server.py`: the fault short-circuits BEFORE `dispatch`, so the
+agent sees a 429/503/504 and must take its fail-safe path. Tests:
+`tests/test_lab_chaos.py` (11 cases: off-by-default, clamp, determinism, partial
+split, status choice). Live proof: an okta POST under `error_rate:1.0` returns
+HTTP 503 with a `service_unavailable` envelope; a system at `error_rate:0`
+passes through 200.
+
 ## Related
 
 - `docs/ARCHITECTURE.md` -- lab topology + governed path diagrams.
 - `docs/runbooks/platform.md` -- gateway + lab lifecycle.
 - `docs/runbooks/recette-sh.md` -- the single launcher (R19).
+- `.claude/rules/failure-modes.md` -- expected fail-safe behaviour under an INFRA fault.
 - `.claude/skills/recette-campaign-builder/` -- how a campaign verdict is decided.
