@@ -67,6 +67,27 @@ class TestSeenVsDone(unittest.TestCase):
         args = (_ebpf("bot", ["connect:127.0.0.1:9101"]), _proxy("bot", ["github"]), SERVERS)
         self.assertEqual(_svd.analyze(*args), _svd.analyze(*args))
 
+    def test_kernel_reachable_full_coverage(self) -> None:
+        # The deterministic layer: every traced agent whose DONE target maps to a
+        # registered server is kernel-reachable, across the whole fleet.
+        out = _svd.analyze(
+            {"captures": []},
+            _proxy("a", ["github"]) + _proxy("b", ["okta"]),
+            SERVERS,
+        )
+        self.assertEqual(out["traced_agents"], 2)
+        self.assertEqual(out["kernel_reachable_agents"], 2)
+        self.assertEqual(out["kernel_reachable_rate"], 1.0)
+        self.assertEqual(out["ghost_target_agents"], [])
+
+    def test_ghost_target_flagged(self) -> None:
+        # An agent whose DONE target has NO registered server is a ghost-target:
+        # it claims to act on a system the kernel could never witness.
+        out = _svd.analyze({"captures": []}, _proxy("rogue", ["unknown_system"]), SERVERS)
+        self.assertEqual(out["kernel_reachable_agents"], 0)
+        self.assertEqual(len(out["ghost_target_agents"]), 1)
+        self.assertEqual(out["ghost_target_agents"][0]["ghost_targets"], ["unknown_system"])
+
 
 if __name__ == "__main__":
     unittest.main()

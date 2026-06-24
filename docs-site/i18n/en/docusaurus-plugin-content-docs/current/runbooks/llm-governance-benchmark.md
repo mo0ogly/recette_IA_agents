@@ -146,12 +146,21 @@ Two checks cross the surfaces:
   the proxy mediated) on the SAME runs. Result: detection parity 1.0, legibility chain
   `done<=decided<=declared` 1.0, IDENTICAL vocabulary, 0 divergence. HONEST caveat:
   both sides read the same action-log, so the agreement is partly tautological.
-- **seen-vs-done** (`recette_seen_vs_done_skynet.py`): crosses two GENUINELY
-  INDEPENDENT channels -- the kernel `connect:` (which server the agent dialed,
-  resolved to a target_system) vs the proxy `target_system`. Different observation
-  mechanisms (kernel tracepoint vs app proxy), so the agreement is real evidence. A
-  server SEEN dialed but never mediated = a covert-channel signal; a connect to a host
-  outside the registry = undeclared egress.
+- **seen-vs-done** (`recette_seen_vs_done_skynet.py`): does the kernel CORROBORATE
+  what the agent DOES? Two tiers:
+  - **LIVE (mock subset)**: crosses two GENUINELY INDEPENDENT channels -- the kernel
+    `connect:` (which server the agent dialed, resolved to a target_system) vs the
+    proxy `target_system`. Different mechanisms (kernel tracepoint vs app proxy), so
+    the agreement is real evidence. Limit: `process-capture` is mock-only (S4 -- a
+    live key never crosses the captured subprocess), so only mock agents are live
+    witnesses (2/2 coherent: github==github, support_desk==support_desk).
+  - **DETERMINISTIC (whole fleet, no caps)**: for EVERY traced agent, does its DONE
+    `target_system` map to a DECLARED (kernel-reachable) server? A "ghost-target" (a
+    claimed system with no server) means the agent claims to act on a system the
+    kernel could NEVER witness -- a red flag. Result: 24/24 traced agents have a
+    kernel-reachable target, 0 ghost-targets.
+  A server SEEN dialed but never mediated = a covert-channel signal; a connect to a
+  host outside the registry = undeclared egress.
 
 ## 9. ANSSI export + replay (determinism I4)
 

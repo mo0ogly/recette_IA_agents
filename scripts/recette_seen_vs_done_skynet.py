@@ -97,17 +97,51 @@ def analyze(ebpf: dict, proxy_rows: list[dict], servers: list[dict]) -> dict:
     n = len(overlap) or 1
     # Undeclared egress = any agent that dialed (via eBPF) a host NOT in the registry.
     covert = sorted({ep for eps in seen_unmapped.values() for ep in eps})
+
+    # --- Deterministic kernel-reachability layer (FULL coverage, no caps needed) ---
+    # Live process-capture is mock-only (S4: a live key never crosses the captured
+    # subprocess), so the LIVE kernel<->action cross only covers the mock agents.
+    # For EVERY traced agent, verify deterministically that its DONE target_system
+    # maps to a REGISTERED server -- i.e. a kernel-reachable target a live capture
+    # COULD witness as a connect. A "ghost target" (a done system with no server)
+    # would mean the agent claims to act on a system the kernel could never see --
+    # a red flag. This makes the bridge full-coverage; the live overlap is the
+    # strong corroboration subset.
+    registered_systems = {str(s.get("system")) for s in servers if s.get("system")}
+    done_all: dict[str, set[str]] = {}
+    for t in proxy_rows:
+        aid = str(t.get("agent_id") or "")
+        if t.get("target_system"):
+            done_all.setdefault(aid, set()).add(str(t["target_system"]))
+    reachable_agents: list[dict] = []
+    ghost_target_agents: list[dict] = []
+    for aid in sorted(done_all):
+        systems = sorted(done_all[aid])
+        ghosts = [s for s in systems if s not in registered_systems]
+        (ghost_target_agents if ghosts else reachable_agents).append(
+            {"agent_id": aid, "done_systems": systems, "ghost_targets": ghosts}
+        )
+    n_done = len(done_all) or 1
+
     return {
         "overlap_agents": len(overlap),
         "coherent_agents": agree,
         "coherence_rate": round(agree / n, 3),
         "undeclared_egress_endpoints": covert,
         "per_agent": per_agent,
+        # Deterministic full-coverage layer:
+        "traced_agents": len(done_all),
+        "kernel_reachable_agents": len(reachable_agents),
+        "kernel_reachable_rate": round(len(reachable_agents) / n_done, 3),
+        "ghost_target_agents": ghost_target_agents,
         "note": (
-            "SEEN (eBPF kernel connect -> server) and DONE (proxy target_system) are "
-            "INDEPENDENT channels; agreement here is real coherence, not the tautology "
-            "of feeding one action-log to two surfaces. Overlap is bounded by the "
-            "agents captured live on eBPF (process-capture is mock-only)."
+            "TWO tiers. LIVE: SEEN (eBPF kernel connect -> server) vs DONE (proxy "
+            "target_system) are INDEPENDENT channels -- real coherence, not the "
+            "tautology of one action-log fed to two surfaces; bounded by the mock "
+            "agents captured live (process-capture is mock-only, S4). DETERMINISTIC: "
+            "every traced agent's DONE target maps to a registered (kernel-reachable) "
+            "server, so a ghost-target (a claimed system the kernel could never "
+            "witness) is flagged across the WHOLE fleet, no caps needed."
         ),
     }
 
@@ -128,14 +162,30 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"## SEEN-vs-DONE -- independent cross ({result['overlap_agents']} overlap agents)")
-        print(f"- coherence rate: {result['coherence_rate']}")
-        print(f"- undeclared egress endpoints: {result['undeclared_egress_endpoints'] or 'none'}")
+        print("## SEEN-vs-DONE -- kernel corroborates the agent's action")
+        print(
+            f"\nLIVE (independent kernel<->action, mock subset): "
+            f"{result['coherent_agents']}/{result['overlap_agents']} coherent, "
+            f"rate {result['coherence_rate']}"
+        )
         for a in result["per_agent"]:
             print(
                 f"  {a['agent_id']:38} seen={a['seen_systems']} done={a['done_systems']} "
                 f"coherent={a['coherent']}"
             )
+        print(
+            f"\nDETERMINISTIC (full fleet, no caps): "
+            f"{result['kernel_reachable_agents']}/{result['traced_agents']} traced agents have a "
+            f"kernel-reachable DONE target, rate {result['kernel_reachable_rate']}"
+        )
+        ghosts = result["ghost_target_agents"]
+        print(
+            f"- ghost-target agents (claimed system the kernel could never witness): {len(ghosts)}"
+        )
+        for g in ghosts:
+            print(f"    {g['agent_id']}: ghost_targets={g['ghost_targets']}")
+        egress = result["undeclared_egress_endpoints"] or "none"
+        print(f"- undeclared egress endpoints (eBPF): {egress}")
     return 0
 
 
