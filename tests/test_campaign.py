@@ -12,6 +12,7 @@ from recette.campaign import (
     CampaignError,
     CampaignRunner,
     HttpClient,
+    is_catalog_probe,
     load_campaign,
     validate_campaign,
 )
@@ -40,6 +41,40 @@ class TestCampaignValidation(unittest.TestCase):
     def test_rejects_missing_actions(self) -> None:
         with self.assertRaises(CampaignError):
             validate_campaign({"name": "x", "agents": [], "actions": []})
+
+    def test_catalog_probe_kind_accepted_and_detected(self) -> None:
+        # #8 hard tag: a catalog_probe kind validates and is_catalog_probe sees it.
+        doc = {
+            "name": "coverage-x",
+            "kind": "catalog_probe",
+            "agents": [{"id": "a", "runtime": "lab"}],
+            "actions": [
+                {"agent_id": "a", "target_system": "okta", "action_type": "read", "resource": "r"}
+            ],
+        }
+        validate_campaign(doc)
+        self.assertTrue(is_catalog_probe(doc))
+
+    def test_unknown_kind_rejected(self) -> None:
+        with self.assertRaises(CampaignError):
+            validate_campaign(
+                {
+                    "name": "x",
+                    "kind": "not_a_kind",
+                    "agents": [{"id": "a", "runtime": "lab"}],
+                    "actions": [
+                        {
+                            "agent_id": "a",
+                            "target_system": "okta",
+                            "action_type": "read",
+                            "resource": "r",
+                        }
+                    ],
+                }
+            )
+
+    def test_narrative_campaign_not_catalog(self) -> None:
+        self.assertFalse(is_catalog_probe({"name": "bnp-sec-5"}))
 
     def test_rejects_bad_expect(self) -> None:
         with self.assertRaises(CampaignError):

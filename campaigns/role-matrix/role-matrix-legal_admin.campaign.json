@@ -1,5 +1,6 @@
 {
   "name": "role-matrix-legal_admin",
+  "kind": "catalog_probe",
   "objective": "Role-matrix recette for legal_admin: the role is submitted against ALL 148 catalogued actions, asserting its role-specific verdict. In-scope (legal_dms): 1 allow, 8 escalate, 0 deny. Out-of-mandate: 139 deny (capability_overreach). Proves the engine never grants a silent allow to a role on an action it does not own.",
   "teaching": "A role's authority is bounded by the catalog, not by the action's existence: legal_admin is allowed only its low-risk routine actions, escalates the sensitive ones it is privileged for, and every other action -- in any other domain -- is denied by default. The full sweep is deterministic and replayable for audit (I4).",
   "agents": [

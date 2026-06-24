@@ -1,5 +1,6 @@
 {
   "name": "coverage-mcp",
+  "kind": "catalog_probe",
   "objective": "Coverage recette for the mcp domain: the privileged role tool_operator exercises every one of its 2 catalogued actions, asserting the documented posture (0 allow, 2 escalate, 0 deny). Proves the catalog/engine emit the right verdict for each action of this domain.",
   "teaching": "The tool_operator gets a verdict matching the risk, never a blanket grant: a low-risk routine action is allowed (least-privilege), a sensitive action escalates to a human (I6), a pure-deny action stays denied for everyone. The whole sweep is replayable for audit (I4).",
   "agents": [
