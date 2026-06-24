@@ -1,0 +1,24 @@
+sequenceDiagram
+  participant C as Console / campagne
+  participant R as RunManager
+  participant B as lane_b.run_agent
+  participant L as LlmBackend
+  participant F as Forge (LabForge)
+  participant REC as Recording
+  C->>R: POST /runs kind=lane_b
+  R->>B: run_agent(goal, capability_scope, llm)
+  loop max_steps (10 par defaut)
+    B->>L: decide(system, history, tools)
+    L-->>B: LlmDecision (tool_call ou final)
+    alt tool_call
+      B->>F: execute(action_type, resource)
+      F-->>B: AgentAction (seq, ts logique, mode)
+      B->>REC: append(decision, action)
+      B-->>R: frame step
+    else final
+      B->>REC: append(decision, null)
+      Note over B: sortie de boucle
+    end
+  end
+  B-->>R: LaneBResult(actions, recording)
+  R-->>C: frames result + end

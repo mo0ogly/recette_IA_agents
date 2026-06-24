@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph SK["SKYNET -- notre IA interne"]
+    BRAIN["Moteur LLM SKYNET<br/>sert le cerveau des agents"]
+  end
+  subgraph BENCH["inspect_ia_agents (banc de recette)"]
+    BACKEND["ai-backend = skynet<br/>provider + modele (cle env, R8)"]
+    subgraph AG["Agents (ai_mode = real)"]
+      LANEB["Lane B : decide -> act<br/>l'agent demande a SKYNET<br/>quelle action faire"]
+    end
+    subgraph CAP["Captation (le banc rend l'agent observable)"]
+      PROXY["Proxy I5 : ProxyTrace<br/>requete + reponse serveur"]
+      PROBE["discoveryprobe (Rust eBPF)<br/>exec / connect / dns au noyau"]
+    end
+    SCORE["Recette : discovery + identification<br/>4 dimensions, scorecards"]
+  end
+  subgraph LAB["Serveurs en face (lab)"]
+    SYS["16 doubles deterministes<br/>github okta finance cloud ..."]
+  end
+  BRAIN -->|"decisions (tool-calls)"| BACKEND
+  BACKEND --> LANEB
+  LANEB -->|"action"| PROXY
+  PROXY -->|"effet de bord"| SYS
+  SYS -->|"reponse"| PROXY
+  LANEB -.->|"syscalls observes"| PROBE
+  PROXY --> SCORE
+  PROBE --> SCORE

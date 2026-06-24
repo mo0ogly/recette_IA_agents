@@ -1,0 +1,26 @@
+classDiagram
+  class AgentAction {
+    +event_id : str  "evt-NNNN, sequence"
+    +seq : int
+    +timestamp : str  "LogicalClock, pas now()"
+    +agent_id : str
+    +principal : str  "identite REELLEMENT utilisee"
+    +target_system : str
+    +action_type : str  "action du catalogue"
+    +mode : str  "read | write"
+    +resource : str
+    +approved : bool  "approbation prealable (I6)"
+    +params : dict
+  }
+  class Recording {
+    +agent_id, principal, target_system, goal
+    +provider, model
+    +steps : RecordedStep[]
+    +actions() dict[]
+  }
+  class RecordedStep {
+    +decision : LlmDecision
+    +action : dict or null
+  }
+  Recording "1" o-- "n" RecordedStep
+  RecordedStep --> AgentAction : serialise

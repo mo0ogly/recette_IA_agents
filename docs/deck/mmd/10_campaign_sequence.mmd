@@ -1,0 +1,18 @@
+sequenceDiagram
+  participant U as Equipe discovery
+  participant API as API /campaigns
+  participant CR as Campaign runner
+  participant ST as RecordingStore
+  U->>API: POST /campaign-templates/finance-wire-fraud/instantiate
+  API-->>U: agent mock + campagne crees (idempotent)
+  U->>API: POST /campaigns/finance-wire-fraud/run
+  API->>CR: run en thread (frames live via WS)
+  loop chaque etape (agent)
+    CR->>CR: resolve agent (scenario mock OU ai_backend reel)
+    CR->>CR: lane_b.run_agent(...)
+    CR->>ST: save(recording "campagne.etape.agent")
+    CR-->>U: frames agent_start / step / agent_done
+  end
+  CR-->>U: campaign_done
+  U->>API: POST /recordings/id/replay
+  API-->>U: replay_result IDENTIQUE / DIVERGENT

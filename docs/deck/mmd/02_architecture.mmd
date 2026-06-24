@@ -1,0 +1,37 @@
+flowchart TB
+  subgraph CONSOLE["Console React (console/, :5173)"]
+    DASH["Tableau de bord<br/>statut live des agents"]
+    COCK["Cockpit (onglet de Agents)<br/>lancer/arreter + log reseau (proxy I5)"]
+    RUNTAB["Recette<br/>runners discovery + identification"]
+    CAMP["Campagnes<br/>templates, runs, replays"]
+    AGENTS["Agents<br/>config, catalogue d'actions, ai-backends"]
+    SRVTAB["Serveurs<br/>registre, start/stop, access log"]
+  end
+
+  subgraph API["API FastAPI (recette/api/, extra [api])"]
+    RM["RunManager<br/>runs en threads, frames bufferisees"]
+    CFG["ConfigStore<br/>agents + ai-backends (JSON atomique)"]
+    CSTORE["CampaignStore + RecordingStore<br/>campagnes + enregistrements"]
+    TPL["Campaign templates<br/>17 modeles predefinis"]
+  end
+
+  subgraph ENGINE["Moteur recette (recette/)"]
+    LANEB["lane_b.run_agent<br/>boucle decide -> act"]
+    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>8 providers live (cle env, R8)"]
+    FORGE["GitForge<br/>LabForge (defaut) / RealForge"]
+    REC["Recording<br/>artefact rejouable (I4)"]
+    HARN["Harnais + Scorecards<br/>harness.py, discovery_harness.py"]
+  end
+
+  subgraph LAB["Lab simule (recette/lab/, :8082)"]
+    MOCK["Serveur mock unique<br/>16 domaines deterministes<br/>doubles realistes (champs metier, 422 si invalide)"]
+  end
+
+  CONSOLE -->|"HTTP + WebSocket"| API
+  RM --> LANEB
+  LANEB --> LLM
+  LANEB --> FORGE
+  LANEB --> REC
+  RM --> HARN
+  HARN -->|"adapters"| LAB
+  CSTORE --> REC

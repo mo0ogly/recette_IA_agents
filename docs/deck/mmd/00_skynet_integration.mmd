@@ -1,0 +1,23 @@
+flowchart LR
+  subgraph SK["SKYNET (IA interne)"]
+    SKBRAIN["Moteur IA SKYNET<br/>decide les actions"]
+  end
+  subgraph IIA["inspect_ia_agents"]
+    BACKEND["ai-backend SKYNET<br/>provider openai_compat<br/>base_url + cle (env, R8)"]
+    LANEB["Lane B<br/>boucle decide -> act"]
+    GW["Gateway gouvernee<br/>policy allow/deny/escalate (I2)"]
+    PROXY["Proxy mediatise (I5)<br/>ProxyTrace: requete + reponse"]
+    AUDIT["Event store append-only<br/>hash-chaine (I1), rejouable (I4)"]
+  end
+  subgraph TGT["Systemes cibles"]
+    SYS["github, okta, finance,<br/>cloud, slack, ... (16)"]
+  end
+  SKBRAIN -->|"wire LLM (tool-calls)"| BACKEND
+  BACKEND --> LANEB
+  LANEB -->|"action proposee"| GW
+  GW -->|"allow / approved"| PROXY
+  GW -.->|"deny / escalate (I6)"| LANEB
+  PROXY -->|"effet de bord"| SYS
+  SYS -->|"reponse serveur"| PROXY
+  PROXY --> AUDIT
+  GW --> AUDIT
