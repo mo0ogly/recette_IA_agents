@@ -8,10 +8,49 @@ architecture document. Edit a diagram HERE, then re-inject it with:
     python3 scripts/gen_diagrams.py --render    # validate via mmdc if installed
 
 Each entry maps a marker name (``<!-- mermaid:NAME -->`` in the markdown)
-to the diagram body. Stdlib only.
+to the diagram body. Stdlib only EXCEPT the corpus count labels (templates /
+providers / lab domains), which are injected from the single source of truth
+(``scripts/deck_metrics.py``) so they can never drift again (they did: 17
+templates / 8 providers hand-typed vs real 35 / 32). A corpus change therefore
+turns ``gen_diagrams --check`` red until the markdown is regenerated.
 """
 
 from __future__ import annotations
+
+import functools
+import sys
+from pathlib import Path
+
+
+@functools.lru_cache(maxsize=1)
+def _metrics() -> dict:
+    """Live corpus counts from the single source of truth (deck_metrics.collect).
+
+    Imported lazily and cached. Raises loudly (never a stale fallback) when the
+    recette package is not importable -- regenerate the diagrams in the recette
+    venv (.venv), where ``deck_metrics`` resolves.
+    """
+    scripts_dir = str(Path(__file__).resolve().parent.parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from deck_metrics import collect
+    except ImportError as exc:  # pragma: no cover - environment guard
+        raise RuntimeError(
+            "diagram count labels need scripts/deck_metrics.py (recette package). "
+            "Regenerate gen_diagrams in the recette venv -- no stale fallback."
+        ) from exc
+    return collect()
+
+
+def _inject(body: str) -> str:
+    """Replace the count sentinels in a diagram body from the source of truth."""
+    m = _metrics()
+    return (
+        body.replace("__N_TEMPLATES__", str(m["templates"]))
+        .replace("__N_PROVIDERS__", str(m["providers"]))
+        .replace("__N_SYSTEMS__", str(m["systems"]))
+    )
 
 
 def context_recette() -> str:
@@ -56,19 +95,19 @@ flowchart TB
     RM["RunManager<br/>runs en threads, frames bufferisees"]
     CFG["ConfigStore<br/>agents + ai-backends (JSON atomique)"]
     CSTORE["CampaignStore + RecordingStore<br/>campagnes + enregistrements"]
-    TPL["Campaign templates<br/>35 modeles predefinis"]
+    TPL["Campaign templates<br/>__N_TEMPLATES__ modeles predefinis"]
   end
 
   subgraph ENGINE["Moteur recette (recette/)"]
     LANEB["lane_b.run_agent<br/>boucle decide -> act"]
-    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>32 providers live (cle env, R8)"]
+    LLM["LlmBackend<br/>StubLlm / ReplayLlm<br/>__N_PROVIDERS__ providers live (cle env, R8)"]
     FORGE["GitForge<br/>LabForge (defaut) / RealForge"]
     REC["Recording<br/>artefact rejouable (I4)"]
     HARN["Harnais + Scorecards<br/>harness.py, discovery_harness.py"]
   end
 
   subgraph LAB["Lab simule (recette/lab/, :8082)"]
-    MOCK["Serveur mock unique<br/>16 domaines deterministes<br/>doubles realistes (champs metier, 422 si invalide)"]
+    MOCK["Serveur mock unique<br/>__N_SYSTEMS__ domaines deterministes<br/>doubles realistes (champs metier, 422 si invalide)"]
   end
 
   CONSOLE -->|"HTTP + WebSocket"| API
@@ -110,7 +149,7 @@ flowchart LR
   subgraph SRV["Serveurs en face"]
     direction TB
     LF["LabForge<br/>in-memory, in-process"]
-    LAB["Mock servers mock_local (config-driven, 12 serveurs :9101-9112)<br/>16 domaines: github gitlab okta finance support_desk slack cloud<br/>hris legal_dms product_cms data_platform crm knowledge_base mcp comms compliance<br/>doubles realistes (champs metier, 422 si invalide), deterministes<br/>POST /system/execute, access log JSONL + /health"]
+    LAB["Mock servers mock_local (config-driven, 12 serveurs :9101-9112)<br/>__N_SYSTEMS__ domaines: github gitlab okta finance support_desk slack cloud<br/>hris legal_dms product_cms data_platform crm knowledge_base mcp comms compliance<br/>doubles realistes (champs metier, 422 si invalide), deterministes<br/>POST /system/execute, access log JSONL + /health"]
     DECL["Serveur declare (declared_url)<br/>meme contrat wire que le lab"]
     REAL["SaaS reels (real_saas)<br/>pas de proxy encore : run FAIL<br/>jamais de fallback (I5)"]
   end
@@ -309,7 +348,7 @@ flowchart TB
   end
   subgraph DATA["Data Plane"]
     PROXY["ExternalSystemProxy (proxy/)<br/>seul contact externe<br/>produit side_effect_hash"]
-    LAB2["Lab mock :8082<br/>16 domaines, handlers purs (doubles realistes)"]
+    LAB2["Lab mock :8082<br/>__N_SYSTEMS__ domaines, handlers purs (doubles realistes)"]
     PROXY --> LAB2
   end
   subgraph AUDIT["Audit Plane"]
@@ -325,17 +364,22 @@ flowchart TB
 """
 
 
+# Count sentinels (__N_TEMPLATES__ / __N_PROVIDERS__ / __N_SYSTEMS__) are
+# replaced from the single source of truth at build time -- never hand-typed.
 DIAGRAMS: dict[str, str] = {
-    "context-recette": context_recette(),
-    "components": components(),
-    "run-lifecycle": run_lifecycle(),
-    "lab-topology": lab_topology(),
-    "capture-points": capture_points(),
-    "capture-to-dimensions": capture_to_dimensions(),
-    "lane-b-loop": lane_b_loop(),
-    "agent-action-model": agent_action_model(),
-    "record-replay": record_replay(),
-    "agent-axes": agent_axes(),
-    "campaign-flow": campaign_flow(),
-    "governed-path": governed_path(),
+    name: _inject(body)
+    for name, body in {
+        "context-recette": context_recette(),
+        "components": components(),
+        "run-lifecycle": run_lifecycle(),
+        "lab-topology": lab_topology(),
+        "capture-points": capture_points(),
+        "capture-to-dimensions": capture_to_dimensions(),
+        "lane-b-loop": lane_b_loop(),
+        "agent-action-model": agent_action_model(),
+        "record-replay": record_replay(),
+        "agent-axes": agent_axes(),
+        "campaign-flow": campaign_flow(),
+        "governed-path": governed_path(),
+    }.items()
 }
