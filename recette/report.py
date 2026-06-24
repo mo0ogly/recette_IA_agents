@@ -38,11 +38,26 @@ class FullReport:
             and all(s.all_passed for s in self.discovery.values())
         )
 
+    def summary(self) -> str:
+        """One-line verdict headline (so the JSON does not lead with a bare brace)."""
+        i = self.identification
+        m = self.maf
+        o = self.orchestration
+        disc_passed = sum(1 for s in self.discovery.values() if s.all_passed)
+        return (
+            f"{'PASS' if self.all_passed else 'FAIL'} -- "
+            f"identification {i.passed_count}/{i.total}, "
+            f"maf {m.passed_count}/{m.total}, "
+            f"orchestration {o.passed_count}/{o.total}, "
+            f"discovery {disc_passed}/{len(self.discovery)} surfaces"
+        )
+
     def to_dict(self) -> dict:
         i = self.identification
         m = self.maf
         o = self.orchestration
         return {
+            "summary": self.summary(),
             "identification": {
                 "agents": i.total,
                 "passed": i.passed_count,
