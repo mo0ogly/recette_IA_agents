@@ -163,9 +163,26 @@ def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
         }
     )
     report = run_wave(bundle, profile)
-    behavior_reports = {a["agent_id"]: a for a in report.to_dict()["agents"]}
-    from ...behavior.correlate import build_discovery_facts, correlate
+    live_reports = {a["agent_id"]: a for a in report.to_dict()["agents"]}
+    from ...behavior.correlate import (
+        build_discovery_facts,
+        corpus_behavior_reports,
+        correlate,
+    )
+
+    # Overlay: start from the frozen twin baseline so quadrants stay populated, then
+    # override any agent the live recording actually drove with its REAL runtime
+    # report. A live SKYNET run that touches a linked agent shows its live behavior;
+    # untouched links keep the corpus twin. live_overlay lists who came from live.
+    baseline = corpus_behavior_reports(links)
+    behavior_reports = {**baseline, **live_reports}
+    live_overlay = sorted(set(live_reports) & {ln.agent_id for ln in links})
 
     discovery_facts = build_discovery_facts(links)
     corr = correlate(discovery_facts, behavior_reports, links, thresholds)
-    return {"report": report.to_dict(), "correlation": corr, "cohort": cohort_echo}
+    return {
+        "report": report.to_dict(),
+        "correlation": corr,
+        "cohort": cohort_echo,
+        "live_overlay": live_overlay,
+    }

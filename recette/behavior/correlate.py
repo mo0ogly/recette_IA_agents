@@ -149,18 +149,16 @@ def build_discovery_facts(
     return dict(sorted(facts.items()))
 
 
-def correlate_corpus(
+def corpus_behavior_reports(
     links: list[Link],
-    thresholds: dict,
     corpus_root: Path | str | None = None,
-) -> dict:
-    """Populate quadrants from frozen twin bundles -- no live probe.
+) -> dict[str, dict]:
+    """Per-agent behavioral reports from the frozen twin bundles, keyed by agent_id.
 
     For each link with an evidence_bundle, load ``<evidence_bundle>/bundle.json``
     relative to the repo root (or ``corpus_root`` when supplied), run one wave with
-    the default exfil profile, and take the agent's report into behavior_reports.
-    Then delegates to the pure ``correlate``.  Deterministic (I4): twin bundles are
-    frozen fixtures; no clock/random in the wave engine.
+    the default exfil profile, and keep the matching agent's report. Deterministic
+    (I4): twin bundles are frozen fixtures; no clock/random in the wave engine.
     """
     import json as _json
 
@@ -168,20 +166,17 @@ def correlate_corpus(
     from .engine import run_wave
     from .profile import AnalysisProfile
 
-    facts = build_discovery_facts(links, corpus_root)
-    behavior_reports: dict[str, dict] = {}
-    prof = AnalysisProfile.from_dict({"threat": "exfil"})
-
-    # resolve the repo root once (evidence_bundle paths in agent_links.json are repo-relative)
     if corpus_root is not None:
         root = Path(corpus_root)
     else:
-        # DEFAULT_LINKS lives at <repo_root>/corpus/agent_links.json so the repo root
-        # is two parents up from that file, which equals the package parents[2].
+        # DEFAULT_LINKS lives at <repo_root>/corpus/agent_links.json; the repo root
+        # is one parent up from corpus/.
         from .links import DEFAULT_LINKS
 
         root = DEFAULT_LINKS.parents[1]  # corpus/ -> repo root
 
+    prof = AnalysisProfile.from_dict({"threat": "exfil"})
+    reports: dict[str, dict] = {}
     for ln in links:
         if not ln.evidence_bundle:
             continue
@@ -192,8 +187,22 @@ def correlate_corpus(
         rep = run_wave(EvidenceBundle.from_dict(data), prof).to_dict()
         for a in rep["agents"]:
             if a["agent_id"] == ln.agent_id:
-                behavior_reports[ln.agent_id] = a
+                reports[ln.agent_id] = a
+    return reports
 
+
+def correlate_corpus(
+    links: list[Link],
+    thresholds: dict,
+    corpus_root: Path | str | None = None,
+) -> dict:
+    """Populate quadrants from frozen twin bundles -- no live probe.
+
+    Delegates the per-agent twin waves to ``corpus_behavior_reports`` and the
+    classification to the pure ``correlate``. Deterministic (I4).
+    """
+    facts = build_discovery_facts(links, corpus_root)
+    behavior_reports = corpus_behavior_reports(links, corpus_root)
     return correlate(facts, behavior_reports, links, thresholds)
 
 

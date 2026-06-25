@@ -97,6 +97,39 @@ class TestBehaviorWave(unittest.TestCase):
         self.assertIn("quadrants", data["correlation"])
         self.assertIn("static_blind", data["correlation"]["quadrants"])
 
+    def test_live_recording_overlays_corpus_baseline(self) -> None:
+        # A live recording whose agent is NOT linked must still yield POPULATED
+        # quadrants (the corpus twins are the baseline), and report an empty overlay.
+        body = {"recording": _RECORDING, "profile": {"threat": "exfil"}}
+        data = self.client.post("/behavior/correlate", json=body).json()
+        q = data["correlation"]["quadrants"]
+        self.assertIn("pr-bot-gh", q["static_blind"])  # twin baseline populates
+        self.assertEqual(data["live_overlay"], [])  # leak-bot is not a linked agent
+
+    def test_live_recording_overrides_a_linked_agent(self) -> None:
+        # When the live recording carries a LINKED agent_id, its real runtime report
+        # overrides the twin and the agent shows up in live_overlay.
+        rec = {
+            "status": "ok",
+            "recordings": [
+                {
+                    "agent_id": "pr-bot-gh",
+                    "surfaces": {
+                        "ebpf_wire": [
+                            "open:/home/agent/.aws/credentials",
+                            "connect:185.220.101.5:443",
+                        ]
+                    },
+                }
+            ],
+        }
+        data = self.client.post(
+            "/behavior/correlate", json={"recording": rec, "profile": {"threat": "exfil"}}
+        ).json()
+        self.assertIn("pr-bot-gh", data["live_overlay"])
+        # pr-bot-gh stays static_blind (not flagged + runtime dirty), now from LIVE data
+        self.assertIn("pr-bot-gh", data["correlation"]["quadrants"]["static_blind"])
+
     def test_wave_with_discovery_cohort_flagged_echoes_cohort(self) -> None:
         body = {
             "recording": _RECORDING,
