@@ -87,8 +87,10 @@ class TestCorrelate(unittest.TestCase):
         self.assertEqual(flagged, sorted(set(flagged)))
         # flagged is a subset of detected
         self.assertTrue(set(flagged).issubset(set(detected)))
-        # admin-overreach is the high-risk repo -> in flagged
-        self.assertIn("admin-overreach", flagged)
+        # admin-overreach (gh + gl) are high-risk repos -> both in flagged
+        # agent_ids are surface-qualified: admin-overreach-gh, admin-overreach-gl
+        self.assertIn("admin-overreach-gh", flagged)
+        self.assertIn("admin-overreach-gl", flagged)
         # replay-stable
         self.assertEqual(discovery_cohort(links, "flagged"), flagged)
 
@@ -105,9 +107,27 @@ class TestCorrelate(unittest.TestCase):
 
         prof = AnalysisProfile.from_dict({"threat": "exfil"})
         resolved = resolve_discovery_cohort(prof, "flagged")
-        self.assertIn("admin-overreach", prof.cohort.get("agents", []))
+        # With the full 10-link corpus, admin-overreach subjects are surface-qualified.
+        # Both gh and gl variants are high-risk -> both appear in the flagged cohort.
+        agents = prof.cohort.get("agents", [])
+        self.assertIn("admin-overreach-gh", agents)
+        self.assertIn("admin-overreach-gl", agents)
         self.assertEqual(resolved["mode"], "flagged")
         self.assertEqual(sorted(resolved["agents"]), sorted(prof.cohort["agents"]))
+
+    def test_build_discovery_facts_surface_aware(self):
+        from recette.behavior.correlate import build_discovery_facts
+        from recette.behavior.links import load_links
+
+        facts = build_discovery_facts(load_links())
+        # gitlab subject resolves (was invisible before surface-awareness)
+        self.assertIn("gl-pr-bot", facts)
+        self.assertTrue(facts["gl-pr-bot"]["detected"])
+        # flagged split per verified levels: admin/supply flagged; pr-bot/readonly not
+        self.assertTrue(facts["gh-admin-overreach"]["flagged"])
+        self.assertTrue(facts["gh-supply-chain-compromise"]["flagged"])
+        self.assertFalse(facts["gh-pr-bot"]["flagged"])
+        self.assertFalse(facts["gh-readonly-reporter"]["flagged"])
 
     def test_cli_correlate_renders_static_blind(self):
         from recette.cli.behavior_cmds import correlate_summary

@@ -93,9 +93,14 @@ def build_discovery_facts(
     """Run the reference source-scan adapter over each link's discovery subject
     and reduce it to {detected, flagged}.
 
+    Surface-aware: each link's surface field (default "github") selects the
+    corpus sub-directory via SURFACE_CORPUS. This lets github (corpus/repos)
+    and gitlab (corpus/gitlab) subjects coexist in the same scan.
+
     flagged uses the invariant risk LEVEL (never an opaque score), per the
     discovery ground-truth rule: flagged = detected AND max_level strictly
-    above the lower median of detected levels across the scanned set.
+    above the lower median of detected levels across ALL detected linked
+    subjects across both surfaces.
     The lower median (index (n-1)//2 of the sorted list) avoids a bias where
     a two-element set [low, high] would raise the median to high, making
     nothing flaggable. The adapter scan is deterministic (proven in
@@ -103,9 +108,8 @@ def build_discovery_facts(
     Returns a dict sorted by key (I4).
     """
     from ..adapters import ReferenceSourceScanAdapter
-    from ..discovery_harness import DEFAULT_REPO_CORPUS, _max_level
+    from ..discovery_harness import SURFACE_CORPUS, _max_level
 
-    root = Path(corpus_root) if corpus_root is not None else Path(DEFAULT_REPO_CORPUS)
     adapter = ReferenceSourceScanAdapter()
     facts: dict[str, dict] = {}
     levels: dict[str, int] = {}
@@ -114,7 +118,13 @@ def build_discovery_facts(
         subj = ln.discovery_subject
         if not subj or subj in facts:
             continue
-        repo_tree = root / subj / "repo"
+        surface = ln.surface or "github"
+        if corpus_root is not None:
+            # caller-supplied root: resolve directly (used in tests)
+            surface_root = Path(corpus_root)
+        else:
+            surface_root = SURFACE_CORPUS.get(surface, SURFACE_CORPUS["github"])
+        repo_tree = surface_root / subj / "repo"
         if not repo_tree.exists():
             facts[subj] = {"detected": False, "flagged": False}
             continue
@@ -127,8 +137,8 @@ def build_discovery_facts(
             levels[subj] = _max_level(risks)
 
     # flagged = detected AND max level strictly above the lower median of all
-    # detected levels in the scanned set (invariant: relative risk ordering,
-    # never an absolute score).
+    # detected levels across ALL surfaces in the scanned set (invariant:
+    # relative risk ordering, never an absolute score).
     detected_levels = sorted(levels.values())
     median = detected_levels[(len(detected_levels) - 1) // 2] if detected_levels else 0
     for subj in facts:

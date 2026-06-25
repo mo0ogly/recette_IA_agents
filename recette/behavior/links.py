@@ -23,6 +23,7 @@ class Link:
     runtime_subject: str | None
     evidence_bundle: str | None
     expected: dict
+    surface: str | None = None
 
 
 def load_links(path: Path | str = DEFAULT_LINKS) -> list[Link]:
@@ -35,6 +36,7 @@ def load_links(path: Path | str = DEFAULT_LINKS) -> list[Link]:
             runtime_subject=e.get("runtime_subject"),
             evidence_bundle=e.get("evidence_bundle"),
             expected=e.get("expected") or {},
+            surface=e.get("surface") or None,
         )
         for e in data.get("links", [])
     ]
