@@ -151,6 +151,30 @@ if [ "${#PY[@]}" -gt 0 ]; then
   fi
 fi
 
+# ==========================================================================
+# BORN-OVER-CEILING (R29)
+# ==========================================================================
+# A NEWLY ADDED source file must not be born above the LOC ceiling
+# (.rs 800 / .ts 500 / .tsx 400). Applies to CREATION only (diff-filter=A):
+# editing a legacy over-ceiling file is unaffected. An @allow-long-file marker
+# does NOT exempt creation -- a birth bypass becomes permanent debt (the
+# index.tsx-at-543 incident the Runs Explorer cycle had to split by hand).
+# Test files (*.test.* / *.spec.*) and corpus subjects are exempt.
+declare -A CEIL=( [rs]=800 [ts]=500 [tsx]=400 )
+mapfile -t ADDED < <(git diff --cached --name-only --diff-filter=A -- '*.rs' '*.ts' '*.tsx' \
+  | grep -v '^corpus/' | grep -vE '\.(test|spec)\.(ts|tsx)$')
+for f in "${ADDED[@]}"; do
+  ext="${f##*.}"
+  ceil="${CEIL[$ext]:-}"
+  [ -z "$ceil" ] && continue
+  loc="$(git show ":${f}" 2>/dev/null | wc -l)"
+  if [ "$loc" -gt "$ceil" ]; then
+    printf '[pre-commit][FAIL] R29 born-over-ceiling: %s is %s LOC > %s (.%s) -- split it before creating (no @allow-long-file at birth).\n' \
+      "$f" "$loc" "$ceil" "$ext" >&2
+    FAIL=1
+  fi
+done
+
 if [ "$FAIL" -ne 0 ]; then
   printf '[pre-commit] BLOCKED. Fix the issues above, or bypass with RUST_RECETTE_PRECOMMIT_SKIP=1 (logged).\n' >&2
   exit 1
