@@ -68,6 +68,7 @@ from .routers import rag as rag_router
 from .routers import recette_campaigns as recette_campaigns_router
 from .routers import registry as registry_router
 from .routers import runs as runs_router
+from .routers import runs_registry as runs_registry_router
 from .routers import sim as sim_router
 from .routers import subjects as subjects_router
 from .routers import verdicts as verdicts_router
@@ -347,6 +348,7 @@ def create_app(
     app.include_router(catalog_router.router)
     app.include_router(catalog_registry_router.router)
     app.include_router(runs_router.router)
+    app.include_router(runs_registry_router.router)
     app.include_router(actions_router.router)
     app.include_router(policies_router.router)
     app.include_router(approvals_router.router)
