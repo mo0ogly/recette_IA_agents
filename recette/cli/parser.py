@@ -180,6 +180,12 @@ def build_parser() -> argparse.ArgumentParser:
     an_run.add_argument(
         "--json", action="store_true", help="emit the full report as JSON (default: summary)"
     )
+    an_run.add_argument(
+        "--cohort-discovery",
+        choices=["detected", "flagged"],
+        default=None,
+        help="derive the wave cohort from discovery: detected (all) or flagged (high-risk)",
+    )
     an_rep = analyze_sub.add_parser(
         "replay", help="re-run a wave and assert the report is byte-identical (reproducibility)"
     )

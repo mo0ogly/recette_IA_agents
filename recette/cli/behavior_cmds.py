@@ -58,10 +58,33 @@ def _render_summary(report: dict) -> str:
     return "\n".join(lines)
 
 
-def _cmd_analyze_wave(evidence: str, profile: str | None, threat: str | None, as_json: bool) -> int:
+def resolve_discovery_cohort(profile: AnalysisProfile, mode: str | None) -> dict:
+    """Fill profile.cohort['agents'] from a discovery scan; return the resolved
+    cohort echo {mode, agents}. No-op echo when mode is falsy."""
+    if not mode:
+        return {"mode": None, "agents": profile.cohort.get("agents", ["*"])}
+    from ..behavior.correlate import discovery_cohort
+    from ..behavior.links import load_links
+
+    agents = discovery_cohort(load_links(), mode)
+    profile.cohort["agents"] = agents
+    return {"mode": mode, "agents": agents}
+
+
+def _cmd_analyze_wave(
+    evidence: str,
+    profile: str | None,
+    threat: str | None,
+    as_json: bool,
+    cohort_discovery: str | None = None,
+) -> int:
     try:
         bundle = EvidenceBundle.load(evidence)
         prof = _load_profile(profile, threat)
+        echo = resolve_discovery_cohort(prof, cohort_discovery)
+        if cohort_discovery:
+            n = len(echo["agents"])
+            print(f"cohort: {echo['mode']} -> {echo['agents']} ({n})")
         report = run_wave(bundle, prof).to_dict()
     except (OSError, ValueError) as exc:
         print(f"analyze: {exc}", file=sys.stderr)

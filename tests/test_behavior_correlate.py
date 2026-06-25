@@ -99,6 +99,16 @@ class TestCorrelate(unittest.TestCase):
         with self.assertRaises(ValueError):
             discovery_cohort(load_links(), "bogus")
 
+    def test_resolve_cohort_into_profile(self):
+        from recette.behavior import AnalysisProfile
+        from recette.cli.behavior_cmds import resolve_discovery_cohort
+
+        prof = AnalysisProfile.from_dict({"threat": "exfil"})
+        resolved = resolve_discovery_cohort(prof, "flagged")
+        self.assertIn("admin-overreach", prof.cohort.get("agents", []))
+        self.assertEqual(resolved["mode"], "flagged")
+        self.assertEqual(sorted(resolved["agents"]), sorted(prof.cohort["agents"]))
+
     def test_cli_correlate_renders_static_blind(self):
         from recette.cli.behavior_cmds import correlate_summary
 

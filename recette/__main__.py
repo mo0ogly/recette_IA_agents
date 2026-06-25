@@ -115,7 +115,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_surface(args.recording)
     if args.command == "analyze":
         if args.analyze_cmd == "wave":
-            return _cmd_analyze_wave(args.evidence, args.profile, args.threat, args.json)
+            return _cmd_analyze_wave(
+                args.evidence, args.profile, args.threat, args.json, args.cohort_discovery
+            )
         if args.analyze_cmd == "replay":
             return _cmd_analyze_replay(args.evidence, args.profile, args.threat, args.report)
         if args.analyze_cmd == "metrics":
