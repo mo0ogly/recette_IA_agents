@@ -1482,6 +1482,7 @@
       "ai_mode": "mock",
       "principal": "dx@acme",
       "target_system": "github",
+      "server": "gh-mock",
       "capability_scope": [
         "read_repo"
       ],

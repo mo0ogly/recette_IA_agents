@@ -65,8 +65,17 @@ def _discovery_detects(agent_id: str, target_system: str, decided: list[str]) ->
     return ReferenceDiscoveryAdapter().discover(log).detected
 
 
-def analyze(rows: list[dict]) -> dict:
-    """Per-run discovery-vs-proxy agreement. Pure."""
+def analyze(rows: list[dict], fleet: list[dict] | None = None) -> dict:
+    """Per-run discovery-vs-proxy agreement. Pure.
+
+    ``rows`` are the GOVERNED traced runs (agents that acted and were mediated).
+    ``fleet`` (optional) is the FULL agent fleet (``agents_live_skynet.jsonl``):
+    when supplied, every fleet agent that did NOT produce a trace is still
+    accounted for -- with its outcome (``acted`` | ``refused`` | ``no_action``) --
+    so the legibility report covers the whole fleet instead of silently dropping
+    the agents that refused-on-policy or were denied (legibility-first: a refusal
+    is an observable, recettable outcome, not an absence).
+    """
     ok = [r for r in rows if r.get("ok")]
     per_agent = []
     detection_parity = 0
@@ -111,11 +120,52 @@ def analyze(rows: list[dict]) -> dict:
             }
         )
 
+    # Account for the non-acting fleet agents (refused-on-policy / denied / idle):
+    # they produced no trace, so they are legitimately absent from the proxy side,
+    # but they MUST stay legible. A fleet agent that DECIDED actions yet was never
+    # traced (e.g. no bound server) is a real decided-but-not-mediated gap.
+    traced_ids = {r.get("agent_id") for r in ok}
+    fleet_outcomes = {"acted": 0, "refused": 0, "no_action": 0}
+    non_acting = 0
+    for f in fleet or []:
+        aid = f.get("agent_id")
+        if aid in traced_ids:
+            continue
+        non_acting += 1
+        outcome = f.get("outcome") or "no_action"
+        fleet_outcomes[outcome] = fleet_outcomes.get(outcome, 0) + 1
+        decided = sorted(set(f.get("action_types", [])))
+        declared = set(f.get("scope", []) or [])
+        disc = bool(decided) and _discovery_detects(aid or "", f.get("target_system", ""), decided)
+        # not traced -> done is empty; parity holds unless it decided yet was unmediated
+        parity = (not disc) and not decided
+        chain = set(decided) <= declared
+        if decided:  # decided something but no proxy trace -> legibility gap
+            decided_not_done.append({"agent_id": aid, "actions": decided})
+        per_agent.append(
+            {
+                "agent_id": aid,
+                "target_system": f.get("target_system"),
+                "discovery_detected": disc,
+                "proxy_acted": False,
+                "decided": decided,
+                "done": [],
+                "parity": parity,
+                "chain_ok": chain,
+                "outcome": outcome,
+                "refused_on_policy": bool(f.get("refused_on_policy")),
+                "traced": False,
+            }
+        )
+
     n = len(ok) or 1
     proxy_types = sorted({t["action_type"] for r in ok for t in r.get("done_traces", [])})
     disc_types = sorted({a for r in ok for a in r.get("decided", [])})
     return {
         "agents": len(ok),
+        "fleet_total": len(fleet) if fleet is not None else len(ok),
+        "non_acting": non_acting,
+        "fleet_outcomes": fleet_outcomes,
         "detection_parity_rate": round(detection_parity / n, 3),
         "legibility_chain_rate": round(chain_ok / n, 3),
         "discovery_action_types": disc_types,
@@ -142,8 +192,15 @@ def to_markdown(a: dict) -> str:
         )
     if not div:
         div = "\n  (no divergence: every decided action was mediated and vice-versa)"
+    fc = a.get("fleet_outcomes", {})
+    coverage = (
+        f"\n- fleet coverage: {a.get('fleet_total', a['agents'])} agents "
+        f"({a['agents']} acted+traced, {a.get('non_acting', 0)} non-acting -- "
+        f"refused={fc.get('refused', 0)}, no_action={fc.get('no_action', 0)}, "
+        f"acted-untraced={fc.get('acted', 0)})"
+    )
     return f"""## discovery-vs-proxy -- same live runs ({a["agents"]} agents)
-
+{coverage}
 - detection parity (discovery sees what proxy mediates): {a["detection_parity_rate"]}
 - legibility chain done<=decided<=declared: {a["legibility_chain_rate"]}
 - action-type vocabulary discovery vs proxy: {same}
@@ -158,7 +215,8 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     rows = _load("traced_skynet.jsonl")
-    a = analyze(rows)
+    fleet = _load("agents_live_skynet.jsonl")
+    a = analyze(rows, fleet)
     # Persist the researcher artifact so the ANSSI bundle is self-contained.
     (_DIR / "discovery_vs_proxy_skynet.json").write_text(json.dumps(a, indent=2), encoding="utf-8")
     print(json.dumps(a, indent=2) if args.json else to_markdown(a))
