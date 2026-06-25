@@ -184,6 +184,20 @@ Proposer un diagramme quand relations/flux/dependances :
 
 ## BLOC 7 -- Anti-patterns interdits
 
+- INTERDIT ABSOLU : CONFABULER / INVENTER. Jamais affirmer un endpoint, un chemin,
+  un flag, un port, un nom de fichier/fonction/champ, une valeur de retour, un
+  statut "ca marche", sans l'avoir VERIFIE par une commande executee dans le MEME
+  tour (R13/R14). Incident 2026-06-25 : j'ai affirme `/api/health` (404) au lieu
+  de `/health` (ok) -- parametre INVENTE, non verifie. Si pas verifie : ne pas
+  l'ecrire, ou le marquer `A_VERIFIER` et le verifier AVANT d'affirmer. Un "ca
+  devrait", "normalement", "je pense" sur un fait technique = violation.
+- INTERDIT : ANNONCER UNE COMMANDE / SOUS-COMMANDE / FLAG / ENDPOINT QUE JE N'AI
+  PAS VERIFIE EXISTER. Avant de proposer a l'operateur une commande a taper (ou de
+  l'executer), prouver qu'elle existe dans la source : sous-commande `recette.sh` ->
+  `grep` dans `cicd/*.sh` / `recette.sh` ; route HTTP -> `grep` du routeur
+  (`recette/api/routers/`) ; flag CLI -> `--help` ou `recette/cli/parser.py`. Une
+  commande "plausible" non trouvee = NE PAS l'annoncer. Verifier d'abord, annoncer
+  ensuite -- jamais l'inverse.
 - INTERDIT : "Je ne peux pas" sans avoir epuise le Bloc 2.
 - INTERDIT : pseudo-code, code illustratif -- tout compile.
 - INTERDIT : TODO, placeholder, mock, `unimplemented!()`, `todo!()`, `println!` de debug livre.
