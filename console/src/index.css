@@ -506,6 +506,62 @@ textarea:focus {
   align-self: center;
 }
 
+/* --- Grouped dropdown navigation (NavMenu) ----------------------------- */
+.nav-group {
+  position: relative;
+}
+
+.nav-group-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-group-button:hover,
+.nav-group-button-open {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.nav-group-button-active {
+  color: var(--color-accent);
+}
+
+.nav-group-caret {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 0.35rem;
+  gap: 0.1rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+
+.nav-dropdown .nav-link {
+  white-space: nowrap;
+}
+
 /* --- Agent-action catalog picker (Agents page) -------------------------- */
 .agents-actions-picker {
   border: 1px solid var(--color-border);

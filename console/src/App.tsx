@@ -1,4 +1,4 @@
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import AgentsPage from "./pages/agents";
 import AiBackendsPage from "./pages/ai-backends";
@@ -23,7 +23,7 @@ import LivePage from "./pages/live";
 import ObservabilityPage from "./pages/observability";
 import ProbePage from "./pages/probe";
 import RunsExplorerPage from "./pages/runs";
-import ProxyNavBadge from "./components/ProxyNavBadge";
+import NavMenu from "./components/NavMenu";
 import ProxyPage from "./pages/proxy";
 import RagPage from "./pages/rag";
 import RecettePage from "./pages/recette";
@@ -32,106 +32,12 @@ import RecetteCampaignsPage from "./pages/recette-campaigns";
 import ServersPage from "./pages/servers";
 import VerdictsPage from "./pages/verdicts";
 
-function navLinkClass({ isActive }: { isActive: boolean }): string {
-  return isActive ? "nav-link nav-link-active" : "nav-link";
-}
-
 export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <header className="app-header">
         <span className="app-title">inspect_ia_agents</span>
-        <nav className="app-nav">
-          <NavLink to="/dashboard" className={navLinkClass}>
-            Tableau de bord
-          </NavLink>
-          <NavLink to="/flux" className={navLinkClass}>
-            Flux
-          </NavLink>
-          <NavLink to="/live" className={navLinkClass}>
-            Temps reel
-          </NavLink>
-          <NavLink to="/recette" className={navLinkClass}>
-            Recette
-          </NavLink>
-          <NavLink to="/campaigns" className={navLinkClass}>
-            Campagnes
-          </NavLink>
-          <NavLink to="/recette-campaigns" className={navLinkClass}>
-            Campagnes recette
-          </NavLink>
-          <NavLink to="/verdicts" className={navLinkClass}>
-            Verdicts
-          </NavLink>
-          <NavLink to="/rag" className={navLinkClass}>
-            RAG
-          </NavLink>
-          <NavLink to="/discovery" className={navLinkClass}>
-            Discovery
-          </NavLink>
-          <NavLink to="/discovery-exchange" className={navLinkClass}>
-            Discovery x Echange
-          </NavLink>
-          <NavLink to="/discovery-overview" className={navLinkClass}>
-            Discovery overview
-          </NavLink>
-          <NavLink to="/detect" className={navLinkClass}>
-            Reperage
-          </NavLink>
-          <NavLink to="/registry" className={navLinkClass}>
-            Catalogue
-          </NavLink>
-          <NavLink to="/agent-registry" className={navLinkClass}>
-            Registry
-          </NavLink>
-          <NavLink to="/probe" className={navLinkClass}>
-            Probe
-          </NavLink>
-          <NavLink to="/runs" className={navLinkClass}>
-            Runs
-          </NavLink>
-          <NavLink to="/sim" className={navLinkClass}>
-            Red-team
-          </NavLink>
-          <NavLink to="/agents" className={navLinkClass}>
-            Agents
-          </NavLink>
-          <NavLink to="/ai-backends" className={navLinkClass}>
-            IA
-          </NavLink>
-          <NavLink to="/servers" className={navLinkClass}>
-            Serveurs
-          </NavLink>
-          <span className="nav-sep">Control plane</span>
-          <NavLink to="/control" className={navLinkClass}>
-            Control
-          </NavLink>
-          <NavLink to="/catalog" className={navLinkClass}>
-            Catalog
-          </NavLink>
-          <NavLink to="/approvals" className={navLinkClass}>
-            Approvals
-          </NavLink>
-          <NavLink to="/audit" className={navLinkClass}>
-            Audit
-          </NavLink>
-          <NavLink to="/observability" className={navLinkClass}>
-            Observabilite
-          </NavLink>
-          <NavLink to="/metrics" className={navLinkClass}>
-            Metriques
-          </NavLink>
-          <NavLink to="/graph" className={navLinkClass}>
-            Graphe
-          </NavLink>
-          <NavLink to="/proxy" className={navLinkClass}>
-            Proxy
-            <ProxyNavBadge />
-          </NavLink>
-          <NavLink to="/receipts" className={navLinkClass}>
-            Receipts
-          </NavLink>
-        </nav>
+        <NavMenu />
       </header>
       <main className="app-main">
         <Routes>
