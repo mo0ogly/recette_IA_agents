@@ -11,6 +11,8 @@ no clock, no random, sorted/stable output -> byte-identical on replay.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .links import Link
 from .report import TOOL_VERSION
 
@@ -82,3 +84,54 @@ def correlate(
         "thresholds": {"runtime_dirty": dirty_threshold},
         "tool_version": TOOL_VERSION,
     }
+
+
+def build_discovery_facts(
+    links: list[Link],
+    corpus_root: Path | str | None = None,
+) -> dict[str, dict]:
+    """Run the reference source-scan adapter over each link's discovery subject
+    and reduce it to {detected, flagged}.
+
+    flagged uses the invariant risk LEVEL (never an opaque score), per the
+    discovery ground-truth rule: flagged = detected AND max_level strictly
+    above the lower median of detected levels across the scanned set.
+    The lower median (index (n-1)//2 of the sorted list) avoids a bias where
+    a two-element set [low, high] would raise the median to high, making
+    nothing flaggable. The adapter scan is deterministic (proven in
+    discovery_harness), so this function is deterministic given the corpus.
+    Returns a dict sorted by key (I4).
+    """
+    from ..adapters import ReferenceSourceScanAdapter
+    from ..discovery_harness import DEFAULT_REPO_CORPUS, _max_level
+
+    root = Path(corpus_root) if corpus_root is not None else Path(DEFAULT_REPO_CORPUS)
+    adapter = ReferenceSourceScanAdapter()
+    facts: dict[str, dict] = {}
+    levels: dict[str, int] = {}
+
+    for ln in sorted(links, key=lambda x: x.agent_id):
+        subj = ln.discovery_subject
+        if not subj or subj in facts:
+            continue
+        repo_tree = root / subj / "repo"
+        if not repo_tree.exists():
+            facts[subj] = {"detected": False, "flagged": False}
+            continue
+        sid = adapter.register(str(repo_tree))
+        adapter.await_run(adapter.scan(sid))
+        risks = adapter.risks(sid)
+        detected = len(risks) > 0
+        facts[subj] = {"detected": detected}
+        if detected:
+            levels[subj] = _max_level(risks)
+
+    # flagged = detected AND max level strictly above the lower median of all
+    # detected levels in the scanned set (invariant: relative risk ordering,
+    # never an absolute score).
+    detected_levels = sorted(levels.values())
+    median = detected_levels[(len(detected_levels) - 1) // 2] if detected_levels else 0
+    for subj in facts:
+        facts[subj]["flagged"] = facts[subj]["detected"] and levels.get(subj, 0) > median
+
+    return dict(sorted(facts.items()))

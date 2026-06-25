@@ -63,3 +63,14 @@ class TestCorrelate(unittest.TestCase):
         a = correlate(self.discovery_facts, self.behavior_reports, self.links, self.thresholds)
         b = correlate(self.discovery_facts, self.behavior_reports, self.links, self.thresholds)
         self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
+
+    def test_build_discovery_facts_over_corpus(self):
+        from recette.behavior.correlate import build_discovery_facts
+        from recette.behavior.links import load_links
+
+        facts = build_discovery_facts(load_links())
+        # gh-pr-bot is a detected agent repo in the corpus
+        self.assertIn("gh-pr-bot", facts)
+        self.assertTrue(facts["gh-pr-bot"]["detected"])
+        # gh-admin-overreach is the high-risk overreach repo -> flagged
+        self.assertTrue(facts["gh-admin-overreach"]["flagged"])
