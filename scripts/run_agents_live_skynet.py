@@ -129,7 +129,46 @@ def main() -> int:
         f"\nfleet done: {len(results)} agents | acted={acted} | "
         f"errors={errs} | out-of-scope={out_scope}\nresults: {_OUT}"
     )
+
+    # Register this fleet run in the registry (fail-safe, non-fatal -- R19).
+    _register_fleet(results=results, model=args.model)
+
     return 0
+
+
+def _register_fleet(*, results: list[dict], model: str) -> None:
+    """Register the fleet run into the eurodated run registry (fail-safe).
+
+    Keeps the flat-file _OUT write for back-compat; the registry is additive.
+    The eurodate is ops metadata (not a decision path -- I4).
+    """
+    try:
+        import datetime
+
+        from recette.runs.capture import capture_surface, update_latest_symlink
+
+        eurodate = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        group_id = f"skynet-fleet-{eurodate}"
+        capture_surface(
+            category="skynet",
+            group_id=group_id,
+            eurodate=eurodate,
+            label=f"SKYNET fleet {model}",
+            runs={
+                "agents": {
+                    "kind": "agent",
+                    "artifacts": {
+                        "agents_live_skynet.jsonl": "\n".join(json.dumps(r) for r in results)
+                        + "\n",
+                    },
+                }
+            },
+        )
+        update_latest_symlink("skynet", eurodate, group_id)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("run registry capture failed (non-fatal): %s", exc)
 
 
 if __name__ == "__main__":

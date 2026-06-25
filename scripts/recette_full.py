@@ -23,6 +23,9 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
 
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))  # importable as `python3 scripts/X.py` from anywhere
+
 # (subsystem label, argv, core?) -- core checks always run; non-core skipped with --quick.
 _CHECKS: list[tuple[str, list[str], bool]] = [
     ("schemas", ["python3", "-m", "recette", "validate"], True),
@@ -135,6 +138,40 @@ def render_retex(results: list[dict[str, object]], date: str) -> str:
 """
 
 
+def _register_sweep(*, results: list[dict], date: str, quick: bool) -> None:
+    """Register this sweep into the run registry (fail-safe, non-fatal).
+
+    Keeps the flat-file write + latest/ symlink for back-compat.
+    The eurodate is derived from the ops date (allowed: operational metadata,
+    not a decision path -- I4 governs decision paths).
+    """
+    try:
+        from recette.runs.capture import capture_surface, update_latest_symlink
+
+        eurodate = date.replace("-", "-") + "T00-00-00"
+        group_id = f"recette-full-{date}"
+        artifacts: dict[str, str] = {
+            "results.json": json.dumps(results, indent=2),
+        }
+        capture_surface(
+            category="recette-full",
+            group_id=group_id,
+            eurodate=eurodate,
+            label=f"recette-full {'quick' if quick else 'full'} {date}",
+            runs={
+                "sweep": {
+                    "kind": "recette-full",
+                    "artifacts": artifacts,
+                }
+            },
+        )
+        update_latest_symlink("recette-full", eurodate, group_id)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("run registry capture failed (non-fatal): %s", exc)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Deterministic recette sweep + RETEX skeleton.")
     ap.add_argument("--quick", action="store_true", help="skip the slow unittest + gates checks")
@@ -156,6 +193,10 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"RETEX_recette-full_{date}.md"
     out_path.write_text(render_retex(results, date), encoding="utf-8")
+
+    # Register this sweep in the run registry (fail-safe: errors are logged,
+    # never abort the recette run -- R19/capture fail-safe).
+    _register_sweep(results=results, date=date, quick=args.quick)
 
     for r in results:
         mark = "PASS" if r["passed"] else "FAIL"
