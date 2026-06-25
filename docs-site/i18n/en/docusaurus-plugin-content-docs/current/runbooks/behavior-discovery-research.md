@@ -78,6 +78,71 @@ loud (`unresolved[]`), never silently dropped.
    knob that re-runs the correlation live, the provenance line, and an explicit
    unresolved / coverage-gap block. Drill into a quadrant cell to see its agents.
 
+## Cohort from discovery (P2)
+
+By default a behavioral wave runs over all agents present in the evidence bundles.
+P2 lets you restrict that cohort to the agents a discovery scan retained, in two
+modes:
+
+- **detected**: every agent the scanner detected (all visible repos).
+- **flagged**: only agents the scanner marked as high-risk (elevated risk level or
+  sensitive action patterns).
+
+### CLI
+
+```
+python3 -m recette analyze wave --evidence <bundle> --profile <profile.json> --cohort-discovery detected
+python3 -m recette analyze wave --evidence <bundle> --profile <profile.json> --cohort-discovery flagged
+```
+
+The resolver reads the identity map (`corpus/agent_links.json`) and the reference
+discovery scan, then injects the retained `agent_id` list into the profile before
+launching the wave. The output always prints the cohort echo:
+`cohort: flagged -> [admin-overreach, ...] (N)`. This is fail-loud by design: if the
+mode matches no agent, the list is empty and the count is explicitly zero -- never a
+silent success.
+
+### API
+
+Pass `cohort.discovery` in the profile submitted to `/behavior/wave`:
+
+```json
+{
+  "recording": "...",
+  "profile": {
+    "threat": "exfil",
+    "cohort": { "discovery": "flagged" }
+  }
+}
+```
+
+The response includes a `cohort` field with the resolved mode and agent list:
+
+```json
+{
+  "cohort": { "mode": "flagged", "agents": ["admin-overreach"] }
+}
+```
+
+An unknown value (neither `detected` nor `flagged`) returns a 400 error.
+
+### Console
+
+The **Behavioral analysis** panel on the Probe page exposes a cohort selector:
+**All** (default behavior, all agents in the evidence), **Discovered** (`detected`
+mode), and **Flagged** (`flagged` mode). After a run in `Discovered` or `Flagged`
+mode the panel displays the line `cohort: {mode} -> N agent(s)` with the resolved
+list.
+
+### P1 boundary -- "0 matched"
+
+A `flagged` cohort contains the `agent_id`s that the identity map could resolve from
+the discovery scan. If none of those `agent_id`s has runtime evidence in the supplied
+bundle, the wave runs over zero agents and the echo says so explicitly. This is
+expected in P2 -- the 1:1 twins between discovery subjects and runtime bundles are
+built in P3. Until then, a `flagged` cohort may match no agent in the current bundle;
+that is the honest, visible frontier, never hidden.
+
 ## Reading the result honestly (P1 boundary)
 
 At P1 the identity map pairs the subjects that already exist on both sides;

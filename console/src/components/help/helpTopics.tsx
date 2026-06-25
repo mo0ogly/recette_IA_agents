@@ -1592,6 +1592,9 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <code>evidence_missing</code>, jamais dans un quadrant fantome —
           c&apos;est la frontiere de couverture P1, fermee par les jumeaux 1:1
           (P3). Detail : <code>docs/runbooks/behavior-discovery-research.md</code>.
+          Le selecteur de cohorte (<strong>All / Discovered / Flagged</strong>)
+          restreint la vague aux agents que le moteur discovery a detectes ou
+          marques haut-risque, avant meme de lancer la correlation.
         </p>
       </>
     ),

@@ -78,6 +78,71 @@ est reporte loud (`unresolved[]`), jamais avale silencieusement.
    qui relance la correlation en direct, la ligne de provenance, et un bloc
    explicite unresolved / coverage-gap. Clique une cellule pour voir ses agents.
 
+## Cohorte depuis discovery (P2)
+
+Par defaut, une vague comportementale s'execute sur tous les agents presents dans
+les evidence bundles. P2 permet de restreindre cette cohorte aux agents qu'un scan
+discovery a retenus, en deux modes :
+
+- **detected** : tous les agents que le scanner a detectes (tous repos visibles).
+- **flagged** : uniquement les agents marques haut-risque par le scanner (niveau de
+  risque eleve ou patterns d'action sensibles).
+
+### CLI
+
+```
+python3 -m recette analyze wave --evidence <bundle> --profile <profile.json> --cohort-discovery detected
+python3 -m recette analyze wave --evidence <bundle> --profile <profile.json> --cohort-discovery flagged
+```
+
+Le resolveur lit la carte d'identite (`corpus/agent_links.json`) et le scan discovery
+de reference, puis injecte la liste des `agent_id` retenus dans le profil avant de
+lancer la vague. La sortie affiche toujours le echo de cohorte :
+`cohort: flagged -> [admin-overreach, ...] (N)`. C'est fail-loud par construction : si
+le mode ne correspond a aucun agent, la liste est vide et le compte est explicitement
+zero -- jamais un succes silencieux.
+
+### API
+
+Passer `cohort.discovery` dans le profil soumis a `/behavior/wave` :
+
+```json
+{
+  "recording": "...",
+  "profile": {
+    "threat": "exfil",
+    "cohort": { "discovery": "flagged" }
+  }
+}
+```
+
+La reponse inclut le champ `cohort` avec le mode resolu et la liste des agents :
+
+```json
+{
+  "cohort": { "mode": "flagged", "agents": ["admin-overreach"] }
+}
+```
+
+Une valeur inconnue (ni `detected` ni `flagged`) retourne une erreur 400.
+
+### Console
+
+Le panneau **Behavioral analysis** de la page Probe expose un selecteur de cohorte :
+**All** (comportement par defaut, tous les agents de la preuve), **Discovered** (mode
+`detected`) et **Flagged** (mode `flagged`). Apres un run en mode `Discovered` ou
+`Flagged`, le panneau affiche la ligne `cohort: {mode} -> N agent(s)` avec la liste
+resolue.
+
+### Frontiere P1 -- "0 matched"
+
+Une cohorte `flagged` contient les `agent_id` que la carte d'identite a pu resoudre
+depuis le scan discovery. Si aucun de ces `agent_id` n'a de preuve runtime dans le
+bundle fourni, la vague s'execute sur zero agent et l'echo l'indique explicitement.
+Ce cas est attendu en P2 -- les jumeaux 1:1 entre sujets discovery et bundles runtime
+sont construits en P3. Jusqu'a cette echeance, une cohorte `flagged` peut ne croiser
+aucun agent du bundle courant ; c'est la frontiere honnete, visible, jamais masquee.
+
 ## Lire le resultat honnetement (frontiere P1)
 
 En P1, la carte d'identite paire les sujets qui existent deja des deux cotes ;
