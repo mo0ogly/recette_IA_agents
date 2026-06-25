@@ -9,7 +9,14 @@ unchanged. ``main`` only parses args and dispatches to the grouped handlers.
 from __future__ import annotations
 
 from .cli.agent_cmds import _cmd_agent_freeze, _cmd_agent_replay, _cmd_agent_run
-from .cli.behavior_cmds import _cmd_analyze_replay, _cmd_analyze_wave
+from .cli.behavior_cmds import (
+    _cmd_analyze_ablate,
+    _cmd_analyze_export,
+    _cmd_analyze_metrics,
+    _cmd_analyze_replay,
+    _cmd_analyze_sweep,
+    _cmd_analyze_wave,
+)
 from .cli.corpus_cmds import (
     _cmd_benchmark,
     _cmd_import_maf,
@@ -110,6 +117,16 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_analyze_wave(args.evidence, args.profile, args.threat, args.json)
         if args.analyze_cmd == "replay":
             return _cmd_analyze_replay(args.evidence, args.profile, args.threat, args.report)
+        if args.analyze_cmd == "metrics":
+            return _cmd_analyze_metrics(args.evidence, args.profile, args.threat, args.json)
+        if args.analyze_cmd == "sweep":
+            return _cmd_analyze_sweep(
+                args.evidence, args.profile, args.threat, args.knob, args.values
+            )
+        if args.analyze_cmd == "ablate":
+            return _cmd_analyze_ablate(args.evidence, args.profile, args.threat)
+        if args.analyze_cmd == "export":
+            return _cmd_analyze_export(args.evidence, args.profile, args.threat, args.out)
     if args.command == "redteam":
         return _cmd_redteam()
     if args.command == "redteam-promote":

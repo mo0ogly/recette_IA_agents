@@ -62,6 +62,35 @@ python3 -m recette analyze replay --evidence <bundle> [--profile p.json] [--thre
 
 `--evidence` accepts a bundle folder (`bundle.json`) or a direct JSON file.
 
+## Research layer (P2) -- measure, not just detect
+
+When the bundle carries `ground_truth` (`expected_verdict: correct|incorrect`),
+the wave becomes a measurement instrument:
+
+```
+python3 -m recette analyze metrics --evidence <bundle> [--threat exfil] [--json]
+python3 -m recette analyze sweep   --evidence <bundle> --knob ghost_host_tolerance --values 0,1,2,3
+python3 -m recette analyze ablate  --evidence <bundle> [--threat exfil]
+python3 -m recette analyze export  --evidence <bundle> --out <pkg>
+```
+
+- **metrics**: confusion matrix (TP/FP/FN/TN, precision/recall/F1), **separation
+  AUC** (is a POSITIVE scored more suspicious than a NEGATIVE?), **ROC curve** over
+  the score cutoff, and **standards distribution** (OWASP/ATLAS).
+- **sweep**: sweeps a threshold knob and prints the confusion at each setting --
+  the dose-response for finding the operating point (e.g. ghost-host tolerance
+  0->3 drops recall once the single-host leak is tolerated).
+- **ablate**: removes each lens and measures the detection delta -> each lens'
+  quantified contribution (a lens whose removal drops TP is pulling its weight;
+  one that only drops FP is a noise source).
+- **export**: writes a self-contained **experiment package** (`evidence/`,
+  `profile.json`, `report.json`, `metrics.json`, `README`) reproducible via
+  `analyze replay` -- a researcher's citable artifact.
+
+Label convention: `expected_verdict = "incorrect"` = POSITIVE (should be detected);
+`"correct"` = NEGATIVE (should stay clean); an unlabeled agent is excluded from
+the metrics.
+
 ## Determinism (I4)
 
 No clock / random / IO in a lens or the runner: the baseline and the frozen
