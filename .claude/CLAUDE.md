@@ -349,16 +349,17 @@ Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
   Acces par **SSH uniquement** (`git@gitlab.cossi.internet:...`), JAMAIS HTTPS (HTTPS
   -> 403 "not allowed", la cle SSH `@fpizzi` a le droit). Ajouter le remote une fois :
   `git remote add gitlab git@gitlab.cossi.internet:sdo/desc/siq/cyber_lab_agents_ia.git`.
-- **CAUSE RACINE du refus main (verifie 2026-06-25, vrai push pas dry-run)** : `main`
-  est PROTEGEE et **@fpizzi a le role Developer sur cyber_lab_agents_ia** (pas Maintainer).
-  Un Developer ne peut PAS pousser une branche protegee, quel que soit le protocole ou le
-  token (`GitLab: You are not allowed to push code to protected branches`). HTTPS+token ne
-  change RIEN -- ce n'est PAS un probleme de creds, c'est le ROLE. Comparaison : sur
-  `wattson_devcontainer` @fpizzi est Maintainer -> push main direct (HTTPS) sans friction.
-  Le SEUL fix pour pousser main direct = un owner du projet promeut @fpizzi Maintainer (ou
-  baisse la protection) ; ni l'agent ni @fpizzi ne peut s'auto-accorder ce droit. NE PAS
-  perdre du temps a chercher un token : tant que role=Developer, le workflow est la MR.
-- **Workflow MR** (cree SANS token via push-option SSH, le seul chemin possible en Developer) :
+- **CAUSE du refus main (FAIT verifie 2026-06-25, vrai push)** : direct push `main` REFUSE
+  -- `GitLab: You are not allowed to push code to protected branches`. C'est TOUT ce que
+  l'erreur prouve. La cause "role Developer" affirmee avant etait CONFABULEE (deduite, jamais
+  interrogee) : **@fpizzi est OWNER de cyber_lab_agents_ia.** La vraie cause = la regle de
+  branche PROTEGEE de `main` : *Allowed to push directly* est restreint (Maintainers / No one),
+  ce qui bloque le push DIRECT meme pour un owner. HTTPS+token ne change RIEN -- c'est le
+  REGLAGE de protection, pas les creds. Le role n'a JAMAIS ete interroge (pas de token / pas
+  de glab) : NE JAMAIS deduire un role d'un refus de branche protegee (R13). Fix owner pour
+  push direct : Settings -> Repository -> Protected branches -> regler *Allowed to push* (ou
+  baisser la protection). Sinon, workflow MR ci-dessous. NE PAS perdre du temps a chercher un token.
+- **Workflow MR** (cree SANS token via push-option SSH, tant que le push direct est bloque) :
   `git push gitlab HEAD:refs/heads/<branche> -o merge_request.create -o merge_request.target=main -o merge_request.title="..."`
   (la MR ne se cree que sur une MAJ de ref : si la branche existe deja inchangee, la
   supprimer puis re-pousser avec l'option). Verifier d'abord `getent hosts
