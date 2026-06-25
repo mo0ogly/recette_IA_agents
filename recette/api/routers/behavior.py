@@ -46,11 +46,43 @@ def profile_defaults() -> dict:
     }
 
 
+def _resolve_cohort_discovery(profile: AnalysisProfile) -> dict:
+    """Resolve ``profile.cohort.discovery`` into ``cohort.agents``.
+
+    If the ``discovery`` key is present in the cohort dict, the agent_ids are
+    derived from the discovery scan (``detected`` or ``flagged`` mode).  The
+    profile's ``cohort["agents"]`` is updated in place so the engine filters on
+    the resolved set.  Returns the cohort echo dict ``{mode, agents}`` that is
+    included in every response (fail-loud: the caller always sees which cohort
+    was applied).
+
+    Imports are local so the module remains importable without the behavior
+    extras installed.
+    """
+    cohort_echo: dict = {"mode": None, "agents": profile.cohort.get("agents", ["*"])}
+    mode = profile.cohort.get("discovery")
+    if not mode:
+        return cohort_echo
+    if mode not in ("detected", "flagged"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid cohort.discovery: {mode!r} (expected detected|flagged)",
+        )
+    from ...behavior.correlate import discovery_cohort
+    from ...behavior.links import load_links
+
+    agents = discovery_cohort(load_links(), mode)
+    profile.cohort["agents"] = agents
+    cohort_echo = {"mode": mode, "agents": agents}
+    return cohort_echo
+
+
 @router.post("/wave")
 def wave(request: Request, body: dict[str, Any]) -> dict:
     """Run one wave. Body: ``{"recording": {...}, "profile": {...},
-    "ground_truth": {...}?}``. Returns ``{"report": ..., "metrics": ...|null}``.
-    400 on a missing recording or an invalid profile."""
+    "ground_truth": {...}?}``. Returns ``{"report": ..., "metrics": ...|null,
+    "cohort": {"mode": ..., "agents": [...]}}``.
+    400 on a missing recording, an invalid profile, or an unknown cohort.discovery mode."""
     recording = body.get("recording")
     if not isinstance(recording, dict):
         raise HTTPException(status_code=400, detail="recording (object) is required")
@@ -58,6 +90,8 @@ def wave(request: Request, body: dict[str, Any]) -> dict:
         profile = AnalysisProfile.from_dict(body.get("profile") or {})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid profile: {exc}") from exc
+
+    cohort_echo = _resolve_cohort_discovery(profile)
 
     store = request.app.state.config_store
     ground_truth = body.get("ground_truth") or {}
@@ -78,7 +112,7 @@ def wave(request: Request, body: dict[str, Any]) -> dict:
             "roc": M.roc_curve(report, bundle.ground_truth),
             "standards_distribution": M.standards_distribution(report),
         }
-    return {"report": report.to_dict(), "metrics": metrics}
+    return {"report": report.to_dict(), "metrics": metrics, "cohort": cohort_echo}
 
 
 @router.post("/correlate")
@@ -88,8 +122,8 @@ def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
     the raw wave report.
 
     Body: ``{"recording": {...}, "profile": {...}, "thresholds": {...}?}``
-    Returns: ``{"report": ..., "correlation": {...}}``.
-    400 on a missing recording or an invalid profile (same contract as /wave).
+    Returns: ``{"report": ..., "correlation": {...}, "cohort": {"mode": ..., "agents": [...]}}``.
+    400 on a missing recording, an invalid profile, or an unknown cohort.discovery mode.
     """
     from ...behavior.correlate import build_discovery_facts, correlate
     from ...behavior.links import load_links
@@ -101,6 +135,8 @@ def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
         profile = AnalysisProfile.from_dict(body.get("profile") or {})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid profile: {exc}") from exc
+
+    cohort_echo = _resolve_cohort_discovery(profile)
 
     store = request.app.state.config_store
     bundle = EvidenceBundle.from_dict(
@@ -117,4 +153,4 @@ def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
     discovery_facts = build_discovery_facts(links)
     thresholds = body.get("thresholds") or {"runtime_dirty": 50}
     corr = correlate(discovery_facts, behavior_reports, links, thresholds)
-    return {"report": report.to_dict(), "correlation": corr}
+    return {"report": report.to_dict(), "correlation": corr, "cohort": cohort_echo}

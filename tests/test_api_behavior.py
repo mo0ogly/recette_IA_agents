@@ -97,6 +97,17 @@ class TestBehaviorWave(unittest.TestCase):
         self.assertIn("quadrants", data["correlation"])
         self.assertIn("static_blind", data["correlation"]["quadrants"])
 
+    def test_wave_with_discovery_cohort_flagged_echoes_cohort(self) -> None:
+        body = {
+            "recording": _RECORDING,
+            "profile": {"threat": "exfil", "cohort": {"discovery": "flagged"}},
+        }
+        resp = self.client.post("/behavior/wave", json=body)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["cohort"]["mode"], "flagged")
+        self.assertIn("admin-overreach", data["cohort"]["agents"])
+
 
 if __name__ == "__main__":
     unittest.main()
