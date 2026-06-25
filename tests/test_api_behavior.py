@@ -106,7 +106,9 @@ class TestBehaviorWave(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["cohort"]["mode"], "flagged")
-        self.assertIn("admin-overreach", data["cohort"]["agents"])
+        # agent_ids are surface-qualified since the P3 full-corpus link map
+        self.assertIn("admin-overreach-gh", data["cohort"]["agents"])
+        self.assertIn("admin-overreach-gl", data["cohort"]["agents"])
 
 
 if __name__ == "__main__":
