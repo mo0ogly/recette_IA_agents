@@ -34,6 +34,11 @@ run_local() {
         run)       ( cd "${REPO_ROOT}" && "$(py)" -m recette run ) ;;
         discovery) ( cd "${REPO_ROOT}" \
                      && "$(py)" -m recette discovery --adapter reference ) ;;
+        recette-full) # Deterministic full sweep of every recette subsystem +
+                      # RETEX skeleton (docs/tracking/recette/). The gated
+                      # self-repair loop is the /recette-full skill; this is the
+                      # plain operator-runnable sweep it builds on.
+                      ( cd "${REPO_ROOT}" && "$(py)" scripts/recette_full.py ) ;;
         discovery-build) # Build the native Rust discovery engines (host workspace;
                          # the discoveryprobe-ebpf crate is excluded -- different
                          # target). Produces target/release/discoveryprobe-catalog,

@@ -14,7 +14,7 @@ set -euo pipefail
 #   ./recette.sh platform up|down|restart|status|purge   # lab mock + API gouvernee
 #   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
-#   ./recette.sh test|gates|report|validate|run|discovery [--docker]
+#   ./recette.sh test|gates|report|validate|run|discovery|recette-full [--docker]
 #   ./recette.sh console-build|console-test    # React console (tsc+vite / vitest)
 #   ./recette.sh discovery-build               # native Rust discovery engines (cargo, discoveryprobe/)
 #   ./recette.sh probe-ebpf-build              # build the eBPF object + CAP_BPF broker (live capture; see docs/runbooks/ebpf-live-capture.md)
@@ -51,16 +51,12 @@ _opt() { printf "  ${GREEN}%2s)${NC} %s\n" "$1" "$2"; }
 
 show_main_menu() {
     hdr "inspect_ia_agents recette - gestion"
-    _opt 1 "Docker lab"
-    _opt 2 "API gouvernee"
-    _opt 3 "Checks (tests / gates / report)"
+    _opt 1 "Services        (lab + API + console UX + statut)"
+    _opt 2 "Recette         (validate / run / discovery / smoke / campagnes / gates)"
+    _opt 3 "Build           (console / docs / rust-discovery / ebpf)"
     _opt 4 "Git"
-    _opt 5 "Plateforme gouvernee + Console UX"
-    _opt 6 "Campagnes"
-    _opt 7 "Recette & Discovery"
-    _opt 8 "Proxy overlays (Docker, optionnel)"
-    _opt 9 "Console & Docs (build / test)"
-    _opt 10 "Nettoyage"
+    _opt 5 "Proxy overlays  (Docker, optionnel)"
+    _opt 6 "Cleanup"
     echo
     _opt 0 "Quitter"
     echo
@@ -117,26 +113,6 @@ submenu_api() {
     done
 }
 
-submenu_checks() {
-    while true; do
-        hdr "Checks"
-        _opt 1 "Tests (local)"
-        _opt 2 "Gates (local)"
-        _opt 3 "Report (local)"
-        _opt 4 "Tests (docker)"
-        echo; _opt 0 "Retour"; echo -n "  Choix : "
-        local c; read -r c
-        case "${c}" in
-            1) "${CHECKS_SH}" test; _pause ;;
-            2) "${CHECKS_SH}" gates; _pause ;;
-            3) "${CHECKS_SH}" report; _pause ;;
-            4) "${CHECKS_SH}" test --docker; _pause ;;
-            0|q|Q) return ;;
-            *) warn "choix invalide"; _pause ;;
-        esac
-    done
-}
-
 submenu_git() {
     while true; do
         hdr "Git"
@@ -157,28 +133,33 @@ submenu_git() {
     done
 }
 
-submenu_platform() {
+submenu_services() {
     while true; do
-        hdr "Plateforme gouvernee + Console UX"
-        _opt 1 "Plateforme up (lab mock + API)"
-        _opt 2 "Plateforme down"
-        _opt 3 "Plateforme restart"
-        _opt 4 "Plateforme statut"
+        hdr "Services (plateforme gouvernee + console UX)"
+        _opt 1 "Statut global"
+        _opt 2 "Plateforme up (lab mock + API)"
+        _opt 3 "Plateforme down"
+        _opt 4 "Plateforme restart"
         _opt 5 "Console UX start (http://localhost:${CONSOLE_PORT})"
         _opt 6 "Console UX stop"
         _opt 7 "Console UX statut"
         _opt 8 "Console UX logs"
+        echo
+        _opt 9 "Docker lab (sous-menu)"
+        _opt 10 "API gouvernee (sous-menu)"
         echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
-            1) "${PLATFORM_SH}" up; _pause ;;
-            2) "${PLATFORM_SH}" down; _pause ;;
-            3) "${PLATFORM_SH}" restart; _pause ;;
-            4) "${PLATFORM_SH}" status; _pause ;;
+            1) "${STATUS_SH}"; _pause ;;
+            2) "${PLATFORM_SH}" up; _pause ;;
+            3) "${PLATFORM_SH}" down; _pause ;;
+            4) "${PLATFORM_SH}" restart; _pause ;;
             5) "${PLATFORM_SH}" console start; _pause ;;
             6) "${PLATFORM_SH}" console stop; _pause ;;
             7) "${PLATFORM_SH}" console status; _pause ;;
             8) "${PLATFORM_SH}" console logs; _pause ;;
+            9) submenu_docker ;;
+            10) submenu_api ;;
             0|q|Q) return ;;
             *) warn "choix invalide"; _pause ;;
         esac
@@ -208,9 +189,13 @@ submenu_recette() {
         _opt 2 "Run identification (scorecard 4 dimensions)"
         _opt 3 "Discovery (adapter reference)"
         _opt 4 "Smoke e2e (API + lab mock + replay)"
-        _opt 5 "Build moteurs Rust discovery (cargo)"
-        _opt 6 "Build sonde eBPF + broker CAP_BPF"
-        _opt 7 "Grant CAP_BPF au broker (sudo, one-time)"
+        _opt 5 "Campagnes (sous-menu)"
+        _opt 6 "Recette full (sweep deterministe + RETEX)"
+        echo
+        _opt 7 "Tests (unittest, local)"
+        _opt 8 "Gates (ruff / mypy / bandit)"
+        _opt 9 "Report (scorecard agrege)"
+        _opt 10 "Tests (docker)"
         echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
@@ -218,9 +203,12 @@ submenu_recette() {
             2) "${CHECKS_SH}" run; _pause ;;
             3) "${CHECKS_SH}" discovery; _pause ;;
             4) "${SMOKE_SH}"; _pause ;;
-            5) "${CHECKS_SH}" discovery-build; _pause ;;
-            6) "${CHECKS_SH}" probe-ebpf-build; _pause ;;
-            7) "${CHECKS_SH}" probe-grant-caps; _pause ;;
+            5) submenu_campaign ;;
+            6) "${CHECKS_SH}" recette-full; _pause ;;
+            7) "${CHECKS_SH}" test; _pause ;;
+            8) "${CHECKS_SH}" gates; _pause ;;
+            9) "${CHECKS_SH}" report; _pause ;;
+            10) "${CHECKS_SH}" test --docker; _pause ;;
             0|q|Q) return ;;
             *) warn "choix invalide"; _pause ;;
         esac
@@ -255,13 +243,17 @@ submenu_proxy() {
     done
 }
 
-submenu_console_docs() {
+submenu_build() {
     while true; do
-        hdr "Console & Docs"
+        hdr "Build (console / docs / natifs)"
         _opt 1 "Console build (tsc + vite)"
         _opt 2 "Console test (vitest)"
         _opt 3 "Docs build (Docusaurus fr+en)"
         _opt 4 "Docs serve"
+        echo
+        _opt 5 "Moteurs Rust discovery (cargo)"
+        _opt 6 "Sonde eBPF + broker CAP_BPF"
+        _opt 7 "Grant CAP_BPF au broker (sudo, one-time)"
         echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
@@ -269,6 +261,9 @@ submenu_console_docs() {
             2) "${CHECKS_SH}" console-test; _pause ;;
             3) "${CHECKS_SH}" docs-build; _pause ;;
             4) "${CHECKS_SH}" docs-serve; _pause ;;
+            5) "${CHECKS_SH}" discovery-build; _pause ;;
+            6) "${CHECKS_SH}" probe-ebpf-build; _pause ;;
+            7) "${CHECKS_SH}" probe-grant-caps; _pause ;;
             0|q|Q) return ;;
             *) warn "choix invalide"; _pause ;;
         esac
@@ -294,16 +289,12 @@ menu_loop() {
         show_main_menu
         local c; read -r c
         case "${c}" in
-            1)  submenu_docker ;;
-            2)  submenu_api ;;
-            3)  submenu_checks ;;
+            1)  submenu_services ;;
+            2)  submenu_recette ;;
+            3)  submenu_build ;;
             4)  submenu_git ;;
-            5)  submenu_platform ;;
-            6)  submenu_campaign ;;
-            7)  submenu_recette ;;
-            8)  submenu_proxy ;;
-            9)  submenu_console_docs ;;
-            10) submenu_cleanup ;;
+            5)  submenu_proxy ;;
+            6)  submenu_cleanup ;;
             0|q|Q) info "Bye"; exit 0 ;;
             *)  warn "choix invalide"; _pause ;;
         esac
@@ -320,7 +311,7 @@ case "${cmd}" in
     platform)                          "${PLATFORM_SH}" "$@" ;;
     console)                           "${PLATFORM_SH}" console "$@" ;;
     campaign)                          "${PLATFORM_SH}" campaign "$@" ;;
-    test|gates|report|validate|run|discovery|discovery-build|probe-ebpf-build|probe-grant-caps|console-build|console-test|docs-build|docs-serve)
+    test|gates|report|validate|run|discovery|recette-full|discovery-build|probe-ebpf-build|probe-grant-caps|console-build|console-test|docs-build|docs-serve)
                                        "${CHECKS_SH}" "${cmd}" "$@" ;;
     smoke)                             "${SMOKE_SH}" "$@" ;;
     wire)                              "${WIRE_SH}" "$@" ;;
