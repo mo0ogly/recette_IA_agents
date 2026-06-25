@@ -9,7 +9,7 @@
  */
 
 import { lazy, Suspense } from "react";
-import type { RunDetail } from "../../api/client";
+import type { RunDetail, ReplayResult } from "../../api/client";
 
 const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
 
@@ -50,7 +50,7 @@ export interface RunDetailViewProps {
   onDeleteCancel: () => void;
 
   // Replay state
-  replayResult: RunDetail | null;
+  replayResult: ReplayResult | null;
   replayError: string | null;
   replayBusy: boolean;
   onReplay: () => void;
@@ -379,8 +379,8 @@ export default function RunDetailView({
           )}
           {replayResult && (
             <div className="runs-replay-result" data-testid="replay-result">
-              Run enfant cree : <code>{replayResult.meta.id}</code> (
-              {replayResult.meta.status})
+              Run enfant cree : <code>{replayResult.child_run_id}</code> (
+              {replayResult.status})
             </div>
           )}
         </div>

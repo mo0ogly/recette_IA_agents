@@ -132,10 +132,14 @@ describe("RunsExplorer", () => {
   });
 
   it("calls replayRun when Replay button is clicked", async () => {
+    // Real /results/{id}/replay response shape (verified live, 201):
+    // { child_run_id, replay_of, status, kind } -- NOT a full RunDetail.
     const replayChild = {
-      ...detailFixture,
-      meta: { ...detailFixture.meta, id: "agents-fleet-replay", replay_of: "agents-fleet" },
-    } as RunDetail;
+      child_run_id: "agents-fleet-replay",
+      replay_of: "agents-fleet",
+      status: "running",
+      kind: "agent",
+    };
     vi.mocked(fetchRunTree).mockResolvedValue(treeFixture as RunTree);
     vi.mocked(fetchRun).mockResolvedValue(detailFixture as RunDetail);
     vi.mocked(fetchRunArtifact).mockResolvedValue('{}');

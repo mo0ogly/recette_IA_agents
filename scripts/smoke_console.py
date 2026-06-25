@@ -742,8 +742,19 @@ def _verify_runs_explorer(page: Page, console: str, api: str) -> None:
         bool(root_hash.inner_text().strip()),
         "runs-explorer: Meta root_hash is empty (seal not surfaced in the UI)",
     )
+    # Replay tab: the button spawns a child run (replay_of) -- assert the real
+    # /results/{id}/replay response shape ({child_run_id,...}) renders, NOT a
+    # RunDetail (the contract drift caught + fixed in PDCA cycle 2).
+    page.get_by_test_id("runs-tab-replay").click()
+    page.get_by_test_id("replay-btn").click()
+    child = page.get_by_test_id("replay-result")
+    child.wait_for(timeout=UI_TIMEOUT_MS)
+    _expect(
+        "replay" in child.inner_text().lower(),
+        "runs-explorer: Replay produced no child-run result in the UI",
+    )
     _shot(page, "runs-explorer")
-    print("[runs] /runs tree + Monaco artifact + Meta root_hash OK")
+    print("[runs] /runs tree + Monaco + Meta root_hash + Replay child-run OK")
 
 
 def run_smoke(console: str, api: str, server_port: int) -> None:

@@ -19,7 +19,7 @@ import {
   deleteRun,
   replayRun,
 } from "../../api/client";
-import type { RunTree, RunDetail } from "../../api/client";
+import type { RunTree, RunDetail, ReplayResult } from "../../api/client";
 import RunTreeComponent from "./RunTree";
 import PageHelp from "../../components/help/PageHelp";
 import RunDetailView from "./RunDetailView";
@@ -55,7 +55,7 @@ export default function RunsExplorer(): JSX.Element {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Replay state
-  const [replayResult, setReplayResult] = useState<RunDetail | null>(null);
+  const [replayResult, setReplayResult] = useState<ReplayResult | null>(null);
   const [replayError, setReplayError] = useState<string | null>(null);
   const [replayBusy, setReplayBusy] = useState(false);
 

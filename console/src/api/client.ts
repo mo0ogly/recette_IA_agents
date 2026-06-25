@@ -1805,8 +1805,17 @@ export function deleteRun(id: string): Promise<void> {
   );
 }
 
-export function replayRun(id: string): Promise<RunDetail> {
-  return request<RunDetail>(`/results/${encodeURIComponent(id)}/replay`, {
+/** POST /results/{id}/replay returns the spawned child run handle (NOT a full
+ *  RunDetail): the registry records the child and links it via replay_of. */
+export interface ReplayResult {
+  child_run_id: string;
+  replay_of: string;
+  status: string;
+  kind: string;
+}
+
+export function replayRun(id: string): Promise<ReplayResult> {
+  return request<ReplayResult>(`/results/${encodeURIComponent(id)}/replay`, {
     method: "POST",
     body: JSON.stringify({}),
   });
