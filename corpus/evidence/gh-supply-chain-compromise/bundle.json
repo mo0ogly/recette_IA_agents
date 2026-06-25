@@ -1,0 +1,1 @@
+{"baselines":{},"declared":{"supply-chain-gh":{"decided":[],"scope":["read_repo","push"],"systems":["github"]}},"ground_truth":{},"recording":{"recordings":[{"agent_id":"supply-chain-gh","surfaces":{"ebpf_wire":[]}}],"status":"ok"},"servers":[]}

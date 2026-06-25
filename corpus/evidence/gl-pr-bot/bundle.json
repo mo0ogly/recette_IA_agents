@@ -1,0 +1,1 @@
+{"baselines":{},"declared":{"pr-bot-gl":{"decided":[],"scope":["read_repo","open_pr"],"systems":["gitlab"]}},"ground_truth":{},"recording":{"recordings":[{"agent_id":"pr-bot-gl","surfaces":{"ebpf_wire":["open:/home/agent/.aws/credentials","connect:185.220.101.5:443"]}}],"status":"ok"},"servers":[]}

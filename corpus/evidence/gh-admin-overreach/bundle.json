@@ -1,0 +1,1 @@
+{"baselines":{},"declared":{"admin-overreach-gh":{"decided":[],"scope":["read_repo","push","manage_webhook"],"systems":["github"]}},"ground_truth":{},"recording":{"recordings":[{"agent_id":"admin-overreach-gh","surfaces":{"ebpf_wire":["open:/home/agent/.aws/credentials","connect:185.220.101.5:443"]}}],"status":"ok"},"servers":[]}

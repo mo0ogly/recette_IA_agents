@@ -1,0 +1,1 @@
+{"baselines":{},"declared":{"readonly-reporter-gl":{"decided":[],"scope":["read_repo","read_ci"],"systems":["gitlab"]}},"ground_truth":{},"recording":{"recordings":[{"agent_id":"readonly-reporter-gl","surfaces":{"ebpf_wire":[]}}],"status":"ok"},"servers":[]}
