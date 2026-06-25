@@ -47,6 +47,7 @@ from .routers import actions as actions_router
 from .routers import agent_actions as agent_actions_router
 from .routers import approvals as approvals_router
 from .routers import audit as audit_router
+from .routers import behavior as behavior_router
 from .routers import campaigns as campaigns_router
 from .routers import capture as capture_router
 from .routers import catalog as catalog_router
@@ -369,4 +370,5 @@ def create_app(
     app.include_router(control_router.router)
     app.include_router(metrics_router.router)
     app.include_router(registry_router.router)
+    app.include_router(behavior_router.router)
     return app
