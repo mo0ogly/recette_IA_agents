@@ -158,7 +158,54 @@ def main() -> int:
     if audit.exists():
         shutil.copyfile(audit, _AUDIT_SNAPSHOT)
     print(f"wrote {_OUT.relative_to(_ROOT)} + {_AUDIT_SNAPSHOT.relative_to(_ROOT)}")
+
+    # Register this eBPF capture in the registry (fail-safe, non-fatal -- R19).
+    _register_ebpf()
+
     return 0
+
+
+def _register_ebpf() -> None:
+    """Register the live eBPF capture into the eurodated run registry (fail-safe).
+
+    Keeps the flat-file _OUT/_AUDIT_SNAPSHOT writes for back-compat; the registry is
+    additive.  Both artifacts are read back from disk so the bundle is a coherent
+    snapshot of what was written.
+    The eurodate is ops metadata (not a decision path -- I4).
+    """
+    try:
+        import datetime
+
+        from recette.runs.capture import capture_surface, update_latest_symlink
+
+        eurodate = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        group_id = f"skynet-ebpf-{eurodate}"
+
+        capture_content = _OUT.read_text(encoding="utf-8") if _OUT.exists() else ""
+        audit_content = (
+            _AUDIT_SNAPSHOT.read_text(encoding="utf-8") if _AUDIT_SNAPSHOT.exists() else ""
+        )
+
+        capture_surface(
+            category="skynet",
+            group_id=group_id,
+            eurodate=eurodate,
+            label="SKYNET eBPF live capture",
+            runs={
+                "ebpf": {
+                    "kind": "ebpf",
+                    "artifacts": {
+                        "ebpf_live_skynet.json": capture_content,
+                        "probe_audit_skynet.jsonl": audit_content,
+                    },
+                }
+            },
+        )
+        update_latest_symlink("skynet", eurodate, group_id)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("run registry capture failed (non-fatal): %s", exc)
 
 
 if __name__ == "__main__":

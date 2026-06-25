@@ -154,7 +154,56 @@ def main() -> int:
         f"\ntraced run done: {len(results)} agents | total proxy traces={traced}\n"
         f"summary: {_OUT}\nraw proxy log: {_PROXY_OUT}"
     )
+
+    # Register this traced run in the registry (fail-safe, non-fatal -- R19).
+    _register_traced(results=results, model=args.model)
+
     return 0
+
+
+def _register_traced(*, results: list[dict], model: str) -> None:
+    """Register the governed traced run into the eurodated run registry (fail-safe).
+
+    Keeps the flat-file _OUT/_PROXY_OUT writes for back-compat; the registry is additive.
+    The eurodate is ops metadata (not a decision path -- I4).
+    """
+    try:
+        import datetime
+
+        from recette.runs.capture import capture_surface, update_latest_symlink
+
+        eurodate = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        group_id = f"skynet-traced-{eurodate}"
+
+        # Reconstruct the summary JSONL content from in-memory results.
+        summary_content = "\n".join(json.dumps(r) for r in results) + "\n"
+
+        # The raw proxy trace file was written to disk during the run; read it back
+        # so both artifacts land in the registry as a coherent bundle.
+        proxy_content = ""
+        if _PROXY_OUT.exists():
+            proxy_content = _PROXY_OUT.read_text(encoding="utf-8")
+
+        capture_surface(
+            category="skynet",
+            group_id=group_id,
+            eurodate=eurodate,
+            label=f"SKYNET traced {model}",
+            runs={
+                "traced": {
+                    "kind": "traced",
+                    "artifacts": {
+                        "traced_skynet.jsonl": summary_content,
+                        "proxy_traces_skynet.jsonl": proxy_content,
+                    },
+                }
+            },
+        )
+        update_latest_symlink("skynet", eurodate, group_id)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("run registry capture failed (non-fatal): %s", exc)
 
 
 if __name__ == "__main__":

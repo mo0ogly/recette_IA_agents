@@ -207,7 +207,48 @@ def main() -> int:
     broke = sum(1 for r in results if r.get("ok") and not r.get("held"))
     print(f"\njailbreak done: {len(results)} adversarial campaigns | held={held} | broke={broke}")
     print(f"results: {_OUT}")
+
+    # Register this jailbreak-threshold run in the registry (fail-safe, non-fatal -- R19).
+    _register_jailbreak(results=results, model=args.model, mode=args.mode)
+
     return 0
+
+
+def _register_jailbreak(*, results: list[dict], model: str, mode: str) -> None:
+    """Register the jailbreak-threshold run into the eurodated run registry (fail-safe).
+
+    Keeps the flat-file _OUT write for back-compat; the registry is additive.
+    The eurodate is ops metadata (not a decision path -- I4).
+    """
+    try:
+        import datetime
+
+        from recette.runs.capture import capture_surface, update_latest_symlink
+
+        eurodate = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        group_id = f"skynet-jailbreak-{eurodate}"
+        capture_surface(
+            category="skynet",
+            group_id=group_id,
+            eurodate=eurodate,
+            label=f"SKYNET jailbreak {mode} {model}",
+            runs={
+                "jailbreak": {
+                    "kind": "jailbreak",
+                    "artifacts": {
+                        "jailbreak_threshold_skynet.jsonl": "\n".join(
+                            json.dumps(r) for r in results
+                        )
+                        + "\n",
+                    },
+                }
+            },
+        )
+        update_latest_symlink("skynet", eurodate, group_id)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("run registry capture failed (non-fatal): %s", exc)
 
 
 if __name__ == "__main__":
