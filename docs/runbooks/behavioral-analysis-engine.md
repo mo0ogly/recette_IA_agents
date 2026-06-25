@@ -78,6 +78,35 @@ agents: 2
   good-bot                     score=100  coherent  lenses=-
 ```
 
+## Couche recherche (P2) -- mesurer, pas seulement detecter
+
+Quand le bundle porte un `ground_truth` (`expected_verdict: correct|incorrect`),
+la vague devient un instrument de mesure :
+
+```
+python3 -m recette analyze metrics --evidence <bundle> [--threat exfil] [--json]
+python3 -m recette analyze sweep   --evidence <bundle> --knob ghost_host_tolerance --values 0,1,2,3
+python3 -m recette analyze ablate  --evidence <bundle> [--threat exfil]
+python3 -m recette analyze export  --evidence <bundle> --out <pkg>
+```
+
+- **metrics** : matrice de confusion (TP/FP/FN/TN, precision/recall/F1), **AUC de
+  separation** (un POSITIF est-il note plus suspect qu'un NEGATIF ?), **courbe ROC**
+  sur le seuil de score, et **distribution standards** (OWASP/ATLAS).
+- **sweep** : balaye un bouton de seuil et imprime la confusion a chaque reglage --
+  la dose-reponse pour trouver le point de fonctionnement (ex. la tolerance
+  d'hotes fantomes 0->3 fait chuter le recall quand on tolere la fuite mono-hote).
+- **ablate** : retire chaque lens et mesure le delta de detections -> contribution
+  chiffree de chaque lens (une lens dont le retrait fait chuter les TP "gagne sa
+  place" ; une qui ne baisse que les FP est une source de bruit).
+- **export** : ecrit un **paquet d'experience** autoportant (`evidence/`,
+  `profile.json`, `report.json`, `metrics.json`, `README`) reproductible via
+  `analyze replay` -- l'artefact citable d'un chercheur.
+
+Convention de label : `expected_verdict = "incorrect"` = POSITIF (doit etre
+detecte) ; `"correct"` = NEGATIF (doit rester propre) ; un agent non labelise est
+exclu des metriques.
+
 ## Determinisme (I4)
 
 Aucun clock / random / IO dans une lens ou le runner : la baseline et la preuve

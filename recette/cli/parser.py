@@ -189,6 +189,36 @@ def build_parser() -> argparse.ArgumentParser:
     an_rep.add_argument(
         "--report", required=True, help="prior report JSON to check byte-equality against"
     )
+    an_met = analyze_sub.add_parser(
+        "metrics", help="ground-truth metrics for a wave (confusion, ROC, separation AUC)"
+    )
+    an_met.add_argument("--evidence", required=True, help="evidence bundle (needs ground_truth)")
+    an_met.add_argument("--profile", default=None, help="AnalysisProfile JSON")
+    an_met.add_argument("--threat", default=None, help="override the threat hypothesis")
+    an_met.add_argument("--json", action="store_true", help="emit the full metrics block as JSON")
+    an_sweep = analyze_sub.add_parser(
+        "sweep", help="sweep a threshold knob across values -> confusion per setting"
+    )
+    an_sweep.add_argument("--evidence", required=True, help="evidence bundle (needs ground_truth)")
+    an_sweep.add_argument("--profile", default=None, help="AnalysisProfile JSON")
+    an_sweep.add_argument("--threat", default=None, help="override the threat hypothesis")
+    an_sweep.add_argument(
+        "--knob", required=True, help="threshold key to sweep (e.g. ghost_host_tolerance)"
+    )
+    an_sweep.add_argument("--values", required=True, help="comma-separated values (e.g. 0,1,2,3)")
+    an_abl = analyze_sub.add_parser(
+        "ablate", help="per-lens ablation: drop each lens, measure the detection delta"
+    )
+    an_abl.add_argument("--evidence", required=True, help="evidence bundle (needs ground_truth)")
+    an_abl.add_argument("--profile", default=None, help="AnalysisProfile JSON")
+    an_abl.add_argument("--threat", default=None, help="override the threat hypothesis")
+    an_exp = analyze_sub.add_parser(
+        "export", help="write a self-contained, reproducible experiment package"
+    )
+    an_exp.add_argument("--evidence", required=True, help="evidence bundle folder or bundle.json")
+    an_exp.add_argument("--profile", default=None, help="AnalysisProfile JSON")
+    an_exp.add_argument("--threat", default=None, help="override the threat hypothesis")
+    an_exp.add_argument("--out", required=True, help="output folder for the experiment package")
     sub.add_parser(
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",
