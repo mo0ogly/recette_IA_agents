@@ -14,6 +14,8 @@ import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
 import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
 import LlmTracePanel from "./LlmTracePanel";
 import AgentAnalysisPanel from "./AgentAnalysisPanel";
+import BehaviorWavePanel from "./BehaviorWavePanel";
+import CorrelationPanel from "./CorrelationPanel";
 import PageHelp from "../../components/help/PageHelp";
 import "./probe.css";
 
@@ -306,6 +308,10 @@ export default function ProbePage(): JSX.Element {
           </div>
 
           <AgentAnalysisPanel analysis={result.agent_analysis} />
+
+          <BehaviorWavePanel recording={result.recording} />
+
+          <CorrelationPanel recording={result.recording} />
 
           <div className="probe-raw-head">
             <h2 className="probe-subtitle">Recording brut (ce que la sonde a vu)</h2>

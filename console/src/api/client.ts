@@ -1188,6 +1188,172 @@ export function captureProbe(req: ProbeCaptureRequest): Promise<ProbeCaptureResu
   });
 }
 
+// --- Behavioral-analysis engine (POST /behavior/wave) ---
+
+/** A single lens finding in a behavioral wave, with its OWASP/ATLAS tag. */
+export interface BehaviorFinding {
+  lens: string;
+  severity: "alert" | "warn" | "info";
+  log: string;
+  why: string;
+  owasp_asi: string | null;
+  mitre_atlas: string | null;
+}
+
+/** Per-agent report of a wave: the three-way + score + findings. */
+export interface BehaviorAgentReport {
+  agent_id: string;
+  identified: boolean;
+  coherent: boolean;
+  behavioral_score: number;
+  planned: { systems: string[]; scope: string[] };
+  said: { actions: string[] } | null;
+  done: {
+    dialed_servers: string[];
+    undeclared_egress: string[];
+    undeclared_dns: string[];
+    process_spawned: boolean;
+    credential_opens: string[];
+    doh_egress: string[];
+  };
+  findings: BehaviorFinding[];
+}
+
+export interface BehaviorReport {
+  profile_name: string;
+  threat: string;
+  evidence_hash: string;
+  profile_hash: string;
+  tool_version: string;
+  experiment_id: string;
+  agents: BehaviorAgentReport[];
+}
+
+/** Research metrics, present only when the wave was given ground-truth labels. */
+export interface BehaviorMetrics {
+  confusion: {
+    tp: number;
+    fp: number;
+    fn: number;
+    tn: number;
+    precision: number;
+    recall: number;
+    f1: number;
+    accuracy: number;
+  };
+  separation_auc: number;
+  roc: { points: Array<{ cutoff: number; tpr: number; fpr: number }>; auc: number };
+  standards_distribution: {
+    owasp_asi: Record<string, number>;
+    mitre_atlas: Record<string, number>;
+  };
+}
+
+export interface BehaviorWaveResult {
+  report: BehaviorReport;
+  metrics: BehaviorMetrics | null;
+}
+
+/** The four-knob profile the console sends. All fields optional -> engine defaults. */
+export interface BehaviorProfile {
+  name?: string;
+  lenses?: string[];
+  thresholds?: Record<string, string | number>;
+  cohort?: { agents?: string[] };
+  threat?: string;
+}
+
+export interface BehaviorDefaults {
+  lenses: string[];
+  threats: string[];
+  default_thresholds: Record<string, string | number>;
+}
+
+/** GET /behavior/profile/defaults: the catalog (lenses, threats, default thresholds)
+ *  the console needs to build a profile editor. */
+export function getBehaviorDefaults(): Promise<BehaviorDefaults> {
+  return request<BehaviorDefaults>("/behavior/profile/defaults");
+}
+
+/** POST /behavior/wave: run a tunable behavioral-analysis wave over a recording.
+ *  The API assembles the evidence (registry + declared plan) and runs the
+ *  deterministic engine. ground_truth is optional (enables the metrics block). */
+export function runBehaviorWave(
+  recording: unknown,
+  profile: BehaviorProfile,
+  groundTruth?: Record<string, { expected_verdict: string }>,
+): Promise<BehaviorWaveResult> {
+  return request<BehaviorWaveResult>("/behavior/wave", {
+    method: "POST",
+    body: JSON.stringify({ recording, profile, ground_truth: groundTruth ?? {} }),
+  });
+}
+
+// --- Correlation engine (POST /behavior/correlate) ---
+
+/** One row in the correlation quadrant table: the per-agent join between the
+ *  static discovery scan and the runtime behavioral wave. */
+export interface CorrelationRow {
+  agent_id: string;
+  discovery_subject: string | null;
+  static_flagged: boolean;
+  runtime_dirty: boolean;
+  behavioral_score: number;
+  quadrant: "agree_clean" | "static_blind" | "static_overflag" | "agree_dirty";
+  agreement: boolean;
+}
+
+/** The 2x2 quadrant bucketing: agree_clean/agree_dirty are counts (no
+ *  individual detail needed); static_blind/static_overflag carry agent_id lists
+ *  because they are the headline anomalies. */
+export interface CorrelationQuadrants {
+  agree_clean: number;
+  agree_dirty: number;
+  static_blind: string[];
+  static_overflag: string[];
+}
+
+/** An unresolved link: the agent could not be placed in a quadrant because one
+ *  side (discovery or behavioral evidence) is missing. Rendered fail-loud. */
+export interface CorrelationUnresolved {
+  agent_id: string;
+  reason: "discovery_missing" | "evidence_missing";
+}
+
+/** A discovery subject present in the corpus but not wired to any agent link. */
+export interface CorrelationCoverageGap {
+  discovery_subject: string;
+}
+
+/** Full correlation report returned by POST /behavior/correlate. The envelope
+ *  key is `correlation`; this interface represents the unwrapped payload. */
+export interface CorrelationReport {
+  rows: CorrelationRow[];
+  quadrants: CorrelationQuadrants;
+  unresolved: CorrelationUnresolved[];
+  coverage_gaps: CorrelationCoverageGap[];
+  thresholds: { runtime_dirty: number };
+  tool_version: string;
+}
+
+/** Request body for POST /behavior/correlate. */
+export interface CorrelateRequest {
+  recording: unknown;
+  profile?: BehaviorProfile;
+  thresholds?: { runtime_dirty?: number };
+}
+
+/** POST /behavior/correlate: run a behavioral wave then correlate with the
+ *  static discovery scan through the agent identity map. Returns the quadrant
+ *  report (envelope key: `correlation`). The `.correlation` envelope is unwrapped
+ *  here so callers receive the bare CorrelationReport. */
+export function correlateBehavior(req: CorrelateRequest): Promise<CorrelationReport> {
+  return request<{ report: unknown; correlation: CorrelationReport }>("/behavior/correlate", {
+    method: "POST",
+    body: JSON.stringify(req),
+  }).then((r) => r.correlation);
+}
+
 /** One captured in-process LLM decision (the hook surface): intent + ops metrics. */
 export interface LlmTrace {
   seq: number;

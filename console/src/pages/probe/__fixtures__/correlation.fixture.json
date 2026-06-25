@@ -1,0 +1,32 @@
+{
+  "coverage_gaps": [],
+  "quadrants": {
+    "agree_clean": 0,
+    "agree_dirty": 0,
+    "static_blind": [
+      "pr-bot"
+    ],
+    "static_overflag": []
+  },
+  "rows": [
+    {
+      "agent_id": "pr-bot",
+      "agreement": false,
+      "behavioral_score": 0,
+      "discovery_subject": "gh-pr-bot",
+      "quadrant": "static_blind",
+      "runtime_dirty": true,
+      "static_flagged": false
+    }
+  ],
+  "thresholds": {
+    "runtime_dirty": 0
+  },
+  "tool_version": "behavior-engine/1",
+  "unresolved": [
+    {
+      "agent_id": "admin-overreach",
+      "reason": "evidence_missing"
+    }
+  ]
+}
