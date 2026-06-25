@@ -64,7 +64,8 @@ export type HelpTopicKey =
   | "metrics"
   | "graph"
   | "agent_registry"
-  | "receipts";
+  | "receipts"
+  | "runs_explorer";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -1822,6 +1823,77 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           la signature Ed25519 sur sa charge canonique ET la chaine de hash des recus. Le verdict
           affiche les deux. C&apos;est l&apos;echange <strong>hors plateforme</strong> : on signe
           d&apos;un cote, on verifie de l&apos;autre, toujours sans contenu.
+        </p>
+      </>
+    ),
+  },
+  runs_explorer: {
+    title: "Aide — Explorateur de runs",
+    summary:
+      "Parcourir l'historique eurodatee des runs par categorie, visualiser les artefacts, annoter, rejouer et supprimer.",
+    body: (
+      <>
+        <p>
+          L&apos;<strong>Explorateur de runs</strong> donne acces au registre
+          eurodatee des runs produits par la plateforme : agents, campagnes,
+          scorecard, discovery. Les artefacts (JSONL, JSON) sont <strong>immuables</strong>{" "}
+          une fois le run scelle (I1) -- seule la couche{" "}
+          <code>annotations.json</code> est modifiable (PATCH).
+        </p>
+        <h3>Arborescence (gauche)</h3>
+        <p>
+          Trois niveaux : <strong>categorie</strong> (skynet, campaigns, agents,
+          discovery, recette-full), <strong>groupe</strong> (un lancement ou batch
+          identifie par <code>eurodate + group_id</code>), <strong>run</strong>{" "}
+          (execution individuelle avec <code>kind</code> et badge de statut).
+          Cliquer un run charge son detail dans le panneau de droite.
+        </p>
+        <h3>Statuts</h3>
+        <ul>
+          <li>
+            <strong>sealed</strong> : le run est termine et ses artefacts sont figes
+            (la chaine SHA-256 est calculee). Aucune modification possible sauf les
+            annotations.
+          </li>
+          <li>
+            <strong>running</strong> : le run est en cours.
+          </li>
+          <li>
+            <strong>open</strong> : le run a demarre mais n&apos;est pas encore scelle.
+          </li>
+        </ul>
+        <h3>Onglets du panneau droit</h3>
+        <ul>
+          <li>
+            <strong>Contenu</strong> : l&apos;artefact selectionne dans l&apos;editeur
+            Monaco (lecture seule). Si le run produit plusieurs artefacts, un
+            selecteur apparait au-dessus.
+          </li>
+          <li>
+            <strong>Meta</strong> : les metadonnees du run (<code>id</code>,{" "}
+            <code>kind</code>, <code>eurodate</code>, <code>root_hash</code>,
+            SHA-256 de chaque artefact, <code>replay_of</code>). Le{" "}
+            <code>root_hash</code> couvre l&apos;ensemble des artefacts -- il permet
+            de prouver l&apos;integrite du run hors plateforme.
+          </li>
+          <li>
+            <strong>Annotations</strong> : les seuls champs modifiables (tags,
+            commentaire, label, retention). Un PATCH ne modifie jamais les artefacts
+            ni la chaine de hash (I1).
+          </li>
+          <li>
+            <strong>Replay</strong> : recalcul pur -- cree un nouveau run enfant{" "}
+            (<code>replay_of</code> pointe vers ce run) sans alterer le parent.
+            Certains types de run ne sont pas rejouables (422) : l&apos;UI
+            l&apos;indique sans paniquer.
+          </li>
+        </ul>
+        <h3>Supprimer un run</h3>
+        <p>
+          La suppression purge le <strong>repertoire de travail</strong> (R25 --
+          memoire ephemere de l&apos;operateur), jamais l&apos;audit store
+          append-only (I1). Un dialogue de confirmation est obligatoire avant toute
+          suppression.
         </p>
       </>
     ),
