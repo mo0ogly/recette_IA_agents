@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "links": [
+    {
+      "agent_id": "pr-bot",
+      "discovery_subject": "gh-pr-bot",
+      "runtime_subject": "corpus/sim/rt-prbot-context-poisoning.git-scenario.json",
+      "evidence_bundle": null,
+      "expected": { "static_flagged": false, "runtime_dirty": true, "quadrant": "static_blind" }
+    },
+    {
+      "agent_id": "admin-overreach",
+      "discovery_subject": "gh-admin-overreach",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "static_flagged": true, "runtime_dirty": null, "quadrant": null }
+    }
+  ]
+}
