@@ -700,6 +700,52 @@ def _verify_discovery_exchange(page: Page, console: str, api: str) -> None:
     _shot(page, "discovery-exchange-named-wire")
 
 
+def _verify_runs_explorer(page: Page, console: str, api: str) -> None:
+    """Runs Explorer: seed an eurodated run via the registry, then drive the UI.
+
+    Proves the web-only researcher surface end to end -- the tree renders the
+    seeded run, selecting it loads the artifact into Monaco, and the Meta tab
+    surfaces the sha256 root_hash (the frozen-evidence proof, I1). This is the
+    live runtime gate for the /runs page (the unit render tests cover the
+    component; this asserts the browser-to-API wiring in a real Chromium)."""
+    repo_root = str(Path(__file__).resolve().parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from recette.runs.registry import RunRegistry
+
+    reg = RunRegistry(Path("docs/tracking/runs"))
+    group = reg.new_group(
+        category="smoke",
+        group_id="smoke-runs",
+        eurodate="2026-06-25T00-00-00",
+        label="smoke runs-explorer",
+    )
+    run = reg.new_run(
+        group=group,
+        run_id="smoke-runs-explorer",
+        kind="agent",
+        eurodate="2026-06-25T00-00-01",
+    )
+    reg.write_artifact(run, "agents.jsonl", '{"agent_id":"smoke","ok":true}\n')
+    reg.seal(run)
+
+    page.goto(f"{console}/runs", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("runs-explorer").wait_for(timeout=UI_TIMEOUT_MS)
+    node = page.get_by_test_id("run-node-smoke-runs-explorer")
+    node.wait_for(timeout=UI_TIMEOUT_MS)
+    node.get_by_role("button").first.click()
+    page.get_by_test_id("runs-panel-content").wait_for(timeout=UI_TIMEOUT_MS)
+    page.get_by_test_id("runs-tab-meta").click()
+    root_hash = page.get_by_test_id("meta-root-hash")
+    root_hash.wait_for(timeout=UI_TIMEOUT_MS)
+    _expect(
+        bool(root_hash.inner_text().strip()),
+        "runs-explorer: Meta root_hash is empty (seal not surfaced in the UI)",
+    )
+    _shot(page, "runs-explorer")
+    print("[runs] /runs tree + Monaco artifact + Meta root_hash OK")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -738,6 +784,9 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             _verify_registry(page, console)
             _verify_receipts(page, console, api)
             _verify_discovery_exchange(page, console, api)
+            # The Runs Explorer: the web-only researcher surface (eurodated
+            # registry -> tree -> Monaco -> sha256 root_hash).
+            _verify_runs_explorer(page, console, api)
         finally:
             browser.close()
     print("SMOKE PASS")
