@@ -23,6 +23,7 @@ import type { RunTree, RunDetail } from "../../api/client";
 import RunTreeComponent from "./RunTree";
 import PageHelp from "../../components/help/PageHelp";
 import RunDetailView from "./RunDetailView";
+import "./runs.css";
 
 type TabKey = "content" | "meta" | "annotations" | "replay";
 
