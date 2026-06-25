@@ -1716,3 +1716,98 @@ export function verifyImportedReceipts(
     body: JSON.stringify(envelope),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Runs registry (/results) -- raw JSON, no envelope (plan line 12)
+// ---------------------------------------------------------------------------
+
+export interface RunArtifactMeta {
+  file: string;
+  sha256: string;
+}
+
+export interface RunNode {
+  id: string;
+  kind: string;
+  eurodate: string;
+  status: string;
+}
+
+export interface RunGroup {
+  group_id: string;
+  eurodate: string;
+  label: string;
+  status: string;
+  runs: RunNode[];
+}
+
+export interface RunCategory {
+  category: string;
+  groups: RunGroup[];
+}
+
+export interface RunTree {
+  categories: RunCategory[];
+}
+
+export interface RunAnnotations {
+  tags: string[];
+  comment: string;
+  label: string;
+  retention: string;
+}
+
+export interface RunDetail {
+  meta: {
+    id: string;
+    kind: string;
+    eurodate: string;
+    parent_group: string;
+    status: string;
+    artifacts: RunArtifactMeta[];
+    root_hash: string;
+    replay_of: string | null;
+  };
+  annotations: RunAnnotations;
+  artifacts: string[];
+}
+
+export function fetchRunTree(): Promise<RunTree> {
+  return request<RunTree>("/results/tree", { method: "GET" });
+}
+
+export function fetchRun(id: string): Promise<RunDetail> {
+  return request<RunDetail>(`/results/${encodeURIComponent(id)}`, { method: "GET" });
+}
+
+/** Returns the raw artifact text content. */
+export function fetchRunArtifact(id: string, name: string): Promise<string> {
+  return request<string>(
+    `/results/${encodeURIComponent(id)}/artifact/${encodeURIComponent(name)}`,
+    { method: "GET" },
+  );
+}
+
+export function patchRunAnnotations(
+  id: string,
+  body: Partial<RunAnnotations>,
+): Promise<RunDetail> {
+  return request<RunDetail>(`/results/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteRun(id: string): Promise<void> {
+  return request<void>(
+    withQuery(`/results/${encodeURIComponent(id)}`, { confirm: "true" }),
+    { method: "DELETE" },
+  );
+}
+
+export function replayRun(id: string): Promise<RunDetail> {
+  return request<RunDetail>(`/results/${encodeURIComponent(id)}/replay`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
