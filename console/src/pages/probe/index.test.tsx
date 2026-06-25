@@ -9,6 +9,7 @@ vi.mock("../../api/client", () => ({
   getProbeStatus: vi.fn(),
   captureProbe: vi.fn(),
   getLlmTraces: vi.fn(),
+  correlateBehavior: vi.fn(() => Promise.resolve(null)),
 }));
 
 // The Monaco chunk is heavy and worker-bound; stub it so the raw-JSON panel is
