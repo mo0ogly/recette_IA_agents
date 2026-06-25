@@ -341,6 +341,25 @@ AJOUTE, on ne purge pas. Les livrables durables (doc produit, runbook) vont dans
 `docs/` committe ; le suivi ephemere reste dans `docs/tracking/` gitignore.
 Detail : `.claude/rules/agentic-traceability.md`.
 
+**R26 Dual-Remote Push (github + gitlab interne) -- NE PAS RE-DECOUVRIR a chaque fois :**
+Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
+- **`origin`** = GitHub `github.com/mo0ogly/recette_IA_agents` -- `main` pushable en
+  direct : `git push origin HEAD`.
+- **`gitlab`** = GitLab interne `gitlab.cossi.internet/sdo/desc/siq/cyber_lab_agents_ia`.
+  Acces par **SSH uniquement** (`git@gitlab.cossi.internet:...`), JAMAIS HTTPS (HTTPS
+  -> 403 "not allowed", la cle SSH `@fpizzi` a le droit). Ajouter le remote une fois :
+  `git remote add gitlab git@gitlab.cossi.internet:sdo/desc/siq/cyber_lab_agents_ia.git`.
+- **`gitlab` main est PROTEGEE** : push direct sur `main` = REFUSE (c'est normal, pas
+  un bug de creds). Le workflow est une **MR**, creee SANS token via push-option SSH :
+  `git push gitlab HEAD:refs/heads/<branche> -o merge_request.create -o merge_request.target=main -o merge_request.title="..."`
+  (la MR ne se cree que sur une MAJ de ref : si la branche existe deja inchangee, la
+  supprimer puis re-pousser avec l'option). Verifier d'abord `getent hosts
+  gitlab.cossi.internet` (reseau interne cossi, comme SKYNET).
+- **Il n'y a PAS de token gitlab dans le `.env` de wattson** (`~/wattson_devcontainer/.env`
+  = `DREMIO_PAT` + `SKYNET_API_KEY` seulement). NE PAS fouiller un store de credentials
+  hors projet pour un token de push : SSH + push-option suffisent, aucune elevation
+  requise. "push sur les deux git" = `git push origin HEAD` PUIS la MR gitlab ci-dessus.
+
 ---
 
 ## REFERENCES RULES
