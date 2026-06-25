@@ -1252,6 +1252,7 @@ export interface BehaviorMetrics {
 export interface BehaviorWaveResult {
   report: BehaviorReport;
   metrics: BehaviorMetrics | null;
+  cohort?: { mode: string | null; agents: string[] };
 }
 
 /** The four-knob profile the console sends. All fields optional -> engine defaults. */
@@ -1259,7 +1260,7 @@ export interface BehaviorProfile {
   name?: string;
   lenses?: string[];
   thresholds?: Record<string, string | number>;
-  cohort?: { agents?: string[] };
+  cohort?: { agents?: string[]; discovery?: "detected" | "flagged" };
   threat?: string;
 }
 

@@ -428,6 +428,8 @@
 .bw-metrics p { margin: 0.2rem 0; }
 .bw-standards .bw-tag { margin-right: 0.5rem; }
 .bw-error { color: #ff6b6b; }
+.bw-cohort-line { font-size: 0.82rem; color: var(--color-text-muted); margin: 0.25rem 0 0.5rem; }
+.bw-cohort-agents { font-family: var(--font-mono); font-size: 0.8rem; }
 
 /* Correlation panel -- discovery<->behavior quadrant grid */
 .corr-panel {
