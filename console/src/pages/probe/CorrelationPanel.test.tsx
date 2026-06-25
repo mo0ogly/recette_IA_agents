@@ -67,4 +67,14 @@ describe("CorrelationPanel -- re-fetch on threshold change", () => {
     const call = spy.mock.calls[0][0];
     expect(call.thresholds?.runtime_dirty).toBe(30);
   });
+
+  it("auto-fetches corpus mode on mount (no recording) -- P3 populated view", async () => {
+    const spy = vi.spyOn(client, "correlateBehavior").mockResolvedValue(REAL);
+    render(<CorrelationPanel />);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    // corpus mode: the request carries NO recording
+    expect(spy.mock.calls[0][0].recording).toBeUndefined();
+    // the source selector defaults to corpus
+    expect((screen.getByTestId("corr-source-select") as HTMLSelectElement).value).toBe("corpus");
+  });
 });

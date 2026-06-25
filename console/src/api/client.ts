@@ -1339,7 +1339,9 @@ export interface CorrelationReport {
 
 /** Request body for POST /behavior/correlate. */
 export interface CorrelateRequest {
-  recording: unknown;
+  /** Omit (or null) to correlate from the frozen corpus twins (P3 corpus mode);
+   *  pass a probe recording to correlate that live capture (P1 live mode). */
+  recording?: unknown;
   profile?: BehaviorProfile;
   thresholds?: { runtime_dirty?: number };
 }

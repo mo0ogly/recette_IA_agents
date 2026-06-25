@@ -144,42 +144,41 @@ export default function CorrelationPanel({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "corpus" correlates the frozen twins (populated quadrants, no capture needed,
+  // P3); "live" correlates this probe capture (P1). Default corpus -- it is the
+  // meaningful populated view; live needs a recording with a linked agent.
+  const hasRecording = recording !== undefined && recording !== null;
+  const [source, setSource] = useState<"corpus" | "live">("corpus");
 
-  const canRun = recording !== undefined && recording !== null;
-
-  // Auto-fetch on mount when recording is available but no initial data.
-  useEffect(() => {
-    if (canRun && current === null) {
-      setBusy(true);
-      correlateBehavior({ recording, thresholds: { runtime_dirty: threshold } })
-        .then((r) => {
-          setCurrent(r);
-          setThreshold(r.thresholds.runtime_dirty);
-        })
-        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-        .finally(() => setBusy(false));
-    }
-    // Only on mount / when recording first becomes available.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRun]);
-
-  const run = async () => {
-    if (!canRun) return;
+  const fetchCorrelation = (mode: "corpus" | "live", th: number) => {
     setBusy(true);
     setError(null);
-    const profile: BehaviorProfile = { threat: "exfil" };
-    try {
-      const result = await correlateBehavior({
-        recording,
-        profile,
-        thresholds: { runtime_dirty: threshold },
-      });
-      setCurrent(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
+    const req =
+      mode === "live"
+        ? { recording, profile: { threat: "exfil" } as BehaviorProfile, thresholds: { runtime_dirty: th } }
+        : { profile: { threat: "exfil" } as BehaviorProfile, thresholds: { runtime_dirty: th } };
+    return correlateBehavior(req)
+      .then((r) => {
+        if (!r) return;
+        setCurrent(r);
+        setThreshold(r.thresholds.runtime_dirty);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+
+  // Auto-fetch on mount (corpus mode works with no capture).
+  useEffect(() => {
+    if (current === null) {
+      void fetchCorrelation("corpus", threshold);
     }
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const run = async () => {
+    if (source === "live" && !hasRecording) return;
+    await fetchCorrelation(source, threshold);
   };
 
   return (
@@ -198,30 +197,41 @@ export default function CorrelationPanel({
         </div>
       )}
 
-      {canRun && (
-        <div className="corr-controls">
-          <label className="corr-knob">
-            runtime_dirty threshold
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              data-testid="corr-threshold-input"
-            />
-          </label>
-          <button
-            type="button"
-            className="probe-button"
-            onClick={run}
-            disabled={busy}
-            data-testid="corr-run-button"
+      <div className="corr-controls">
+        <label className="corr-knob">
+          source
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value as "corpus" | "live")}
+            data-testid="corr-source-select"
           >
-            {busy ? "running..." : "Re-correlate"}
-          </button>
-        </div>
-      )}
+            <option value="corpus">Corpus (twins)</option>
+            <option value="live" disabled={!hasRecording}>
+              Live (this capture)
+            </option>
+          </select>
+        </label>
+        <label className="corr-knob">
+          runtime_dirty threshold
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={threshold}
+            onChange={(e) => setThreshold(Number(e.target.value))}
+            data-testid="corr-threshold-input"
+          />
+        </label>
+        <button
+          type="button"
+          className="probe-button"
+          onClick={run}
+          disabled={busy}
+          data-testid="corr-run-button"
+        >
+          {busy ? "running..." : "Re-correlate"}
+        </button>
+      </div>
 
       {error && (
         <div className="corr-error probe-error" role="alert">
