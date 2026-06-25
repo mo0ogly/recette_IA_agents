@@ -1,110 +1,112 @@
-# Behavior <-> Discovery Correlation -- research runbook
+# Correlation Comportement <-> Discovery -- runbook recherche
 
-> For the AI-research team. How to use the platform to analyze agent BEHAVIOR
-> (what an agent does at runtime) in relation to the DISCOVERY engine (what its
-> source declares), and read the disagreement between the two.
+> Pour l'equipe recherche IA. Comment utiliser la plateforme pour analyser le
+> COMPORTEMENT d'un agent (ce qu'il fait au runtime) en relation avec le moteur
+> de DISCOVERY (ce que sa source declare), et lire le desaccord entre les deux.
 
-## The mental model -- discovery PREDICTS, behavior MEASURES
+## Le modele mental -- discovery PREDIT, comportement MESURE
 
-Two engines look at the same agent from opposite ends:
+Deux moteurs observent le meme agent par des bouts opposes :
 
-- **Discovery** reads SOURCE (`corpus/repos/<slug>`, a static publishable repo).
-  It is a STATIC risk predictor: detection, action_pattern, target, relative
-  risk order, policy presence. Ground-truth is invariant properties only -- never
-  an opaque score.
-- **Behavioral-analysis engine** reads RUNTIME evidence (ebpf / proxy /
-  action-log bundles). It MEASURES what the agent actually did: egress, dns,
-  credential, doh, process, said-vs-done, and a `behavioral_score`.
+- **Discovery** lit la SOURCE (`corpus/repos/<slug>`, un vrai repo publiable
+  statique). C'est un predicteur de risque STATIQUE : detection, action_pattern,
+  cible, ordre de risque relatif, presence de policy. La ground-truth ne porte
+  que des proprietes invariantes -- jamais un score opaque.
+- **Le moteur d'analyse comportementale** lit la preuve RUNTIME (bundles
+  ebpf / proxy / action-log). Il MESURE ce que l'agent a reellement fait :
+  egress, dns, credential, doh, process, said-vs-done, et un `behavioral_score`.
 
-The research value is the agreement -- and especially the disagreement -- between
-the static prediction and the runtime measurement:
+La valeur recherche est l'accord -- et surtout le desaccord -- entre la
+prediction statique et la mesure runtime :
 
-|                  | runtime clean   | runtime dirty                          |
-|------------------|-----------------|----------------------------------------|
-| source low-risk  | agree_clean     | **static_blind** (scanner false negative) |
-| source high-risk | static_overflag | agree_dirty                            |
+|                  | runtime propre  | runtime sale                            |
+|------------------|-----------------|-----------------------------------------|
+| source bas-risque| agree_clean     | **static_blind** (faux negatif du scanner) |
+| source haut-risque| static_overflag| agree_dirty                             |
 
-`static_blind` -- a source the scanner called clean that behaves dirty at runtime
--- is the headline signal. It is where a static-only review would have missed a
-real threat.
+`static_blind` -- une source que le scanner a jugee propre mais qui se comporte
+salement au runtime -- est le signal phare. C'est la ou une revue purement
+statique aurait rate une vraie menace.
 
-## The identity map -- `corpus/agent_links.json`
+## La carte d'identite -- `corpus/agent_links.json`
 
-Discovery subjects and runtime subjects are distinct corpus objects. They are
-joined by `corpus/agent_links.json`: one entry per `agent_id`, naming its
-`discovery_subject` (a repo) and its `runtime_subject` / `evidence_bundle`. This
-is hand-maintained ground-truth until 1:1 twin evidence bundles exist (P3). A
-link with no resolvable discovery subject or no runtime evidence is reported
-loud (`unresolved[]`), never silently dropped.
+Les sujets discovery et les sujets runtime sont des objets de corpus distincts.
+Ils sont joints par `corpus/agent_links.json` : une entree par `agent_id`,
+nommant son `discovery_subject` (un repo) et son `runtime_subject` /
+`evidence_bundle`. C'est une ground-truth hand-maintenue jusqu'a l'existence des
+jumeaux 1:1 (P3). Un lien sans sujet discovery resolvable ou sans preuve runtime
+est reporte loud (`unresolved[]`), jamais avale silencieusement.
 
-## Day-to-day flow
+## Flux jour-le-jour
 
-1. **Static risk** -- run the discovery scorecard:
+1. **Risque statique** -- lance le scorecard discovery :
    ```
    python3 -m recette discovery --adapter reference
    ```
-   This is the source-side prediction (per-repo detection + relative risk order).
+   C'est la prediction cote source (detection par repo + ordre de risque relatif).
 
-2. **Runtime evidence** -- build / refresh evidence bundles (corpus-first,
-   deterministic) and run behavioral waves:
+2. **Preuve runtime** -- construis / rafraichis les evidence bundles (corpus
+   d'abord, deterministe) et lance des vagues comportementales :
    ```
    python3 -m recette analyze wave --evidence <bundle> --profile <profile.json>
    ```
-   Each wave is pure (I4): same `(evidence, profile)` -> byte-identical report.
+   Chaque vague est pure (I4) : meme `(evidence, profile)` -> rapport byte-identique.
 
-3. **Correlate** -- join the two engines through the identity map:
+3. **Correler** -- joins les deux moteurs via la carte d'identite :
    ```
    python3 -m recette analyze correlate
    ```
-   Prints the quadrant matrix. Read the `static_blind` line first. `unresolved`
-   and coverage-gap lines show exactly which links could not be resolved at the
-   current corpus state (the honest P1 boundary).
+   Affiche la matrice de quadrants. Lis la ligne `static_blind` en premier. Les
+   lignes `unresolved` et coverage-gap montrent exactement quels liens n'ont pas
+   pu etre resolus a l'etat actuel du corpus (la frontiere honnete P1).
 
-4. **Inspect static_blind** -- for each agent in that quadrant, open its
-   three-way (PLANNED / SAID / DONE) and its OWASP ASI 2026 + MITRE ATLAS
-   findings to see WHAT it did that the source scan missed.
+4. **Inspecter static_blind** -- pour chaque agent de ce quadrant, ouvre son
+   trois-temps (PLANNED / SAID / DONE) et ses findings OWASP ASI 2026 + MITRE
+   ATLAS pour voir CE QU'il a fait que le scan de source a rate.
 
-5. **Metrology** -- turn a correlation into a measurement:
-   - `python3 -m recette analyze sweep ...` -- vary a knob (e.g. the
-     `runtime_dirty` threshold) -> ROC of "does static risk predict runtime
-     behavior?".
-   - `python3 -m recette analyze ablate ...` -- per-lens detection delta.
-   - `python3 -m recette analyze export ...` -- a citable experiment package.
-     The correlation carries its provenance (`tool_version`, `thresholds`) so a
-     result is reproducible.
+5. **Metrologie** -- transforme une correlation en mesure :
+   - `python3 -m recette analyze sweep ...` -- fait varier un knob (ex le seuil
+     `runtime_dirty`) -> ROC de "le risque statique predit-il le comportement
+     runtime ?".
+   - `python3 -m recette analyze ablate ...` -- delta de detection par lens.
+   - `python3 -m recette analyze export ...` -- un package d'experience citable.
+     La correlation porte sa provenance (`tool_version`, `thresholds`), donc un
+     resultat est reproductible.
 
-6. **Console** -- the Probe page hosts the **Correlation panel**: the 2x2
-   quadrant grid (static_blind in the alert accent), a `runtime_dirty` threshold
-   knob that re-runs the correlation live, the provenance line, and an explicit
-   unresolved / coverage-gap block. Drill into a quadrant cell to see its agents.
+6. **Console** -- la page Probe heberge le **panneau Correlation** : la grille de
+   quadrants 2x2 (static_blind en accent alerte), un knob de seuil `runtime_dirty`
+   qui relance la correlation en direct, la ligne de provenance, et un bloc
+   explicite unresolved / coverage-gap. Clique une cellule pour voir ses agents.
 
-## Reading the result honestly (P1 boundary)
+## Lire le resultat honnetement (frontiere P1)
 
-At P1 the identity map pairs the subjects that already exist on both sides;
-links without runtime evidence show as `evidence_missing` in `unresolved[]`. That
-is expected and visible by design -- it is not a bug, it is the coverage frontier.
-P2 lets a discovery scan feed a wave cohort directly; P3 builds 1:1 twin evidence
-bundles per discovery subject and closes the gaps (the coverage guard then turns
-red on any unlinked discovery subject).
+En P1, la carte d'identite paire les sujets qui existent deja des deux cotes ;
+les liens sans preuve runtime apparaissent en `evidence_missing` dans
+`unresolved[]`. C'est attendu et visible par conception -- ce n'est pas un bug,
+c'est la frontiere de couverture. P2 laisse un scan discovery alimenter une
+cohorte de vague directement ; P3 construit les evidence bundles jumeaux 1:1 par
+sujet discovery et ferme les trous (le coverage guard passe alors rouge sur tout
+sujet discovery non lie).
 
-## Determinism and provenance (why this is publishable)
+## Determinisme et provenance (pourquoi c'est publiable)
 
-- `correlate` is a pure function of `(discovery_facts, behavior_reports, links,
-  thresholds)` -- no clock, no random, sorted output, byte-identical on replay
-  (I4). The reference discovery scan is itself deterministic.
-- `static_flagged` is derived from invariant discovery properties (detection +
-  risk level + action_pattern), never an opaque static score -- so the
-  correlation respects the discovery ground-truth rule.
-- Every correlation reports its `thresholds` + `tool_version`, so a quadrant
-  assignment is reproducible and citable.
+- `correlate` est une fonction pure de `(discovery_facts, behavior_reports,
+  links, thresholds)` -- pas d'horloge, pas de random, sortie triee,
+  byte-identique au replay (I4). Le scan discovery de reference est lui-meme
+  deterministe.
+- `static_flagged` est derive de proprietes discovery invariantes (detection +
+  niveau de risque + action_pattern), jamais d'un score statique opaque -- la
+  correlation respecte donc la regle de ground-truth discovery.
+- Chaque correlation reporte ses `thresholds` + `tool_version`, donc une
+  affectation de quadrant est reproductible et citable.
 
-## Related
+## Voir aussi
 
-- `docs/plans/2026-06-25-behavioral-analysis-engine-design.md` -- the behavioral
-  engine (evidence bundles, profiles, lenses, research layer).
-- `docs/plans/2026-06-25-behavior-discovery-correlation-design.md` -- this
-  correlation design (approach A, phasing).
-- `.claude/rules/recette-corpus.md` -- the three forms of an agent (runtime /
-  identification / discovery) and why discovery never sees the runtime.
-- `.claude/rules/redteam-standards-alignment.md` (R23) -- the OWASP ASI 2026 +
-  MITRE ATLAS tags the findings carry.
+- `docs/plans/2026-06-25-behavioral-analysis-engine-design.md` -- le moteur
+  comportemental (evidence bundles, profils, lenses, couche recherche).
+- `docs/plans/2026-06-25-behavior-discovery-correlation-design.md` -- ce design
+  de correlation (approche A, phasage).
+- `.claude/rules/recette-corpus.md` -- les trois formes d'un agent (runtime /
+  identification / discovery) et pourquoi discovery ne voit jamais le runtime.
+- `.claude/rules/redteam-standards-alignment.md` (R23) -- les tags OWASP ASI
+  2026 + MITRE ATLAS que portent les findings.

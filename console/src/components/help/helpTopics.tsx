@@ -1562,6 +1562,37 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <code>INSPECT_IA_AGENTS_PROBE_SOCKET</code>), la page l&apos;indique et la
           capture reste indisponible — elle ne plante pas (fail-safe).
         </p>
+        <h3>Analyse comportementale (vague)</h3>
+        <p>
+          Sous la capture, le panneau <strong>Behavioral analysis</strong> lance
+          une <strong>vague</strong> parametrable sur la preuve figee : on active
+          des <em>lenses</em> (egress, dns, credential, doh, process, said_scope,
+          sequence, baseline), on choisit un <em>threat</em> et des seuils, et le
+          moteur produit le trois-temps <strong>PLANNED vs SAID vs DONE</strong>
+          par agent + un <code>behavioral_score</code>. Pur et rejouable (I4) :
+          meme preuve + meme profil = meme rapport au byte pres.
+        </p>
+        <h3>Correlation Comportement &lt;-&gt; Discovery</h3>
+        <p>
+          Le panneau <strong>Behavior &lt;-&gt; Discovery correlation</strong>
+          croise le <strong>risque statique</strong> predit par le moteur
+          discovery (lecture de la source) avec le{" "}
+          <code>behavioral_score</code> <strong>runtime</strong> mesure par la
+          vague. Chaque agent tombe dans un quadrant : <code>agree_clean</code>,
+          <code>agree_dirty</code>, <code>static_overflag</code>, ou{" "}
+          <strong><code>static_blind</code></strong> — source jugee propre mais
+          comportement sale au runtime, le faux negatif qu&apos;une revue
+          statique seule aurait rate. Le knob <em>runtime_dirty threshold</em>
+          rejoue la correlation en direct ; la jointure passe par la carte
+          d&apos;identite <code>corpus/agent_links.json</code>.
+        </p>
+        <p>
+          Honnetete (R13) : un lien sans preuve runtime apparait en{" "}
+          <strong>UNRESOLVED (fail-loud)</strong> avec la raison{" "}
+          <code>evidence_missing</code>, jamais dans un quadrant fantome —
+          c&apos;est la frontiere de couverture P1, fermee par les jumeaux 1:1
+          (P3). Detail : <code>docs/runbooks/behavior-discovery-research.md</code>.
+        </p>
       </>
     ),
   },
