@@ -135,3 +135,20 @@ def build_discovery_facts(
         facts[subj]["flagged"] = facts[subj]["detected"] and levels.get(subj, 0) > median
 
     return dict(sorted(facts.items()))
+
+
+def discovery_cohort(links, mode, corpus_root=None):
+    """Resolve a wave cohort from a discovery scan: the agent_ids whose
+    discovery_subject is detected (mode="detected") or flagged (mode="flagged").
+    Pure given the corpus (build_discovery_facts is deterministic); sorted+deduped
+    so the cohort is byte-stable across runs (I4)."""
+    if mode not in ("detected", "flagged"):
+        raise ValueError(f"unknown cohort mode: {mode!r} (expected detected|flagged)")
+    facts = build_discovery_facts(links, corpus_root)
+    out = set()
+    for ln in links:
+        subj = ln.discovery_subject
+        fact = facts.get(subj or "")
+        if fact and fact.get(mode if mode == "detected" else "flagged"):
+            out.add(ln.agent_id)
+    return sorted(out)

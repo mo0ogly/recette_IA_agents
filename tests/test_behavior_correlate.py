@@ -75,6 +75,30 @@ class TestCorrelate(unittest.TestCase):
         # gh-admin-overreach is the high-risk overreach repo -> flagged
         self.assertTrue(facts["gh-admin-overreach"]["flagged"])
 
+    def test_discovery_cohort_detected_and_flagged(self):
+        from recette.behavior.correlate import discovery_cohort
+        from recette.behavior.links import load_links
+
+        links = load_links()
+        detected = discovery_cohort(links, "detected")
+        flagged = discovery_cohort(links, "flagged")
+        # both sorted + deduped
+        self.assertEqual(detected, sorted(set(detected)))
+        self.assertEqual(flagged, sorted(set(flagged)))
+        # flagged is a subset of detected
+        self.assertTrue(set(flagged).issubset(set(detected)))
+        # admin-overreach is the high-risk repo -> in flagged
+        self.assertIn("admin-overreach", flagged)
+        # replay-stable
+        self.assertEqual(discovery_cohort(links, "flagged"), flagged)
+
+    def test_discovery_cohort_bad_mode_raises(self):
+        from recette.behavior.correlate import discovery_cohort
+        from recette.behavior.links import load_links
+
+        with self.assertRaises(ValueError):
+            discovery_cohort(load_links(), "bogus")
+
     def test_cli_correlate_renders_static_blind(self):
         from recette.cli.behavior_cmds import correlate_summary
 
