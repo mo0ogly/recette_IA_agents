@@ -133,6 +133,16 @@ class TestRegistryReadIndex(unittest.TestCase):
         tree = self.reg.tree()
         self.assertEqual(tree["categories"], [])
 
+    def test_tree_excludes_reserved_dirs(self) -> None:
+        self._seed()
+        # The back-compat symlink dir and the delete-archive dir are NOT
+        # categories (regression: "latest" leaked into the category list).
+        (self.reg._root / "latest").mkdir(exist_ok=True)
+        (self.reg._root / "_archive").mkdir(exist_ok=True)
+        cats = {n["category"] for n in self.reg.tree()["categories"]}
+        self.assertNotIn("latest", cats)
+        self.assertNotIn("_archive", cats)
+
     def test_read_run_returns_meta_annotations_artifacts(self) -> None:
         _, _ = self._seed()
         doc = self.reg.read_run("r1")

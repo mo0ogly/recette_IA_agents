@@ -25,6 +25,8 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -161,6 +163,38 @@ root_hash: {manifest["root_hash"]}
     return manifest
 
 
+def _register_bundle(llm: str, out_dir: Path, manifest: dict, eurodate: str) -> None:
+    """Register the bundle as a sealed run-group so it is browsable in the Runs
+    Explorer (web-only researcher surface). Fail-safe: a registry error never
+    aborts the export. The bundle keeps its OWN MANIFEST root_hash; this just
+    surfaces the integrity proof + scorecard + readme through the registry."""
+    repo_root = str(_ROOT)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    try:
+        from recette.runs.capture import capture_surface, update_latest_symlink
+    except ImportError as exc:  # registry optional -- never fatal
+        print(f"[anssi] registry capture unavailable (non-fatal): {exc}")
+        return
+
+    slug = llm.replace("/", "_")
+    artifacts: dict[str, str] = {}
+    for name in ("MANIFEST.json", "scorecard.json", "README.md"):
+        path = out_dir / name
+        if path.exists():
+            artifacts[name] = path.read_text(encoding="utf-8")
+    group_id = f"anssi-{slug}"
+    capture_surface(
+        category="anssi",
+        group_id=group_id,
+        eurodate=eurodate,
+        label=f"ANSSI bundle {llm} (root {manifest['root_hash'][:12]})",
+        runs={"bundle": {"kind": "anssi-bundle", "artifacts": artifacts}},
+    )
+    update_latest_symlink("anssi", eurodate, group_id)
+    print(f"[anssi] registered in run-registry: anssi/{eurodate}_{group_id}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Export an ANSSI-researcher recette bundle.")
     ap.add_argument("--llm", default="skynet/gpt-oss-120b")
@@ -173,6 +207,10 @@ def main() -> int:
     print(f"bundle: {out_dir}")
     print(f"files: {len(manifest['files'])} | root_hash: {manifest['root_hash'][:16]}...")
     print(f"git: {manifest['git_commit'][:12]} | llm: {manifest['llm']}")
+    # Operational eurodate (wall clock) -- bundle export is an ops action, not a
+    # decision/judge path (maf-standard rule); the registry itself stays clock-free.
+    eurodate = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")  # noqa: DTZ005
+    _register_bundle(args.llm, out_dir, manifest, eurodate)
     return 0
 
 

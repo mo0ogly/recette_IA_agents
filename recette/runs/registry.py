@@ -232,7 +232,9 @@ class RunRegistry:
             return {"categories": categories}
 
         for cat_dir in sorted(self._root.iterdir()):
-            if not cat_dir.is_dir() or cat_dir.name.startswith("_"):
+            # Reserved dirs are not categories: "_archive" (delete target) and
+            # "latest" (the back-compat symlink dir).
+            if not cat_dir.is_dir() or cat_dir.name.startswith("_") or cat_dir.name == "latest":
                 continue
             groups: list[dict] = []
             for g_dir in sorted(cat_dir.iterdir(), reverse=True):
