@@ -349,8 +349,16 @@ Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
   Acces par **SSH uniquement** (`git@gitlab.cossi.internet:...`), JAMAIS HTTPS (HTTPS
   -> 403 "not allowed", la cle SSH `@fpizzi` a le droit). Ajouter le remote une fois :
   `git remote add gitlab git@gitlab.cossi.internet:sdo/desc/siq/cyber_lab_agents_ia.git`.
-- **`gitlab` main est PROTEGEE** : push direct sur `main` = REFUSE (c'est normal, pas
-  un bug de creds). Le workflow est une **MR**, creee SANS token via push-option SSH :
+- **CAUSE RACINE du refus main (verifie 2026-06-25, vrai push pas dry-run)** : `main`
+  est PROTEGEE et **@fpizzi a le role Developer sur cyber_lab_agents_ia** (pas Maintainer).
+  Un Developer ne peut PAS pousser une branche protegee, quel que soit le protocole ou le
+  token (`GitLab: You are not allowed to push code to protected branches`). HTTPS+token ne
+  change RIEN -- ce n'est PAS un probleme de creds, c'est le ROLE. Comparaison : sur
+  `wattson_devcontainer` @fpizzi est Maintainer -> push main direct (HTTPS) sans friction.
+  Le SEUL fix pour pousser main direct = un owner du projet promeut @fpizzi Maintainer (ou
+  baisse la protection) ; ni l'agent ni @fpizzi ne peut s'auto-accorder ce droit. NE PAS
+  perdre du temps a chercher un token : tant que role=Developer, le workflow est la MR.
+- **Workflow MR** (cree SANS token via push-option SSH, le seul chemin possible en Developer) :
   `git push gitlab HEAD:refs/heads/<branche> -o merge_request.create -o merge_request.target=main -o merge_request.title="..."`
   (la MR ne se cree que sur une MAJ de ref : si la branche existe deja inchangee, la
   supprimer puis re-pousser avec l'option). Verifier d'abord `getent hosts
