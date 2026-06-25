@@ -117,24 +117,39 @@ def wave(request: Request, body: dict[str, Any]) -> dict:
 
 @router.post("/correlate")
 def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
-    """Run a wave then correlate its behavioral reports with the static discovery
-    scan through the agent identity map. Returns the quadrant report alongside
-    the raw wave report.
+    """Run a correlation between the static discovery scan and the behavioral engine.
 
-    Body: ``{"recording": {...}, "profile": {...}, "thresholds": {...}?}``
-    Returns: ``{"report": ..., "correlation": {...}, "cohort": {"mode": ..., "agents": [...]}}``.
-    400 on a missing recording, an invalid profile, or an unknown cohort.discovery mode.
+    Two modes:
+    - **corpus mode** (no recording): load frozen twin bundles, run each wave, then
+      classify.  Body: ``{"profile": {...}?, "thresholds": {...}?}``.
+      Returns ``{"correlation": {...}}``.
+    - **live mode** (recording present): run a wave over the supplied recording, then
+      correlate.  Body: ``{"recording": {...}, "profile": {...}?, "thresholds": {...}?}``.
+      Returns ``{"report": ..., "correlation": {...}, "cohort": {"mode": ..., "agents": [...]}}``.
+
+    400 on an invalid profile or an unknown cohort.discovery mode.
     """
-    from ...behavior.correlate import build_discovery_facts, correlate
     from ...behavior.links import load_links
 
     recording = body.get("recording")
-    if not isinstance(recording, dict):
-        raise HTTPException(status_code=400, detail="recording (object) is required")
+    thresholds = body.get("thresholds") or {"runtime_dirty": 50}
     try:
         profile = AnalysisProfile.from_dict(body.get("profile") or {})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid profile: {exc}") from exc
+
+    links = load_links()
+
+    if not recording:
+        # Corpus mode: no live recording -- load frozen twins and run waves offline.
+        from ...behavior.correlate import correlate_corpus
+
+        corr = correlate_corpus(links, thresholds)
+        return {"correlation": corr}
+
+    # Live mode: recording supplied -- run wave then correlate.
+    if not isinstance(recording, dict):
+        raise HTTPException(status_code=400, detail="recording must be an object")
 
     cohort_echo = _resolve_cohort_discovery(profile)
 
@@ -149,8 +164,8 @@ def correlate_endpoint(request: Request, body: dict[str, Any]) -> dict:
     )
     report = run_wave(bundle, profile)
     behavior_reports = {a["agent_id"]: a for a in report.to_dict()["agents"]}
-    links = load_links()
+    from ...behavior.correlate import build_discovery_facts, correlate
+
     discovery_facts = build_discovery_facts(links)
-    thresholds = body.get("thresholds") or {"runtime_dirty": 50}
     corr = correlate(discovery_facts, behavior_reports, links, thresholds)
     return {"report": report.to_dict(), "correlation": corr, "cohort": cohort_echo}

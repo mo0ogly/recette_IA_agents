@@ -17,16 +17,17 @@ def _link(agent_id, disc, runtime, expected):
 
 class TestCorrelate(unittest.TestCase):
     def setUp(self):
-        # source clean (not flagged), runtime dirty (score 80 > 50) -> static_blind
+        # behavioral_score = 100 - penalties: score < threshold means dirty.
+        # source clean (not flagged), runtime dirty (score 10 < 50) -> static_blind
         self.discovery_facts = {
             "gh-pr-bot": {"detected": True, "flagged": False},
             "gh-admin-overreach": {"detected": True, "flagged": True},
         }
         self.behavior_reports = {
-            "pr-bot": {"agent_id": "pr-bot", "behavioral_score": 80, "coherent": False},
+            "pr-bot": {"agent_id": "pr-bot", "behavioral_score": 10, "coherent": False},
             "admin-overreach": {
                 "agent_id": "admin-overreach",
-                "behavioral_score": 90,
+                "behavioral_score": 10,
                 "coherent": False,
             },
         }
@@ -129,6 +130,22 @@ class TestCorrelate(unittest.TestCase):
         self.assertFalse(facts["gh-pr-bot"]["flagged"])
         self.assertFalse(facts["gh-readonly-reporter"]["flagged"])
 
+    def test_correlate_corpus_populates_quadrants(self):
+        from recette.behavior.correlate import correlate_corpus
+        from recette.behavior.links import load_links
+
+        rep = correlate_corpus(load_links(), {"runtime_dirty": 50})
+        # static_blind has the pr-bot twins; agree_dirty has admin-overreach
+        self.assertIn("pr-bot-gh", rep["quadrants"]["static_blind"])
+        self.assertIn("admin-overreach-gh", rep["quadrants"]["agree_dirty"])
+        self.assertGreater(rep["quadrants"]["agree_clean"], 0)
+        self.assertTrue(rep["quadrants"]["static_overflag"])
+        # replay byte-identical (I4)
+        import json
+
+        a = correlate_corpus(load_links(), {"runtime_dirty": 50})
+        self.assertEqual(json.dumps(rep, sort_keys=True), json.dumps(a, sort_keys=True))
+
     def test_cli_correlate_renders_static_blind(self):
         from recette.cli.behavior_cmds import correlate_summary
 
@@ -138,14 +155,14 @@ class TestCorrelate(unittest.TestCase):
                     "agent_id": "pr-bot",
                     "static_flagged": False,
                     "runtime_dirty": True,
-                    "behavioral_score": 80,
+                    "behavioral_score": 10,
                     "quadrant": "static_blind",
                     "agreement": False,
                 }
             ],
             "quadrants": {
                 "agree_clean": 0,
-                "agree_dirty": 0,
+                "agree_dirty": [],
                 "static_blind": ["pr-bot"],
                 "static_overflag": [],
             },

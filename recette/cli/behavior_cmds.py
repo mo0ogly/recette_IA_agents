@@ -225,7 +225,7 @@ def correlate_summary(rep: dict) -> str:
     q = rep["quadrants"]
     lines = [
         "=== Behavior <-> Discovery correlation ===",
-        f"agree_clean={q['agree_clean']}  agree_dirty={q['agree_dirty']}  "
+        f"agree_clean={q['agree_clean']}  agree_dirty={len(q['agree_dirty'])}  "
         f"static_blind={len(q['static_blind'])}  static_overflag={len(q['static_overflag'])}",
         "",
     ]
@@ -248,18 +248,14 @@ def correlate_summary(rep: dict) -> str:
 
 
 def _cmd_analyze_correlate(profile_path: str | None, threat: str | None, as_json: bool) -> int:
-    """`recette analyze correlate` -- build discovery facts + a behavioral wave
-    over each linked runtime, then classify into quadrants."""
-    from ..behavior.correlate import build_discovery_facts, correlate
+    """`recette analyze correlate` -- load frozen twin bundles, run each wave,
+    then classify into quadrants.  No live probe required (corpus mode)."""
+    from ..behavior.correlate import correlate_corpus
     from ..behavior.links import load_links
 
     links = load_links()
-    discovery_facts = build_discovery_facts(links)
-    # P1: behavior reports come from the wave the analyst already ran; here we
-    # accept them from --profile's referenced reports dir, or empty (fail-loud).
-    behavior_reports: dict = {}  # wired in Task 6 from the live wave; empty -> all evidence_missing
     thresholds = {"runtime_dirty": 50}
-    rep = correlate(discovery_facts, behavior_reports, links, thresholds)
+    rep = correlate_corpus(links, thresholds)
     if as_json:
         print(json.dumps(rep, sort_keys=True, indent=2))
     else:

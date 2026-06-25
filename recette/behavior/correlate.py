@@ -36,7 +36,7 @@ def correlate(
     unresolved: list[dict] = []
     quadrants: dict[str, list[str] | int] = {
         "agree_clean": 0,
-        "agree_dirty": 0,
+        "agree_dirty": [],
         "static_blind": [],
         "static_overflag": [],
     }
@@ -52,7 +52,9 @@ def correlate(
             continue
 
         static_flagged = bool(disc.get("flagged"))
-        runtime_dirty = int(beh.get("behavioral_score", 0)) >= dirty_threshold
+        # behavioral_score = 100 - penalties: a LOWER score means MORE findings
+        # (dirtier behaviour), so runtime_dirty = score strictly below the threshold.
+        runtime_dirty = int(beh.get("behavioral_score", 0)) < dirty_threshold
         quadrant = _QUADRANT[(static_flagged, runtime_dirty)]
         rows.append(
             {
@@ -65,7 +67,7 @@ def correlate(
                 "agreement": static_flagged == runtime_dirty,
             }
         )
-        if quadrant in ("agree_clean", "agree_dirty"):
+        if quadrant == "agree_clean":
             quadrants[quadrant] += 1  # type: ignore[operator]
         else:
             quadrants[quadrant].append(ln.agent_id)  # type: ignore[union-attr]
@@ -145,6 +147,54 @@ def build_discovery_facts(
         facts[subj]["flagged"] = facts[subj]["detected"] and levels.get(subj, 0) > median
 
     return dict(sorted(facts.items()))
+
+
+def correlate_corpus(
+    links: list[Link],
+    thresholds: dict,
+    corpus_root: Path | str | None = None,
+) -> dict:
+    """Populate quadrants from frozen twin bundles -- no live probe.
+
+    For each link with an evidence_bundle, load ``<evidence_bundle>/bundle.json``
+    relative to the repo root (or ``corpus_root`` when supplied), run one wave with
+    the default exfil profile, and take the agent's report into behavior_reports.
+    Then delegates to the pure ``correlate``.  Deterministic (I4): twin bundles are
+    frozen fixtures; no clock/random in the wave engine.
+    """
+    import json as _json
+
+    from . import EvidenceBundle
+    from .engine import run_wave
+    from .profile import AnalysisProfile
+
+    facts = build_discovery_facts(links, corpus_root)
+    behavior_reports: dict[str, dict] = {}
+    prof = AnalysisProfile.from_dict({"threat": "exfil"})
+
+    # resolve the repo root once (evidence_bundle paths in agent_links.json are repo-relative)
+    if corpus_root is not None:
+        root = Path(corpus_root)
+    else:
+        # DEFAULT_LINKS lives at <repo_root>/corpus/agent_links.json so the repo root
+        # is two parents up from that file, which equals the package parents[2].
+        from .links import DEFAULT_LINKS
+
+        root = DEFAULT_LINKS.parents[1]  # corpus/ -> repo root
+
+    for ln in links:
+        if not ln.evidence_bundle:
+            continue
+        bpath = root / ln.evidence_bundle / "bundle.json"
+        if not bpath.exists():
+            continue
+        data = _json.loads(bpath.read_text(encoding="utf-8"))
+        rep = run_wave(EvidenceBundle.from_dict(data), prof).to_dict()
+        for a in rep["agents"]:
+            if a["agent_id"] == ln.agent_id:
+                behavior_reports[ln.agent_id] = a
+
+    return correlate(facts, behavior_reports, links, thresholds)
 
 
 def discovery_cohort(links, mode, corpus_root=None):
