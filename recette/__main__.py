@@ -9,6 +9,7 @@ unchanged. ``main`` only parses args and dispatches to the grouped handlers.
 from __future__ import annotations
 
 from .cli.agent_cmds import _cmd_agent_freeze, _cmd_agent_replay, _cmd_agent_run
+from .cli.behavior_cmds import _cmd_analyze_replay, _cmd_analyze_wave
 from .cli.corpus_cmds import (
     _cmd_benchmark,
     _cmd_import_maf,
@@ -104,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_import_maf(args.spec, args.out)
     if args.command == "surface":
         return _cmd_surface(args.recording)
+    if args.command == "analyze":
+        if args.analyze_cmd == "wave":
+            return _cmd_analyze_wave(args.evidence, args.profile, args.threat, args.json)
+        if args.analyze_cmd == "replay":
+            return _cmd_analyze_replay(args.evidence, args.profile, args.threat, args.report)
     if args.command == "redteam":
         return _cmd_redteam()
     if args.command == "redteam-promote":

@@ -158,6 +158,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="score a discoveryprobe broker capture recording (JSON file) "
         "instead of the in-bench corpus projection",
     )
+    analyze = sub.add_parser(
+        "analyze",
+        help="behavioral-analysis engine: run/replay tunable waves over agent evidence",
+    )
+    analyze_sub = analyze.add_subparsers(dest="analyze_cmd", required=True)
+    an_run = analyze_sub.add_parser(
+        "wave", help="run one analysis wave (evidence + profile) -> report"
+    )
+    an_run.add_argument(
+        "--evidence", required=True, help="evidence bundle folder or a bundle.json file"
+    )
+    an_run.add_argument(
+        "--profile", default=None, help="AnalysisProfile JSON (omit for the default profile)"
+    )
+    an_run.add_argument(
+        "--threat",
+        default=None,
+        help="override the threat hypothesis (neutral|exfil|escalation|tunneling|supply_chain)",
+    )
+    an_run.add_argument(
+        "--json", action="store_true", help="emit the full report as JSON (default: summary)"
+    )
+    an_rep = analyze_sub.add_parser(
+        "replay", help="re-run a wave and assert the report is byte-identical (reproducibility)"
+    )
+    an_rep.add_argument("--evidence", required=True, help="evidence bundle folder or bundle.json")
+    an_rep.add_argument("--profile", default=None, help="AnalysisProfile JSON (default profile)")
+    an_rep.add_argument("--threat", default=None, help="override the threat hypothesis")
+    an_rep.add_argument(
+        "--report", required=True, help="prior report JSON to check byte-equality against"
+    )
     sub.add_parser(
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",
