@@ -219,6 +219,21 @@ def build_parser() -> argparse.ArgumentParser:
     an_exp.add_argument("--profile", default=None, help="AnalysisProfile JSON")
     an_exp.add_argument("--threat", default=None, help="override the threat hypothesis")
     an_exp.add_argument("--out", required=True, help="output folder for the experiment package")
+    an_cor = analyze_sub.add_parser(
+        "correlate",
+        help="correlate behavioral wave with static discovery scan -> quadrant report",
+    )
+    an_cor.add_argument(
+        "--profile", default=None, help="AnalysisProfile JSON (omit for the default profile)"
+    )
+    an_cor.add_argument(
+        "--threat",
+        default=None,
+        help="override the threat hypothesis (neutral|exfil|escalation|tunneling|supply_chain)",
+    )
+    an_cor.add_argument(
+        "--json", action="store_true", help="emit the full report as JSON (default: summary)"
+    )
     sub.add_parser(
         "redteam",
         help="run the deterministic red-team recette and print the scorecard",

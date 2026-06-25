@@ -74,3 +74,32 @@ class TestCorrelate(unittest.TestCase):
         self.assertTrue(facts["gh-pr-bot"]["detected"])
         # gh-admin-overreach is the high-risk overreach repo -> flagged
         self.assertTrue(facts["gh-admin-overreach"]["flagged"])
+
+    def test_cli_correlate_renders_static_blind(self):
+        from recette.cli.behavior_cmds import correlate_summary
+
+        rep = {
+            "rows": [
+                {
+                    "agent_id": "pr-bot",
+                    "static_flagged": False,
+                    "runtime_dirty": True,
+                    "behavioral_score": 80,
+                    "quadrant": "static_blind",
+                    "agreement": False,
+                }
+            ],
+            "quadrants": {
+                "agree_clean": 0,
+                "agree_dirty": 0,
+                "static_blind": ["pr-bot"],
+                "static_overflag": [],
+            },
+            "unresolved": [],
+            "coverage_gaps": [],
+            "thresholds": {"runtime_dirty": 50},
+            "tool_version": "behavior-engine/1",
+        }
+        text = correlate_summary(rep)
+        self.assertIn("static_blind", text)
+        self.assertIn("pr-bot", text)

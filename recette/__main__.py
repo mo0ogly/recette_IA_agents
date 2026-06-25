@@ -11,6 +11,7 @@ from __future__ import annotations
 from .cli.agent_cmds import _cmd_agent_freeze, _cmd_agent_replay, _cmd_agent_run
 from .cli.behavior_cmds import (
     _cmd_analyze_ablate,
+    _cmd_analyze_correlate,
     _cmd_analyze_export,
     _cmd_analyze_metrics,
     _cmd_analyze_replay,
@@ -127,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_analyze_ablate(args.evidence, args.profile, args.threat)
         if args.analyze_cmd == "export":
             return _cmd_analyze_export(args.evidence, args.profile, args.threat, args.out)
+        if args.analyze_cmd == "correlate":
+            return _cmd_analyze_correlate(args.profile, args.threat, args.json)
     if args.command == "redteam":
         return _cmd_redteam()
     if args.command == "redteam-promote":

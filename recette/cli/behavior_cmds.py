@@ -195,3 +195,50 @@ def _cmd_analyze_export(evidence: str, profile: str | None, threat: str | None, 
     print(f"experiment package -> {out}")
     print(f"experiment_id: {experiment_id}")
     return 0
+
+
+def correlate_summary(rep: dict) -> str:
+    """Human render of a correlation report. Pure string build."""
+    q = rep["quadrants"]
+    lines = [
+        "=== Behavior <-> Discovery correlation ===",
+        f"agree_clean={q['agree_clean']}  agree_dirty={q['agree_dirty']}  "
+        f"static_blind={len(q['static_blind'])}  static_overflag={len(q['static_overflag'])}",
+        "",
+    ]
+    for r in rep["rows"]:
+        lines.append(
+            f"  {r['agent_id']:<24} static_flagged={str(r['static_flagged']):<5} "
+            f"runtime_dirty={str(r['runtime_dirty']):<5} score={r['behavioral_score']:>3}  "
+            f"-> {r['quadrant']}"
+        )
+    if rep["unresolved"]:
+        lines.append("")
+        lines.append("UNRESOLVED (fail-loud):")
+        for u in rep["unresolved"]:
+            lines.append(f"  {u['agent_id']}: {u['reason']}")
+    if rep["coverage_gaps"]:
+        lines.append(
+            "COVERAGE GAPS: " + ", ".join(g["discovery_subject"] for g in rep["coverage_gaps"])
+        )
+    return "\n".join(lines)
+
+
+def _cmd_analyze_correlate(profile_path: str | None, threat: str | None, as_json: bool) -> int:
+    """`recette analyze correlate` -- build discovery facts + a behavioral wave
+    over each linked runtime, then classify into quadrants."""
+    from ..behavior.correlate import build_discovery_facts, correlate
+    from ..behavior.links import load_links
+
+    links = load_links()
+    discovery_facts = build_discovery_facts(links)
+    # P1: behavior reports come from the wave the analyst already ran; here we
+    # accept them from --profile's referenced reports dir, or empty (fail-loud).
+    behavior_reports: dict = {}  # wired in Task 6 from the live wave; empty -> all evidence_missing
+    thresholds = {"runtime_dirty": 50}
+    rep = correlate(discovery_facts, behavior_reports, links, thresholds)
+    if as_json:
+        print(json.dumps(rep, sort_keys=True, indent=2))
+    else:
+        print(correlate_summary(rep))
+    return 0
