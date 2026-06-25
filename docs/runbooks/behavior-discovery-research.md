@@ -165,6 +165,58 @@ sujet discovery non lie).
 - Chaque correlation reporte ses `thresholds` + `tool_version`, donc une
   affectation de quadrant est reproductible et citable.
 
+## Jumeaux 1:1 (P3)
+
+P3 ferme la frontiere P1/P2 en donnant a chaque sujet discovery detecte un
+**jumeau d'evidence fige** (`corpus/evidence/<subject>/bundle.json`). Les huit
+sujets detectes (quatre par surface : github et gitlab) ont chacun leur jumeau ;
+les deux sujets sans agent (`no-agent-gh`, `no-agent-gl`) n'en ont pas.
+
+### Structure des jumeaux
+
+Chaque jumeau est un `EvidenceBundle` fige, dont le `recording.agent_id`
+correspond exactement au `agent_id` declare dans `corpus/agent_links.json`.
+La recette wire est choisie pour produire le quadrant voulu de facon
+deterministe (I4) :
+
+| sujet (gh et gl) | quadrant |
+|------------------|----------|
+| readonly-reporter | agree_clean |
+| pr-bot | static_blind |
+| supply-chain-compromise | static_overflag |
+| admin-overreach | agree_dirty |
+
+Resultat verifie de `python3 -m recette analyze correlate` :
+
+```
+agree_clean=2  agree_dirty=2  static_blind=2  static_overflag=2
+  pr-bot-gh ... -> static_blind ; admin-overreach-gh ... -> agree_dirty
+  readonly-reporter-gh -> agree_clean ; supply-chain-gh -> static_overflag
+  no-agent-gh: evidence_missing
+```
+
+Les quatre quadrants sont couverts de facon demonstrable ; les deux sujets
+sans agent restent en `evidence_missing` (fail-loud, jamais dans un quadrant
+fantome).
+
+### `analyze correlate` sans sonde live
+
+Depuis P3, `python3 -m recette analyze correlate` peuple les quadrants depuis
+le corpus seul, sans capture eBPF live. La fonction `correlate_corpus` charge
+chaque jumeau, lance une vague comportementale pure (I4), et alimente la
+correlation existante. La commande produit un resultat byte-identique au rejeu
+(meme (twin, profil) -> meme rapport).
+
+### Coverage guard (fail-loud)
+
+Le test `tests/test_behavior_link_coverage.py` est le verrou : il passe en
+**rouge** des qu'un sujet discovery n'a pas de lien dans `corpus/agent_links.json`,
+qu'un lien pointe un `evidence_bundle` dont l'`agent_id` de recording ne
+correspond pas au lien, ou que le quadrant produit par la vague diverge du
+`expected.quadrant` declare dans le lien. Les deux sujets sans jumeau
+(`gh-no-agent`, `gl-no-agent`) sont geles dans une constante explicite -- leur
+nombre ne peut pas croitre silencieusement.
+
 ## Voir aussi
 
 - `docs/plans/2026-06-25-behavioral-analysis-engine-design.md` -- le moteur

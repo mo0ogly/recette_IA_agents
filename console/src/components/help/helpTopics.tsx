@@ -1595,6 +1595,12 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           Le selecteur de cohorte (<strong>All / Discovered / Flagged</strong>)
           restreint la vague aux agents que le moteur discovery a detectes ou
           marques haut-risque, avant meme de lancer la correlation.
+          Depuis P3, la correlation se peuple sans capture live : chaque sujet
+          discovery detecte dispose d&apos;un jumeau fige dans le corpus
+          (<code>corpus/evidence/&lt;subject&gt;/</code>), et{" "}
+          <code>analyze correlate</code> charge ces jumeaux directement pour
+          alimenter les quatre quadrants &mdash; aucune sonde eBPF n&apos;est
+          necessaire.
         </p>
       </>
     ),

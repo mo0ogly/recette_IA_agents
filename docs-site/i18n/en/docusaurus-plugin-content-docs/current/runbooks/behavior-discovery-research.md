@@ -163,6 +163,55 @@ red on any unlinked discovery subject).
 - Every correlation reports its `thresholds` + `tool_version`, so a quadrant
   assignment is reproducible and citable.
 
+## 1:1 twins (P3)
+
+P3 closes the P1/P2 frontier by giving every detected discovery subject a
+**frozen evidence twin** (`corpus/evidence/<subject>/bundle.json`). All eight
+detected subjects (four per surface: github and gitlab) have a twin; the two
+no-agent subjects (`no-agent-gh`, `no-agent-gl`) do not.
+
+### Twin structure
+
+Each twin is a frozen `EvidenceBundle` whose `recording.agent_id` matches
+exactly the `agent_id` declared in `corpus/agent_links.json`. The wire recipe
+is chosen to produce the intended quadrant deterministically (I4):
+
+| subject (gh and gl) | quadrant |
+|---------------------|----------|
+| readonly-reporter | agree_clean |
+| pr-bot | static_blind |
+| supply-chain-compromise | static_overflag |
+| admin-overreach | agree_dirty |
+
+Verified output of `python3 -m recette analyze correlate`:
+
+```
+agree_clean=2  agree_dirty=2  static_blind=2  static_overflag=2
+  pr-bot-gh ... -> static_blind ; admin-overreach-gh ... -> agree_dirty
+  readonly-reporter-gh -> agree_clean ; supply-chain-gh -> static_overflag
+  no-agent-gh: evidence_missing
+```
+
+All four quadrants are demonstrably covered; the two no-agent subjects remain
+as `evidence_missing` (fail-loud, never in a phantom quadrant).
+
+### `analyze correlate` without a live probe
+
+From P3 onward, `python3 -m recette analyze correlate` populates the quadrants
+from the corpus alone, with no live eBPF capture. The `correlate_corpus`
+function loads each twin, runs a pure behavioral wave (I4), and feeds the
+existing correlate. The command produces a byte-identical result on replay
+(same (twin, profile) -> same report).
+
+### Coverage guard (fail-loud)
+
+The test `tests/test_behavior_link_coverage.py` is the lock: it turns **red**
+whenever a discovery subject has no entry in `corpus/agent_links.json`, a link
+points to an `evidence_bundle` whose recording `agent_id` does not match the
+link, or the quadrant produced by the wave diverges from the `expected.quadrant`
+declared in the link. The two twin-less subjects (`gh-no-agent`, `gl-no-agent`)
+are frozen in an explicit constant -- their count cannot grow silently.
+
 ## Related
 
 - `docs/plans/2026-06-25-behavioral-analysis-engine-design.md` -- the behavioral
