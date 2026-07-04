@@ -22,13 +22,15 @@
 //! 5. An observed edge absent from the declared graph -> `UndeclaredHandoff`
 //!    attached to the `from` record (when that record exists; the edge is
 //!    ALWAYS listed in `comm_graph.undeclared_edges` either way).
-//! 6. Conformity: violations -> `Violations` (sorted); no violations and the
+//! 6. Conformity: violations -> `Violations` (sorted); no violations, the
 //!    agent was seen live (matched recording, observed principal, or an
-//!    observed edge touching it) -> `Conform`; otherwise `NotObserved`. A
-//!    static-only run (`observed = None`) can therefore NEVER be `Conform`.
-//!    An `Invalid` passport keeps `PassportStatus::Invalid` as the signal
-//!    and stays `NotObserved` unless observed data adds violations
-//!    (documented choice: no violation variant duplicates the status).
+//!    observed edge touching it) AND it carries a parseable declaration ->
+//!    `Conform`; otherwise `NotObserved`. A static-only run
+//!    (`observed = None`) can therefore NEVER be `Conform`. Invalid
+//!    passport: the Invalid status itself is the signal; with no parseable
+//!    declaration the record can never be `Conform` -- it stays
+//!    `NotObserved` unless observed data adds violations (fail-safe: a
+//!    broken manifest must never outrank a missing one, nor a valid one).
 //! 7. `ModeEscalation` / `ApprovalBypass` are NEVER fabricated: the current
 //!    `CaptureRecording` surface keys carry no mode/approval signal. The
 //!    variants stay in the contract for the bridge (Task 10/13) to populate.
@@ -149,9 +151,15 @@ pub fn correlate(
             }
             record_violations.sort();
             record_violations.dedup();
+            // Conform requires a parseable declaration to compare against:
+            // an observed record with `declared == None` (Invalid passport)
+            // stays NotObserved (fail-safe, rule 6).
             record.conformity = if !record_violations.is_empty() {
                 Conformity::Violations(record_violations)
-            } else if observed_present && observed_ids.contains(&record.agent_id) {
+            } else if observed_present
+                && observed_ids.contains(&record.agent_id)
+                && record.declared.is_some()
+            {
                 Conformity::Conform
             } else {
                 Conformity::NotObserved
@@ -605,6 +613,50 @@ mod tests {
         assert_eq!(inv.agents[0].conformity, Conformity::NotObserved);
         assert_eq!(inv.summary.invalid_passport, 1);
         assert_eq!(inv.summary.violation_count, 0);
+    }
+
+    #[test]
+    fn invalid_passport_observed_live_is_never_conform() {
+        let scanned = vec![
+            present_agent("pr-bot", "good-bot", &["open_pr"]),
+            ScannedAgent {
+                root: "/scan/broken-agent".to_string(),
+                passport: PassportStatus::Invalid {
+                    errors: vec!["agent.name is missing or empty".to_string()],
+                },
+            },
+        ];
+        let mut broken_rec = CaptureRecording::new("broken-agent");
+        broken_rec.observe(ObservationSurface::EbpfWire, "POST api.github.com:443/x");
+        let mut valid_rec = CaptureRecording::new("pr-bot");
+        valid_rec.observe(ObservationSurface::HookSdk, "open_pr:acme/web#1");
+        let obs = ObservedInput {
+            recordings: vec![broken_rec, valid_rec],
+            ..Default::default()
+        };
+        let inv = correlate(&scanned, &DeclaredGraph::default(), Some(&obs));
+        assert_eq!(inv.agents.len(), 2);
+        let broken = inv
+            .agents
+            .iter()
+            .find(|a| a.agent_id == "broken-agent")
+            .expect("broken record");
+        // Observed live with egress evidence, but no parseable declaration:
+        // never Conform (fail-safe -- a broken manifest must not outrank a
+        // missing or a valid one).
+        assert_eq!(broken.conformity, Conformity::NotObserved);
+        assert_eq!(
+            broken.observed.egress,
+            vec!["POST api.github.com:443/x".to_string()]
+        );
+        // Discriminator: a sibling VALID record in the SAME run CAN be
+        // Conform, so the gate targets the missing declaration only.
+        let valid = inv
+            .agents
+            .iter()
+            .find(|a| a.agent_id == "pr-bot")
+            .expect("valid record");
+        assert_eq!(valid.conformity, Conformity::Conform);
     }
 
     #[test]
