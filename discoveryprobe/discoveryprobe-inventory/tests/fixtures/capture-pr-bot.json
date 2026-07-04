@@ -1,0 +1,12 @@
+{
+  "recordings": [
+    {
+      "agent_id": "acme-dependency-pr-bot[bot]",
+      "surfaces": {
+        "hook_sdk": ["open_pr:acme/web#42"]
+      }
+    }
+  ],
+  "observed_edges": [],
+  "observed_principals": []
+}
