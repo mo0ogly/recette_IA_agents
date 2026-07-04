@@ -105,9 +105,12 @@ export default function ProbePage(): JSX.Element {
   const [live, setLive] = useState(false);
   const [windowCount, setWindowCount] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
-  // Static agent inventory (discoveryprobe-inventory): passports + comm graph.
-  // Independent of a live capture (a static scan), fetched once on mount.
+  // Agent inventory (discoveryprobe-inventory): passports + comm graph, from a
+  // live on-demand scan of the configured agent-source trees (or the committed
+  // sample when the Rust engine is not built). Fetched once on mount.
   const [inventory, setInventory] = useState<AgentInventory | null>(null);
+  const [inventoryLive, setInventoryLive] = useState(false);
+  const [inventoryReason, setInventoryReason] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -126,7 +129,12 @@ export default function ProbePage(): JSX.Element {
   useEffect(() => {
     let alive = true;
     getInventory()
-      .then((inv) => alive && setInventory(inv))
+      .then((resp) => {
+        if (!alive) return;
+        setInventory(resp.inventory);
+        setInventoryLive(resp.live);
+        setInventoryReason(resp.reason ?? null);
+      })
       .catch((err) => {
         if (alive) setInventory(null);
         console.error("probe inventory fetch failed", err);
@@ -369,7 +377,7 @@ export default function ProbePage(): JSX.Element {
         communication (aretes declarees vs observees, handoffs non declares en
         rouge, sauts via passerelle a part). Independant d&apos;une capture live.
       </p>
-      <InventoryPanel inventory={inventory} />
+      <InventoryPanel inventory={inventory} live={inventoryLive} reason={inventoryReason} />
 
       <h2 className="probe-subtitle">Trace LLM (surface hook in-process)</h2>
       <p className="probe-note">

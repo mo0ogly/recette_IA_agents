@@ -83,4 +83,18 @@ describe("InventoryPanel (R16)", () => {
     const { container } = render(<InventoryPanel inventory={null} />);
     expect(container.firstChild).toBeNull();
   });
+
+  it("shows the LIVE SCAN badge when the inventory is a live scan", () => {
+    render(<InventoryPanel inventory={REAL} live={true} />);
+    expect(screen.getByTestId("inv-live-badge").textContent).toBe("LIVE SCAN");
+  });
+
+  it("shows the SAMPLE badge with the fallback reason when not live", () => {
+    render(
+      <InventoryPanel inventory={REAL} live={false} reason="engine not built" />,
+    );
+    const badge = screen.getByTestId("inv-live-badge");
+    expect(badge.textContent).toBe("SAMPLE");
+    expect(badge.getAttribute("title")).toBe("engine not built");
+  });
 });

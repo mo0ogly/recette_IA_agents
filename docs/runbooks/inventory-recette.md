@@ -155,16 +155,23 @@ Deux sujets ground-truth mono-axe (R20) exercent la reconnaissance de passeport 
 
 ## L'API et la console
 
-- **Endpoint** : `GET /probe/inventory` (`recette/api/routers/probe.py`) sert un
-  `AgentInventory` sous la cle `inventory` (le client unwrap une cle). Il valide la sortie
-  via `parse_inventory` avant de la servir : un inventaire malforme est un 500, jamais un
-  inventaire fabrique.
-- **Console** : le panneau `InventoryPanel` (page **Probe eBPF**) rend, par agent : son
+- **Endpoint** : `GET /probe/inventory` (`recette/api/routers/probe.py`) fait un **scan
+  live a la demande** : il lance le binaire Rust `discoveryprobe-inventory` sur chaque
+  arbre d'agent sous `corpus/repos/*/repo` (racine et binaire configurables par
+  `INSPECT_IA_AGENTS_INVENTORY_SCAN_ROOT` / `INSPECT_IA_AGENTS_INVENTORY_BIN`, R5), fusionne
+  les inventaires et renvoie `{inventory, live: true, engine}` sous la cle `inventory`.
+  Read-only (I1) : le moteur ne fait que lire les sources. Fail-safe (R7) : si le binaire
+  n'est pas build (`./recette.sh discovery-build`), la route retombe sur l'echantillon
+  committe (`corpus/inventory/sample-inventory.json`) avec `live: false` + `reason` -- le
+  panneau rend quand meme, et l'operateur sait que c'est l'echantillon. Un id d'agent derive
+  du montage generique (`repo`) est reetiquete par le slug du sujet (ex. `gh-shadow-agent`).
+- **Console** : le panneau `InventoryPanel` (page **Probe**) rend, par agent : son
   id, l'**evidence** de code scanne, le **badge de passeport** (present / absent /
   invalide -- keyed off `passport.kind` seul, jamais sur une liste de violations non vide),
-  le kind du sujet, et le verdict de conformite. Sous la table : la liste des violations et
-  le graphe de communication (aretes declarees vs observees, non declarees en rouge,
-  via-passerelle a part). Aide UI : bouton **? Aide** du panneau (topic `inventory`).
+  le kind du sujet, et le verdict de conformite. Un badge **LIVE SCAN** (vert) / **SAMPLE**
+  (ambre) indique si l'inventaire vient d'un scan live ou de l'echantillon. Sous la table :
+  la liste des violations et le graphe de communication (aretes declarees vs observees, non
+  declarees en rouge, via-passerelle a part). Aide UI : bouton **? Aide** (topic `inventory`).
 
 ## Construire l'outil
 

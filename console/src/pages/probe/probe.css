@@ -656,6 +656,28 @@
   color: var(--color-text);
 }
 
+.inv-live-badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.inv-live-on {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  border: 1px solid var(--badge-green-fg);
+}
+
+.inv-live-off {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  border: 1px solid var(--badge-amber-fg);
+}
+
 .inv-summary {
   display: flex;
   flex-wrap: wrap;

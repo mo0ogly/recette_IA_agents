@@ -758,28 +758,46 @@ def _verify_runs_explorer(page: Page, console: str, api: str) -> None:
 
 
 def _verify_probe_inventory(page: Page, console: str) -> None:
-    """The /probe agent-inventory panel renders the static-scan AgentInventory.
+    """The /probe agent-inventory panel renders the AgentInventory.
 
-    Drives the real console -> GET /probe/inventory (the committed sample served
-    by the API). Asserts the panel mounts and a passport BADGE is in the DOM --
-    the discovery legibility signal (present / absent / invalid). Deterministic:
-    the endpoint serves a frozen document, no live capture needed."""
+    Drives the real console -> GET /probe/inventory. When the Rust engine is
+    built the endpoint serves a LIVE scan of the configured agent-source trees
+    (badge "LIVE SCAN", real slugs like gh-shadow-agent); otherwise it falls back
+    to the committed sample (badge "SAMPLE", which also carries the demo comm
+    graph). Asserts the panel mounts, the live/sample badge is present, and the
+    three passport BADGES (present / absent / invalid) render -- the discovery
+    legibility signal -- then branches its deeper assertion on the mode."""
     page.goto(f"{console}/probe", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
     panel = page.get_by_test_id("inv-panel")
     panel.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
-    # The sample carries all three passport states; assert each badge is present.
+    live_badge = page.get_by_test_id("inv-live-badge")
+    live_badge.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    mode = live_badge.inner_text().strip().upper()
+    _expect(
+        mode in ("LIVE SCAN", "SAMPLE"),
+        f"probe inventory: unexpected live badge {mode!r}",
+    )
+    # All three passport states render in both modes.
     for kind in ("present", "absent", "invalid"):
         badge = page.get_by_test_id(f"inv-badge-{kind}")
         badge.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
-    # An undeclared communication edge must be flagged (comm graph legibility).
-    undeclared = page.get_by_test_id("inv-edges-undeclared")
-    undeclared.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
-    _expect(
-        "undeclared" in undeclared.inner_text().lower(),
-        "probe inventory: undeclared comm edge group not rendered",
-    )
+    if mode == "LIVE SCAN":
+        # Live scan of corpus/repos: the shadow + invalid subjects read by slug.
+        body = panel.inner_text()
+        _expect(
+            "gh-shadow-agent" in body and "gh-invalid-passport" in body,
+            "probe inventory: live scan did not surface the shadow/invalid slugs",
+        )
+    else:
+        # Sample fallback carries the demo comm graph with an undeclared edge.
+        undeclared = page.get_by_test_id("inv-edges-undeclared")
+        undeclared.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+        _expect(
+            "undeclared" in undeclared.inner_text().lower(),
+            "probe inventory: undeclared comm edge group not rendered",
+        )
     _shot(page, "probe-inventory")
-    print("[probe] /probe inventory panel: present/absent/invalid badges + undeclared edge OK")
+    print(f"[probe] /probe inventory panel: {mode} + present/absent/invalid badges OK")
 
 
 def run_smoke(console: str, api: str, server_port: int) -> None:

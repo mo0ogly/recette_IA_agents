@@ -14,7 +14,9 @@ capture.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import subprocess  # nosec B404 - fixed binary + fixed args, no shell, no request input
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,8 @@ from ...surface.agent_analysis import analyze_recording, declared_view
 from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/probe", tags=["probe"])
 
@@ -41,6 +45,141 @@ router = APIRouter(prefix="/probe", tags=["probe"])
 _INVENTORY_SAMPLE = (
     Path(__file__).resolve().parents[3] / "corpus" / "inventory" / "sample-inventory.json"
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+#: The compiled ``discoveryprobe-inventory`` CLI, produced by
+#: ``./recette.sh discovery-build``. Config first (R5): env override, else the
+#: release build under the discoveryprobe workspace.
+_INVENTORY_BIN_ENV = "INSPECT_IA_AGENTS_INVENTORY_BIN"
+_INVENTORY_BIN_REL = "discoveryprobe/target/release/discoveryprobe-inventory"
+
+#: Root of real agent-source trees the live scan walks. Each immediate child that
+#: contains a ``repo/`` directory is scanned as one agent-source tree. Config
+#: first (R5): env override, else the discovery corpus repos.
+_INVENTORY_SCAN_ROOT_ENV = "INSPECT_IA_AGENTS_INVENTORY_SCAN_ROOT"
+_INVENTORY_SCAN_ROOT_REL = "corpus/repos"
+
+_INVENTORY_ENGINE = "discoveryprobe-inventory (Rust)"
+
+
+def _inventory_bin() -> Path:
+    raw = os.environ.get(_INVENTORY_BIN_ENV)
+    return Path(raw) if raw else _REPO_ROOT / _INVENTORY_BIN_REL
+
+
+def _inventory_scan_root() -> Path:
+    raw = os.environ.get(_INVENTORY_SCAN_ROOT_ENV)
+    return Path(raw) if raw else _REPO_ROOT / _INVENTORY_SCAN_ROOT_REL
+
+
+def _scan_one_tree(binary: Path, tree: Path) -> dict | None:
+    """Run the Rust inventory engine on one agent-source tree, return its
+    ``AgentInventory`` dict, or ``None`` if the scan fails.
+
+    Fixed binary path + fixed tree path, no shell, no request input (the tree
+    comes from the configured scan root, never from the caller). Fail-safe: any
+    failure (non-zero exit, timeout, non-JSON) returns ``None`` so one bad tree
+    never fails the whole scan.
+    """
+    try:
+        proc = subprocess.run(  # nosec B603
+            [str(binary), "scan", str(tree)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("inventory scan of %s failed to run: %s", tree, exc)
+        return None
+    if proc.returncode != 0:
+        logger.warning("inventory scan of %s exited %s", tree, proc.returncode)
+        return None
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        logger.warning("inventory scan of %s returned non-JSON: %s", tree, exc)
+        return None
+
+
+def _merge_inventories(docs: list[dict]) -> dict:
+    """Merge per-tree ``AgentInventory`` documents into one live inventory.
+
+    Agents are concatenated and sorted by ``agent_id``; comm-graph edge lists are
+    unioned and de-duplicated; the summary is recomputed from the merged agents.
+    Deterministic given the input set (sorted throughout, I4-friendly): this is an
+    operator-facing live scan, not a judged decision path.
+    """
+    agents: list[dict] = []
+    for doc in docs:
+        agents.extend(doc.get("agents", []))
+    agents.sort(key=lambda a: a.get("agent_id", ""))
+
+    edge_keys = ("declared_edges", "observed_edges", "undeclared_edges", "via_gateway_edges")
+    comm: dict[str, list[dict]] = {}
+    for key in edge_keys:
+        seen: list[dict] = []
+        for doc in docs:
+            for edge in doc.get("comm_graph", {}).get(key, []):
+                if edge not in seen:
+                    seen.append(edge)
+        seen.sort(key=lambda e: (e.get("from", ""), e.get("to", "")))
+        comm[key] = seen
+
+    def _violations(agent: dict) -> int:
+        conf = agent.get("conformity", {})
+        return len(conf.get("violations", [])) if conf.get("kind") == "violations" else 0
+
+    summary = {
+        "with_passport": sum(1 for a in agents if a.get("passport", {}).get("kind") == "present"),
+        "without_passport": sum(1 for a in agents if a.get("passport", {}).get("kind") == "absent"),
+        "invalid_passport": sum(
+            1 for a in agents if a.get("passport", {}).get("kind") == "invalid"
+        ),
+        "violation_count": sum(_violations(a) for a in agents),
+    }
+    return {
+        "schema_version": "1.0",
+        "agents": agents,
+        "comm_graph": comm,
+        "summary": summary,
+    }
+
+
+def _live_inventory() -> dict | None:
+    """Scan every configured agent-source tree with the Rust engine and merge the
+    results into one live ``AgentInventory``. Returns ``None`` when the binary is
+    not built or no tree could be scanned (the caller then falls back to the
+    committed sample)."""
+    binary = _inventory_bin()
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        return None
+    root = _inventory_scan_root()
+    if not root.is_dir():
+        return None
+    docs: list[dict] = []
+    for child in sorted(root.iterdir()):
+        tree = child / "repo"
+        if tree.is_dir():
+            doc = _scan_one_tree(binary, tree)
+            if doc is not None:
+                _relabel_bland_ids(doc, slug=child.name, mount=tree.name)
+                docs.append(doc)
+    if not docs:
+        return None
+    return _merge_inventories(docs)
+
+
+def _relabel_bland_ids(doc: dict, *, slug: str, mount: str) -> None:
+    """Replace an agent id derived from the generic mount directory (e.g. ``repo``)
+    with the subject slug, so a shadow/invalid agent scanned at ``<slug>/repo``
+    reads as ``<slug>`` in the console instead of a bland, collision-prone
+    ``repo``. Passport-present agents carry a real declared id and are untouched.
+    """
+    for agent in doc.get("agents", []):
+        if agent.get("agent_id") == mount:
+            agent["agent_id"] = slug
 
 
 def _attach_wire_names(result: dict, request: Request) -> dict:
@@ -159,26 +298,38 @@ def status() -> dict:
 
 @router.get("/inventory")
 def inventory() -> dict:
-    """Serve the committed sample ``AgentInventory`` for the console panel.
+    """Serve a LIVE ``AgentInventory`` for the console panel: the Rust engine
+    scans every configured agent-source tree on demand and the results are merged.
 
-    Read-only (I1), deterministic (I4): no clock, no randomness, no live Rust
-    binary in the request path -- the document is a frozen artifact assembled
-    from real CLI output (see ``_INVENTORY_SAMPLE``). The bridge
-    (``recette.inventory_bridge.parse_inventory``) is used as a FAIL-SAFE
-    validation gate: a malformed committed sample raises, and this route answers
-    500 instead of serving a broken document. The full ``AgentInventory`` is
-    returned (the bridge's ``BridgedInventory`` drops the comm graph the panel
-    renders), wrapped under ``inventory`` so the client unwraps one key.
+    Read-only (I1): the scan only reads source trees, it mediates nothing. The
+    live scan runs the compiled ``discoveryprobe-inventory`` binary (fixed path +
+    fixed tree paths from config, no shell, no request input), exactly like the
+    catalog ``/rust-summary`` engine bridge. Each per-tree scan is byte-stable
+    (I4); merging is done in sorted order, so the same corpus yields the same
+    inventory -- this is an operator-facing live scan, not a judged decision path.
 
-    Fail-safe: sample missing/unreadable -> 503; sample present but malformed ->
-    500. Never a fabricated inventory.
+    Fail-safe (R7): if the binary is not built, no tree scans, or the scan output
+    is unusable, the route falls back to the committed sample and flags
+    ``live: false`` with a reason -- the panel still renders, and the operator
+    knows it is the sample, not a live scan. The response is
+    ``{inventory, live, engine, reason?}`` wrapped so the client unwraps one key.
     """
+    live = _live_inventory()
+    if live is not None:
+        return {"inventory": live, "live": True, "engine": _INVENTORY_ENGINE}
+
+    # Fallback: the Rust engine is not built (or nothing scanned). Serve the
+    # committed sample so the panel still renders, flagged as not-live.
+    reason = (
+        "live scan unavailable (build via ./recette.sh discovery-build; "
+        f"scans {_INVENTORY_SCAN_ROOT_REL})"
+    )
     try:
         raw = _INVENTORY_SAMPLE.read_text(encoding="utf-8")
     except OSError as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"sample inventory not available at {_INVENTORY_SAMPLE.name}",
+            detail=f"live scan unavailable and sample missing at {_INVENTORY_SAMPLE.name}",
         ) from exc
     # Validate the shape through the bridge boundary; a broken sample is a loud
     # 500, never a silently served malformed document.
@@ -187,7 +338,7 @@ def inventory() -> dict:
         parsed = json.loads(raw)
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=f"sample inventory malformed: {exc}") from exc
-    return {"inventory": parsed}
+    return {"inventory": parsed, "live": False, "engine": _INVENTORY_ENGINE, "reason": reason}
 
 
 _MANIFEST_ENV = "INSPECT_IA_AGENTS_PROBE_MANIFEST"

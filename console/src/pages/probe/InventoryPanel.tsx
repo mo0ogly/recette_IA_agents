@@ -126,8 +126,15 @@ function EdgeGroup({
 
 export default function InventoryPanel({
   inventory,
+  live = false,
+  reason = null,
 }: {
   inventory: AgentInventory | null;
+  /** True when the inventory is a live on-demand scan; false when it is the
+   *  committed sample fallback (Rust engine not built). */
+  live?: boolean;
+  /** Why the scan fell back to the sample, when `live` is false. */
+  reason?: string | null;
 }): JSX.Element | null {
   if (inventory === null) return null;
 
@@ -145,7 +152,16 @@ export default function InventoryPanel({
 
   return (
     <section className="inv-panel" data-testid="inv-panel">
-      <h4 className="inv-title">Agent inventory -- static scan + correlation</h4>
+      <h4 className="inv-title">
+        Agent inventory -- static scan + correlation
+        <span
+          className={live ? "inv-live-badge inv-live-on" : "inv-live-badge inv-live-off"}
+          data-testid="inv-live-badge"
+          title={live ? "Live scan of the configured agent-source trees" : (reason ?? "")}
+        >
+          {live ? "LIVE SCAN" : "SAMPLE"}
+        </span>
+      </h4>
 
       <div className="inv-summary" data-testid="inv-summary">
         <span>with passport: {inventory.summary.with_passport}</span>

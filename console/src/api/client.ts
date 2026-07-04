@@ -1261,13 +1261,21 @@ export interface AgentInventory {
   };
 }
 
-/** GET /probe/inventory: the committed sample AgentInventory (a frozen artifact
- *  assembled from real CLI output). Deterministic, read-only. The `.inventory`
- *  envelope key is unwrapped here so callers receive the bare AgentInventory. */
-export function getInventory(): Promise<AgentInventory> {
-  return request<{ inventory: AgentInventory }>("/probe/inventory").then(
-    (r) => r.inventory,
-  );
+/** GET /probe/inventory response: the AgentInventory plus whether it is a LIVE
+ *  scan of real agent-source trees (`live: true`) or the committed sample
+ *  fallback (`live: false`, with a `reason`) when the Rust engine is not built. */
+export interface InventoryResponse {
+  inventory: AgentInventory;
+  live: boolean;
+  engine: string;
+  reason?: string;
+}
+
+/** GET /probe/inventory: a LIVE scan (the Rust engine walks the configured
+ *  agent-source trees on demand and the results are merged), or the committed
+ *  sample when the engine is not built. Read-only. */
+export function getInventory(): Promise<InventoryResponse> {
+  return request<InventoryResponse>("/probe/inventory");
 }
 
 // --- Behavioral-analysis engine (POST /behavior/wave) ---

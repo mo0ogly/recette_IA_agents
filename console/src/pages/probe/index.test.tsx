@@ -10,9 +10,30 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
   getLlmTraces: vi.fn(),
   correlateBehavior: vi.fn(() => Promise.resolve(null)),
-  // ProbePage fetches the static inventory on mount; resolve null so the panel
-  // renders nothing (its own R16 test covers the populated render).
-  getInventory: vi.fn(() => Promise.resolve(null)),
+  // ProbePage fetches the inventory on mount; resolve an empty live response so
+  // the panel renders nothing (its own R16 test covers the populated render).
+  getInventory: vi.fn(() =>
+    Promise.resolve({
+      inventory: {
+        schema_version: "1.0",
+        agents: [],
+        comm_graph: {
+          declared_edges: [],
+          observed_edges: [],
+          undeclared_edges: [],
+          via_gateway_edges: [],
+        },
+        summary: {
+          with_passport: 0,
+          without_passport: 0,
+          invalid_passport: 0,
+          violation_count: 0,
+        },
+      },
+      live: true,
+      engine: "discoveryprobe-inventory (Rust)",
+    }),
+  ),
 }));
 
 // The Monaco chunk is heavy and worker-bound; stub it so the raw-JSON panel is
