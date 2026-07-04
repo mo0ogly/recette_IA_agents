@@ -48,12 +48,13 @@ def run_traced(agent: dict, servers: list[dict], llm, model: str, max_steps: int
     """Governed run with proxy tracing. Returns declared/decided/done surfaces."""
     from recette.api.runners import forge_for_agent
     from recette.lane_b import run_agent
-    from recette.platform.proxy.tracing import RingTraceRecorder
+    from recette.platform.proxy.store import SqliteProxyStore, SqliteTraceRecorder
 
     scope = [
         c if isinstance(c, str) else c.get("action") for c in agent.get("capability_scope", [])
     ]
-    rec = RingTraceRecorder(capacity=500)
+    # Per-run in-memory store: same recorder the API wires, no file left behind.
+    rec = SqliteTraceRecorder(SqliteProxyStore(":memory:"))
     try:
         forge = forge_for_agent(
             agent, servers, recorder=rec, debug_enabled=True, run_id=agent["id"]

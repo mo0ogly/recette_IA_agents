@@ -8,7 +8,7 @@ unknown name keeps the exact legacy id-based path. The deny/audit path
 
 NOTE (deviation from the task brief, reported in the handoff): in THIS codebase
 ``LabHttpProxy.execute`` returns an ``ExecutionResult`` (it does not build a
-``ProxyTrace``; the ``RingTraceRecorder`` does, from the event + result). The
+``ProxyTrace``; the ``SqliteTraceRecorder`` does, from the event + result). The
 resolved name is therefore surfaced as ``ExecutionResult.target`` by the proxy
 and copied onto ``ProxyTrace.target`` by the recorder (``result.target or
 event.target_system``). The assertions below check both layers accordingly.
@@ -22,7 +22,7 @@ from recette.platform.events import PlatformActionEvent
 from recette.platform.proxy.lab_proxy import LabHttpProxy
 from recette.platform.proxy.protocol import ExecutionResult
 from recette.platform.proxy.router import resolve_proxy
-from recette.platform.proxy.tracing import RingTraceRecorder
+from recette.platform.proxy.store import SqliteProxyStore, SqliteTraceRecorder
 
 
 def _event(target_system: str = "github") -> PlatformActionEvent:
@@ -110,7 +110,7 @@ class LabProxyTargetNameTests(unittest.TestCase):
         # The recorder builds ProxyTrace.target from result.target or event.target_system.
         proxy = _proxy_with_stub("http://127.0.0.1:9101", target_name="api.github.com")
         result = proxy.execute(_event("github"))
-        recorder = RingTraceRecorder()
+        recorder = SqliteTraceRecorder(SqliteProxyStore(":memory:"))
         recorder.record(_event("github"), result)
         trace = recorder.snapshot()[0]
         self.assertEqual(trace.target, "api.github.com")
@@ -118,7 +118,7 @@ class LabProxyTargetNameTests(unittest.TestCase):
 
     def test_recorder_target_falls_back_to_target_system(self) -> None:
         result = ExecutionResult(ok=True, status_code=200)
-        recorder = RingTraceRecorder()
+        recorder = SqliteTraceRecorder(SqliteProxyStore(":memory:"))
         recorder.record(_event("github"), result)
         trace = recorder.snapshot()[0]
         self.assertEqual(trace.target, "github")
@@ -162,7 +162,7 @@ class ResolveProxyFqdnTests(unittest.TestCase):
         assert isinstance(resolved, LabHttpProxy)
         resolved._client = _StubClient("http://127.0.0.1:9101")  # noqa: SLF001
         result = resolved.execute(_event("github"))
-        recorder = RingTraceRecorder()
+        recorder = SqliteTraceRecorder(SqliteProxyStore(":memory:"))
         recorder.record(_event("github"), result)
         self.assertEqual(recorder.snapshot()[0].target, "api.github.com")
 

@@ -1,7 +1,8 @@
 """Unit tests for the wire-proxy core (recette/platform/proxy/wire.py).
 
-Deterministic, container-free: the recorder and normalizer are pure, so the full
-ingest -> normalize -> ring path is exercised without a live mitmproxy overlay.
+Deterministic, container-free: the normalizer is pure and the recorder is the
+SQLite-backed SqliteWireRecorder on ``:memory:``, so the full ingest ->
+normalize -> buffer path is exercised without a live mitmproxy overlay.
 """
 
 from __future__ import annotations
@@ -9,13 +10,17 @@ from __future__ import annotations
 import unittest
 from dataclasses import FrozenInstanceError
 
+from recette.platform.proxy.store import SqliteProxyStore, SqliteWireRecorder
 from recette.platform.proxy.wire import (
     MAX_BODY_CHARS,
     TRUNCATION_MARKER,
     WireFlow,
-    WireFlowRecorder,
     normalize_flow,
 )
+
+
+def _recorder() -> SqliteWireRecorder:
+    return SqliteWireRecorder(SqliteProxyStore(":memory:"))
 
 
 def _payload(**over: object) -> dict:
@@ -101,44 +106,32 @@ class NormalizeFlowTests(unittest.TestCase):
         self.assertIsNone(normalize_flow(_payload(duration_ms="x"), seq=1).duration_ms)
 
 
-class WireFlowRecorderTests(unittest.TestCase):
+class WireRecorderTests(unittest.TestCase):
+    # Bounding/retention (the ring's capacity semantics) is now the store's
+    # max_rows prune, covered by PruneTests in tests/test_proxy_store.py.
+
     def test_record_assigns_monotone_seq(self) -> None:
-        rec = WireFlowRecorder()
+        rec = _recorder()
         f1 = rec.record(_payload())
         f2 = rec.record(_payload())
         self.assertEqual((f1.seq, f2.seq), (1, 2))
         self.assertEqual([f.seq for f in rec.snapshot()], [1, 2])
 
-    def test_ring_is_bounded_and_keeps_newest(self) -> None:
-        rec = WireFlowRecorder(capacity=2)
-        rec.record(_payload(path="/a"))
-        rec.record(_payload(path="/b"))
-        rec.record(_payload(path="/c"))
-        snap = rec.snapshot()
-        self.assertEqual(len(snap), 2)
-        self.assertEqual([f.path for f in snap], ["/b", "/c"])
-        # seq stays monotone even after the ring wrapped.
-        self.assertEqual([f.seq for f in snap], [2, 3])
-
-    def test_clear_empties_the_ring(self) -> None:
-        rec = WireFlowRecorder()
+    def test_clear_empties_the_buffer(self) -> None:
+        rec = _recorder()
         rec.record(_payload())
         rec.clear()
         self.assertEqual(rec.snapshot(), [])
 
-    def test_zero_capacity_rejected(self) -> None:
-        with self.assertRaises(ValueError):
-            WireFlowRecorder(capacity=0)
-
     def test_snapshot_is_a_copy(self) -> None:
-        rec = WireFlowRecorder()
+        rec = _recorder()
         rec.record(_payload())
         snap = rec.snapshot()
         snap.clear()
         self.assertEqual(len(rec.snapshot()), 1)
 
     def test_stored_flow_is_immutable(self) -> None:
-        rec = WireFlowRecorder()
+        rec = _recorder()
         flow = rec.record(_payload())
         self.assertIsInstance(flow, WireFlow)
         with self.assertRaises(FrozenInstanceError):

@@ -527,7 +527,7 @@ class SqliteProxyStore:
 class SqliteTraceRecorder:
     """``TraceRecorder`` facade over ``SqliteProxyStore``.
 
-    Field mapping is identical to ``RingTraceRecorder.record`` (same fallbacks:
+    Field mapping keeps the historical recorder contract (same fallbacks:
     ``target = result.target or event.target_system``). ``record`` NEVER
     raises: observability must never break the I5 execution path.
     """
@@ -619,13 +619,13 @@ class SqliteTraceRecorder:
 class SqliteWireRecorder:
     """Wire-flow facade over ``SqliteProxyStore`` (mirrors ``SqliteTraceRecorder``).
 
-    Normalization is the shared ``normalize_flow`` from wire.py (DRY with the
-    in-memory ring); the governed-action ``side_effect_hash`` is computed ONCE
-    at insert (``wire_flow_side_effect_hash``) and persisted, instead of being
-    recomputed on every GET /proxy/wire.
+    Normalization is the shared ``normalize_flow`` from wire.py (one normalizer
+    for every ingest path); the governed-action ``side_effect_hash`` is computed
+    ONCE at insert (``wire_flow_side_effect_hash``) and persisted, instead of
+    being recomputed on every GET /proxy/wire.
 
     Failure contract of ``record``: a non-dict payload raises ``ValueError``
-    (the endpoint turns it into 422 -- same contract as the ring's record). A
+    (the endpoint turns it into 422 -- the historical recorder contract). A
     STORAGE failure never raises: the normalized flow is returned with
     ``seq=0`` (marking it unpersisted), the failure is logged and surfaced via
     ``store_error`` (fail-safe: observability never breaks the I5 path).

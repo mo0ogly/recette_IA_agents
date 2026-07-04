@@ -12,9 +12,9 @@ contre une forge reelle allowlistee.
   enregistre un `ProxyTrace` par `execute()` : l'intention de la requete (event
   id, agent, action, systeme cible, ressource, payload) et le resultat (`ok`,
   code de statut, `side_effect_hash`, erreur).
-- Les traces vivent dans un ring borne en memoire (`RingTraceRecorder`). Le ring
-  est une **vue jetable** -- la verite durable reste dans le log d'audit
-  append-only (I1).
+- Les traces vivent dans le store SQLite de debug (`SqliteTraceRecorder` sur
+  `SqliteProxyStore`, retention par prune). C'est une **vue jetable** -- la
+  verite durable reste dans le log d'audit append-only (I1).
 - La console (`/proxy`) affiche les traces en lecture seule dans Monaco : une
   liste a gauche, un inspecteur JSON / flux JSONL a droite.
 
@@ -209,13 +209,13 @@ preset **LiteLLM gateway (local)** qui cree en un clic un backend
 agent --(HTTP proxy)--> [mitmproxy container] --> lab / real system
                              | addon POSTs each flow
                              v
-                     API POST /proxy/wire --> WireFlowRecorder (bounded ring, I1)
+                     API POST /proxy/wire --> SqliteWireRecorder (bounded debug store, I1)
                              ^
                 Proxy page <--GET /proxy/wire (status + flows)
 ```
 
-- `recette/platform/proxy/wire.py` -- `WireFlow` + `WireFlowRecorder` (reflete le
-  ring de traces : borne, `seq` monotone, jetable) + `normalize_flow` pur.
+- `recette/platform/proxy/wire.py` -- `WireFlow` + `normalize_flow` pur ; le
+  buffer est `SqliteWireRecorder` (store.py : borne, `seq` monotone, jetable).
 - `scripts/mitm_wire_addon.py` -- addon mitmdump : normalise chaque flow et le
   POST vers l'ingest de l'API (fail-safe, n'altere jamais le trafic).
 - Endpoints : `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`,
@@ -399,9 +399,12 @@ left/right + `regression`. Preuve sur un vrai recording (`camp-pr.00.gh-pr-bot`)
 dans `docs/screenshots/sim/proxy-replay-diff.png`.
 
 ### Persistance (long run)
-`INSPECT_IA_AGENTS_PROXY_ROTATE_DIR` : l'entree evincee du ring borne est
-ecrite en JSONL avant que la deque la drope (fail-safe), donc un long run garde
-ses premiers paquets. Convenance debug, pas un second event store (I1).
+Les traces et flux wire sont persistes dans le store SQLite de debug
+(`INSPECT_IA_AGENTS_PROXY_DB`, defaut `.run/proxy_traces.db`), avec retention
+par `INSPECT_IA_AGENTS_PROXY_DB_MAX_ROWS` (prune amorti des plus vieilles
+lignes). Un long run garde donc ses paquets sans mecanisme de rotation JSONL
+(l'ancien `INSPECT_IA_AGENTS_PROXY_ROTATE_DIR` est supprime). Convenance debug,
+pas un second event store (I1).
 
 ### Captures de reference
 - `proxy-sessions-launch.png` -- lancer un agent et atterrir sur sa session live.

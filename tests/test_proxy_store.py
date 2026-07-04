@@ -4,9 +4,10 @@
 SqliteProxyStore owns the connection + schema (traces AND wire tables, wire is
 filled by Task 2). SqliteTraceRecorder is a facade implementing the
 TraceRecorder protocol: record() never raises (fail-safe, I5 path), snapshot()
-rebuilds ProxyTrace field-for-field identical to RingTraceRecorder, clear()
-empties the debug buffer only (never the audit log, I1) while seq stays
-monotone (sqlite AUTOINCREMENT keeps the counter across DELETE).
+rebuilds ProxyTrace field-for-field (golden-field tests below freeze the exact
+mapping the deleted in-memory ring recorder used), clear() empties the debug
+buffer only (never the audit log, I1) while seq stays monotone (sqlite
+AUTOINCREMENT keeps the counter across DELETE).
 """
 
 from __future__ import annotations
@@ -33,8 +34,8 @@ from recette.platform.proxy.store import (
     db_path_from_env,
     max_rows_from_env,
 )
-from recette.platform.proxy.tracing import ProxyTrace, RingTraceRecorder
-from recette.platform.proxy.wire import WireFlow, WireFlowRecorder
+from recette.platform.proxy.tracing import ProxyTrace
+from recette.platform.proxy.wire import WireFlow
 
 
 def _event(
@@ -119,7 +120,7 @@ class SqliteTraceRecorderTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.store.close()
 
-    def test_record_three_snapshot_identical_to_ring(self) -> None:
+    def test_record_three_snapshot_matches_golden_fields(self) -> None:
         ok = ExecutionResult(
             ok=True,
             status_code=200,
@@ -127,26 +128,42 @@ class SqliteTraceRecorderTests(unittest.TestCase):
             side_effect_hash="h1",
             target="api.github.com",
         )
-        ring = RingTraceRecorder()
         for i in range(1, 4):
             self.recorder.record(_event(f"evt-{i:04d}"), ok, run_id="run-abc")
-            ring.record(_event(f"evt-{i:04d}"), ok, run_id="run-abc")
         traces = self.recorder.snapshot()
         self.assertEqual(len(traces), 3)
         self.assertIsInstance(traces[0], ProxyTrace)
-        # (a) The store owns the monotone order: seq is 1-based AUTOINCREMENT.
-        self.assertEqual([t.seq for t in traces], [1, 2, 3])
-        # (b) Field parity with the ring recorder. The two recorders number
-        # seq independently, so compare with seq zeroed on both sides.
+        # Golden field mapping (frozen contract of the historical in-memory
+        # ring recorder): every ProxyTrace field is asserted verbatim, with the
+        # store-owned monotone seq (1-based AUTOINCREMENT).
         self.assertEqual(
-            [dataclasses.replace(t, seq=0) for t in traces],
-            [dataclasses.replace(t, seq=0) for t in ring.snapshot()],
+            traces,
+            [
+                ProxyTrace(
+                    seq=i,
+                    event_id=f"evt-{i:04d}",
+                    timestamp="2026-06-13T00:00:00Z",
+                    agent_id="agent-x",
+                    target_system="github",
+                    target="api.github.com",
+                    action_type="read_repo",
+                    resource="acme/widgets",
+                    request_payload={"ref": "main"},
+                    ok=True,
+                    status_code=200,
+                    side_effect_hash="h1",
+                    error=None,
+                    run_id="run-abc",
+                    response={"x": 1},
+                )
+                for i in range(1, 4)
+            ],
         )
         self.assertIsNone(self.recorder.store_error)
         self.assertIsNone(self.store.store_error)
 
     def test_target_falls_back_to_target_system(self) -> None:
-        # Same fallback as RingTraceRecorder: result.target or event.target_system.
+        # Historical recorder fallback: result.target or event.target_system.
         ok = ExecutionResult(ok=True, status_code=200)
         self.recorder.record(_event(), ok)
         trace = self.recorder.snapshot()[0]
@@ -247,17 +264,15 @@ class SqliteWireRecorderTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.store.close()
 
-    def test_record_three_snapshot_identical_to_ring(self) -> None:
+    def test_record_three_snapshot_matches_golden_fields(self) -> None:
         payloads = [
             _governed_wire_payload(),
             _health_wire_payload(),
             _governed_wire_payload(run_id=None),
         ]
-        ring = WireFlowRecorder()
         returned = []
         for payload in payloads:
             returned.append(self.recorder.record(payload))
-            ring.record(payload)
         flows = self.recorder.snapshot()
         self.assertEqual(len(flows), 3)
         self.assertIsInstance(flows[0], WireFlow)
@@ -265,12 +280,44 @@ class SqliteWireRecorderTests(unittest.TestCase):
         # both on the snapshot and on the flow returned by record().
         self.assertEqual([f.seq for f in flows], [1, 2, 3])
         self.assertEqual([f.seq for f in returned], [1, 2, 3])
-        # (b) Field parity with the in-memory ring recorder. The two recorders
-        # number seq independently, so compare with seq zeroed on both sides.
-        self.assertEqual(
-            [dataclasses.replace(f, seq=0) for f in flows],
-            [dataclasses.replace(f, seq=0) for f in ring.snapshot()],
+        # (b) Golden field mapping (frozen contract of the historical in-memory
+        # ring recorder): normalize_flow output round-trips verbatim, including
+        # method upper-casing, ok derivation, run_id None vs string, and the
+        # duration_ms default.
+        governed = WireFlow(
+            seq=1,
+            method="POST",
+            scheme="http",
+            host="127.0.0.1",
+            port=9101,
+            path="/github/execute",
+            status_code=200,
+            ok=True,
+            content_type="application/json",
+            request_body=(
+                '{"event_id":"e1","action_type":"read_repo","resource":"acme/x","payload":{}}'
+            ),
+            response_body='{"data":{"action":"read_repo","resource":"acme/x"},"success":true}',
+            run_id="run-abc",
+            duration_ms=None,
         )
+        health = WireFlow(
+            seq=2,
+            method="GET",
+            scheme="http",
+            host="127.0.0.1",
+            port=8082,
+            path="/health",
+            status_code=200,
+            ok=True,
+            content_type="application/json",
+            request_body="",
+            response_body='{"ok":true}',
+            run_id=None,
+            duration_ms=None,
+        )
+        expected = [governed, health, dataclasses.replace(governed, seq=3, run_id=None)]
+        self.assertEqual(flows, expected)
         self.assertIsNone(self.recorder.store_error)
 
     def test_governed_flow_hash_computed_at_insert(self) -> None:

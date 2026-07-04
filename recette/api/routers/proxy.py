@@ -6,10 +6,11 @@ Two altitudes over the SAME side effects:
 - ``/proxy/wire`` -- the NETWORK view (WireFlow), the bytes on the wire, fed by
   the OPTIONAL mitmproxy Docker overlay (``POST /proxy/wire`` ingest).
 
-Both rings are jettable views (I1 keeps the durable truth in the append-only
-audit log), so a ``clear`` is allowed -- it discards the debug buffer, never the
-log. The ingest is the only mutating route here and it only appends to a bounded
-in-memory ring; it never touches the event store.
+Both buffers are jettable views persisted in the SQLite proxy store (I1 keeps
+the durable truth in the append-only audit log), so a ``clear`` is allowed -- it
+discards the debug buffer, never the log. The ingest is the only mutating route
+here and it only appends to the bounded debug store; it never touches the event
+store.
 """
 
 from __future__ import annotations
@@ -45,11 +46,15 @@ router = APIRouter(prefix="/proxy", tags=["proxy"])
 
 @router.get("/debug")
 def get_debug_status(request: Request) -> dict:
-    """Whether proxy debug tracing is on, and how many traces are buffered."""
+    """Whether proxy debug tracing is on, and how many traces are buffered.
+
+    ``store_error`` surfaces the last storage failure of the SQLite debug
+    store (``None`` when healthy) so the console can flag a degraded buffer."""
     recorder = request.app.state.proxy_trace_recorder
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
         "trace_count": len(recorder.snapshot()),
+        "store_error": recorder.store_error,
     }
 
 
@@ -292,7 +297,7 @@ def control_wire_overlay(request: Request, body: dict) -> dict:
 def ingest_wire_flow(request: Request, payload: dict) -> dict:
     """Ingest one normalized flow from the mitmproxy overlay addon.
 
-    Appends to the bounded wire ring only; never the audit log. A non-object
+    Appends to the bounded wire debug buffer only; never the audit log. A non-object
     payload is a malformed ingest -> 422 (the addon controls the shape, but the
     body crosses a process boundary, so it is validated, not trusted)."""
     try:
