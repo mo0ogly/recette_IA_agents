@@ -30,7 +30,12 @@ _GUARDED_SURFACES = ("github", "gitlab")
 # This set MUST NOT grow silently: a new unlinked subject requires updating it here.
 # It MUST NOT shrink silently either: removing a subject from corpus without removing
 # it here is also a failure.
-_NO_TWIN: set[str] = {"gh-no-agent", "gl-no-agent"}
+_NO_TWIN: set[str] = {
+    "gh-no-agent",
+    "gl-no-agent",
+    "gh-shadow-agent",
+    "gh-invalid-passport",
+}
 
 
 class TestBehaviorLinkCoverage(unittest.TestCase):

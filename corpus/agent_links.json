@@ -18,12 +18,28 @@
       "expected": { "quadrant": "agree_dirty" }
     },
     {
+      "agent_id": "invalid-passport-gh",
+      "surface": "github",
+      "discovery_subject": "gh-invalid-passport",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "detected": true }
+    },
+    {
       "agent_id": "no-agent-gh",
       "surface": "github",
       "discovery_subject": "gh-no-agent",
       "runtime_subject": null,
       "evidence_bundle": null,
       "expected": { "detected": false }
+    },
+    {
+      "agent_id": "shadow-agent-gh",
+      "surface": "github",
+      "discovery_subject": "gh-shadow-agent",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "detected": true }
     },
     {
       "agent_id": "no-agent-gl",
