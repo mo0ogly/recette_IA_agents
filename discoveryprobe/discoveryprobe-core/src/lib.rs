@@ -15,6 +15,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub mod ipc;
+
 /// The surfaces the discovery probe can observe an agent on. The serialised names match
 /// `recette/surface/surfaces.py::ObservationSurface` exactly (the bridge).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

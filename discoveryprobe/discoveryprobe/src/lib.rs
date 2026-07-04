@@ -15,5 +15,6 @@
 pub mod mapping;
 pub mod probe;
 
+pub use discoveryprobe_core::ipc::IpcEvents;
 pub use mapping::{recordings_from_capture, recordings_from_execs, AgentProcessSpec};
 pub use probe::{capture, Capture, CaptureConfig, Session};

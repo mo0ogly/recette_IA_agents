@@ -16,7 +16,11 @@ use anyhow::{Context, Result};
 use aya::maps::{MapData, RingBuf};
 use aya::programs::TracePoint;
 use aya::Ebpf;
-use discoveryprobe_common::{ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent};
+use discoveryprobe_common::{
+    AcceptEvent, ConnectEvent, DnsEvent, ExecEvent, FileEvent, ForkEvent, ListenEvent,
+    UnixConnectEvent,
+};
+use discoveryprobe_core::ipc::IpcEvents;
 
 /// The exec tracepoint the exec-capture program attaches to.
 const EXEC_CATEGORY: &str = "sched";
@@ -33,17 +37,32 @@ const FILE_NAME: &str = "sys_enter_openat";
 /// The sendto tracepoint the DNS-query program attaches to (same `syscalls`
 /// category as connect).
 const DNS_NAME: &str = "sys_enter_sendto";
+/// The bind tracepoint the port-stash program attaches to (same `syscalls`
+/// category as connect). Records pid->port; emits no ring event.
+const BIND_NAME: &str = "sys_enter_bind";
+/// The listen tracepoint the server-side program attaches to.
+const LISTEN_NAME: &str = "sys_enter_listen";
+/// The accept4 tracepoint the live-server program attaches to. The `sys_exit`
+/// variant carries the return value, so a successful accept (ret >= 0) is
+/// distinguishable from a failed one.
+const ACCEPT_NAME: &str = "sys_exit_accept4";
 /// The program and map symbols, matching `discoveryprobe-ebpf/src/main.rs`.
 const EXEC_PROGRAM: &str = "discoveryprobe_exec";
 const CONNECT_PROGRAM: &str = "discoveryprobe_connect";
 const FORK_PROGRAM: &str = "discoveryprobe_fork";
 const FILE_PROGRAM: &str = "discoveryprobe_openat";
 const DNS_PROGRAM: &str = "discoveryprobe_sendto";
+const BIND_PROGRAM: &str = "discoveryprobe_bind";
+const LISTEN_PROGRAM: &str = "discoveryprobe_listen";
+const ACCEPT_PROGRAM: &str = "discoveryprobe_accept4";
 const EXEC_RING_MAP: &str = "EXEC_EVENTS";
 const CONNECT_RING_MAP: &str = "CONNECT_EVENTS";
 const FORK_RING_MAP: &str = "FORK_EVENTS";
 const FILE_RING_MAP: &str = "FILE_EVENTS";
 const DNS_RING_MAP: &str = "DNS_EVENTS";
+const LISTEN_RING_MAP: &str = "LISTEN_EVENTS";
+const ACCEPT_RING_MAP: &str = "ACCEPT_EVENTS";
+const UNIX_CONNECT_RING_MAP: &str = "UNIX_CONNECT_EVENTS";
 
 /// Where the compiled BPF object lives and how long to capture.
 #[derive(Debug, Clone)]
@@ -71,6 +90,30 @@ pub struct Capture {
     pub files: Vec<FileEvent>,
     /// DNS-query events (the agent resolved a name, the name-resolution surface).
     pub dns: Vec<DnsEvent>,
+    /// TCP listen events (an agent serves a local port, the server side of an
+    /// inter-agent edge).
+    pub listens: Vec<ListenEvent>,
+    /// TCP accept events (a live server actually took an inbound connection).
+    pub accepts: Vec<AcceptEvent>,
+    /// `AF_UNIX` connect events (a local IPC dial over a socket file).
+    pub unix_connects: Vec<UnixConnectEvent>,
+}
+
+impl Capture {
+    /// Reconcile the inter-agent communication captures (listen / accept /
+    /// connect / unix-connect) into a normalised, deterministic [`IpcEvents`].
+    ///
+    /// The connect surface is REUSED here as the client side of a localhost
+    /// edge. The mapping is pure (sorted, de-duplicated); it lives in
+    /// `discoveryprobe-core::ipc` and is unit-tested without privilege.
+    pub fn ipc_events(&self) -> IpcEvents {
+        IpcEvents::from_events(
+            &self.listens,
+            &self.accepts,
+            &self.connects,
+            &self.unix_connects,
+        )
+    }
 }
 
 /// Load + attach both capture programs and collect their events for the window.
@@ -89,6 +132,9 @@ pub fn capture(config: &CaptureConfig) -> Result<Capture> {
         capture.forks.extend(slice.forks);
         capture.files.extend(slice.files);
         capture.dns.extend(slice.dns);
+        capture.listens.extend(slice.listens);
+        capture.accepts.extend(slice.accepts);
+        capture.unix_connects.extend(slice.unix_connects);
         if Instant::now() >= deadline {
             break;
         }
@@ -112,6 +158,9 @@ pub struct Session {
     fork_ring: RingBuf<MapData>,
     file_ring: RingBuf<MapData>,
     dns_ring: RingBuf<MapData>,
+    listen_ring: RingBuf<MapData>,
+    accept_ring: RingBuf<MapData>,
+    unix_connect_ring: RingBuf<MapData>,
 }
 
 impl Session {
@@ -125,11 +174,21 @@ impl Session {
         attach_tracepoint(&mut bpf, FORK_PROGRAM, EXEC_CATEGORY, FORK_NAME)?;
         attach_tracepoint(&mut bpf, FILE_PROGRAM, CONNECT_CATEGORY, FILE_NAME)?;
         attach_tracepoint(&mut bpf, DNS_PROGRAM, CONNECT_CATEGORY, DNS_NAME)?;
+        // The inter-agent comm surface (Task 9): bind stashes pid->port (no ring),
+        // listen/accept4 emit the server side, and the connect program above also
+        // emits AF_UNIX dials into UNIX_CONNECT_EVENTS. All share the `syscalls`
+        // category.
+        attach_tracepoint(&mut bpf, BIND_PROGRAM, CONNECT_CATEGORY, BIND_NAME)?;
+        attach_tracepoint(&mut bpf, LISTEN_PROGRAM, CONNECT_CATEGORY, LISTEN_NAME)?;
+        attach_tracepoint(&mut bpf, ACCEPT_PROGRAM, CONNECT_CATEGORY, ACCEPT_NAME)?;
         let exec_ring = take_ring(&mut bpf, EXEC_RING_MAP)?;
         let connect_ring = take_ring(&mut bpf, CONNECT_RING_MAP)?;
         let fork_ring = take_ring(&mut bpf, FORK_RING_MAP)?;
         let file_ring = take_ring(&mut bpf, FILE_RING_MAP)?;
         let dns_ring = take_ring(&mut bpf, DNS_RING_MAP)?;
+        let listen_ring = take_ring(&mut bpf, LISTEN_RING_MAP)?;
+        let accept_ring = take_ring(&mut bpf, ACCEPT_RING_MAP)?;
+        let unix_connect_ring = take_ring(&mut bpf, UNIX_CONNECT_RING_MAP)?;
         Ok(Self {
             _bpf: bpf,
             exec_ring,
@@ -137,6 +196,9 @@ impl Session {
             fork_ring,
             file_ring,
             dns_ring,
+            listen_ring,
+            accept_ring,
+            unix_connect_ring,
         })
     }
 
@@ -166,6 +228,21 @@ impl Session {
         while let Some(item) = self.dns_ring.next() {
             if let Some(event) = DnsEvent::from_bytes(&item) {
                 capture.dns.push(event);
+            }
+        }
+        while let Some(item) = self.listen_ring.next() {
+            if let Some(event) = ListenEvent::from_bytes(&item) {
+                capture.listens.push(event);
+            }
+        }
+        while let Some(item) = self.accept_ring.next() {
+            if let Some(event) = AcceptEvent::from_bytes(&item) {
+                capture.accepts.push(event);
+            }
+        }
+        while let Some(item) = self.unix_connect_ring.next() {
+            if let Some(event) = UnixConnectEvent::from_bytes(&item) {
+                capture.unix_connects.push(event);
             }
         }
         capture

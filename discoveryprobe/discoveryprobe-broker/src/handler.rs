@@ -174,6 +174,7 @@ mod tests {
                     forks: vec![],
                     files: vec![],
                     dns: vec![],
+                    ..Default::default()
                 })
             },
         )
@@ -249,6 +250,7 @@ mod tests {
                     forks: vec![],
                     files: vec![],
                     dns: vec![],
+                    ..Default::default()
                 })
             },
         )
