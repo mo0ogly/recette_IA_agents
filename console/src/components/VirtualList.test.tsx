@@ -161,6 +161,24 @@ describe("VirtualList", () => {
     expect(el.scrollTop).toBe(5000);
   });
 
+  it("scrolls back to the bottom when scrollToTailSignal changes", () => {
+    const props = {
+      items: ITEMS,
+      rowHeight: 20,
+      height: 200,
+      renderRow: (item: Row) => <span data-testid="vrow">{item.label}</span>,
+      followTail: true,
+      testId: "vlist",
+    };
+    const { rerender } = render(<VirtualList<Row> {...props} scrollToTailSignal={0} />);
+    const el = screen.getByTestId("vlist");
+    defineScrollMetrics(el, { scrollTop: 5000, scrollHeight: 20000, clientHeight: 200 });
+    fireEvent.scroll(el); // user is away from the tail; no auto-jump anymore
+    rerender(<VirtualList<Row> {...props} scrollToTailSignal={1} />);
+    // The signal change forces the jump to the bottom and re-arms the pin.
+    expect(el.scrollTop).toBe(20000);
+  });
+
   it("uses itemKey for the rendered rows", () => {
     const itemKey = vi.fn((item: Row) => item.seq);
     renderList({ itemKey });

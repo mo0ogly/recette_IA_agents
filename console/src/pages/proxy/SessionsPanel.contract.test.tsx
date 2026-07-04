@@ -105,7 +105,10 @@ describe("SessionsPanel (R16 contract)", () => {
 
   it("expands an exchange to show the req<->resp pair on demand", async () => {
     renderPanel();
+    // The list renders its empty state before the first fetch lands: wait
+    // for the session rows before clicking one.
     const list = await screen.findByLabelText("sessions");
+    await waitFor(() => expect(within(list).getAllByRole("button").length).toBeGreaterThan(0));
     fireEvent.click(within(list).getAllByRole("button")[0]);
     const timeline = await screen.findByLabelText("session exchanges");
     const firstExchange = within(timeline).getAllByRole("button")[0];

@@ -98,8 +98,9 @@ describe("WirePanel (R16 contract)", () => {
     // exactly that case: enabled=false WITH real flows. The how-to-enable
     // banner must yield to the actual data, not sit on top of it.
     renderWire();
+    // The list container renders before the first fetch lands: wait for rows.
     const list = await screen.findByLabelText("wire flows");
-    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     expect(screen.queryByText(/wire up/)).toBeNull();
     expect(screen.queryByText(/INSPECT_IA_AGENTS_WIRE_PROXY/)).toBeNull();
     expect(screen.queryByTestId("wire-disabled")).toBeNull();

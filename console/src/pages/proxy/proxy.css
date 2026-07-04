@@ -101,6 +101,41 @@
   border-radius: 4px;
 }
 
+/* Virtualized trace list: the VirtualList inner container owns the scroll
+   viewport (fixed pixel height), so the flexible max-height/scroll of
+   .proxy-list is neutralised on the wrapper. */
+.proxy-vlist {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Windowed rows MUST be a uniform fixed height (28px, mirrored by
+   ROW_HEIGHT_PX in AppTracesPanel): no wrapping, overflow clipped. */
+.proxy-vlist .proxy-list-item {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 0.6rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* "N new traces" affordance shown while the user is scrolled away from the
+   tail and rows keep landing; reuses the amber badge tokens (no new colors). */
+.proxy-new-badge {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
 .proxy-empty {
   padding: 0.75rem;
   color: var(--color-text-muted);

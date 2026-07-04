@@ -36,6 +36,10 @@ export interface VirtualListProps<T> {
   /** Stable row key; defaults to the index. Panels should pass the row seq
    *  so React state survives the window shifting under the rows. */
   itemKey?: (item: T, index: number) => string | number;
+  /** Monotonically increasing signal: when it CHANGES (not on mount), the view
+   *  scrolls to the bottom and tail pinning is re-armed. Lets a parent offer a
+   *  "resume follow" affordance without the list exposing a scroll API. */
+  scrollToTailSignal?: number;
   testId?: string;
 }
 
@@ -48,6 +52,7 @@ export function VirtualList<T>({
   followTail = false,
   onScrollAwayFromTail,
   itemKey,
+  scrollToTailSignal,
   testId,
 }: VirtualListProps<T>): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -82,6 +87,22 @@ export function VirtualList<T>({
       setScrollTop(el.scrollTop);
     }
   }, [followTail, items.length]);
+
+  // Forced scroll-to-tail: a CHANGE of the signal (never the mount value)
+  // jumps to the bottom and re-arms the tail pin, so followTail resumes.
+  const lastTailSignalRef = useRef(scrollToTailSignal);
+  useEffect(() => {
+    if (scrollToTailSignal === undefined || scrollToTailSignal === lastTailSignalRef.current) {
+      return;
+    }
+    lastTailSignalRef.current = scrollToTailSignal;
+    atTailRef.current = true;
+    const el = containerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      setScrollTop(el.scrollTop);
+    }
+  }, [scrollToTailSignal]);
 
   const first = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
   const last = Math.min(items.length, Math.ceil((scrollTop + height) / rowHeight) + overscan);
