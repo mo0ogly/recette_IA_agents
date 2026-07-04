@@ -19,6 +19,8 @@
 //!
 //! Failure mode (fail-safe): an unreadable directory, or a manifest that
 //! exists but cannot be read, is a `ScanError` -- never a silent "no agent".
+//!
+//! Unlike `adapters.py` which uses early-return precedence between heuristics (temporal wins over openapi wins over github), this scan unions evidence from ALL heuristics: a tree with both temporalio code and github SDK imports emits evidence from both. Detection yes/no parity with the oracle holds for the corpus; consumers must not assume first-match evidence.
 
 use crate::manifest::{Passport, PassportError, KNOWN_GIT_ACTIONS};
 use serde::{Deserialize, Serialize};
@@ -205,6 +207,7 @@ fn openapi_evidence(root: &Path) -> Result<Vec<String>, ScanError> {
             };
             let action = op
                 .get("operationId")
+                // Falls back only on ABSENT key, not JSON null -- Python's `or` also falls back on null/empty.
                 .or_else(|| op.get("x-inspect_ia_agents-action"))
                 .and_then(|a| a.as_str());
             if let Some(action) = action {
@@ -287,6 +290,11 @@ mod tests {
     #[test]
     fn broken_manifest_is_invalid_with_errors() {
         let found = scan_tree(&fixture_path("invalid-passport")).expect("scan");
+        assert_eq!(
+            found.len(),
+            1,
+            "invalid-passport fixture must produce exactly one result"
+        );
         assert!(matches!(found[0].passport, PassportStatus::Invalid { .. }));
     }
 }
