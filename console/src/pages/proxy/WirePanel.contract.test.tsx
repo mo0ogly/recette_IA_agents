@@ -84,6 +84,9 @@ describe("WirePanel (R16 contract)", () => {
       enabled: false,
       proxy_url: null,
       flows: [],
+      last_seq: 0,
+      total: 0,
+      reset: false,
     });
     renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
@@ -107,6 +110,9 @@ describe("WirePanel (R16 contract)", () => {
       enabled: false,
       proxy_url: null,
       flows: [],
+      last_seq: 0,
+      total: 0,
+      reset: false,
     });
     renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
@@ -215,6 +221,9 @@ describe("WirePanel (R16 contract)", () => {
           request_body: '{"big":"x"}...[truncated]',
         },
       ],
+      last_seq: 7,
+      total: 1,
+      reset: false,
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");
@@ -241,6 +250,9 @@ describe("WirePanel (R16 contract)", () => {
       enabled: false,
       proxy_url: null,
       flows: [{ ...fixture.flows[0], seq: 5, duration_ms: 42 }],
+      last_seq: 5,
+      total: 1,
+      reset: false,
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");

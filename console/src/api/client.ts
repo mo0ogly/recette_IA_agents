@@ -60,6 +60,7 @@ import type {
   ExchangeReport,
   ReconcileReport,
   ReconcileStatus,
+  SessionsDeltaResponse,
   VerdictSubmission,
   VerdictSubmissionRequest,
   WireFlowResponse,
@@ -673,6 +674,43 @@ export function getProxyTraces(
   );
 }
 
+/** Server-side selection for the /proxy/traces delta poll. All optional;
+ *  camelCase here, mapped to the snake_case query params by the client. */
+export interface ProxyTracesQuery {
+  /** Compat: keep only the last N (wins over limit, ignores sinceSeq). */
+  tail?: number;
+  runId?: string;
+  /** Delta cursor: only rows with seq > sinceSeq. Feed back `last_seq`. */
+  sinceSeq?: number;
+  agentId?: string;
+  target?: string;
+  outcome?: "ok" | "fail";
+  /** Literal substring filter (SQL-side). */
+  q?: string;
+  /** Keep the first N of the ascending delta. */
+  limit?: number;
+}
+
+/** Delta-poll of the recorded side-effect traces (oldest first). Send the
+ *  previous `last_seq` as sinceSeq to fetch only new rows; when the response
+ *  flags `reset` (server buffer cleared/restarted, cursor ahead) it already
+ *  carries the full current selection -- replace, do not append. */
+export function getProxyTracesDelta(params: ProxyTracesQuery): Promise<ProxyTraceResponse> {
+  return request<ProxyTraceResponse>(
+    withQuery("/proxy/traces", {
+      tail: params.tail,
+      run_id: params.runId,
+      since_seq: params.sinceSeq,
+      agent_id: params.agentId,
+      target: params.target,
+      outcome: params.outcome,
+      q: params.q,
+      limit: params.limit,
+    }),
+    { method: "GET" },
+  );
+}
+
 /** Debug toggle state plus the buffered trace count. */
 export function getProxyDebugStatus(): Promise<ProxyDebugStatus> {
   return request<ProxyDebugStatus>("/proxy/debug", { method: "GET" });
@@ -701,6 +739,45 @@ export function getWireFlows(tail?: number, runId?: string): Promise<WireFlowRes
   return request<WireFlowResponse>(withQuery("/proxy/wire", { tail, run_id: runId }), {
     method: "GET",
   });
+}
+
+/** Server-side selection for the /proxy/wire delta poll. All optional;
+ *  camelCase here, mapped to the snake_case query params by the client. */
+export interface WireFlowsQuery {
+  /** Compat: keep only the last N (wins over limit, ignores sinceSeq). */
+  tail?: number;
+  runId?: string;
+  /** Delta cursor: only rows with seq > sinceSeq. Feed back `last_seq`. */
+  sinceSeq?: number;
+  host?: string;
+  /** Matched case-insensitively (the store uppercases before comparing). */
+  method?: string;
+  /** Exact status_code match. */
+  status?: number;
+  /** Literal substring filter over path and bodies (SQL-side). */
+  q?: string;
+  /** Keep the first N of the ascending delta. */
+  limit?: number;
+}
+
+/** Delta-poll of the intercepted wire flows (oldest first). Send the previous
+ *  `last_seq` as sinceSeq to fetch only new rows; when the response flags
+ *  `reset` (server buffer cleared/restarted, cursor ahead) it already carries
+ *  the full current selection -- replace, do not append. */
+export function getWireFlowsDelta(params: WireFlowsQuery): Promise<WireFlowResponse> {
+  return request<WireFlowResponse>(
+    withQuery("/proxy/wire", {
+      tail: params.tail,
+      run_id: params.runId,
+      since_seq: params.sinceSeq,
+      host: params.host,
+      method: params.method,
+      status: params.status,
+      q: params.q,
+      limit: params.limit,
+    }),
+    { method: "GET" },
+  );
 }
 
 /** Overlay state (configured?) plus its proxy URL and buffered flow count. */
@@ -745,6 +822,41 @@ export function getReconcileStatus(
     withQuery("/proxy/reconcile/status", {
       run_id: runId,
       strict: strict ? "true" : undefined,
+    }),
+    { method: "GET" },
+  );
+}
+
+/** Parameters of the coalesced /proxy/sessions/delta poll. Cursors are
+ *  independent per side: sinceSeq for traces, wireSinceSeq for wire flows. */
+export interface SessionsDeltaQuery {
+  /** Trace delta cursor. Feed back the response's `last_seq`. */
+  sinceSeq?: number;
+  /** Wire delta cursor. Feed back the response's `wire_last_seq`. */
+  wireSinceSeq?: number;
+  /** Scopes the WIRE delta and the reconcile join only (traces stay unfiltered,
+   *  mirroring the SessionsPanel's client-side grouping). */
+  runId?: string;
+  /** Backend default true (strict per-flow hash join); false relaxes it. */
+  strict?: boolean;
+}
+
+/** Coalesced SessionsPanel poll: traces + wire + reconcile in ONE round trip
+ *  (replaces three parallel requests per tick). Each side has its own delta
+ *  cursor and its own reset flag with the usual contract: a `reset`/
+ *  `wire_reset` response already carries the full current selection for that
+ *  side -- replace, do not append; a stale cursor on one side never forces a
+ *  resync of the other. */
+export function getProxySessionsDelta(
+  params: SessionsDeltaQuery = {},
+): Promise<SessionsDeltaResponse> {
+  return request<SessionsDeltaResponse>(
+    withQuery("/proxy/sessions/delta", {
+      since_seq: params.sinceSeq,
+      wire_since_seq: params.wireSinceSeq,
+      run_id: params.runId,
+      // Backend defaults to strict=true; only an explicit opt-out is sent.
+      strict: params.strict === false ? "false" : undefined,
     }),
     { method: "GET" },
   );

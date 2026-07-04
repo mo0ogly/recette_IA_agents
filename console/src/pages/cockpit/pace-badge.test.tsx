@@ -47,7 +47,7 @@ describe("CockpitPage pace badge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listAiBackends).mockResolvedValue(backendsFixture as AiBackend[]);
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [], last_seq: 0, total: 0, reset: false });
   });
 
   it("shows a pace badge for the selected agent whose pace_ms > 0", async () => {

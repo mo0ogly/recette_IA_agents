@@ -149,5 +149,8 @@
         "result_id": "4aab9fe78d85"
       }
     }
-  ]
+  ],
+  "last_seq": 10,
+  "total": 6,
+  "reset": false
 }

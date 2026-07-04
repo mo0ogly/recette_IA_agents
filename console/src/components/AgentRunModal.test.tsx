@@ -80,6 +80,9 @@ const TRACES_RESPONSE = {
       response: { action: "suspend_user", status: "SUSPENDED", user_id: "00u-jdoe" },
     },
   ],
+  last_seq: 1,
+  total: 1,
+  reset: false,
 };
 
 const SUBMISSION: RunVerdictSubmission = {
@@ -233,7 +236,7 @@ describe("AgentRunModal", () => {
 
   it("shows the debug-off hint when proxy tracing is disabled", async () => {
     renderModal({
-      fetchTraces: () => Promise.resolve({ debug_enabled: false, traces: [] }),
+      fetchTraces: () => Promise.resolve({ debug_enabled: false, traces: [], last_seq: 0, total: 0, reset: false }),
     });
     fireEvent.click(screen.getByRole("tab", { name: /Traces proxy/ }));
     const empty = await screen.findByTestId("run-traces-empty");

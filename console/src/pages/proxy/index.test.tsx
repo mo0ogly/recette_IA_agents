@@ -85,13 +85,13 @@ describe("ProxyPage (R16 contract)", () => {
   });
 
   it("renders the debug-off banner when tracing is disabled", async () => {
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [], last_seq: 0, total: 0, reset: false });
     renderPage();
     expect(await screen.findByRole("status")).toHaveTextContent("INSPECT_IA_AGENTS_PROXY_DEBUG");
   });
 
   it("toggles proxy debug on from the UI when it is off", async () => {
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [], last_seq: 0, total: 0, reset: false });
     vi.mocked(setProxyDebug).mockResolvedValue({ debug_enabled: true });
     renderPage();
     const toggle = await screen.findByTestId("proxy-debug-toggle");
@@ -138,6 +138,9 @@ describe("ProxyPage (R16 contract)", () => {
         { ...t0, seq: 1, agent_id: "agent-a" },
         { ...t0, seq: 2, agent_id: "agent-b" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
@@ -159,6 +162,9 @@ describe("ProxyPage (R16 contract)", () => {
         { ...t0, seq: 1, ok: true, status_code: 200 },
         { ...t0, seq: 2, ok: false, status_code: 503 },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
@@ -182,6 +188,9 @@ describe("ProxyPage (R16 contract)", () => {
         { ...t0, seq: 1, action_type: "list_repos" },
         { ...t0, seq: 2, action_type: "open_pr" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage(["/proxy?q=open_pr"]);
     const list = await screen.findByRole("list", { name: "proxy traces" });
@@ -199,6 +208,9 @@ describe("ProxyPage (R16 contract)", () => {
         { ...t0, seq: 1, run_id: "run-aaa" },
         { ...t0, seq: 2, run_id: "run-bbb" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
@@ -233,7 +245,7 @@ describe("ProxyPage (R16 contract)", () => {
   it("pauses the live poll: no refetch while paused", async () => {
     vi.useFakeTimers();
     try {
-      vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+      vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [], last_seq: 0, total: 0, reset: false });
       renderPage();
       // let the initial fetch resolve
       await vi.advanceTimersByTimeAsync(0);
