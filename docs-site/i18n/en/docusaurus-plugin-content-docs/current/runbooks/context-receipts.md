@@ -65,7 +65,7 @@ flowchart LR
 ```
 
 Each `execute()` on the gateway side goes through the `TracingProxy`, which records a
-`ProxyTrace` in a bounded ring (`RingTraceRecorder`). The receipt endpoints
+`ProxyTrace` in the SQLite debug store (`SqliteTraceRecorder`). The receipt endpoints
 read this buffer via `snapshot()`, project each trace into a receipt, and chain the
 whole. The buffer is disposable -- the durable truth remains the append-only audit log
 (I1); receipts are a read view.

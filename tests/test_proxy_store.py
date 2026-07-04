@@ -839,6 +839,17 @@ class EnvHelperTests(unittest.TestCase):
         finally:
             self._with_env(MAX_ROWS_ENV, saved)
 
+    def test_constructor_resolves_path_via_env(self) -> None:
+        saved = os.environ.get(DB_PATH_ENV)
+        try:
+            self._with_env(DB_PATH_ENV, ":memory:")
+            store = SqliteProxyStore(None)
+            # Intentional private access: verifies constructor-side resolution.
+            self.assertEqual(store._path, ":memory:")
+            store.close()
+        finally:
+            self._with_env(DB_PATH_ENV, saved)
+
 
 if __name__ == "__main__":
     unittest.main()
