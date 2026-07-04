@@ -198,6 +198,42 @@ describe("useDeltaFeed", () => {
     expect(result.current.lastSeq).toBe(7);
   });
 
+  it("re-issues the full fetch when resetFeed lands during an in-flight fetch", async () => {
+    let releaseFirst: (v: { items: Row[]; last_seq: number; reset: boolean }) => void = () => {};
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (releaseFirst = resolve)),
+      )
+      .mockResolvedValue({ items: [row(9)], last_seq: 9, reset: true });
+    const { result } = renderHook(() =>
+      useDeltaFeed<Row>(fetcher, { intervalMs: 1000, paused: false }),
+    );
+    // The mount fetch is hung in flight.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // resetFeed while busy: its direct fetchOnce(null) is skipped by the
+    // busy guard, so only the pending-reset flag can save the refetch.
+    act(() => {
+      result.current.resetFeed();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1); // the direct call was skipped, not issued
+
+    // Resolve the hung (now stale, epoch-discarded) fetch: the pending reset
+    // must fire a NEW full fetch immediately -- only microtasks are flushed
+    // here, no 1000ms interval tick elapses.
+    await act(async () => {
+      releaseFirst({ items: [row(1), row(2)], last_seq: 2, reset: true });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenLastCalledWith(null);
+    // Final state reflects the fresh fetch; the stale delta was discarded.
+    expect(result.current.items.map((i) => i.seq)).toEqual([9]);
+    expect(result.current.lastSeq).toBe(9);
+    expect(result.current.error).toBeNull();
+  });
+
   it("does not overlap an in-flight fetch (busy guard)", async () => {
     let release: (v: { items: Row[]; last_seq: number; reset: boolean }) => void = () => {};
     const fetcher = vi

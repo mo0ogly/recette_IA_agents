@@ -11,6 +11,10 @@
  * up reports onScrollAwayFromTail(true) and STOPS the auto-pin (the parent
  * shows a "N new" affordance instead); scrolling back to the tail reports
  * false and resumes pinning. There is never an auto-jump while away.
+ *
+ * onScrollAwayFromTail should be a stable callback (wrap it in useCallback
+ * in the parent): it is a dependency of the internal scroll handler, so a
+ * new identity on every parent render re-creates the handler each render.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

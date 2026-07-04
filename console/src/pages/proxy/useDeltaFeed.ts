@@ -30,6 +30,12 @@ export const MAX_CLIENT_ITEMS = 2000;
  * PRECONDITION: both `prev` and `delta.items` are ascending by `seq` (the
  * server emits rows in seq order and this function preserves it), so a
  * concat after filtering collisions keeps ascending order without a sort.
+ * The server contract behind this: every delta item has `seq` >= the
+ * requested cursor, and `min(delta.seq)` is never below `max(prev.seq)`
+ * except at the collision boundary (a re-emitted row with `seq` equal to
+ * the cursor) -- the server never rewinds past the cursor. Filtering the
+ * colliding seqs out of `prev` therefore leaves every kept row strictly
+ * below every delta row.
  *
  * - reset: the delta replaces the list entirely.
  * - append: delta items are appended; on a seq collision the delta version
@@ -118,12 +124,19 @@ export function useDeltaFeed<T extends { seq: number }>(
   // Epoch guard: resetFeed bumps it so a delta that was in flight when the
   // feed was reset is discarded instead of merging stale rows.
   const epochRef = useRef(0);
+  // Set when resetFeed's direct fetch was SKIPPED by the busy guard: the
+  // in-flight fetch re-issues the full fetch from its finally block, so the
+  // reset does not have to wait for the next interval tick.
+  const pendingResetRef = useRef(false);
 
   const fetchOnce = useCallback(async (sinceSeq: number | null): Promise<void> => {
     if (busyRef.current) {
       return;
     }
     busyRef.current = true;
+    // This call is actually running, so it covers any pending reset request
+    // (the flag must only survive when the call was skipped while busy).
+    pendingResetRef.current = false;
     const epoch = epochRef.current;
     try {
       const delta = await fetcherRef.current(sinceSeq);
@@ -140,6 +153,13 @@ export function useDeltaFeed<T extends { seq: number }>(
       }
     } finally {
       busyRef.current = false;
+      if (pendingResetRef.current) {
+        // A resetFeed arrived while this fetch was in flight and its direct
+        // call was skipped by the busy guard: re-issue the full fetch now
+        // instead of leaving the panel empty until the next tick.
+        pendingResetRef.current = false;
+        void fetchOnce(null);
+      }
     }
   }, []);
 
@@ -154,6 +174,10 @@ export function useDeltaFeed<T extends { seq: number }>(
     setItems([]);
     setLastSeq(null);
     setError(null);
+    // If a fetch is in flight the direct call below is skipped by the busy
+    // guard; the flag makes that fetch's finally block re-issue the full
+    // fetch. When not busy, the direct call runs and clears the flag itself.
+    pendingResetRef.current = true;
     void fetchOnce(null);
   }, [fetchOnce]);
 

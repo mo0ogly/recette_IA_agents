@@ -62,7 +62,8 @@ describe("VirtualList", () => {
   it("renders only a window of the 1000 items", () => {
     renderList();
     const rows = screen.getAllByTestId("vrow");
-    expect(rows.length).toBeLessThan(50);
+    // ceil(height 200 / rowHeight 20) + overscan 5 = 15 (lower bound clamps at 0).
+    expect(rows.length).toBe(15);
     expect(screen.getByText("row-0")).toBeInTheDocument();
     expect(screen.queryByText("row-500")).toBeNull();
   });
