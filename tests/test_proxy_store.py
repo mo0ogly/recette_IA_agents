@@ -20,6 +20,7 @@ from pathlib import Path
 
 from recette.platform.events import PlatformActionEvent
 from recette.platform.proxy.protocol import ExecutionResult
+from recette.platform.proxy.reconcile import wire_flow_side_effect_hash
 from recette.platform.proxy.store import (
     DB_PATH_ENV,
     DEFAULT_DB_PATH,
@@ -27,10 +28,12 @@ from recette.platform.proxy.store import (
     MAX_ROWS_ENV,
     SqliteProxyStore,
     SqliteTraceRecorder,
+    SqliteWireRecorder,
     db_path_from_env,
     max_rows_from_env,
 )
 from recette.platform.proxy.tracing import ProxyTrace, RingTraceRecorder
+from recette.platform.proxy.wire import WireFlow, WireFlowRecorder
 
 
 def _event(
@@ -72,10 +75,48 @@ class _BrokenConn:
         raise RuntimeError("db down")
 
 
+def _governed_wire_payload(run_id: str | None = "run-abc") -> dict:
+    # Governed-action shape: POST /{target_system}/execute with JSON bodies
+    # (same shape as tests/test_api_wire_session_hash.py).
+    return {
+        "method": "POST",
+        "scheme": "http",
+        "host": "127.0.0.1",
+        "port": 9101,
+        "path": "/github/execute",
+        "status_code": 200,
+        "content_type": "application/json",
+        "request_body": (
+            '{"event_id":"e1","action_type":"read_repo","resource":"acme/x","payload":{}}'
+        ),
+        "response_body": '{"data":{"action":"read_repo","resource":"acme/x"},"success":true}',
+        "run_id": run_id,
+    }
+
+
+def _health_wire_payload() -> dict:
+    # Non-governed traffic (no /{ts}/execute path): benign, never hashed.
+    return {
+        "method": "GET",
+        "scheme": "http",
+        "host": "127.0.0.1",
+        "port": 8082,
+        "path": "/health",
+        "status_code": 200,
+        "content_type": "application/json",
+        "request_body": "",
+        "response_body": '{"ok":true}',
+        "run_id": None,
+    }
+
+
 class SqliteTraceRecorderTests(unittest.TestCase):
     def setUp(self) -> None:
         self.store = SqliteProxyStore(":memory:")
         self.recorder = SqliteTraceRecorder(self.store)
+
+    def tearDown(self) -> None:
+        self.store.close()
 
     def test_record_three_snapshot_identical_to_ring(self) -> None:
         ok = ExecutionResult(
@@ -195,6 +236,103 @@ class SqliteTraceRecorderTests(unittest.TestCase):
         self.assertEqual(len(traces), 1)
         # AUTOINCREMENT retains the counter in sqlite_sequence across DELETE.
         self.assertGreater(traces[0].seq, first_seq)
+
+
+class SqliteWireRecorderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.store = SqliteProxyStore(":memory:")
+        self.recorder = SqliteWireRecorder(self.store)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def test_record_three_snapshot_identical_to_ring(self) -> None:
+        payloads = [
+            _governed_wire_payload(),
+            _health_wire_payload(),
+            _governed_wire_payload(run_id=None),
+        ]
+        ring = WireFlowRecorder()
+        returned = []
+        for payload in payloads:
+            returned.append(self.recorder.record(payload))
+            ring.record(payload)
+        flows = self.recorder.snapshot()
+        self.assertEqual(len(flows), 3)
+        self.assertIsInstance(flows[0], WireFlow)
+        # (a) The store owns the monotone order: seq is 1-based AUTOINCREMENT,
+        # both on the snapshot and on the flow returned by record().
+        self.assertEqual([f.seq for f in flows], [1, 2, 3])
+        self.assertEqual([f.seq for f in returned], [1, 2, 3])
+        # (b) Field parity with the in-memory ring recorder. The two recorders
+        # number seq independently, so compare with seq zeroed on both sides.
+        self.assertEqual(
+            [dataclasses.replace(f, seq=0) for f in flows],
+            [dataclasses.replace(f, seq=0) for f in ring.snapshot()],
+        )
+        self.assertIsNone(self.recorder.store_error)
+
+    def test_governed_flow_hash_computed_at_insert(self) -> None:
+        self.recorder.record(_governed_wire_payload())
+        row = self.recorder.snapshot_dicts()[0]
+        self.assertIsInstance(row["side_effect_hash"], str)
+        # The persisted hash equals the one recomputed independently from the
+        # flow (what GET /proxy/wire used to compute on the fly).
+        flow = self.recorder.snapshot()[0]
+        self.assertEqual(row["side_effect_hash"], wire_flow_side_effect_hash(flow.to_dict()))
+
+    def test_non_governed_flow_hash_is_none(self) -> None:
+        self.recorder.record(_health_wire_payload())
+        self.assertIsNone(self.recorder.snapshot_dicts()[0]["side_effect_hash"])
+
+    def test_non_dict_payload_raises_value_error(self) -> None:
+        # Same contract as the ring's record: the endpoint turns this into 422.
+        with self.assertRaises(ValueError):
+            self.recorder.record("not-a-dict")  # type: ignore[arg-type]
+
+    def test_broken_store_returns_unpersisted_flow_and_recovers(self) -> None:
+        real_conn = self.store._conn
+        self.store._conn = _BrokenConn()
+        with self.assertLogs("recette.proxy.store", level="ERROR"):
+            flow = self.recorder.record(_governed_wire_payload())  # must not raise
+        # seq=0 marks the flow as normalized but unpersisted (fail-safe).
+        self.assertIsInstance(flow, WireFlow)
+        self.assertEqual(flow.seq, 0)
+        self.assertEqual(self.recorder.store_error, "db down")
+        # Recovery: the next SUCCESSFUL insert clears store_error.
+        self.store._conn = real_conn
+        recovered = self.recorder.record(_governed_wire_payload())
+        self.assertGreater(recovered.seq, 0)
+        self.assertIsNone(self.recorder.store_error)
+        self.assertEqual(len(self.recorder.snapshot()), 1)
+
+    def test_clear_empties_wire_flows_but_not_traces(self) -> None:
+        traces = SqliteTraceRecorder(self.store)
+        traces.record(_event(), ExecutionResult(ok=True, status_code=200))
+        self.recorder.record(_governed_wire_payload())
+        self.recorder.clear()
+        self.assertEqual(self.recorder.snapshot(), [])
+        self.assertEqual(self.recorder.snapshot_dicts(), [])
+        # The trace buffer is untouched: clear() deletes wire_flows only.
+        self.assertEqual(len(traces.snapshot()), 1)
+
+    def test_wire_and_trace_seq_counters_are_independent(self) -> None:
+        traces = SqliteTraceRecorder(self.store)
+        traces.record(_event("evt-0001"), ExecutionResult(ok=True, status_code=200))
+        traces.record(_event("evt-0002"), ExecutionResult(ok=True, status_code=200))
+        flow = self.recorder.record(_governed_wire_payload())
+        self.assertEqual(flow.seq, 1)
+
+    def test_snapshot_dicts_preserves_run_id_ok_and_duration(self) -> None:
+        self.recorder.record(_governed_wire_payload(run_id="run-x"))
+        self.recorder.record(_health_wire_payload())
+        self.recorder.record({**_health_wire_payload(), "duration_ms": 12.5, "status_code": 503})
+        rows = self.recorder.snapshot_dicts()
+        self.assertEqual([r["run_id"] for r in rows], ["run-x", None, None])
+        self.assertEqual([r["ok"] for r in rows], [True, True, False])
+        for row in rows:
+            self.assertIsInstance(row["ok"], bool)
+        self.assertEqual([r["duration_ms"] for r in rows], [None, None, 12.5])
 
 
 class SqliteProxyStoreTests(unittest.TestCase):

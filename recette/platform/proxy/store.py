@@ -24,6 +24,7 @@ construction now but not yet enforced.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
@@ -33,7 +34,9 @@ from pathlib import Path
 
 from ..events import PlatformActionEvent
 from .protocol import ExecutionResult
+from .reconcile import wire_flow_side_effect_hash
 from .tracing import ProxyTrace
+from .wire import WireFlow, normalize_flow
 
 DB_PATH_ENV = "INSPECT_IA_AGENTS_PROXY_DB"
 DEFAULT_DB_PATH = ".run/proxy_traces.db"
@@ -75,6 +78,18 @@ _SELECT_TRACES = (
     "SELECT seq, event_id, timestamp, agent_id, target_system, target, action_type, "
     "resource, request_payload, ok, status_code, side_effect_hash, error, run_id, "
     "response FROM proxy_traces ORDER BY seq"
+)
+
+_INSERT_WIRE = (
+    "INSERT INTO wire_flows (method, scheme, host, port, path, status_code, ok, "
+    "content_type, request_body, response_body, run_id, duration_ms, side_effect_hash) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+)
+
+_SELECT_WIRE = (
+    "SELECT seq, method, scheme, host, port, path, status_code, ok, content_type, "
+    "request_body, response_body, run_id, duration_ms, side_effect_hash "
+    "FROM wire_flows ORDER BY seq"
 )
 
 
@@ -169,6 +184,55 @@ class SqliteProxyStore:
                 raise
             self._store_error = None
 
+    def insert_wire(self, flow: WireFlow, side_effect_hash: str | None) -> int:
+        """Insert one wire-flow row and return the SQLite-assigned ``seq``.
+
+        Same lock + commit + error lifecycle as ``insert_trace``: a failure
+        records the message in ``store_error`` and re-raises; a subsequent
+        successful insert clears it back to ``None``. The passed ``flow.seq``
+        is ignored -- AUTOINCREMENT owns the monotone order (its counter is
+        independent from the traces one; each table has its own).
+        """
+        with self._lock:
+            try:
+                cursor = self._conn.execute(
+                    _INSERT_WIRE,
+                    (
+                        flow.method,
+                        flow.scheme,
+                        flow.host,
+                        flow.port,
+                        flow.path,
+                        flow.status_code,
+                        int(flow.ok),
+                        flow.content_type,
+                        flow.request_body,
+                        flow.response_body,
+                        flow.run_id,
+                        flow.duration_ms,
+                        side_effect_hash,
+                    ),
+                )
+                self._conn.commit()
+            except Exception as exc:
+                self._store_error = str(exc)
+                raise
+            self._store_error = None
+            # A successful INSERT always sets lastrowid; `or 0` only narrows
+            # the Optional for typing, it is never hit on this path.
+            return cursor.lastrowid or 0
+
+    def snapshot_wire_rows(self) -> list[tuple]:
+        """All wire rows in monotone ``seq`` order (raw tuples, hash included)."""
+        with self._lock:
+            return self._conn.execute(_SELECT_WIRE).fetchall()
+
+    def clear_wire(self) -> None:
+        """Empty the DEBUG wire buffer only -- traces and audit log untouched."""
+        with self._lock:
+            self._conn.execute("DELETE FROM wire_flows")
+            self._conn.commit()
+
     def snapshot_traces(self) -> list[ProxyTrace]:
         """All traces in monotone ``seq`` order, rebuilt as ``ProxyTrace``."""
         with self._lock:
@@ -261,3 +325,85 @@ class SqliteTraceRecorder:
     def clear(self) -> None:
         """Empty the debug buffer only (I1-safe: the audit log is untouched)."""
         self._store.clear_traces()
+
+
+class SqliteWireRecorder:
+    """Wire-flow facade over ``SqliteProxyStore`` (mirrors ``SqliteTraceRecorder``).
+
+    Normalization is the shared ``normalize_flow`` from wire.py (DRY with the
+    in-memory ring); the governed-action ``side_effect_hash`` is computed ONCE
+    at insert (``wire_flow_side_effect_hash``) and persisted, instead of being
+    recomputed on every GET /proxy/wire.
+
+    Failure contract of ``record``: a non-dict payload raises ``ValueError``
+    (the endpoint turns it into 422 -- same contract as the ring's record). A
+    STORAGE failure never raises: the normalized flow is returned with
+    ``seq=0`` (marking it unpersisted), the failure is logged and surfaced via
+    ``store_error`` (fail-safe: observability never breaks the I5 path).
+    """
+
+    def __init__(self, store: SqliteProxyStore) -> None:
+        self._store = store
+
+    @property
+    def store_error(self) -> str | None:
+        """Delegates to the store: last failure message, ``None`` when healthy."""
+        return self._store.store_error
+
+    def record(self, payload: dict) -> WireFlow:
+        # ValueError from a non-dict payload propagates (the 422 contract).
+        # seq=0 is a placeholder: AUTOINCREMENT assigns the real seq at insert.
+        flow = normalize_flow(payload, 0)
+        try:
+            effect_hash = wire_flow_side_effect_hash(flow.to_dict())
+            seq = self._store.insert_wire(flow, effect_hash)
+            return dataclasses.replace(flow, seq=seq)
+        except Exception as exc:  # noqa: BLE001 - recording must never break execution
+            # The store already tracked the failure in store_error (its own
+            # lifecycle, under its lock); here we only swallow and log. The
+            # returned flow keeps seq=0: normalized but unpersisted.
+            _LOG.error("wire flow record failed: %s", exc)
+            return flow
+
+    @staticmethod
+    def _flow_from_row(row: tuple) -> WireFlow:
+        # Column order matches _SELECT_WIRE; row[13] (side_effect_hash) is not
+        # a WireFlow field (wire.py is unchanged) -- see snapshot_dicts.
+        return WireFlow(
+            seq=row[0],
+            method=row[1],
+            scheme=row[2],
+            host=row[3],
+            port=row[4],
+            path=row[5],
+            status_code=row[6],
+            ok=bool(row[7]),
+            content_type=row[8],
+            request_body=row[9],
+            response_body=row[10],
+            run_id=row[11],
+            duration_ms=row[12],
+        )
+
+    def snapshot(self) -> list[WireFlow]:
+        """All flows in monotone ``seq`` order, rebuilt as ``WireFlow``."""
+        return [self._flow_from_row(row) for row in self._store.snapshot_wire_rows()]
+
+    def snapshot_dicts(self) -> list[dict]:
+        """Dict view of the rows WITH the persisted ``side_effect_hash``.
+
+        This is the GET /proxy/wire shape: the hash the endpoint used to
+        recompute on the fly is now read straight from the column (NULL ->
+        ``None``); ``run_id`` stays ``None`` vs string, ``ok`` is a bool and
+        ``duration_ms`` is ``None``-safe via the dataclass rebuild.
+        """
+        rows = []
+        for row in self._store.snapshot_wire_rows():
+            blob = self._flow_from_row(row).to_dict()
+            blob["side_effect_hash"] = row[13]
+            rows.append(blob)
+        return rows
+
+    def clear(self) -> None:
+        """Empty the debug wire buffer only (I1-safe: the audit log is untouched)."""
+        self._store.clear_wire()
