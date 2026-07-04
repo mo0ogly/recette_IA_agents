@@ -6,6 +6,7 @@
 
 pub mod correlate;
 pub mod graph;
+pub mod ipc_correlate;
 pub mod manifest;
 pub mod model;
 pub mod report;

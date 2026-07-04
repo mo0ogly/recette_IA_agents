@@ -52,6 +52,7 @@
 //! `NotObserved`, never to a false `Conform`.
 
 use crate::graph::{DeclaredGraph, Edge};
+use crate::ipc_correlate::derive_ipc_edges;
 use crate::manifest::KNOWN_GIT_ACTIONS;
 use crate::model::{
     AgentInventory, AgentRecord, CommGraph, Conformity, Declared, InventorySummary, Observed,
@@ -94,6 +95,7 @@ pub fn correlate(
     let mut observed_ids: BTreeSet<String> = BTreeSet::new();
     let mut observed_edges: Vec<Edge> = Vec::new();
     let mut undeclared_edges: Vec<Edge> = Vec::new();
+    let mut via_gateway_edges: Vec<Edge> = Vec::new();
 
     if let Some(input) = observed {
         // Rule 1 + 2: recordings drive observed actions/egress; a recording
@@ -119,9 +121,22 @@ pub fn correlate(
                 }
             }
         }
+        // Task 10: build agent-level edges from the raw IPC capture
+        // (localhost TCP + AF_UNIX pairing, fork-tree pid->agent attribution,
+        // gateway classification), then UNION them with any pre-correlated
+        // `observed_edges` the caller supplied (dedup via normalize_edges).
+        let derived =
+            derive_ipc_edges(&input.ipc, &input.forks, &input.pid_agents, &input.gateways);
         // Rule 5: observed edges minus declared edges = undeclared handoffs.
-        observed_edges = normalize_edges(input.observed_edges.clone());
-        for edge in &observed_edges {
+        // via_gateway edges are kept SEPARATE and excluded from that diff: a
+        // broker hop is not an undeclared direct handoff (design rule 4).
+        let mut all_observed = input.observed_edges.clone();
+        all_observed.extend(derived.direct);
+        observed_edges = normalize_edges(all_observed);
+        via_gateway_edges = normalize_edges(derived.via_gateway);
+        // Both direct and gateway edges are live observations of the agents
+        // they touch (rule 6 Conform precondition).
+        for edge in observed_edges.iter().chain(via_gateway_edges.iter()) {
             observed_ids.insert(edge.from.clone());
             observed_ids.insert(edge.to.clone());
         }
@@ -181,6 +196,7 @@ pub fn correlate(
             declared_edges,
             observed_edges,
             undeclared_edges,
+            via_gateway_edges,
         },
         summary,
     }
@@ -724,6 +740,71 @@ mod tests {
     }
 
     #[test]
+    fn ipc_derived_edge_outside_declared_graph_is_undeclared_handoff() {
+        // Raw IPC: pid10=agent-a connects 127.0.0.1:9000; pid20=agent-b listens
+        // :9000. The correlator BUILDS edge(a,b) from the IPC events; with an
+        // empty declared graph it is an undeclared handoff (Task 5 diff).
+        use discoveryprobe_core::ipc::IpcEvents;
+        let obs = ObservedInput {
+            ipc: IpcEvents {
+                listens: vec!["listen:20:9000".to_string()],
+                accepts: vec![],
+                connects: vec!["connect:10:127.0.0.1:9000".to_string()],
+                unix_connects: vec![],
+            },
+            pid_agents: vec![(10, "a".to_string()), (20, "b".to_string())],
+            ..Default::default()
+        };
+        let inv = correlate(
+            &[
+                present_agent("a", "a-bot", &["read_repo"]),
+                present_agent("b", "b-bot", &["read_repo"]),
+            ],
+            &DeclaredGraph::default(),
+            Some(&obs),
+        );
+        // The IPC-derived edge surfaces as observed AND undeclared.
+        assert_eq!(inv.comm_graph.observed_edges, vec![edge("a", "b")]);
+        assert_eq!(inv.comm_graph.undeclared_edges, vec![edge("a", "b")]);
+        assert!(inv.comm_graph.via_gateway_edges.is_empty());
+        assert_eq!(
+            violations_of(&inv, "a"),
+            vec![Violation::UndeclaredHandoff {
+                from: "a".to_string(),
+                to: "b".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn ipc_edge_to_a_gateway_is_not_an_undeclared_handoff() {
+        // Same shape, but pid20 resolves to the configured gateway "broker":
+        // the edge is via_gateway, NOT undeclared, and raises no violation.
+        use discoveryprobe_core::ipc::IpcEvents;
+        let obs = ObservedInput {
+            ipc: IpcEvents {
+                listens: vec!["listen:20:9000".to_string()],
+                accepts: vec![],
+                connects: vec!["connect:10:127.0.0.1:9000".to_string()],
+                unix_connects: vec![],
+            },
+            pid_agents: vec![(10, "a".to_string()), (20, "broker".to_string())],
+            gateways: vec!["broker".to_string()],
+            ..Default::default()
+        };
+        let inv = correlate(
+            &[present_agent("a", "a-bot", &["read_repo"])],
+            &DeclaredGraph::default(),
+            Some(&obs),
+        );
+        assert!(inv.comm_graph.observed_edges.is_empty());
+        assert!(inv.comm_graph.undeclared_edges.is_empty());
+        assert_eq!(inv.comm_graph.via_gateway_edges, vec![edge("a", "broker")]);
+        // agent "a" was seen live (gateway comm) with no violation -> Conform.
+        assert_eq!(inv.agents[0].conformity, Conformity::Conform);
+    }
+
+    #[test]
     fn declared_graph_is_renormalized_on_intake() {
         // graph.rs exposes `edges` pub: feed an unsorted, duplicated set and
         // assert the correlator normalizes defensively.
@@ -771,6 +852,7 @@ mod tests {
             recordings: vec![rec],
             observed_edges: vec![edge("ghost", "pr-bot")],
             observed_principals: vec![("pr-bot".to_string(), "evil-bot".to_string())],
+            ..Default::default()
         };
         let run_a = correlate(&scanned, &declared, Some(&obs));
         let run_b = correlate(&scanned, &declared, Some(&obs));

@@ -30,6 +30,7 @@
 
 use crate::graph::Edge;
 use crate::scan::PassportStatus;
+use discoveryprobe_core::ipc::IpcEvents;
 use discoveryprobe_core::CaptureRecording;
 use serde::{Deserialize, Serialize};
 
@@ -185,6 +186,11 @@ pub struct CommGraph {
     pub observed_edges: Vec<Edge>,
     /// Observed edges absent from the declared set (violations).
     pub undeclared_edges: Vec<Edge>,
+    /// Observed edges whose resolved destination agent is a gateway process
+    /// (design rule 4): carried SEPARATELY and EXCLUDED from
+    /// `undeclared_edges` -- a hop through a declared broker is not an
+    /// undeclared direct handoff. Sorted and deduplicated (I4).
+    pub via_gateway_edges: Vec<Edge>,
 }
 
 /// Runtime-observation input to the correlator. `None` at the correlate call
@@ -193,9 +199,32 @@ pub struct CommGraph {
 pub struct ObservedInput {
     /// Per-agent capture recordings (surface keys).
     pub recordings: Vec<CaptureRecording>,
-    /// Pre-correlated agent-level communication edges (Task 10 builds these
-    /// from raw IPC events; they arrive ready).
+    /// Pre-correlated agent-level communication edges. When present these are
+    /// UNIONED (deduped) with the edges the correlator derives from `ipc`.
+    #[serde(default)]
     pub observed_edges: Vec<Edge>,
     /// `(agent_id, observed principal)` pairs when a trace carries identity.
+    #[serde(default)]
     pub observed_principals: Vec<(String, String)>,
+    /// Raw reconciled inter-agent IPC events (Task 9 `IpcEvents`): the
+    /// correlator parses these back into pid-level listen/connect/accept/
+    /// unix-connect facts and BUILDS agent-level observed edges from them.
+    /// Default empty (a static or hook-only run carries none).
+    #[serde(default)]
+    pub ipc: IpcEvents,
+    /// Fork edges `(parent_pid, child_pid)` for fork-tree pid->agent
+    /// attribution: a comm from a fork child is attributed to the nearest
+    /// ancestor pid that maps to an agent. Default empty.
+    #[serde(default)]
+    pub forks: Vec<(u32, u32)>,
+    /// `pid -> agent_id` mapping (the broker knows which pid runs which
+    /// agent). A pid resolves either directly here or via the fork tree.
+    /// Default empty (an unresolvable pid drops its edge, never fabricates).
+    #[serde(default)]
+    pub pid_agents: Vec<(u32, String)>,
+    /// Agent ids considered GATEWAYS (R5: config input, never hardcoded). An
+    /// IPC edge whose resolved destination agent is in this set is recorded in
+    /// `CommGraph::via_gateway_edges`, not as an undeclared direct handoff.
+    #[serde(default)]
+    pub gateways: Vec<String>,
 }
