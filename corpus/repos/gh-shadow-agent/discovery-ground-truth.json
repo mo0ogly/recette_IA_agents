@@ -1,0 +1,11 @@
+{
+  "agent_repo": "gh-shadow-agent",
+  "target_system": "github",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_repo", "open_pr"],
+  "risk_rank": 2,
+  "policy_generated": true,
+  "passport_status": "absent",
+  "notes": "Shadow agent: real GitHub agent code (reads repos, opens PRs) with NO .inspect_ia_agents manifest anywhere in the tree. The scanner must detect one agent from the code fallback, surface read_repo + open_pr, rank it like the sanctioned pr-bot (risk_rank 2), emit a PR-only policy, AND report passport_status = absent. Detecting the code but silently trusting the missing passport is the miss this subject guards."
+}

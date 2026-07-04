@@ -185,6 +185,7 @@ version = "0.1.0"
 name = "discoveryprobe-core"
 version = "0.1.0"
 dependencies = [
+ "discoveryprobe-common",
  "serde",
  "serde_json",
 ]
@@ -193,6 +194,15 @@ dependencies = [
 name = "discoveryprobe-detect"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "discoveryprobe-inventory"
+version = "0.1.0"
+dependencies = [
+ "discoveryprobe-core",
  "serde",
  "serde_json",
 ]

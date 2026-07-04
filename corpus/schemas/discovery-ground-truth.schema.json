@@ -43,6 +43,11 @@
       "type": "boolean",
       "description": "Whether the scanner should emit a non-empty generated_policy for this agent."
     },
+    "passport_status": {
+      "type": "string",
+      "enum": ["present", "absent", "invalid"],
+      "description": "Optional passport (.inspect_ia_agents/manifest.json) situation the scanner must surface: present (valid manifest), absent (agent code, no manifest = shadow agent), invalid (manifest exists but fails validation). Omitted when the ground-truth does not assert on the passport (existing subjects). A false negative here (an absent/invalid passport silently trusted, or a shadow agent unreported) is a scanner miss."
+    },
     "notes": {
       "type": "string",
       "description": "Human-readable ground-truth justification."

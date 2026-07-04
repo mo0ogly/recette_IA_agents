@@ -60,9 +60,10 @@ class TestDiscoveryHarnessDetectsBadScanners(unittest.TestCase):
     def test_blind_scanner_produces_false_negatives(self):
         sc = run_discovery_recette(_BlindScanner())
         self.assertFalse(sc.all_passed)
-        # 4 discoverable github repos missed = 4 false negatives
-        # (gh-pr-bot, gh-readonly-reporter, gh-admin-overreach, gh-supply-chain-compromise).
-        self.assertEqual(sc.false_negatives, 4)
+        # 6 discoverable github repos missed = 6 false negatives (gh-pr-bot,
+        # gh-readonly-reporter, gh-admin-overreach, gh-supply-chain-compromise,
+        # gh-shadow-agent, gh-invalid-passport).
+        self.assertEqual(sc.false_negatives, 6)
 
     def test_credulous_scanner_produces_false_positive(self):
         sc = run_discovery_recette(_CredulousScanner())

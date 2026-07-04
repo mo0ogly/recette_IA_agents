@@ -1188,6 +1188,88 @@ export function captureProbe(req: ProbeCaptureRequest): Promise<ProbeCaptureResu
   });
 }
 
+// --- Agent inventory (GET /probe/inventory) ---
+
+/** One communication edge in the inventory comm graph (agent -> agent). */
+export interface InventoryEdge {
+  from: string;
+  to: string;
+}
+
+/** Kind-tagged passport situation of a scanned agent. Present carries the parsed
+ *  passport, absent the code evidence, invalid the parse/validation errors. */
+export type InventoryPassport =
+  | { kind: "present"; passport: unknown }
+  | { kind: "absent"; evidence: string[] }
+  | { kind: "invalid"; errors: string[] };
+
+/** Kind-tagged conformity verdict; only `violations` carries a list. */
+export type InventoryConformity =
+  | { kind: "conform" }
+  | { kind: "not_observed" }
+  | { kind: "violations"; violations: InventoryViolation[] };
+
+/** Kind-tagged violation. Only the fields for a given `kind` are present. */
+export interface InventoryViolation {
+  kind: string;
+  action?: string;
+  source?: string;
+  declared?: string;
+  observed?: string;
+  from?: string;
+  to?: string;
+  tool?: string;
+}
+
+/** The declared side of a record, extracted from a valid passport. */
+export interface InventoryDeclared {
+  principal: string;
+  target_systems: string[];
+  actions: string[];
+  handoffs: string[];
+}
+
+/** One identified agent in the inventory. */
+export interface InventoryAgent {
+  agent_id: string;
+  passport: InventoryPassport;
+  kind: string | null;
+  declared: InventoryDeclared | null;
+  observed: { actions: string[]; egress: string[] };
+  conformity: InventoryConformity;
+  evidence: string[];
+}
+
+/** Declared vs observed communication edges; undeclared and via-gateway split. */
+export interface InventoryCommGraph {
+  declared_edges: InventoryEdge[];
+  observed_edges: InventoryEdge[];
+  undeclared_edges: InventoryEdge[];
+  via_gateway_edges: InventoryEdge[];
+}
+
+/** The correlated agent inventory (discoveryprobe-inventory AgentInventory). */
+export interface AgentInventory {
+  schema_version: string;
+  agents: InventoryAgent[];
+  comm_graph: InventoryCommGraph;
+  summary: {
+    with_passport: number;
+    without_passport: number;
+    invalid_passport: number;
+    violation_count: number;
+  };
+}
+
+/** GET /probe/inventory: the committed sample AgentInventory (a frozen artifact
+ *  assembled from real CLI output). Deterministic, read-only. The `.inventory`
+ *  envelope key is unwrapped here so callers receive the bare AgentInventory. */
+export function getInventory(): Promise<AgentInventory> {
+  return request<{ inventory: AgentInventory }>("/probe/inventory").then(
+    (r) => r.inventory,
+  );
+}
+
 // --- Behavioral-analysis engine (POST /behavior/wave) ---
 
 /** A single lens finding in a behavioral wave, with its OWASP/ATLAS tag. */

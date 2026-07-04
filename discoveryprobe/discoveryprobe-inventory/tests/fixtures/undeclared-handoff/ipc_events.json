@@ -1,0 +1,14 @@
+{
+  "recordings": [],
+  "observed_edges": [],
+  "observed_principals": [],
+  "ipc": {
+    "listens": ["listen:200:9100"],
+    "accepts": [],
+    "connects": ["connect:100:127.0.0.1:9100"],
+    "unix_connects": []
+  },
+  "forks": [],
+  "pid_agents": [[100, "wire"], [200, "audit"]],
+  "gateways": []
+}

@@ -21,6 +21,9 @@ pub const PATH_LEN: usize = 128;
 /// `& (QNAME_LEN - 1)` to satisfy the verifier (a constant-bounded buffer).
 pub const QNAME_LEN: usize = 256;
 
+/// Length cap for a captured Unix socket path (`sockaddr_un.sun_path`).
+pub const UNIX_PATH_LEN: usize = 108;
+
 /// One captured process-exec event: which process (`pid`) ran, under what
 /// command name (`comm`). This is the kernel's evidence that an agent process
 /// exists -- the eBPF view of "the agent is running", visible even when the
@@ -281,6 +284,172 @@ impl DnsEvent {
     }
 }
 
+/// One captured TCP listen (`bind` + `listen`): which process (`pid`/`comm`)
+/// serves which local TCP `port`. This is the SERVER-side half of an
+/// inter-agent localhost edge -- when another agent's [`ConnectEvent`] dials
+/// `127.0.0.1:port`, this event names the pid on the other end, so the two
+/// halves pair into an observed agent-to-agent communication edge.
+///
+/// The port is stored as its on-wire network-byte-order bytes (like
+/// [`ConnectEvent::dport`]), so parsing is endianness-unambiguous.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListenEvent {
+    /// The process id (thread-group leader) that called `listen`.
+    pub pid: u32,
+    /// Local port bytes, in network order / big-endian (`sin_port` at bind).
+    pub port: [u8; 2],
+    /// Explicit padding so `repr(C)` size is fixed and deterministic on both
+    /// the kernel producer and userspace consumer.
+    pub _pad: [u8; 2],
+    /// The process command name, NUL-padded (`bpf_get_current_comm`).
+    pub comm: [u8; COMM_LEN],
+}
+
+/// Wire size of a serialised [`ListenEvent`] -- the exact byte count the kernel
+/// reserves in the ring buffer and the loader reads back.
+pub const LISTEN_EVENT_SIZE: usize = core::mem::size_of::<ListenEvent>();
+
+impl ListenEvent {
+    /// Parse one event from raw ring-buffer bytes. The `pid` is host-native
+    /// (the kernel producer and userspace consumer share one host); the port
+    /// bytes are kept in network order. Returns `None` if the slice is too
+    /// short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < LISTEN_EVENT_SIZE {
+            return None;
+        }
+        let pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let port = [buf[4], buf[5]];
+        let _pad = [buf[6], buf[7]];
+        let mut comm = [0u8; COMM_LEN];
+        comm.copy_from_slice(&buf[8..8 + COMM_LEN]);
+        Some(Self {
+            pid,
+            port,
+            _pad,
+            comm,
+        })
+    }
+
+    /// The listening port in host order (the network-order bytes read
+    /// big-endian).
+    pub fn port(&self) -> u16 {
+        u16::from_be_bytes(self.port)
+    }
+
+    /// The command name as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn comm_str(&self) -> &str {
+        let end = self.comm.iter().position(|&b| b == 0).unwrap_or(COMM_LEN);
+        core::str::from_utf8(&self.comm[..end]).unwrap_or("")
+    }
+}
+
+/// One captured TCP `accept`: which process (`pid`/`comm`) accepted an inbound
+/// connection. This confirms the listening pid is a LIVE server actually
+/// taking traffic, not a dormant socket left bound by a dead or idle process
+/// -- the difference between "declares a port" and "serves on it", which is
+/// what makes a [`ListenEvent`]/[`ConnectEvent`] pair a real comm edge.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AcceptEvent {
+    /// The process id (thread-group leader) that called `accept`.
+    pub pid: u32,
+    /// The process command name, NUL-padded (`bpf_get_current_comm`).
+    pub comm: [u8; COMM_LEN],
+}
+
+/// Wire size of a serialised [`AcceptEvent`] -- the exact byte count the kernel
+/// reserves in the ring buffer and the loader reads back.
+pub const ACCEPT_EVENT_SIZE: usize = core::mem::size_of::<AcceptEvent>();
+
+impl AcceptEvent {
+    /// Parse one event from raw ring-buffer bytes (native endianness: the
+    /// kernel producer and the userspace consumer share one host). Returns
+    /// `None` if the slice is too short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < ACCEPT_EVENT_SIZE {
+            return None;
+        }
+        let pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let mut comm = [0u8; COMM_LEN];
+        comm.copy_from_slice(&buf[4..4 + COMM_LEN]);
+        Some(Self { pid, comm })
+    }
+
+    /// The command name as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn comm_str(&self) -> &str {
+        let end = self.comm.iter().position(|&b| b == 0).unwrap_or(COMM_LEN);
+        core::str::from_utf8(&self.comm[..end]).unwrap_or("")
+    }
+}
+
+/// One captured `AF_UNIX` `connect`: which process (`pid`/`comm`) dialed which
+/// Unix socket `path` (NUL-padded, truncated to [`UNIX_PATH_LEN`], the
+/// `sockaddr_un.sun_path` size). Local MCP/gRPC transports between agents run
+/// over Unix sockets, so this edge is INVISIBLE to TCP-only capture --
+/// without it a co-located agent pair talking over a socket file is a blind
+/// spot.
+///
+/// Known limitation: abstract-namespace sockets start with a leading NUL byte
+/// in `sun_path`; [`path_str`](Self::path_str) trims at the first NUL, so an
+/// abstract socket name is reported as an EMPTY path (the connect itself is
+/// still captured with pid/comm).
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct UnixConnectEvent {
+    /// The process id (thread-group leader) that called `connect`.
+    pub pid: u32,
+    /// The process command name, NUL-padded (`bpf_get_current_comm`).
+    pub comm: [u8; COMM_LEN],
+    /// The Unix socket path, NUL-padded, truncated to [`UNIX_PATH_LEN`]
+    /// (read from the `sockaddr_un.sun_path` connect argument).
+    pub path: [u8; UNIX_PATH_LEN],
+}
+
+/// Wire size of a serialised [`UnixConnectEvent`] -- the exact byte count the
+/// kernel reserves in the ring buffer and the loader reads back.
+pub const UNIX_CONNECT_EVENT_SIZE: usize = core::mem::size_of::<UnixConnectEvent>();
+
+impl UnixConnectEvent {
+    /// Parse one event from raw ring-buffer bytes (native endianness: the
+    /// kernel producer and the userspace consumer share one host). Returns
+    /// `None` if the slice is too short.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < UNIX_CONNECT_EVENT_SIZE {
+            return None;
+        }
+        let pid = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+        let mut comm = [0u8; COMM_LEN];
+        comm.copy_from_slice(&buf[4..4 + COMM_LEN]);
+        let mut path = [0u8; UNIX_PATH_LEN];
+        let path_start = 4 + COMM_LEN;
+        path.copy_from_slice(&buf[path_start..path_start + UNIX_PATH_LEN]);
+        Some(Self { pid, comm, path })
+    }
+
+    /// The command name as a string slice, trimmed at the first NUL. Returns an
+    /// empty slice if the bytes are not valid UTF-8.
+    pub fn comm_str(&self) -> &str {
+        let end = self.comm.iter().position(|&b| b == 0).unwrap_or(COMM_LEN);
+        core::str::from_utf8(&self.comm[..end]).unwrap_or("")
+    }
+
+    /// The Unix socket path as a string slice, trimmed at the first NUL.
+    /// Returns an empty slice if the bytes are not valid UTF-8, and an empty
+    /// path for abstract-namespace sockets (leading NUL -- see the struct doc).
+    pub fn path_str(&self) -> &str {
+        let end = self
+            .path
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(UNIX_PATH_LEN);
+        core::str::from_utf8(&self.path[..end]).unwrap_or("")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -496,5 +665,155 @@ mod tests {
     #[test]
     fn dns_from_bytes_rejects_short_slice() {
         assert!(DnsEvent::from_bytes(&[0u8; DNS_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn make_listen(pid: u32, port: u16, name: &str) -> ListenEvent {
+        let mut comm = [0u8; COMM_LEN];
+        let bytes = name.as_bytes();
+        let n = bytes.len().min(COMM_LEN);
+        comm[..n].copy_from_slice(&bytes[..n]);
+        ListenEvent {
+            pid,
+            port: port.to_be_bytes(),
+            _pad: [0u8; 2],
+            comm,
+        }
+    }
+
+    fn listen_to_bytes(ev: &ListenEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(LISTEN_EVENT_SIZE);
+        buf.extend_from_slice(&ev.pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.port);
+        buf.extend_from_slice(&ev._pad);
+        buf.extend_from_slice(&ev.comm);
+        buf
+    }
+
+    #[test]
+    fn listen_event_size_is_pid_port_pad_comm() {
+        assert_eq!(LISTEN_EVENT_SIZE, 4 + 2 + 2 + COMM_LEN);
+    }
+
+    #[test]
+    fn listen_from_bytes_round_trips() {
+        let ev = make_listen(4242, 8082, "mcp-server");
+        let parsed = ListenEvent::from_bytes(&listen_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed, ev);
+    }
+
+    #[test]
+    fn listen_port_reads_network_order_big_endian() {
+        let ev = make_listen(1, 8090, "a");
+        assert_eq!(ev.port(), 8090);
+        assert_eq!(ev.port, 8090u16.to_be_bytes());
+    }
+
+    #[test]
+    fn listen_comm_str_trims_at_nul() {
+        let ev = make_listen(1, 80, "server");
+        assert_eq!(ev.comm_str(), "server");
+    }
+
+    #[test]
+    fn listen_from_bytes_rejects_short_slice() {
+        assert!(ListenEvent::from_bytes(&[0u8; LISTEN_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn make_accept(pid: u32, name: &str) -> AcceptEvent {
+        let mut comm = [0u8; COMM_LEN];
+        let bytes = name.as_bytes();
+        let n = bytes.len().min(COMM_LEN);
+        comm[..n].copy_from_slice(&bytes[..n]);
+        AcceptEvent { pid, comm }
+    }
+
+    fn accept_to_bytes(ev: &AcceptEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(ACCEPT_EVENT_SIZE);
+        buf.extend_from_slice(&ev.pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.comm);
+        buf
+    }
+
+    #[test]
+    fn accept_event_size_is_pid_plus_comm() {
+        assert_eq!(ACCEPT_EVENT_SIZE, 4 + COMM_LEN);
+    }
+
+    #[test]
+    fn accept_from_bytes_round_trips_pid_and_comm() {
+        let ev = make_accept(4242, "mcp-server");
+        let parsed = AcceptEvent::from_bytes(&accept_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed, ev);
+    }
+
+    #[test]
+    fn accept_comm_str_trims_at_nul() {
+        let ev = make_accept(1, "server");
+        assert_eq!(ev.comm_str(), "server");
+    }
+
+    #[test]
+    fn accept_from_bytes_rejects_short_slice() {
+        assert!(AcceptEvent::from_bytes(&[0u8; ACCEPT_EVENT_SIZE - 1]).is_none());
+    }
+
+    fn make_unix_connect(pid: u32, name: &str, path: &str) -> UnixConnectEvent {
+        let mut comm = [0u8; COMM_LEN];
+        let cb = name.as_bytes();
+        let cn = cb.len().min(COMM_LEN);
+        comm[..cn].copy_from_slice(&cb[..cn]);
+        let mut path_buf = [0u8; UNIX_PATH_LEN];
+        let pb = path.as_bytes();
+        let pn = pb.len().min(UNIX_PATH_LEN);
+        path_buf[..pn].copy_from_slice(&pb[..pn]);
+        UnixConnectEvent {
+            pid,
+            comm,
+            path: path_buf,
+        }
+    }
+
+    fn unix_connect_to_bytes(ev: &UnixConnectEvent) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(UNIX_CONNECT_EVENT_SIZE);
+        buf.extend_from_slice(&ev.pid.to_ne_bytes());
+        buf.extend_from_slice(&ev.comm);
+        buf.extend_from_slice(&ev.path);
+        buf
+    }
+
+    #[test]
+    fn unix_connect_event_size_is_pid_comm_path() {
+        assert_eq!(UNIX_CONNECT_EVENT_SIZE, 4 + COMM_LEN + UNIX_PATH_LEN);
+    }
+
+    #[test]
+    fn unix_connect_from_bytes_round_trips_pid_comm_path() {
+        let ev = make_unix_connect(4242, "pr-bot", "/tmp/mcp.sock");
+        let parsed = UnixConnectEvent::from_bytes(&unix_connect_to_bytes(&ev)).expect("parse");
+        assert_eq!(parsed.pid, ev.pid);
+        assert_eq!(parsed.comm, ev.comm);
+        assert_eq!(parsed.path, ev.path);
+    }
+
+    #[test]
+    fn unix_connect_path_str_trims_at_nul() {
+        let ev = make_unix_connect(1, "agent", "/run/agent/grpc.sock");
+        assert_eq!(ev.path_str(), "/run/agent/grpc.sock");
+        assert_eq!(ev.comm_str(), "agent");
+    }
+
+    #[test]
+    fn unix_connect_abstract_socket_leading_nul_yields_empty_path() {
+        // Abstract AF_UNIX sockets start with a NUL byte; path_str trims at the
+        // first NUL, so an abstract name is reported as empty (documented cap).
+        let mut ev = make_unix_connect(1, "agent", "");
+        ev.path[0] = 0;
+        ev.path[1] = b'x';
+        assert_eq!(ev.path_str(), "");
+    }
+
+    #[test]
+    fn unix_connect_from_bytes_rejects_short_slice() {
+        assert!(UnixConnectEvent::from_bytes(&[0u8; UNIX_CONNECT_EVENT_SIZE - 1]).is_none());
     }
 }

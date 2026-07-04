@@ -57,6 +57,7 @@ export type HelpTopicKey =
   | "live"
   | "proxy"
   | "probe"
+  | "inventory"
   | "discovery"
   | "discovery_exchange"
   | "observability"
@@ -1602,6 +1603,74 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <code>analyze correlate</code> charge ces jumeaux directement pour
           alimenter les quatre quadrants &mdash; aucune sonde eBPF n&apos;est
           necessaire.
+        </p>
+      </>
+    ),
+  },
+  inventory: {
+    title: "Aide — Inventaire des agents",
+    summary:
+      "Le scan statique detaille : par agent, son passeport (present / absent / invalide), ses violations, et le graphe de communication (declare vs observe). Independant d'une capture live.",
+    body: (
+      <>
+        <p>
+          Ce panneau montre l&apos;<strong>inventaire</strong> produit par
+          l&apos;outil <code>discoveryprobe-inventory</code> : pour chaque agent
+          identifie dans l&apos;arbre source, son <strong>passeport</strong>, son{" "}
+          <strong>evidence</strong> de code, ses <strong>violations</strong> et le{" "}
+          <strong>graphe de communication</strong>. C&apos;est de la lecture seule,
+          deterministe (I4), et independant d&apos;une capture eBPF live. Detail :{" "}
+          <code>docs/runbooks/inventory-recette.md</code>.
+        </p>
+        <h3>Le badge de passeport (present / absent / invalide)</h3>
+        <p>
+          Le badge se cale sur <code>passport.kind</code> <strong>seul</strong>,
+          jamais sur une liste de violations :
+        </p>
+        <ul>
+          <li>
+            <strong>present</strong> : un <code>.inspect_ia_agents/manifest.json</code>{" "}
+            existe ET valide le schema -- le manifest est parse a fond (kind,
+            identite, capability_scope, handoffs).
+          </li>
+          <li>
+            <strong>absent</strong> : du code d&apos;agent est detecte mais AUCUN
+            manifest -- le <strong>shadow agent</strong>. La colonne evidence dit
+            pourquoi on croit que c&apos;est un agent (imports SDK, entrypoint) : pas
+            de revendication sans preuve.
+          </li>
+          <li>
+            <strong>invalide</strong> : un manifest existe mais echoue la validation.
+            Il porte un statut mais aucune violation et une conformite{" "}
+            <code>not_observed</code> -- il doit quand meme se lire comme{" "}
+            <em>invalide</em>, jamais comme propre.
+          </li>
+        </ul>
+        <p>
+          Un passeport <strong>present</strong> ne veut PAS dire{" "}
+          <strong>conforme</strong> : la conformite est un axe distinct
+          (<code>conform</code> / <code>not_observed</code> / violations). Un scan
+          statique seul (sans capture) rend toujours <code>not_observed</code> --
+          jamais un faux &laquo; conforme &raquo; (fail-safe).
+        </p>
+        <h3>Violations</h3>
+        <p>
+          Sous la table, la liste des violations rend l&apos;anomalie lisible :{" "}
+          <code>PassportAbsent</code> (le shadow agent),{" "}
+          <code>UndeclaredHandoff</code> (une arete de comm hors du graphe declare),
+          et les autres depassements (action hors scope, escalade de mode, mismatch
+          de principal, bypass d&apos;approbation).
+        </p>
+        <h3>Le graphe de communication</h3>
+        <p>
+          Le graphe croise le <strong>declare</strong> et l&apos;<strong>observe</strong> :
+          les aretes <strong>declarees</strong> (manifests + <code>team.json</code>),
+          les aretes <strong>observees</strong> (IPC runtime, pid -&gt; agent), les
+          aretes <strong>non declarees</strong> (observe moins declare) signalees en{" "}
+          <strong>rouge</strong>, et les aretes <strong>via passerelle</strong> a part
+          (un saut par un broker declare, LiteLLM / mitmproxy, n&apos;est pas un
+          handoff direct non declare). La sonde voit l&apos;arete, pas le contenu --
+          la topologie suffit pour juger la conformite des handoffs.
         </p>
       </>
     ),

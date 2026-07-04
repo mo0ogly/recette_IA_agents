@@ -1,7 +1,8 @@
 """M8 coverage audit for the discovery corpus: every surface is complete and well-formed.
 
 Each surface must carry exactly one true-negative (the false-positive guard) and at least
-one detected subject, with distinct positive risk ranks (so the ordering check is meaningful).
+one detected subject, each with a positive risk rank. Rank TIES are allowed by design
+(mono-axis subjects can share a rank); the corpus invariant enforces only monotonicity.
 This is the discovery counterpart to the identification orthogonality audit in test_recette.py.
 """
 
@@ -40,12 +41,18 @@ class TestDiscoveryCoverage(unittest.TestCase):
                 detected = [gt for gt in _ground_truths(surface) if gt["detected"]]
                 self.assertGreaterEqual(len(detected), 1)
 
-    def test_detected_ranks_are_distinct_and_positive(self):
+    def test_detected_ranks_are_positive(self):
+        # Every detected subject carries a positive risk_rank (>= 1). Rank TIES are
+        # allowed by design: the real corpus invariant (discovery_harness._check_ordering)
+        # only enforces MONOTONICITY -- it fires when ranks[a] < ranks[b] yet the risk
+        # LEVELS invert, never on equal ranks. Mono-axis subjects (gh-shadow-agent,
+        # gh-invalid-passport) deliberately share rank 2 with gh-pr-bot: passport_status
+        # is the only differing axis, so their risk_rank must stay equal.
         for surface in _surfaces_with_corpus():
             with self.subTest(surface=surface):
                 ranks = [gt["risk_rank"] for gt in _ground_truths(surface) if gt["detected"]]
+                self.assertTrue(ranks, f"{surface}: expected at least one detected rank")
                 self.assertTrue(all(r >= 1 for r in ranks), f"{surface}: rank must be >= 1")
-                self.assertEqual(len(ranks), len(set(ranks)), f"{surface}: duplicate ranks")
 
     def test_true_negative_is_well_formed(self):
         for surface in _surfaces_with_corpus():

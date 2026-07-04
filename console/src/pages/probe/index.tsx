@@ -10,12 +10,18 @@
  */
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { captureProbe, getLlmTraces, getProbeStatus } from "../../api/client";
-import type { LlmTrace, ProbeCaptureResult, SurfaceRecording } from "../../api/client";
+import { captureProbe, getInventory, getLlmTraces, getProbeStatus } from "../../api/client";
+import type {
+  AgentInventory,
+  LlmTrace,
+  ProbeCaptureResult,
+  SurfaceRecording,
+} from "../../api/client";
 import LlmTracePanel from "./LlmTracePanel";
 import AgentAnalysisPanel from "./AgentAnalysisPanel";
 import BehaviorWavePanel from "./BehaviorWavePanel";
 import CorrelationPanel from "./CorrelationPanel";
+import InventoryPanel from "./InventoryPanel";
 import PageHelp from "../../components/help/PageHelp";
 import "./probe.css";
 
@@ -99,6 +105,9 @@ export default function ProbePage(): JSX.Element {
   const [live, setLive] = useState(false);
   const [windowCount, setWindowCount] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
+  // Static agent inventory (discoveryprobe-inventory): passports + comm graph.
+  // Independent of a live capture (a static scan), fetched once on mount.
+  const [inventory, setInventory] = useState<AgentInventory | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -109,6 +118,19 @@ export default function ProbePage(): JSX.Element {
         setMode(s.mode);
       })
       .catch(() => alive && setConfigured(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    getInventory()
+      .then((inv) => alive && setInventory(inv))
+      .catch((err) => {
+        if (alive) setInventory(null);
+        console.error("probe inventory fetch failed", err);
+      });
     return () => {
       alive = false;
     };
@@ -336,6 +358,18 @@ export default function ProbePage(): JSX.Element {
           )}
         </>
       )}
+
+      <div className="probe-raw-head">
+        <h2 className="probe-subtitle">Inventaire des agents (scan statique)</h2>
+        <PageHelp topic="inventory" />
+      </div>
+      <p className="probe-note">
+        Ce que le scan statique DECLARE : chaque agent identifie, son passeport
+        (present / absent / invalide), ses violations, et le graphe de
+        communication (aretes declarees vs observees, handoffs non declares en
+        rouge, sauts via passerelle a part). Independant d&apos;une capture live.
+      </p>
+      <InventoryPanel inventory={inventory} />
 
       <h2 className="probe-subtitle">Trace LLM (surface hook in-process)</h2>
       <p className="probe-note">

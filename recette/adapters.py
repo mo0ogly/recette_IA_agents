@@ -203,6 +203,11 @@ class DiscoveryRisk:
     target_system: str
     estimated_risk: dict
     generated_policy: str | None = None
+    passport_status: str | None = None
+    # How the agent declares itself, surfaced by the scanner (never silently trusted):
+    #   "present" -> a valid .inspect_ia_agents/manifest.json,
+    #   "absent"  -> no manifest anywhere (shadow agent detected via code fallback),
+    #   "invalid" -> manifest exists but is unparseable or fails the manifest shape.
 
 
 @runtime_checkable
@@ -213,6 +218,20 @@ class SourceScanAdapter(Protocol):
     def scan(self, source_id: str) -> str: ...
     def await_run(self, run_id: str) -> str: ...
     def risks(self, source_id: str) -> list[DiscoveryRisk]: ...
+
+
+def _manifest_has_shape(manifest: dict) -> bool:
+    """A manifest is a valid passport only if it carries agent.identity.principal and a
+    non-empty agent.capabilities list. Present-but-broken (e.g. missing agent.identity,
+    like gh-invalid-passport) fails this and is classified passport_status="invalid"."""
+    agent = manifest.get("agent")
+    if not isinstance(agent, dict):
+        return False
+    identity = agent.get("identity")
+    if not isinstance(identity, dict) or not identity.get("principal"):
+        return False
+    capabilities = agent.get("capabilities")
+    return isinstance(capabilities, list) and len(capabilities) > 0
 
 
 def _action_level(action: str) -> int:
@@ -261,23 +280,45 @@ class ReferenceSourceScanAdapter:
     def _analyze(self, repo: Path) -> list[DiscoveryRisk]:
         manifest_path = repo / ".inspect_ia_agents" / "manifest.json"
         if manifest_path.exists():
-            return self._from_manifest(repo, json.loads(manifest_path.read_text(encoding="utf-8")))
+            manifest = self._load_manifest(manifest_path)
+            if manifest is not None and _manifest_has_shape(manifest):
+                return self._from_manifest(repo, manifest)
+            # Manifest present but unparseable OR missing the required shape
+            # (agent.identity / agent.capabilities). Detect the agent via the code
+            # fallback but tag every risk passport_status="invalid" -- a broken
+            # passport is reported, never silently trusted (mirrors scan.rs: manifest
+            # present, Passport::parse fails).
+            return self._fallback_risks(repo, "invalid")
+        # No manifest anywhere -> shadow agent (absent passport) via the fallback chain.
+        return self._fallback_risks(repo, "absent")
+
+    def _fallback_risks(self, repo: Path, passport_status: str) -> list[DiscoveryRisk]:
+        """Derive risks from code/temporal/openapi surfaces, tagged with the given
+        passport_status. Used for shadow agents (absent) and broken manifests (invalid)."""
         if self._has_temporal_agent_code(repo):
-            return self._from_temporal_code(repo)
+            return self._from_temporal_code(repo, passport_status)
         if (repo / "openapi.json").exists():
-            return self._from_openapi(repo)
+            return self._from_openapi(repo, passport_status)
         if self._has_github_agent_code(repo):
-            return self._from_code(repo)
+            return self._from_code(repo, passport_status)
         return []  # true negative
+
+    @staticmethod
+    def _load_manifest(path: Path) -> dict | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+        return data if isinstance(data, dict) else None
 
     def _from_manifest(self, repo: Path, manifest: dict) -> list[DiscoveryRisk]:
         agent = manifest["agent"]
         principal = agent["identity"]["principal"]
         target = agent["target_system"]
         actions = sorted({cap["action"] for cap in agent["capabilities"]})
-        return self._build_risks(repo, principal, target, actions)
+        return self._build_risks(repo, principal, target, actions, "present")
 
-    def _from_code(self, repo: Path) -> list[DiscoveryRisk]:
+    def _from_code(self, repo: Path, passport_status: str = "absent") -> list[DiscoveryRisk]:
         # Minimal code-derived fallback (used only when no manifest is present).
         text = "\n".join(p.read_text(encoding="utf-8") for p in (repo / "agent").rglob("*.py"))
         mapping = {
@@ -292,18 +333,22 @@ class ReferenceSourceScanAdapter:
         actions = sorted({pattern for needle, pattern in mapping.items() if needle in text})
         if not actions:
             return []
-        return self._build_risks(repo, repo.parent.name, "github", actions)
+        return self._build_risks(repo, repo.parent.name, "github", actions, passport_status)
 
-    def _from_temporal_code(self, repo: Path) -> list[DiscoveryRisk]:
+    def _from_temporal_code(
+        self, repo: Path, passport_status: str = "absent"
+    ) -> list[DiscoveryRisk]:
         # A Temporal agent = real temporalio code; the scanner reads workflow/activity
         # definitions statically. We parse the source via AST (no import, deterministic):
         # each @activity.defn whose name is a canonical action is a declared capability.
         principal, actions = _parse_temporal_dir(repo)
         if not actions:
             return []  # temporalio code without target-system actions = not an agent
-        return self._build_risks(repo, principal or repo.parent.name, "temporal", actions)
+        return self._build_risks(
+            repo, principal or repo.parent.name, "temporal", actions, passport_status
+        )
 
-    def _from_openapi(self, repo: Path) -> list[DiscoveryRisk]:
+    def _from_openapi(self, repo: Path, passport_status: str = "absent") -> list[DiscoveryRisk]:
         # An OpenAPI-described agent declares each capability as an operation whose
         # operationId (or x-inspect_ia_agents-action) is a canonical action. The scanner reads
         # the spec; we parse the JSON statically (deterministic, zero extra dependency).
@@ -324,10 +369,15 @@ class ReferenceSourceScanAdapter:
                     actions.add(action)
         if not actions:
             return []  # a plain API with no agent capability = not an agent
-        return self._build_risks(repo, principal, "openapi", sorted(actions))
+        return self._build_risks(repo, principal, "openapi", sorted(actions), passport_status)
 
     def _build_risks(
-        self, repo: Path, principal: str, target: str, actions: list[str]
+        self,
+        repo: Path,
+        principal: str,
+        target: str,
+        actions: list[str],
+        passport_status: str,
     ) -> list[DiscoveryRisk]:
         canonical = hashlib.sha256(principal.encode("utf-8")).hexdigest()[:16]
         ci_bump = 1 if self._has_broad_ci(repo) else 0
@@ -341,6 +391,7 @@ class ReferenceSourceScanAdapter:
                 target_system=target,
                 estimated_risk={"level": level},
                 generated_policy=policy,
+                passport_status=passport_status,
             )
             for action in actions
         ]

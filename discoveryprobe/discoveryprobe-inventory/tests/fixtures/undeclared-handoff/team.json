@@ -1,0 +1,33 @@
+{
+  "kind": "maf_orchestration",
+  "style": "handoff",
+  "agent_id": "undeclared-handoff-team",
+  "name": "Intake to Wire Handoff",
+  "description": "An intake agent may hand off ONLY to a wire specialist. There is NO declared edge wire->audit; an observed wire->audit hop is an undeclared handoff.",
+  "source": { "standard": "microsoft-agent-framework", "orchestration": "HandoffBuilder" },
+  "start_agent": "intake",
+  "termination": { "max_hops": 8 },
+  "participants": [
+    {
+      "agent_id": "intake",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "handoffs": [
+        { "target": "wire", "description": "payment / wire transfer requests" }
+      ]
+    },
+    {
+      "agent_id": "wire",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "mcp", "target": "https://mcp.example.com/finance/wire", "approval": "always" }
+      ]
+    },
+    {
+      "agent_id": "audit",
+      "declared_identity": { "provider": "AzureOpenAI", "model": "=Env.MODEL" },
+      "tools": [
+        { "tool_kind": "web_search", "target": "web_search", "approval": "never" }
+      ]
+    }
+  ]
+}

@@ -74,6 +74,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "target_system": r.target_system,
                     "estimated_risk": r.estimated_risk,
                     "generated_policy": r.generated_policy,
+                    "passport_status": r.passport_status,
                 }
                 for r in _ADAPTER.risks(source_id)
             ]

@@ -10,6 +10,9 @@ vi.mock("../../api/client", () => ({
   captureProbe: vi.fn(),
   getLlmTraces: vi.fn(),
   correlateBehavior: vi.fn(() => Promise.resolve(null)),
+  // ProbePage fetches the static inventory on mount; resolve null so the panel
+  // renders nothing (its own R16 test covers the populated render).
+  getInventory: vi.fn(() => Promise.resolve(null)),
 }));
 
 // The Monaco chunk is heavy and worker-bound; stub it so the raw-JSON panel is

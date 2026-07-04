@@ -757,6 +757,31 @@ def _verify_runs_explorer(page: Page, console: str, api: str) -> None:
     print("[runs] /runs tree + Monaco + Meta root_hash + Replay child-run OK")
 
 
+def _verify_probe_inventory(page: Page, console: str) -> None:
+    """The /probe agent-inventory panel renders the static-scan AgentInventory.
+
+    Drives the real console -> GET /probe/inventory (the committed sample served
+    by the API). Asserts the panel mounts and a passport BADGE is in the DOM --
+    the discovery legibility signal (present / absent / invalid). Deterministic:
+    the endpoint serves a frozen document, no live capture needed."""
+    page.goto(f"{console}/probe", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    panel = page.get_by_test_id("inv-panel")
+    panel.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    # The sample carries all three passport states; assert each badge is present.
+    for kind in ("present", "absent", "invalid"):
+        badge = page.get_by_test_id(f"inv-badge-{kind}")
+        badge.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    # An undeclared communication edge must be flagged (comm graph legibility).
+    undeclared = page.get_by_test_id("inv-edges-undeclared")
+    undeclared.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    _expect(
+        "undeclared" in undeclared.inner_text().lower(),
+        "probe inventory: undeclared comm edge group not rendered",
+    )
+    _shot(page, "probe-inventory")
+    print("[probe] /probe inventory panel: present/absent/invalid badges + undeclared edge OK")
+
+
 def run_smoke(console: str, api: str, server_port: int) -> None:
     _seed(api, server_port)
     print(f"[1/4] seeded {SERVER_ID} + {AGENT_ID} + {CAMPAIGN_ID} via API")
@@ -788,6 +813,8 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # previously-missing help modals on /probe and /observability.
             _verify_agent_ui(page, console)
             _verify_help_modals(page, console)
+            # The /probe agent-inventory panel: static-scan passports + comm graph.
+            _verify_probe_inventory(page, console)
             # The Control plane page: architecture diagram + live governance digest.
             _verify_control(page, console)
             _verify_metrics(page, console)

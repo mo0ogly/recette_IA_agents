@@ -1,0 +1,141 @@
+{
+  "schema_version": "1.0",
+  "agents": [
+    {
+      "agent_id": "acme-dependency-pr-bot[bot]",
+      "passport": {
+        "kind": "present",
+        "passport": {
+          "Repo": {
+            "schema_version": "1.0",
+            "agent": {
+              "name": "acme-dependency-pr-bot",
+              "description": "Opens pull requests to bump outdated dependencies in acme repositories.",
+              "target_system": "github",
+              "identity": {
+                "auth_method": "github_app",
+                "principal": "acme-dependency-pr-bot[bot]"
+              },
+              "capabilities": [
+                {
+                  "action": "read_repo",
+                  "mode": "read",
+                  "resources": [
+                    "acme/*"
+                  ]
+                },
+                {
+                  "action": "open_pr",
+                  "mode": "write",
+                  "resources": [
+                    "acme/*"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "kind": "git_agent",
+      "declared": {
+        "principal": "acme-dependency-pr-bot[bot]",
+        "target_systems": [
+          "github"
+        ],
+        "actions": [
+          "open_pr",
+          "read_repo"
+        ],
+        "handoffs": []
+      },
+      "observed": {
+        "actions": [],
+        "egress": []
+      },
+      "conformity": {
+        "kind": "violations",
+        "violations": [
+          {
+            "kind": "undeclared_handoff",
+            "from": "acme-dependency-pr-bot[bot]",
+            "to": "repo"
+          }
+        ]
+      },
+      "evidence": []
+    },
+    {
+      "agent_id": "repo",
+      "passport": {
+        "kind": "absent",
+        "evidence": [
+          "agent/main.py: from github import"
+        ]
+      },
+      "kind": null,
+      "declared": null,
+      "observed": {
+        "actions": [],
+        "egress": []
+      },
+      "conformity": {
+        "kind": "violations",
+        "violations": [
+          {
+            "kind": "passport_absent"
+          }
+        ]
+      },
+      "evidence": [
+        "agent/main.py: from github import"
+      ]
+    },
+    {
+      "agent_id": "repo",
+      "passport": {
+        "kind": "invalid",
+        "errors": [
+          "repo shape: agent.identity is missing",
+          "unified shape: agent_id is missing or empty; target_systems is missing; declared_identity is missing; capability_scope is missing"
+        ]
+      },
+      "kind": null,
+      "declared": null,
+      "observed": {
+        "actions": [],
+        "egress": []
+      },
+      "conformity": {
+        "kind": "not_observed"
+      },
+      "evidence": []
+    }
+  ],
+  "comm_graph": {
+    "declared_edges": [],
+    "observed_edges": [
+      {
+        "from": "acme-dependency-pr-bot[bot]",
+        "to": "repo"
+      }
+    ],
+    "undeclared_edges": [
+      {
+        "from": "acme-dependency-pr-bot[bot]",
+        "to": "repo"
+      }
+    ],
+    "via_gateway_edges": [
+      {
+        "from": "acme-dependency-pr-bot[bot]",
+        "to": "gw-broker"
+      }
+    ]
+  },
+  "summary": {
+    "with_passport": 1,
+    "without_passport": 1,
+    "invalid_passport": 1,
+    "violation_count": 2
+  }
+}

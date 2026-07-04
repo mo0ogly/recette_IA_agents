@@ -113,6 +113,16 @@ def run_discovery_recette(
                     f"policy_present={policy_present} expected={gt.get('policy_generated')}"
                 )
 
+            # Passport status invariant: how the agent declares itself (present /
+            # absent / invalid). Only checked when the ground-truth pins it, so
+            # existing subjects without the key are unaffected.
+            if "passport_status" in gt:
+                expected_passport = gt["passport_status"]
+                matches["passport"] = all(r.passport_status == expected_passport for r in risks)
+                if not matches["passport"]:
+                    got_passport = sorted({str(r.passport_status) for r in risks})
+                    detail.append(f"passport_status={got_passport} expected={expected_passport}")
+
             levels[repo_dir.name] = _max_level(risks)
             ranks[repo_dir.name] = gt.get("risk_rank", 0)
 

@@ -110,6 +110,7 @@ class HttpSourceScanAdapter:
                 target_system=row["target_system"],
                 estimated_risk=row.get("estimated_risk") or {},
                 generated_policy=row.get("generated_policy"),
+                passport_status=row.get("passport_status"),
             )
             for row in rows
         ]
