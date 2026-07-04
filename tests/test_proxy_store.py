@@ -11,8 +11,10 @@ monotone (sqlite AUTOINCREMENT keeps the counter across DELETE).
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -31,11 +33,15 @@ from recette.platform.proxy.store import (
 from recette.platform.proxy.tracing import ProxyTrace, RingTraceRecorder
 
 
-def _event(event_id: str = "evt-0001", action_type: str = "read_repo") -> PlatformActionEvent:
+def _event(
+    event_id: str = "evt-0001",
+    action_type: str = "read_repo",
+    agent_id: str = "agent-x",
+) -> PlatformActionEvent:
     return PlatformActionEvent(
         event_id=event_id,
         timestamp="2026-06-13T00:00:00Z",
-        agent_id="agent-x",
+        agent_id=agent_id,
         capability_scope=(),
         role="reader",
         action_type=action_type,
@@ -54,6 +60,15 @@ class _BrokenConn:
         raise RuntimeError("db down")
 
     def commit(self) -> None:
+        raise RuntimeError("db down")
+
+    def fetchall(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("db down")
+
+    def executescript(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("db down")
+
+    def close(self, *args: object, **kwargs: object) -> None:
         raise RuntimeError("db down")
 
 
@@ -76,10 +91,15 @@ class SqliteTraceRecorderTests(unittest.TestCase):
             ring.record(_event(f"evt-{i:04d}"), ok, run_id="run-abc")
         traces = self.recorder.snapshot()
         self.assertEqual(len(traces), 3)
-        self.assertEqual([t.seq for t in traces], [1, 2, 3])
         self.assertIsInstance(traces[0], ProxyTrace)
-        # Field-for-field identical to the ring behaviour (frozen dataclass eq).
-        self.assertEqual(traces, ring.snapshot())
+        # (a) The store owns the monotone order: seq is 1-based AUTOINCREMENT.
+        self.assertEqual([t.seq for t in traces], [1, 2, 3])
+        # (b) Field parity with the ring recorder. The two recorders number
+        # seq independently, so compare with seq zeroed on both sides.
+        self.assertEqual(
+            [dataclasses.replace(t, seq=0) for t in traces],
+            [dataclasses.replace(t, seq=0) for t in ring.snapshot()],
+        )
         self.assertIsNone(self.recorder.store_error)
         self.assertIsNone(self.store.store_error)
 
@@ -104,19 +124,65 @@ class SqliteTraceRecorderTests(unittest.TestCase):
         # I4: the stored JSON is canonical (sorted keys, no spaces).
         ok = ExecutionResult(ok=True, status_code=200, response={"b": 2, "a": 1})
         self.recorder.record(_event(), ok)
+        # Intentional private access: there is no public raw-blob API and the
+        # I4 assertion needs the stored bytes, not the rebuilt dict.
         row = self.store._conn.execute(
             "SELECT request_payload, response FROM proxy_traces"
         ).fetchone()
         self.assertEqual(row[0], '{"ref":"main"}')
         self.assertEqual(row[1], '{"a":1,"b":2}')
 
-    def test_broken_store_never_raises_and_sets_store_error(self) -> None:
+    def test_broken_store_never_raises_and_error_clears_on_recovery(self) -> None:
         ok = ExecutionResult(ok=True, status_code=200)
+        real_conn = self.store._conn
         self.store._conn = _BrokenConn()
         with self.assertLogs("recette.proxy.store", level="ERROR"):
-            self.recorder.record(_event(), ok)  # must not raise
+            self.recorder.record(_event("evt-fail"), ok)  # must not raise
         self.assertEqual(self.recorder.store_error, "db down")
         self.assertEqual(self.store.store_error, "db down")
+        # Recovery: restore the live connection; the next SUCCESSFUL insert
+        # clears store_error back to None (the error never latches forever).
+        self.store._conn = real_conn
+        self.recorder.record(_event("evt-okay"), ok)
+        self.assertIsNone(self.recorder.store_error)
+        self.assertIsNone(self.store.store_error)
+        self.assertEqual(len(self.recorder.snapshot()), 1)
+
+    def test_concurrent_records_all_land(self) -> None:
+        # 20 threads record through the SAME recorder; the store lock must
+        # serialize inserts without losing or duplicating a row.
+        thread_count = 20
+        barrier = threading.Barrier(thread_count)
+        ok = ExecutionResult(ok=True, status_code=200)
+
+        def _record(index: int) -> None:
+            barrier.wait()
+            self.recorder.record(_event(f"evt-c{index:03d}"), ok)
+
+        threads = [threading.Thread(target=_record, args=(i,)) for i in range(thread_count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        traces = self.recorder.snapshot()
+        self.assertEqual(len(traces), thread_count)
+        self.assertEqual(
+            {t.event_id for t in traces},
+            {f"evt-c{i:03d}" for i in range(thread_count)},
+        )
+        self.assertIsNone(self.store.store_error)
+
+    def test_mixed_run_id_and_agent_ids_round_trip(self) -> None:
+        # Baseline for the Task 3 filters: a NULL run_id must round-trip as
+        # None and a string run_id as the exact string (no "" / "None"
+        # coercion), with distinct agent_ids preserved per row.
+        ok = ExecutionResult(ok=True, status_code=200)
+        self.recorder.record(_event("evt-0001", agent_id="agent-a"), ok)
+        self.recorder.record(_event("evt-0002", agent_id="agent-b"), ok, run_id="run-x")
+        self.recorder.record(_event("evt-0003", agent_id="agent-c"), ok)
+        traces = self.recorder.snapshot()
+        self.assertEqual([t.run_id for t in traces], [None, "run-x", None])
+        self.assertEqual([t.agent_id for t in traces], ["agent-a", "agent-b", "agent-c"])
 
     def test_clear_empties_but_seq_stays_monotone(self) -> None:
         ok = ExecutionResult(ok=True, status_code=200)

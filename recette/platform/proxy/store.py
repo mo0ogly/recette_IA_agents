@@ -119,12 +119,7 @@ class SqliteProxyStore:
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._lock = threading.Lock()
         self._store_error: str | None = None
-        try:
-            self._conn.execute("PRAGMA journal_mode=WAL")
-        except sqlite3.Error:
-            # WAL is a file-backed optimisation; :memory: or an unsupporting
-            # filesystem falls back silently (debug buffer, non-fatal).
-            pass
+        self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
@@ -141,28 +136,38 @@ class SqliteProxyStore:
 
     def insert_trace(self, trace: ProxyTrace) -> None:
         """Insert one trace row. ``seq`` is assigned by SQLite (the passed
-        ``trace.seq`` is ignored -- the store owns the monotone order)."""
+        ``trace.seq`` is ignored -- the store owns the monotone order).
+
+        Error lifecycle (owned here, under the lock): a failure records the
+        message in ``store_error`` and re-raises; a subsequent successful
+        insert clears it back to ``None``. The error never latches forever.
+        """
         with self._lock:
-            self._conn.execute(
-                _INSERT_TRACE,
-                (
-                    trace.event_id,
-                    trace.timestamp,
-                    trace.agent_id,
-                    trace.target_system,
-                    trace.target,
-                    trace.action_type,
-                    trace.resource,
-                    _dumps(trace.request_payload),
-                    int(trace.ok),
-                    trace.status_code,
-                    trace.side_effect_hash,
-                    trace.error,
-                    trace.run_id,
-                    _dumps(trace.response),
-                ),
-            )
-            self._conn.commit()
+            try:
+                self._conn.execute(
+                    _INSERT_TRACE,
+                    (
+                        trace.event_id,
+                        trace.timestamp,
+                        trace.agent_id,
+                        trace.target_system,
+                        trace.target,
+                        trace.action_type,
+                        trace.resource,
+                        _dumps(trace.request_payload),
+                        int(trace.ok),
+                        trace.status_code,
+                        trace.side_effect_hash,
+                        trace.error,
+                        trace.run_id,
+                        _dumps(trace.response),
+                    ),
+                )
+                self._conn.commit()
+            except Exception as exc:
+                self._store_error = str(exc)
+                raise
+            self._store_error = None
 
     def snapshot_traces(self) -> list[ProxyTrace]:
         """All traces in monotone ``seq`` order, rebuilt as ``ProxyTrace``."""
@@ -246,8 +251,9 @@ class SqliteTraceRecorder:
             )
             self._store.insert_trace(trace)
         except Exception as exc:  # noqa: BLE001 - recording must never break execution
+            # The store already tracked the failure in store_error (its own
+            # lifecycle, under its lock); here we only swallow and log.
             _LOG.error("proxy trace record failed: %s", exc)
-            self._store._store_error = str(exc)
 
     def snapshot(self) -> list[ProxyTrace]:
         return self._store.snapshot_traces()
