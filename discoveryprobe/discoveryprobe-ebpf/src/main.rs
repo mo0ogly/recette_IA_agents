@@ -78,8 +78,12 @@ static UNIX_CONNECT_EVENTS: RingBuf = RingBuf::with_byte_size(256 * 1024, 0);
 /// the address but `listen` does not, so the port observed at `bind` is stashed
 /// here keyed by pid and read back when the same pid calls `listen`. Bounded to
 /// a fixed capacity so the map cannot grow without limit (passive: an insert
-/// into a full map fails silently and the listen simply emits nothing). AF_UNIX
-/// binds are NOT recorded here -- the Unix server side is inferred downstream
+/// into a full map fails silently and the listen simply emits nothing).
+///
+/// **Completeness boundary:** The map is keyed by pid alone, so a multi-port server
+/// (multiple binds on the same pid) emits a ListenEvent only for the last-bound port.
+///
+/// AF_UNIX binds are NOT recorded here -- the Unix server side is inferred downstream
 /// from a [`UnixConnectEvent`] path match, keeping this path simple.
 #[map]
 static BIND_PORTS: HashMap<u32, u16> = HashMap::with_max_entries(MAX_BIND_ENTRIES, 0);
@@ -545,6 +549,10 @@ fn try_capture_listen(_ctx: &TracePointContext) -> Result<(), i64> {
         Some(port) => *port,
         None => return Err(0),
     };
+    // Evict the entry to prevent the bounded map from filling up over a long
+    // capture window. A failed remove is passive (just continue).
+    let _ = BIND_PORTS.remove(&pid).map_err(|_| ());
+
     let comm = bpf_get_current_comm()?;
 
     let mut entry = LISTEN_EVENTS.reserve::<ListenEvent>(0).ok_or(0_i64)?;
