@@ -21,12 +21,26 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ...inventory_bridge import parse_inventory
 from ...surface.agent_analysis import analyze_recording, declared_view
 from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
 
 router = APIRouter(prefix="/probe", tags=["probe"])
+
+#: Committed sample ``AgentInventory`` served by ``GET /probe/inventory``. It is
+#: assembled from REAL ``discoveryprobe-inventory`` CLI output (Task 5): the
+#: present block + comm graph come from a real ``scan ... --capture`` run, the
+#: absent and invalid blocks are the real single-agent scan fixtures
+#: (tests/fixtures/agent_inventory*.fixture.json). Merging real per-agent blocks
+#: into one document is the sanctioned way to obtain a captured API sample that
+#: exercises all three passport states -- the CLI scans one agent per tree, so a
+#: multi-agent inventory is never a single CLI run. repo_root is this file's
+#: parents[3] (recette/api/routers/probe.py -> repo root), matching sim.py.
+_INVENTORY_SAMPLE = (
+    Path(__file__).resolve().parents[3] / "corpus" / "inventory" / "sample-inventory.json"
+)
 
 
 def _attach_wire_names(result: dict, request: Request) -> dict:
@@ -141,6 +155,39 @@ def status() -> dict:
         "socket_env": _SOCKET_ENV,
         "mode": mode,
     }
+
+
+@router.get("/inventory")
+def inventory() -> dict:
+    """Serve the committed sample ``AgentInventory`` for the console panel.
+
+    Read-only (I1), deterministic (I4): no clock, no randomness, no live Rust
+    binary in the request path -- the document is a frozen artifact assembled
+    from real CLI output (see ``_INVENTORY_SAMPLE``). The bridge
+    (``recette.inventory_bridge.parse_inventory``) is used as a FAIL-SAFE
+    validation gate: a malformed committed sample raises, and this route answers
+    500 instead of serving a broken document. The full ``AgentInventory`` is
+    returned (the bridge's ``BridgedInventory`` drops the comm graph the panel
+    renders), wrapped under ``inventory`` so the client unwraps one key.
+
+    Fail-safe: sample missing/unreadable -> 503; sample present but malformed ->
+    500. Never a fabricated inventory.
+    """
+    try:
+        raw = _INVENTORY_SAMPLE.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"sample inventory not available at {_INVENTORY_SAMPLE.name}",
+        ) from exc
+    # Validate the shape through the bridge boundary; a broken sample is a loud
+    # 500, never a silently served malformed document.
+    try:
+        parse_inventory(raw)
+        parsed = json.loads(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=f"sample inventory malformed: {exc}") from exc
+    return {"inventory": parsed}
 
 
 _MANIFEST_ENV = "INSPECT_IA_AGENTS_PROBE_MANIFEST"
