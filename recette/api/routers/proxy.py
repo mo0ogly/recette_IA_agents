@@ -22,7 +22,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ...platform.proxy.reconcile import wire_flow_side_effect_hash
 from ...platform.proxy.redact import redact_mapping, redaction_enabled
 
 
@@ -313,23 +312,17 @@ def list_wire_flows(request: Request, tail: int | None = None, run_id: str | Non
 
     ``run_id`` narrows to one run's flows (applied before ``tail``); ``tail``
     keeps only the last N. Read-only."""
-    flows = request.app.state.wire_flow_recorder.snapshot()
+    # side_effect_hash is read from the persisted column (computed once at
+    # insert), not recomputed per request; response shape is unchanged.
+    flows = request.app.state.wire_flow_recorder.snapshot_dicts()
     if run_id is not None:
-        flows = [f for f in flows if f.run_id == run_id]
+        flows = [f for f in flows if f["run_id"] == run_id]
     if tail is not None and tail >= 0:
         flows = flows[-tail:]
-
-    def _enrich(flow_dict: dict) -> dict:
-        # Derived VIEW field: canonical side_effect_hash recomputed from the bytes
-        # so the console can join a wire flow to its app-level exchange (None when
-        # the flow is not a governed-action shape). Recorded WireFlow stays pure;
-        # computed read-only here (I1/I4).
-        return {**flow_dict, "side_effect_hash": wire_flow_side_effect_hash(flow_dict)}
-
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
-        "flows": [_redacted_view(_enrich(f.to_dict())) for f in flows],
+        "flows": [_redacted_view(f) for f in flows],
     }
 
 
@@ -381,10 +374,13 @@ def _build_run_allowlist(request: Request, run_id: str | None):
     from ...platform.proxy.lab_proxy import lab_url_from_env
     from ...platform.proxy.reconcile import build_allowlist, target_of
 
-    flows = request.app.state.wire_flow_recorder.snapshot()
+    # Wire dicts come from snapshot_dicts() WITH the persisted side_effect_hash,
+    # so reconcile_strict never re-parses the bodies. run_id is filtered here
+    # in Python (snapshot_dicts has no run filter).
+    flow_dicts = request.app.state.wire_flow_recorder.snapshot_dicts()
     traces = request.app.state.proxy_trace_recorder.snapshot()
     if run_id is not None:
-        flows = [f for f in flows if f.run_id == run_id]
+        flow_dicts = [f for f in flow_dicts if f["run_id"] == run_id]
         traces = [t for t in traces if t.run_id == run_id]
     lab = urlparse(lab_url_from_env())
     # Normalize through target_of so "localhost:8082" matches a flow recorded as
@@ -403,7 +399,7 @@ def _build_run_allowlist(request: Request, run_id: str | None):
         lab_host=lab_host,
         llm_hosts=llm_hosts,
     )
-    return allow, [f.to_dict() for f in flows], [t.to_dict() for t in traces]
+    return allow, flow_dicts, [t.to_dict() for t in traces]
 
 
 def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = False):

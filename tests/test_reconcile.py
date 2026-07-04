@@ -191,5 +191,58 @@ class TestReconcileStrict(unittest.TestCase):
         self.assertEqual(a.to_dict(), b.to_dict())
 
 
+class TestReconcileStrictPersistedHash(unittest.TestCase):
+    """The persisted ``side_effect_hash`` column replaces the per-call recompute:
+    a flow dict carrying the key must yield the same report as a legacy dict
+    without it, and a persisted NULL (key present, value None) is benign."""
+
+    def test_persisted_hash_report_is_byte_identical_to_recompute(self) -> None:
+        # Golden equivalence: same flows, one copy with the persisted key
+        # (precomputed exactly as the store does at insert), one legacy copy
+        # without the key -> byte-identical reconciliation.
+        legacy = [
+            _exec_flow(1, 9101),
+            {"seq": 2, "host": "127.0.0.1", "port": 9101, "path": "/health", "run_id": "R"},
+        ]
+        persisted = [{**f, "side_effect_hash": wire_flow_side_effect_hash(f)} for f in legacy]
+        traces = [_trace_for()]
+        allow = {"127.0.0.1:9101"}
+        a = reconcile_strict(persisted, traces, allow)
+        b = reconcile_strict(legacy, traces, allow)
+        self.assertEqual(
+            json.dumps(a.to_dict(), sort_keys=True),
+            json.dumps(b.to_dict(), sort_keys=True),
+        )
+        self.assertTrue(a.ok)
+
+    def test_persisted_key_wins_over_recompute(self) -> None:
+        # The presence of the key short-circuits the JSON re-parse entirely:
+        # a governed-shaped flow whose persisted hash matches the audit event
+        # reconciles OK even when a recompute over the (here altered) bodies
+        # would yield a DIFFERENT hash -- the column is the source of truth.
+        altered_body = json.dumps({"success": True, "data": {"number": 999}})
+        flow = {**_exec_flow(1, 9101), "response_body": altered_body}
+        self.assertIsNotNone(wire_flow_side_effect_hash(flow))  # recompute WOULD diverge
+        flow["side_effect_hash"] = wire_flow_side_effect_hash(_exec_flow(1, 9101))
+        report = reconcile_strict([flow], [_trace_for()], {"127.0.0.1:9101"})
+        self.assertTrue(report.ok)
+        self.assertEqual(report.bypass_flows, [])
+
+    def test_persisted_none_hash_is_benign_for_allowlisted_flow(self) -> None:
+        # Key present with value None = non-governed flow persisted as NULL:
+        # benign on an allowlisted target, never flagged no_audit_event.
+        flow = {
+            "seq": 1,
+            "host": "127.0.0.1",
+            "port": 9101,
+            "path": "/health",
+            "run_id": "R",
+            "side_effect_hash": None,
+        }
+        report = reconcile_strict([flow], [], {"127.0.0.1:9101"})
+        self.assertTrue(report.ok)
+        self.assertEqual(report.bypass_flows, [])
+
+
 if __name__ == "__main__":
     unittest.main()
