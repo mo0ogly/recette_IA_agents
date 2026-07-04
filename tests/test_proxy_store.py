@@ -12,6 +12,7 @@ monotone (sqlite AUTOINCREMENT keeps the counter across DELETE).
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 import tempfile
 import threading
@@ -333,6 +334,403 @@ class SqliteWireRecorderTests(unittest.TestCase):
         for row in rows:
             self.assertIsInstance(row["ok"], bool)
         self.assertEqual([r["duration_ms"] for r in rows], [None, None, 12.5])
+
+
+def _seed_traces(recorder: SqliteTraceRecorder) -> None:
+    """Five trace rows exercising every Task 3 trace filter axis.
+
+    seq1 agent-a ok  read_repo      api.github.com  run None  response "alpha"
+    seq2 agent-b ok  open_pr        api.github.com  run-x
+    seq3 agent-a FAIL read_repo     gitlab.example  run-x
+    seq4 agent-b ok  comment_issue  api.github.com  run None  response "100%done"
+    seq5 agent-a ok  read_repo      api.github.com  run-y
+    """
+    recorder.record(
+        _event("evt-0001", agent_id="agent-a"),
+        ExecutionResult(
+            ok=True, status_code=200, response={"note": "alpha"}, target="api.github.com"
+        ),
+    )
+    recorder.record(
+        _event("evt-0002", action_type="open_pr", agent_id="agent-b"),
+        ExecutionResult(ok=True, status_code=201, target="api.github.com"),
+        run_id="run-x",
+    )
+    recorder.record(
+        _event("evt-0003", agent_id="agent-a"),
+        ExecutionResult(
+            ok=False, status_code=503, error="lab returned HTTP 503", target="gitlab.example"
+        ),
+        run_id="run-x",
+    )
+    recorder.record(
+        _event("evt-0004", action_type="comment_issue", agent_id="agent-b"),
+        ExecutionResult(
+            ok=True, status_code=200, response={"note": "100%done"}, target="api.github.com"
+        ),
+    )
+    recorder.record(
+        _event("evt-0005", agent_id="agent-a"),
+        ExecutionResult(ok=True, status_code=200, target="api.github.com"),
+        run_id="run-y",
+    )
+
+
+def _seed_wire(recorder: SqliteWireRecorder) -> None:
+    """Four wire rows exercising every Task 3 wire filter axis.
+
+    seq1 POST /github/execute 127.0.0.1 200 run-abc (governed -> hashed)
+    seq2 GET  /health          127.0.0.1 200 None
+    seq3 POST /github/execute  api.other 200 run-z  (governed -> hashed)
+    seq4 GET  /metrics          127.0.0.1 503 None   response "50%off"
+    """
+    recorder.record(_governed_wire_payload())
+    recorder.record(_health_wire_payload())
+    recorder.record({**_governed_wire_payload(run_id="run-z"), "host": "api.other"})
+    recorder.record(
+        {
+            **_health_wire_payload(),
+            "status_code": 503,
+            "path": "/metrics",
+            "response_body": '{"pct":"50%off"}',
+        }
+    )
+
+
+class TraceQueryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.store = SqliteProxyStore(":memory:")
+        self.recorder = SqliteTraceRecorder(self.store)
+        _seed_traces(self.recorder)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def _seqs(self, items: list[ProxyTrace]) -> list[int]:
+        return [t.seq for t in items]
+
+    def test_no_filters_returns_everything(self) -> None:
+        items, last_seq, total = self.recorder.query()
+        self.assertEqual(self._seqs(items), [1, 2, 3, 4, 5])
+        self.assertEqual(last_seq, 5)
+        self.assertEqual(total, 5)
+
+    def test_filter_run_id(self) -> None:
+        items, last_seq, total = self.recorder.query(run_id="run-x")
+        self.assertEqual(self._seqs(items), [2, 3])
+        self.assertEqual(last_seq, 5)
+        self.assertEqual(total, 2)
+
+    def test_filter_agent_id(self) -> None:
+        items, _, total = self.recorder.query(agent_id="agent-a")
+        self.assertEqual(self._seqs(items), [1, 3, 5])
+        self.assertEqual(total, 3)
+
+    def test_filter_target(self) -> None:
+        items, _, total = self.recorder.query(target="gitlab.example")
+        self.assertEqual(self._seqs(items), [3])
+        self.assertEqual(total, 1)
+
+    def test_filter_outcome_ok_and_fail(self) -> None:
+        ok_items, _, ok_total = self.recorder.query(outcome="ok")
+        self.assertEqual(self._seqs(ok_items), [1, 2, 4, 5])
+        self.assertEqual(ok_total, 4)
+        fail_items, _, fail_total = self.recorder.query(outcome="fail")
+        self.assertEqual(self._seqs(fail_items), [3])
+        self.assertEqual(fail_total, 1)
+
+    def test_filters_combined(self) -> None:
+        items, last_seq, total = self.recorder.query(run_id="run-x", agent_id="agent-a")
+        self.assertEqual(self._seqs(items), [3])
+        self.assertEqual(total, 1)
+        self.assertEqual(last_seq, 5)
+        # Adding outcome=ok excludes the failing seq3: empty, total 0, but
+        # last_seq stays the unfiltered table MAX (the delta cursor).
+        items, last_seq, total = self.recorder.query(
+            run_id="run-x", agent_id="agent-a", outcome="ok"
+        )
+        self.assertEqual(items, [])
+        self.assertEqual(total, 0)
+        self.assertEqual(last_seq, 5)
+
+    def test_since_seq_delta(self) -> None:
+        items, last_seq, total = self.recorder.query(since_seq=3)
+        self.assertEqual(self._seqs(items), [4, 5])
+        self.assertEqual(last_seq, 5)
+        # total ignores since_seq: it counts the whole FILTERED set.
+        self.assertEqual(total, 5)
+
+    def test_last_seq_unfiltered_when_no_row_matches(self) -> None:
+        items, last_seq, total = self.recorder.query(run_id="no-such-run")
+        self.assertEqual(items, [])
+        self.assertEqual(total, 0)
+        self.assertEqual(last_seq, 5)
+
+    def test_limit_takes_first_n_ascending(self) -> None:
+        items, _, total = self.recorder.query(limit=2)
+        self.assertEqual(self._seqs(items), [1, 2])
+        self.assertEqual(total, 5)
+
+    def test_tail_takes_last_n_ascending(self) -> None:
+        items, _, total = self.recorder.query(tail=2)
+        self.assertEqual(self._seqs(items), [4, 5])
+        self.assertEqual(total, 5)
+
+    def test_tail_wins_over_limit(self) -> None:
+        items, _, _ = self.recorder.query(limit=1, tail=2)
+        self.assertEqual(self._seqs(items), [4, 5])
+
+    def test_tail_ignores_since_seq(self) -> None:
+        # tail is the compat "last N of the filtered set" -- no delta cursor.
+        items, _, _ = self.recorder.query(since_seq=10, tail=2)
+        self.assertEqual(self._seqs(items), [4, 5])
+
+    def test_q_matches_response_substring(self) -> None:
+        items, _, total = self.recorder.query(q="alpha")
+        self.assertEqual(self._seqs(items), [1])
+        self.assertEqual(total, 1)
+
+    def test_q_is_case_insensitive(self) -> None:
+        # sqlite default LIKE is ASCII case-insensitive.
+        items, _, _ = self.recorder.query(q="ALPHA")
+        self.assertEqual(self._seqs(items), [1])
+
+    def test_q_matches_action_type(self) -> None:
+        items, _, _ = self.recorder.query(q="open_pr")
+        self.assertEqual(self._seqs(items), [2])
+
+    def test_q_matches_resource_on_all_rows(self) -> None:
+        items, _, total = self.recorder.query(q="acme")
+        self.assertEqual(self._seqs(items), [1, 2, 3, 4, 5])
+        self.assertEqual(total, 5)
+
+    def test_q_percent_is_literal_not_wildcard(self) -> None:
+        # The literal needle exists in seq4's response.
+        items, _, _ = self.recorder.query(q="100%done")
+        self.assertEqual(self._seqs(items), [4])
+        # Wildcard semantics WOULD match seq4 ("100" ... "e"); escaped
+        # literal semantics must not.
+        items, _, total = self.recorder.query(q="100%e")
+        self.assertEqual(items, [])
+        self.assertEqual(total, 0)
+
+    def test_q_underscore_is_literal_not_wildcard(self) -> None:
+        # Wildcard "_" would match "note" (n_te); escaped literal must not.
+        items, _, total = self.recorder.query(q="n_te")
+        self.assertEqual(items, [])
+        self.assertEqual(total, 0)
+
+    def test_count_and_last_seq(self) -> None:
+        self.assertEqual(self.recorder.count(), 5)
+        self.assertEqual(self.recorder.last_seq(), 5)
+
+    def test_count_and_last_seq_empty_store(self) -> None:
+        store = SqliteProxyStore(":memory:")
+        recorder = SqliteTraceRecorder(store)
+        self.assertEqual(recorder.count(), 0)
+        self.assertEqual(recorder.last_seq(), 0)
+        _, last_seq, total = recorder.query()
+        self.assertEqual(last_seq, 0)
+        self.assertEqual(total, 0)
+        store.close()
+
+
+class WireQueryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.store = SqliteProxyStore(":memory:")
+        self.recorder = SqliteWireRecorder(self.store)
+        _seed_wire(self.recorder)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def _seqs(self, items: list[dict]) -> list[int]:
+        return [row["seq"] for row in items]
+
+    def test_no_filters_returns_dicts_with_hash(self) -> None:
+        items, last_seq, total = self.recorder.query()
+        self.assertEqual(self._seqs(items), [1, 2, 3, 4])
+        self.assertEqual(last_seq, 4)
+        self.assertEqual(total, 4)
+        self.assertIsInstance(items[0], dict)
+        # The persisted side_effect_hash is part of the row shape: a string
+        # for governed flows, None for non-governed traffic.
+        self.assertIsInstance(items[0]["side_effect_hash"], str)
+        self.assertIsNone(items[1]["side_effect_hash"])
+
+    def test_filter_run_id(self) -> None:
+        items, last_seq, total = self.recorder.query(run_id="run-z")
+        self.assertEqual(self._seqs(items), [3])
+        self.assertEqual(total, 1)
+        self.assertEqual(last_seq, 4)
+
+    def test_filter_host(self) -> None:
+        items, _, total = self.recorder.query(host="api.other")
+        self.assertEqual(self._seqs(items), [3])
+        self.assertEqual(total, 1)
+
+    def test_filter_method_is_case_insensitive_input(self) -> None:
+        items, _, total = self.recorder.query(method="get")
+        self.assertEqual(self._seqs(items), [2, 4])
+        self.assertEqual(total, 2)
+        upper_items, _, _ = self.recorder.query(method="GET")
+        self.assertEqual(self._seqs(upper_items), [2, 4])
+
+    def test_filter_status_exact(self) -> None:
+        items, _, total = self.recorder.query(status=503)
+        self.assertEqual(self._seqs(items), [4])
+        self.assertEqual(total, 1)
+        ok_items, _, _ = self.recorder.query(status=200)
+        self.assertEqual(self._seqs(ok_items), [1, 2, 3])
+
+    def test_q_matches_path_and_request_body(self) -> None:
+        path_items, _, _ = self.recorder.query(q="execute")
+        self.assertEqual(self._seqs(path_items), [1, 3])
+        body_items, _, _ = self.recorder.query(q="read_repo")
+        self.assertEqual(self._seqs(body_items), [1, 3])
+
+    def test_q_percent_is_literal_not_wildcard(self) -> None:
+        items, _, _ = self.recorder.query(q="50%off")
+        self.assertEqual(self._seqs(items), [4])
+        # Wildcard semantics WOULD match seq4 ("50" ... "f"); escaped must not.
+        items, _, total = self.recorder.query(q="50%f")
+        self.assertEqual(items, [])
+        self.assertEqual(total, 0)
+
+    def test_since_seq_delta_and_total(self) -> None:
+        items, last_seq, total = self.recorder.query(since_seq=2)
+        self.assertEqual(self._seqs(items), [3, 4])
+        self.assertEqual(last_seq, 4)
+        self.assertEqual(total, 4)
+
+    def test_limit_and_tail(self) -> None:
+        limited, _, _ = self.recorder.query(limit=2)
+        self.assertEqual(self._seqs(limited), [1, 2])
+        tailed, _, _ = self.recorder.query(tail=2)
+        self.assertEqual(self._seqs(tailed), [3, 4])
+        winner, _, _ = self.recorder.query(limit=1, tail=2)
+        self.assertEqual(self._seqs(winner), [3, 4])
+
+    def test_count_and_last_seq(self) -> None:
+        self.assertEqual(self.recorder.count(), 4)
+        self.assertEqual(self.recorder.last_seq(), 4)
+
+
+class _PruneRaisesStore(SqliteProxyStore):
+    """Store double whose prune always fails -- proves the fail-safe path."""
+
+    def _prune(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("prune down")
+
+
+class PruneTests(unittest.TestCase):
+    def test_prune_caps_traces(self) -> None:
+        store = SqliteProxyStore(":memory:", max_rows=5, prune_every=1)
+        recorder = SqliteTraceRecorder(store)
+        ok = ExecutionResult(ok=True, status_code=200)
+        for i in range(1, 9):
+            recorder.record(_event(f"evt-{i:04d}"), ok)
+        self.assertEqual(recorder.count(), 5)
+        self.assertEqual([t.seq for t in recorder.snapshot()], [4, 5, 6, 7, 8])
+        store.close()
+
+    def test_prune_caps_wire(self) -> None:
+        store = SqliteProxyStore(":memory:", max_rows=5, prune_every=1)
+        recorder = SqliteWireRecorder(store)
+        for _ in range(8):
+            recorder.record(_health_wire_payload())
+        self.assertEqual(recorder.count(), 5)
+        self.assertEqual([f.seq for f in recorder.snapshot()], [4, 5, 6, 7, 8])
+        store.close()
+
+    def test_prune_disabled_when_max_rows_is_zero(self) -> None:
+        store = SqliteProxyStore(":memory:", max_rows=0, prune_every=1)
+        recorder = SqliteTraceRecorder(store)
+        ok = ExecutionResult(ok=True, status_code=200)
+        for i in range(1, 9):
+            recorder.record(_event(f"evt-{i:04d}"), ok)
+        self.assertEqual(recorder.count(), 8)
+        store.close()
+
+    def test_prune_only_fires_on_the_modulo(self) -> None:
+        # With the default prune_every=64, 8 inserts never hit the modulo:
+        # the buffer temporarily exceeds max_rows (amortized prune by design).
+        store = SqliteProxyStore(":memory:", max_rows=5)
+        recorder = SqliteTraceRecorder(store)
+        ok = ExecutionResult(ok=True, status_code=200)
+        for i in range(1, 9):
+            recorder.record(_event(f"evt-{i:04d}"), ok)
+        self.assertEqual(recorder.count(), 8)
+        store.close()
+
+    def test_prune_failure_never_breaks_the_insert(self) -> None:
+        # The insert commits BEFORE the prune runs: a prune failure is logged
+        # but the row stays, store_error stays None (the insert succeeded).
+        store = _PruneRaisesStore(":memory:", max_rows=5, prune_every=1)
+        traces = SqliteTraceRecorder(store)
+        wire = SqliteWireRecorder(store)
+        with self.assertLogs("recette.proxy.store", level="ERROR"):
+            traces.record(_event("evt-0001"), ExecutionResult(ok=True, status_code=200))
+        self.assertEqual(traces.count(), 1)
+        self.assertIsNone(store.store_error)
+        with self.assertLogs("recette.proxy.store", level="ERROR"):
+            flow = wire.record(_health_wire_payload())
+        self.assertEqual(flow.seq, 1)
+        self.assertEqual(wire.count(), 1)
+        self.assertIsNone(store.store_error)
+        store.close()
+
+
+class ReplayDeterminismTests(unittest.TestCase):
+    """I4/R11: two stores fed the same record() sequence are byte-identical."""
+
+    @staticmethod
+    def _feed(store: SqliteProxyStore) -> tuple[SqliteTraceRecorder, SqliteWireRecorder]:
+        traces = SqliteTraceRecorder(store)
+        wire = SqliteWireRecorder(store)
+        _seed_traces(traces)
+        _seed_wire(wire)
+        return traces, wire
+
+    def test_replay_is_byte_identical(self) -> None:
+        store_a = SqliteProxyStore(":memory:")
+        store_b = SqliteProxyStore(":memory:")
+        traces_a, wire_a = self._feed(store_a)
+        traces_b, wire_b = self._feed(store_b)
+        # Full snapshots, canonically serialized.
+        self.assertEqual(
+            json.dumps([t.to_dict() for t in traces_a.snapshot()], sort_keys=True),
+            json.dumps([t.to_dict() for t in traces_b.snapshot()], sort_keys=True),
+        )
+        self.assertEqual(
+            json.dumps(wire_a.snapshot_dicts(), sort_keys=True),
+            json.dumps(wire_b.snapshot_dicts(), sort_keys=True),
+        )
+        # Representative filtered queries, serialized with cursor and total.
+        items_a, last_a, total_a = traces_a.query(
+            agent_id="agent-a", outcome="ok", q="acme", since_seq=1, limit=5
+        )
+        items_b, last_b, total_b = traces_b.query(
+            agent_id="agent-a", outcome="ok", q="acme", since_seq=1, limit=5
+        )
+        self.assertEqual(
+            json.dumps(
+                {"items": [t.to_dict() for t in items_a], "last_seq": last_a, "total": total_a},
+                sort_keys=True,
+            ),
+            json.dumps(
+                {"items": [t.to_dict() for t in items_b], "last_seq": last_b, "total": total_b},
+                sort_keys=True,
+            ),
+        )
+        wq_a = wire_a.query(method="get", q="o", tail=2)
+        wq_b = wire_b.query(method="get", q="o", tail=2)
+        self.assertEqual(
+            json.dumps({"items": wq_a[0], "last_seq": wq_a[1], "total": wq_a[2]}, sort_keys=True),
+            json.dumps({"items": wq_b[0], "last_seq": wq_b[1], "total": wq_b[2]}, sort_keys=True),
+        )
+        store_a.close()
+        store_b.close()
 
 
 class SqliteProxyStoreTests(unittest.TestCase):
