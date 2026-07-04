@@ -7,6 +7,7 @@
 pub mod correlate;
 pub mod graph;
 pub mod manifest;
+pub mod model;
 pub mod report;
 pub mod scan;
 
