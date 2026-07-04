@@ -18,7 +18,9 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -38,6 +40,21 @@ def _redacted_view(d: dict) -> dict:
     out = {k: redact_mapping(v) for k, v in d.items()}
     out["side_effect_hash"] = seh  # never redact the integrity hash
     return out
+
+
+def _query_with_reset(
+    query: Callable[..., tuple[list[Any], int, int]],
+    since_seq: int | None,
+    **kwargs: Any,
+) -> tuple[list[Any], int, int, bool]:
+    """Run a delta query; when the client cursor is ahead of the store
+    (buffer cleared or server restarted), re-issue WITHOUT the cursor so the
+    client resyncs in one round trip. Returns (items, last_seq, total, reset)."""
+    items, last_seq, total = query(since_seq=since_seq, **kwargs)
+    reset = since_seq is not None and since_seq > last_seq
+    if reset:
+        items, last_seq, total = query(**kwargs)
+    return items, last_seq, total, reset
 
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
@@ -109,8 +126,9 @@ def list_traces(
     if outcome is not None and outcome not in ("ok", "fail"):
         raise HTTPException(status_code=422, detail='outcome must be "ok" or "fail"')
     recorder = request.app.state.proxy_trace_recorder
-    items, last_seq, total = recorder.query(
-        since_seq=since_seq,
+    items, last_seq, total, reset = _query_with_reset(
+        recorder.query,
+        since_seq,
         run_id=run_id,
         agent_id=agent_id,
         target=target,
@@ -119,19 +137,6 @@ def list_traces(
         limit=limit,
         tail=tail,
     )
-    reset = since_seq is not None and since_seq > last_seq
-    if reset:
-        # Cursor ahead of the server: re-issue without since_seq (same filters
-        # + limit) so the client gets the full current selection to resync.
-        items, last_seq, total = recorder.query(
-            run_id=run_id,
-            agent_id=agent_id,
-            target=target,
-            outcome=outcome,
-            q=q,
-            limit=limit,
-            tail=tail,
-        )
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
         "traces": [_redacted_view(t.to_dict()) for t in items],
@@ -383,8 +388,9 @@ def list_wire_flows(
     resyncs in one round trip. Each emitted dict carries the persisted
     ``side_effect_hash`` and goes through redaction. Stays read-only."""
     recorder = request.app.state.wire_flow_recorder
-    items, last_seq, total = recorder.query(
-        since_seq=since_seq,
+    items, last_seq, total, reset = _query_with_reset(
+        recorder.query,
+        since_seq,
         run_id=run_id,
         host=host,
         method=method,
@@ -393,19 +399,6 @@ def list_wire_flows(
         limit=limit,
         tail=tail,
     )
-    reset = since_seq is not None and since_seq > last_seq
-    if reset:
-        # Cursor ahead of the server: re-issue without since_seq (same filters
-        # + limit) so the client gets the full current selection to resync.
-        items, last_seq, total = recorder.query(
-            run_id=run_id,
-            host=host,
-            method=method,
-            status=status,
-            q=q,
-            limit=limit,
-            tail=tail,
-        )
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
@@ -577,22 +570,15 @@ def get_sessions_delta(
     panel uses the strict per-flow hash join). ``reconcile`` carries the same
     shape as GET /proxy/reconcile. Both views emit through redaction. No
     tail/limit knobs (the panel does not use them). Stays read-only (I1).
+    Reconcile takes its own recorder snapshots, so a new wire flow may appear
+    in the reconcile badge one poll tick before the wire delta -- benign.
     """
     trace_recorder = request.app.state.proxy_trace_recorder
-    items, last_seq, _total = trace_recorder.query(since_seq=since_seq)
-    reset = since_seq is not None and since_seq > last_seq
-    if reset:
-        # Cursor ahead of the server: re-issue without since_seq so the client
-        # gets the full current selection to resync (same shape as /traces).
-        items, last_seq, _total = trace_recorder.query()
+    items, last_seq, _total, reset = _query_with_reset(trace_recorder.query, since_seq)
     wire_recorder = request.app.state.wire_flow_recorder
-    wire_items, wire_last_seq, _wire_total = wire_recorder.query(
-        since_seq=wire_since_seq, run_id=run_id
+    wire_items, wire_last_seq, _wire_total, wire_reset = _query_with_reset(
+        wire_recorder.query, wire_since_seq, run_id=run_id
     )
-    wire_reset = wire_since_seq is not None and wire_since_seq > wire_last_seq
-    if wire_reset:
-        # Independent resync for the wire side (same shape as /wire).
-        wire_items, wire_last_seq, _wire_total = wire_recorder.query(run_id=run_id)
     report = _reconcile_report(request, run_id, strict=strict)
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
