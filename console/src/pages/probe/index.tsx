@@ -356,7 +356,10 @@ export default function ProbePage(): JSX.Element {
         </>
       )}
 
-      <h2 className="probe-subtitle">Inventaire des agents (scan statique)</h2>
+      <div className="probe-raw-head">
+        <h2 className="probe-subtitle">Inventaire des agents (scan statique)</h2>
+        <PageHelp topic="inventory" />
+      </div>
       <p className="probe-note">
         Ce que le scan statique DECLARE : chaque agent identifie, son passeport
         (present / absent / invalide), ses violations, et le graphe de
