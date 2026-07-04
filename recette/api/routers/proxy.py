@@ -551,6 +551,61 @@ def get_reconcile(request: Request, run_id: str | None = None, strict: bool = Fa
     return {"run_id": run_id, "strict": strict, **report.to_dict()}
 
 
+@router.get("/sessions/delta")
+def get_sessions_delta(
+    request: Request,
+    since_seq: int | None = None,
+    wire_since_seq: int | None = None,
+    run_id: str | None = None,
+    strict: bool = True,
+) -> dict:
+    """Coalesced SessionsPanel poll: traces + wire + reconcile in ONE call.
+
+    Replaces the panel's three parallel proxy-owned requests per tick
+    (GET /proxy/traces + GET /proxy/wire + GET /proxy/reconcile) with a single
+    round trip. Cursors are INDEPENDENT per side -- ``since_seq`` for traces,
+    ``wire_since_seq`` for wire -- each with the same reset semantics as the
+    per-source endpoints: a cursor AHEAD of the server (buffer cleared or store
+    restarted) flags ``reset``/``wire_reset`` and re-issues the full query
+    without the cursor so the client resyncs in one round trip; a stale cursor
+    on one side never forces a resync of the other.
+
+    Asymmetry BY DESIGN, mirroring today's panel behavior exactly: the panel
+    groups ALL traces client-side but scopes wire + reconcile to the
+    deep-linked run, so ``run_id`` applies to the WIRE delta and the reconcile
+    join only -- traces stay unfiltered. ``strict`` defaults to true (the
+    panel uses the strict per-flow hash join). ``reconcile`` carries the same
+    shape as GET /proxy/reconcile. Both views emit through redaction. No
+    tail/limit knobs (the panel does not use them). Stays read-only (I1).
+    """
+    trace_recorder = request.app.state.proxy_trace_recorder
+    items, last_seq, _total = trace_recorder.query(since_seq=since_seq)
+    reset = since_seq is not None and since_seq > last_seq
+    if reset:
+        # Cursor ahead of the server: re-issue without since_seq so the client
+        # gets the full current selection to resync (same shape as /traces).
+        items, last_seq, _total = trace_recorder.query()
+    wire_recorder = request.app.state.wire_flow_recorder
+    wire_items, wire_last_seq, _wire_total = wire_recorder.query(
+        since_seq=wire_since_seq, run_id=run_id
+    )
+    wire_reset = wire_since_seq is not None and wire_since_seq > wire_last_seq
+    if wire_reset:
+        # Independent resync for the wire side (same shape as /wire).
+        wire_items, wire_last_seq, _wire_total = wire_recorder.query(run_id=run_id)
+    report = _reconcile_report(request, run_id, strict=strict)
+    return {
+        "debug_enabled": bool(request.app.state.proxy_debug_enabled),
+        "traces": [_redacted_view(t.to_dict()) for t in items],
+        "last_seq": last_seq,
+        "reset": reset,
+        "wire_flows": [_redacted_view(f) for f in wire_items],
+        "wire_last_seq": wire_last_seq,
+        "wire_reset": wire_reset,
+        "reconcile": {"run_id": run_id, "strict": strict, **report.to_dict()},
+    }
+
+
 @router.get("/reconcile/status")
 def get_reconcile_status(request: Request, run_id: str | None = None, strict: bool = False) -> dict:
     """Lightweight reconciliation verdict for the source-menu badge.
