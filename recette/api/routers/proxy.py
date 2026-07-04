@@ -52,7 +52,8 @@ def get_debug_status(request: Request) -> dict:
     recorder = request.app.state.proxy_trace_recorder
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
-        "trace_count": len(recorder.snapshot()),
+        # COUNT(*) in SQL -- never rebuild the full snapshot for a badge.
+        "trace_count": recorder.count(),
         "store_error": recorder.store_error,
     }
 
@@ -285,7 +286,8 @@ def get_wire_status(request: Request) -> dict:
     return {
         "enabled": proxy_url is not None,
         "proxy_url": proxy_url,
-        "flow_count": len(recorder.snapshot()),
+        # COUNT(*) in SQL -- never rebuild the full snapshot for a badge.
+        "flow_count": recorder.count(),
     }
 
 
@@ -351,22 +353,66 @@ def ingest_wire_flow(request: Request, payload: dict) -> dict:
 
 
 @router.get("/wire")
-def list_wire_flows(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
+def list_wire_flows(
+    request: Request,
+    tail: int | None = None,
+    run_id: str | None = None,
+    since_seq: int | None = None,
+    host: str | None = None,
+    method: str | None = None,
+    status: int | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+) -> dict:
     """Recorded wire flows in monotone seq order (oldest first).
 
-    ``run_id`` narrows to one run's flows (applied before ``tail``); ``tail``
-    keeps only the last N. Read-only."""
-    # side_effect_hash is read from the persisted column (computed once at
-    # insert), not recomputed per request; response shape is unchanged.
-    flows = request.app.state.wire_flow_recorder.snapshot_dicts()
-    if run_id is not None:
-        flows = [f for f in flows if f["run_id"] == run_id]
-    if tail is not None and tail >= 0:
-        flows = flows[-tail:]
+    Delta-poll + server-side filtering, all delegated to the SQLite store
+    (``recorder.query``): ``since_seq`` returns only rows newer than the
+    client's cursor; ``run_id``/``host``/``method``/``status``/``q`` narrow
+    the selection in SQL (``method`` is uppercased by the store before the
+    comparison -- the column is stored uppercased by ``normalize_flow``, so a
+    lowercase input still matches; ``status`` is an exact status_code match;
+    ``q`` is a literal substring over path, request_body and response_body);
+    ``limit`` keeps the first N of the ascending delta; ``tail`` keeps the
+    last N (compat: wins over ``limit`` and ignores ``since_seq``). Envelope
+    keeps the historical ``enabled``/``proxy_url``/``flows`` keys and grows
+    ``last_seq`` (the unfiltered MAX(seq), the next cursor), ``total`` (the
+    filtered count ignoring cursor/limit/tail) and ``reset``. ``reset`` flags
+    a client cursor AHEAD of the server (the buffer was cleared or the store
+    restarted) -- the full current selection is then served so the client
+    resyncs in one round trip. Each emitted dict carries the persisted
+    ``side_effect_hash`` and goes through redaction. Stays read-only."""
+    recorder = request.app.state.wire_flow_recorder
+    items, last_seq, total = recorder.query(
+        since_seq=since_seq,
+        run_id=run_id,
+        host=host,
+        method=method,
+        status=status,
+        q=q,
+        limit=limit,
+        tail=tail,
+    )
+    reset = since_seq is not None and since_seq > last_seq
+    if reset:
+        # Cursor ahead of the server: re-issue without since_seq (same filters
+        # + limit) so the client gets the full current selection to resync.
+        items, last_seq, total = recorder.query(
+            run_id=run_id,
+            host=host,
+            method=method,
+            status=status,
+            q=q,
+            limit=limit,
+            tail=tail,
+        )
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
-        "flows": [_redacted_view(f) for f in flows],
+        "flows": [_redacted_view(f) for f in items],
+        "last_seq": last_seq,
+        "total": total,
+        "reset": reset,
     }
 
 

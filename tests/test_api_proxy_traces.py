@@ -138,6 +138,16 @@ class ProxyTracesEndpointTest(unittest.TestCase):
         self.assertTrue(body["debug_enabled"])
         self.assertEqual(body["trace_count"], 0)
 
+    def test_debug_status_trace_count_uses_store_count(self) -> None:
+        # trace_count comes from COUNT(*) now, not a full snapshot rebuild;
+        # it still tracks executions and a clear.
+        client = self._build(debug=True)
+        for _ in range(3):
+            self._execute(client)
+        self.assertEqual(client.get("/proxy/debug").json()["trace_count"], 3)
+        client.delete("/proxy/traces")
+        self.assertEqual(client.get("/proxy/debug").json()["trace_count"], 0)
+
     def test_executed_side_effect_is_traced_when_debug_on(self) -> None:
         client = self._build(debug=True)
         self.assertEqual(self._execute(client).status_code, 200)
