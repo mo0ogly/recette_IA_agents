@@ -29,6 +29,36 @@ vi.mock("../../api/client", async (importOriginal) => {
     getProxyTracesDelta: vi.fn(),
     clearProxyTraces: vi.fn(),
     setProxyDebug: vi.fn(),
+    // The wire and sessions sources poll their delta endpoints on mount; stub
+    // them with empty envelopes so selecting those sources stays off-network.
+    getWireFlowsDelta: vi.fn(() =>
+      Promise.resolve({
+        enabled: false,
+        proxy_url: null,
+        flows: [],
+        last_seq: 0,
+        total: 0,
+        reset: false,
+      }),
+    ),
+    getProxySessionsDelta: vi.fn(() =>
+      Promise.resolve({
+        debug_enabled: true,
+        traces: [],
+        last_seq: 0,
+        reset: false,
+        wire_flows: [],
+        wire_last_seq: 0,
+        wire_reset: false,
+        reconcile: {
+          run_id: null,
+          strict: true,
+          ok: true,
+          bypass_flows: [],
+          audited_run_ids: [],
+        },
+      }),
+    ),
     // The page mounts the agent-only LaunchPanel, which loads agents on mount;
     // stub them so the page test does not hit the network and stays deterministic.
     listAgents: vi.fn(() => Promise.resolve([])),

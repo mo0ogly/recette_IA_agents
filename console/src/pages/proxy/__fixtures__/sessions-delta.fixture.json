@@ -1,0 +1,184 @@
+{
+  "debug_enabled": true,
+  "traces": [
+    {
+      "seq": 5,
+      "event_id": "evt-0001",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "agent_id": "sess-cap-bot-b",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "list_repos",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9",
+      "error": null,
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "response": {
+        "action": "list_repos",
+        "repositories": [
+          "acme/x/e168-0",
+          "acme/x/e168-1",
+          "acme/x/e168-2"
+        ],
+        "resource": "acme/x",
+        "result_id": "e1685ad22870"
+      }
+    },
+    {
+      "seq": 6,
+      "event_id": "evt-0001",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "read_repo",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "687f92f619b7f2adbbbcf8abd64466b86d4942026ff1e76ce12aa46cc3edb563",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "read_repo",
+        "repository": {
+          "default_branch": "main",
+          "full_name": "acme/x"
+        },
+        "resource": "acme/x",
+        "result_id": "e63bd1d9263d"
+      }
+    },
+    {
+      "seq": 7,
+      "event_id": "evt-0002",
+      "timestamp": "2023-11-14T22:13:21Z",
+      "agent_id": "sess-cap-bot-b",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "read_repo",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "687f92f619b7f2adbbbcf8abd64466b86d4942026ff1e76ce12aa46cc3edb563",
+      "error": null,
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "response": {
+        "action": "read_repo",
+        "repository": {
+          "default_branch": "main",
+          "full_name": "acme/x"
+        },
+        "resource": "acme/x",
+        "result_id": "e63bd1d9263d"
+      }
+    },
+    {
+      "seq": 8,
+      "event_id": "evt-0002",
+      "timestamp": "2023-11-14T22:13:21Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "open_pr",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "0b6f686ad48bda57e116afb490ada13b3e06892257398edae343478e5567043a",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "open_pr",
+        "pull_request": {
+          "number": 9626,
+          "state": "open"
+        },
+        "resource": "acme/x",
+        "result_id": "b535e8b94f78"
+      }
+    },
+    {
+      "seq": 9,
+      "event_id": "evt-0003",
+      "timestamp": "2023-11-14T22:13:22Z",
+      "agent_id": "sess-cap-bot-b",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "open_issue",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "b10e001005a72a24033ae06b04cd4528c4d659b178effa36b4dd31112db66496",
+      "error": null,
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "response": {
+        "action": "open_issue",
+        "issue": {
+          "number": 8718,
+          "state": "open"
+        },
+        "resource": "acme/x",
+        "result_id": "0c6af39d5bdd"
+      }
+    },
+    {
+      "seq": 10,
+      "event_id": "evt-0003",
+      "timestamp": "2023-11-14T22:13:22Z",
+      "agent_id": "sess-cap-bot-a",
+      "target_system": "github",
+      "target": "github",
+      "action_type": "merge_pr",
+      "resource": "acme/x",
+      "request_payload": {},
+      "ok": true,
+      "status_code": 200,
+      "side_effect_hash": "7ee8ff7a7e4a0cc7a807b30b509fbcb91195e7134692ece71727636899f2e13a",
+      "error": null,
+      "run_id": "ad00bf1d60ff4a3a9c2898593e6d0b13",
+      "response": {
+        "action": "merge_pr",
+        "merged": true,
+        "resource": "acme/x",
+        "result_id": "4aab9fe78d85"
+      }
+    }
+  ],
+  "last_seq": 10,
+  "reset": false,
+  "wire_flows": [
+    {
+      "seq": 1,
+      "method": "POST",
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 9101,
+      "path": "/github/execute",
+      "status_code": 200,
+      "ok": true,
+      "content_type": "application/json",
+      "request_body": "{\"event_id\":\"e1\",\"action_type\":\"read_repo\",\"resource\":\"acme/x\",\"payload\":{}}",
+      "response_body": "{\"data\":{\"action\":\"read_repo\"},\"success\":true}",
+      "run_id": "1e9b7889ec614c45894e8c855ea72543",
+      "side_effect_hash": "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9"
+    }
+  ],
+  "wire_last_seq": 1,
+  "wire_reset": false,
+  "reconcile": {
+    "run_id": null,
+    "strict": true,
+    "ok": true,
+    "bypass_flows": [],
+    "audited_run_ids": [
+      "1e9b7889ec614c45894e8c855ea72543",
+      "ad00bf1d60ff4a3a9c2898593e6d0b13"
+    ]
+  }
+}

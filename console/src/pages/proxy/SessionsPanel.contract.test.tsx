@@ -1,56 +1,52 @@
 /**
- * R16 contract tests for the sessions panel.
+ * R16 contract tests for the sessions panel (coalesced delta poll).
  *
- * The fixture in __fixtures__/sessions.fixture.json carries two interleaved
- * runs (real ProxyTraceResponse shape). The api client is mocked so the panel
- * renders against the exact payload the backend returns. Covers the grouping
- * (one session row per run) and the progressive-disclosure expand of an
- * exchange into its req<->resp pair. Uses fireEvent (sibling-test convention):
- * @testing-library/user-event is not a dependency of this console.
+ * The fixture in __fixtures__/sessions-delta.fixture.json is shaped EXACTLY
+ * like GET /proxy/sessions/delta (traces + wire flows + reconcile in ONE
+ * envelope, two independent cursors), derived from the captured sessions +
+ * sessions-wire fixtures with a seq-consistent reconcile block. The api client
+ * is mocked so the panel renders against the exact payload the backend
+ * returns. Covers the grouping (one session row per run) and the
+ * progressive-disclosure expand of an exchange into its req<->resp pair. Uses
+ * fireEvent (sibling-test convention): @testing-library/user-event is not a
+ * dependency of this console.
  */
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getReconcile, getRunEvents } from "../../api/client";
-import type {
-  ProxyTraceResponse,
-  ReconcileReport,
-  RunEvent,
-  WireFlowResponse,
-} from "../../types/platform";
-import fixture from "./__fixtures__/sessions.fixture.json";
-import wireFixture from "./__fixtures__/sessions-wire.fixture.json";
+import { getProxySessionsDelta, getRunEvents } from "../../api/client";
+import type { RunEvent, SessionsDeltaResponse } from "../../types/platform";
+import deltaFixture from "./__fixtures__/sessions-delta.fixture.json";
 import SessionsPanel from "./SessionsPanel";
 
-// The wire fixture's flow shares run_id + side_effect_hash with the FIRST trace
+const fixture = deltaFixture as SessionsDeltaResponse;
+
+// The fixture's wire flow shares run_id + side_effect_hash with the FIRST trace
 // (seq 5) of this run, so its first exchange carries the matched wire flow.
 const RUN_WITH_WIRE = "1e9b7889ec614c45894e8c855ea72543";
 // The non-null side_effect_hash of that first exchange (trace seq 5). A reconcile
 // bypass_flow carrying this hash means the exchange is a non-mediated (ghost) path.
 const GHOST_HASH = "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9";
 
-const okReconcile: ReconcileReport = {
-  run_id: RUN_WITH_WIRE,
-  ok: true,
-  bypass_flows: [],
-  audited_run_ids: [],
-  strict: true,
-};
-
-const ghostReconcile: ReconcileReport = {
-  run_id: RUN_WITH_WIRE,
-  ok: false,
-  bypass_flows: [
-    {
-      ...(wireFixture as WireFlowResponse).flows[0],
-      side_effect_hash: GHOST_HASH,
-      bypass_reason: "no_audit_event",
-    },
-  ],
-  audited_run_ids: [],
-  strict: true,
+/** The fixture envelope with its reconcile block flagging the first exchange's
+ *  hash as a bypass (the ghost / non-mediated case). */
+const ghostFixture: SessionsDeltaResponse = {
+  ...fixture,
+  reconcile: {
+    run_id: RUN_WITH_WIRE,
+    strict: true,
+    ok: false,
+    bypass_flows: [
+      {
+        ...fixture.wire_flows[0],
+        side_effect_hash: GHOST_HASH,
+        bypass_reason: "no_audit_event",
+      },
+    ],
+    audited_run_ids: [],
+  },
 };
 
 // Ordered tool_call decisions for RUN_WITH_WIRE's three exchanges (real wire
@@ -66,9 +62,7 @@ const runEvents: RunEvent[] = [
 ];
 
 vi.mock("../../api/client", () => ({
-  getProxyTraces: vi.fn(() => Promise.resolve(fixture as ProxyTraceResponse)),
-  getWireFlows: vi.fn(() => Promise.resolve(wireFixture as WireFlowResponse)),
-  getReconcile: vi.fn(() => Promise.resolve(okReconcile)),
+  getProxySessionsDelta: vi.fn(() => Promise.resolve(deltaFixture as SessionsDeltaResponse)),
   getRunEvents: vi.fn(() => Promise.resolve(runEvents)),
 }));
 
@@ -91,16 +85,24 @@ const renderPanel = (props = {}, route = "/") =>
     </MemoryRouter>,
   );
 
-describe("SessionsPanel (R16 contract)", () => {
+describe("SessionsPanel (R16 contract, coalesced delta)", () => {
   it("renders one session row per run and no crash on the real payload", async () => {
     renderPanel();
     const list = await screen.findByLabelText("sessions");
-    const runs = new Set(
-      (fixture as ProxyTraceResponse).traces.map((t) => t.run_id ?? "(no run)"),
-    );
+    const runs = new Set(fixture.traces.map((t) => t.run_id ?? "(no run)"));
     await waitFor(() => {
       expect(within(list).getAllByRole("button").length).toBe(runs.size);
     });
+  });
+
+  it("coalesces a tick into ONE proxy call (no getRunEvents without ?run=)", async () => {
+    renderPanel();
+    const list = await screen.findByLabelText("sessions");
+    await waitFor(() => expect(within(list).getAllByRole("button").length).toBeGreaterThan(0));
+    // The mount tick is exactly one delta round trip: traces + wire +
+    // reconcile all come from it (the old panel fired four calls here).
+    expect(getProxySessionsDelta).toHaveBeenCalledTimes(1);
+    expect(getRunEvents).not.toHaveBeenCalled();
   });
 
   it("expands an exchange to show the req<->resp pair on demand", async () => {
@@ -141,13 +143,13 @@ describe("SessionsPanel (R16 contract)", () => {
   });
 
   it("preselects the run named in ?run= without a click", async () => {
-    const run = (fixture as ProxyTraceResponse).traces[0].run_id!;
+    const run = fixture.traces[0].run_id!;
     renderPanel({}, `/?run=${run}`);
     expect(await screen.findByLabelText("session exchanges")).toBeInTheDocument();
   });
 
   it("marks an exchange ghost / non-mediated when reconcile flags its hash as a bypass", async () => {
-    vi.mocked(getReconcile).mockResolvedValue(ghostReconcile);
+    vi.mocked(getProxySessionsDelta).mockResolvedValue(ghostFixture);
     renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
     const timeline = await screen.findByLabelText("session exchanges");
     fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange
@@ -155,7 +157,9 @@ describe("SessionsPanel (R16 contract)", () => {
   });
 
   it("shows no ghost badge when reconcile reports no bypass flows", async () => {
-    vi.mocked(getReconcile).mockResolvedValue(okReconcile);
+    // Re-pin the default envelope (the ghost test above swapped the mock, and
+    // clearAllMocks does not restore a mockResolvedValue implementation).
+    vi.mocked(getProxySessionsDelta).mockResolvedValue(fixture);
     renderPanel({}, `/?run=${RUN_WITH_WIRE}`);
     const timeline = await screen.findByLabelText("session exchanges");
     fireEvent.click(within(timeline).getAllByRole("button")[0]); // expand first exchange

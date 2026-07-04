@@ -120,6 +120,36 @@
   white-space: nowrap;
 }
 
+/* Windowed wire rows MUST be a uniform fixed height (44px, mirrored by
+   ROW_HEIGHT_PX in WirePanel): the select button keeps its two-line layout
+   (summary + latency bar) inside the fixed row, the compare button sits to
+   the right, overflow clipped. */
+.proxy-wire-vlist .proxy-wire-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.proxy-wire-vlist .proxy-wire-row .proxy-list-item {
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-bottom: none;
+  /* Re-allow the two-line layout inside the fixed row (the shared
+     .proxy-vlist .proxy-list-item rule forces nowrap for trace rows). */
+  flex-wrap: wrap;
+  white-space: normal;
+  padding: 0.2rem 0.6rem;
+}
+
+.proxy-wire-vlist .proxy-wire-compare-btn {
+  flex: 0 0 auto;
+}
+
 /* "N new traces" affordance shown while the user is scrolled away from the
    tail and rows keep landing; reuses the amber badge tokens (no new colors). */
 .proxy-new-badge {
