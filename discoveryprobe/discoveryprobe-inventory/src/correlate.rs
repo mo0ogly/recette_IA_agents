@@ -18,7 +18,10 @@
 //!    -- the passport status itself is the signal (mono-axis).
 //! 3. Every `Absent` record carries a `PassportAbsent` violation.
 //! 4. `observed_principals` divergent from the declared principal ->
-//!    `PrincipalMismatch` (I3).
+//!    `PrincipalMismatch` (I3). Unlike recordings (rule 1), an observed
+//!    principal or edge whose agent id matches no record synthesizes
+//!    NOTHING -- intentional asymmetry: a recording proves a live agent, a
+//!    bare principal/edge mention alone does not.
 //! 5. An observed edge absent from the declared graph -> `UndeclaredHandoff`
 //!    attached to the `from` record (when that record exists; the edge is
 //!    ALWAYS listed in `comm_graph.undeclared_edges` either way).
@@ -155,7 +158,9 @@ pub fn correlate(
             // an observed record with `declared == None` (Invalid passport)
             // stays NotObserved (fail-safe, rule 6).
             record.conformity = if !record_violations.is_empty() {
-                Conformity::Violations(record_violations)
+                Conformity::Violations {
+                    violations: record_violations,
+                }
             } else if observed_present
                 && observed_ids.contains(&record.agent_id)
                 && record.declared.is_some()
@@ -185,7 +190,7 @@ pub fn correlate(
 /// derivation is documented in the module header).
 fn record_from_scanned(agent: &ScannedAgent) -> AgentRecord {
     let (agent_id, kind, declared, evidence) = match &agent.passport {
-        PassportStatus::Present(passport) => {
+        PassportStatus::Present { passport } => {
             let agent_id = match passport.agent_id() {
                 Some(id) => id.to_string(),
                 None => {
@@ -260,7 +265,13 @@ fn apply_recording(
             if KNOWN_GIT_ACTIONS.contains(&prefix) {
                 record.observed.actions.push(prefix.to_string());
                 if let Some(declared) = &record.declared {
-                    if !declared.actions.iter().any(|a| a == prefix) {
+                    // `declared.actions` is sorted+deduped (passport intake):
+                    // binary search on the hot path (every key of every recording).
+                    if declared
+                        .actions
+                        .binary_search_by(|a| a.as_str().cmp(prefix))
+                        .is_err()
+                    {
                         violations.entry(record.agent_id.clone()).or_default().push(
                             Violation::UndeclaredAction {
                                 action: prefix.to_string(),
@@ -318,12 +329,12 @@ fn summarize(agents: &[AgentRecord]) -> InventorySummary {
     };
     for record in agents {
         match &record.passport {
-            PassportStatus::Present(_) => summary.with_passport += 1,
+            PassportStatus::Present { .. } => summary.with_passport += 1,
             PassportStatus::Absent { .. } => summary.without_passport += 1,
             PassportStatus::Invalid { .. } => summary.invalid_passport += 1,
         }
-        if let Conformity::Violations(v) = &record.conformity {
-            summary.violation_count += v.len();
+        if let Conformity::Violations { violations } = &record.conformity {
+            summary.violation_count += violations.len();
         }
     }
     summary
@@ -351,7 +362,9 @@ mod tests {
         );
         ScannedAgent {
             root: format!("/scan/{agent_id}"),
-            passport: PassportStatus::Present(Passport::parse(&raw).expect("test passport")),
+            passport: PassportStatus::Present {
+                passport: Passport::parse(&raw).expect("test passport"),
+            },
         }
     }
 
@@ -381,7 +394,7 @@ mod tests {
             .find(|a| a.agent_id == agent_id)
             .unwrap_or_else(|| panic!("no record for {agent_id}"));
         match &record.conformity {
-            Conformity::Violations(v) => v.clone(),
+            Conformity::Violations { violations } => violations.clone(),
             other => panic!("expected Violations for {agent_id}, got {other:?}"),
         }
     }
@@ -571,6 +584,57 @@ mod tests {
     }
 
     #[test]
+    fn two_recordings_for_the_same_agent_accumulate() {
+        let mut rec_a = CaptureRecording::new("pr-bot");
+        rec_a.observe(ObservationSurface::HookSdk, "open_pr:acme/web#1");
+        rec_a.observe(ObservationSurface::EbpfWire, "POST api.github.com:443/p");
+        let mut rec_b = CaptureRecording::new("pr-bot");
+        rec_b.observe(ObservationSurface::HookMcp, "read_repo:acme/web");
+        // Same egress key as rec_a: must dedup, not duplicate.
+        rec_b.observe(ObservationSurface::EbpfWire, "POST api.github.com:443/p");
+        let obs = ObservedInput {
+            recordings: vec![rec_a, rec_b],
+            ..Default::default()
+        };
+        let inv = correlate(
+            &[present_agent(
+                "pr-bot",
+                "good-bot",
+                &["open_pr", "read_repo"],
+            )],
+            &DeclaredGraph::default(),
+            Some(&obs),
+        );
+        // Both recordings accumulate onto ONE record, merged and deduped.
+        assert_eq!(inv.agents.len(), 1);
+        let record = &inv.agents[0];
+        assert_eq!(
+            record.observed.actions,
+            vec!["open_pr".to_string(), "read_repo".to_string()]
+        );
+        assert_eq!(
+            record.observed.egress,
+            vec!["POST api.github.com:443/p".to_string()]
+        );
+        assert_eq!(record.conformity, Conformity::Conform);
+    }
+
+    #[test]
+    fn observed_principal_for_unknown_agent_is_counted_but_synthesizes_no_record() {
+        // Intentional asymmetry (module doc, rule 4): a recording proves a
+        // live agent and synthesizes a shadow record; a bare observed
+        // principal (or edge) matching no record synthesizes NOTHING and
+        // raises no violation.
+        let obs = ObservedInput {
+            observed_principals: vec![("ghost".to_string(), "someone".to_string())],
+            ..Default::default()
+        };
+        let inv = correlate(&[], &DeclaredGraph::default(), Some(&obs));
+        assert!(inv.agents.is_empty());
+        assert_eq!(inv.summary.violation_count, 0);
+    }
+
+    #[test]
     fn in_scope_action_and_egress_key_yield_conform() {
         let mut rec = CaptureRecording::new("pr-bot");
         rec.observe(ObservationSurface::HookSdk, "open_pr:acme/web#42");
@@ -720,5 +784,11 @@ mod tests {
         let json_a = serde_json::to_string(&run_a).expect("serialize");
         let json_b = serde_json::to_string(&run_b).expect("serialize");
         assert_eq!(json_a, json_b);
+        // Bridge contract: uniform kind-tagged JSON -- every enum value is
+        // an object with a "kind" key (Violation, Conformity, PassportStatus).
+        assert!(json_a.contains(r#""kind":"undeclared_action""#), "{json_a}");
+        assert!(json_a.contains(r#""kind":"violations""#), "{json_a}");
+        assert!(json_a.contains(r#""kind":"present""#), "{json_a}");
+        assert!(json_a.contains(r#""kind":"absent""#), "{json_a}");
     }
 }

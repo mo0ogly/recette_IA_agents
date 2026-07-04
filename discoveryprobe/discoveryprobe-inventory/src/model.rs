@@ -16,8 +16,13 @@
 //!   already carries.
 //!
 //! Serialization: field names are serde-default snake_case (the Python
-//! bridge consumes them as-is); `Conformity` and `Violation` variant tags are
-//! explicitly snake_case, matching `discoveryprobe_core::ObservationSurface`.
+//! bridge consumes them as-is). Enums crossing the bridge (`Conformity`,
+//! `Violation`, `scan::PassportStatus`) use UNIFORM kind-tagged JSON:
+//! internally tagged (`#[serde(tag = "kind")]`), snake_case tags, and no
+//! newtype variants (payloads are named fields), so EVERY enum value is a
+//! JSON object with a `"kind"` key -- Python dispatches on `value["kind"]`
+//! without isinstance checks. Tag vocabulary matches
+//! `discoveryprobe_core::ObservationSurface` (snake_case).
 //!
 //! Determinism (I4): every list is sorted (agents by `agent_id`, violations
 //! by their derived `Ord`, edges by `(from, to)`), so the same inputs
@@ -108,14 +113,17 @@ pub struct Observed {
 /// `NotObserved` is distinct from `Conform`: a static-only scan can NEVER
 /// conclude conformity (fail-safe, per the design).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Conformity {
     /// Observed live and no violation found.
     Conform,
     /// No runtime observation covered this agent; nothing can be concluded.
     NotObserved,
-    /// At least one violation; sorted by the `Violation` derived order (I4).
-    Violations(Vec<Violation>),
+    /// At least one violation.
+    Violations {
+        /// The violations, sorted by the `Violation` derived order (I4).
+        violations: Vec<Violation>,
+    },
 }
 
 /// One declared-vs-observed violation.
@@ -128,7 +136,7 @@ pub enum Conformity {
 /// Derives `Ord`: violations sort by variant declaration order, then by
 /// field values -- a stable, documented sort key (I4).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Violation {
     /// Agent code or a live agent exists with no passport (shadow agent).
     PassportAbsent,

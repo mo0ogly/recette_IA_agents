@@ -50,10 +50,17 @@ impl fmt::Display for ScanError {
 impl std::error::Error for ScanError {}
 
 /// Passport situation of a scanned tree: declared, missing, or broken.
+///
+/// Kind-tagged JSON like every bridge-crossing enum (uniform style, see the
+/// `model` module header): each value is an object with a `"kind"` key.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PassportStatus {
     /// A valid passport was found and parsed.
-    Present(Passport),
+    Present {
+        /// The parsed passport.
+        passport: Passport,
+    },
     /// No passport, but agent code was found: the shadow-agent case. Each
     /// evidence string is `relative/path: needle`, reproducible by an auditor.
     Absent {
@@ -86,7 +93,7 @@ pub fn scan_tree(root: &Path) -> Result<Vec<ScannedAgent>, ScanError> {
     if manifest_path.exists() {
         let raw = read_file(&manifest_path)?;
         let passport = match Passport::parse(&raw) {
-            Ok(p) => PassportStatus::Present(p),
+            Ok(p) => PassportStatus::Present { passport: p },
             Err(e) => PassportStatus::Invalid {
                 errors: passport_error_strings(&e),
             },
@@ -268,7 +275,7 @@ mod tests {
     fn corpus_pr_bot_scans_as_passport_present() {
         let found = scan_tree(&corpus_path("repos/gh-pr-bot/repo")).expect("scan");
         assert_eq!(found.len(), 1);
-        assert!(matches!(found[0].passport, PassportStatus::Present(_)));
+        assert!(matches!(found[0].passport, PassportStatus::Present { .. }));
     }
 
     #[test]
