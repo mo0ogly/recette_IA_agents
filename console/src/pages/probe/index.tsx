@@ -127,7 +127,10 @@ export default function ProbePage(): JSX.Element {
     let alive = true;
     getInventory()
       .then((inv) => alive && setInventory(inv))
-      .catch(() => alive && setInventory(null));
+      .catch((err) => {
+        if (alive) setInventory(null);
+        console.error("probe inventory fetch failed", err);
+      });
     return () => {
       alive = false;
     };

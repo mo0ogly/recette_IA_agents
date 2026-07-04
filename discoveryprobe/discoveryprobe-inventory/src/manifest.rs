@@ -49,6 +49,11 @@ impl fmt::Display for PassportError {
 impl std::error::Error for PassportError {}
 
 /// A parsed, validated agent passport (either corpus shape).
+///
+/// NOTE: intentionally NOT `kind`-tagged (externally-tagged serde default,
+/// `{"Repo": {...}}`), unlike the bridge-crossing enums in `model.rs`. The
+/// Python bridge and the console never dispatch on this wire shape; they read
+/// the pre-extracted `declared` profile and the `kind()` accessor instead.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Passport {
     /// Repo passport: `.inspect_ia_agents/manifest.json` inside a publishable repo.
