@@ -1,0 +1,11 @@
+{
+  "agent_repo": "gh-invalid-passport",
+  "target_system": "github",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_repo", "open_pr"],
+  "risk_rank": 2,
+  "policy_generated": true,
+  "passport_status": "invalid",
+  "notes": "Invalid passport: .inspect_ia_agents/manifest.json exists but is missing the whole agent.identity object, so it parses as JSON yet fails manifest validation. The reference source scan still detects one agent via the code fallback (read_repo + open_pr), ranks it like the pr-bot (risk_rank 2), and emits a PR-only policy. The scanner must surface passport_status = invalid -- a broken manifest reported as invalid, never silently trusted as a valid declaration."
+}
