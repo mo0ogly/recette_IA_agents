@@ -329,7 +329,9 @@ impl Passport {
 /// schema in `corpus/schemas/` (the recette validates only
 /// `discovery-ground-truth.json` for discovery repos), so repo capabilities
 /// stay unguarded by design.
-const KNOWN_GIT_ACTIONS: &[&str] = &[
+/// Also reused by `scan` as the canonical action vocabulary for the
+/// OpenAPI shadow-agent heuristic (single source, never redeclared).
+pub(crate) const KNOWN_GIT_ACTIONS: &[&str] = &[
     "read_repo",
     "list_repos",
     "open_issue",
@@ -496,15 +498,7 @@ fn validate_unified_capability(i: usize, cap: &UnifiedCapability, errors: &mut V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
-    /// Resolves a path under the repo `corpus/` directory. The crate lives at
-    /// `discoveryprobe/discoveryprobe-inventory/`, so corpus is two levels up.
-    fn corpus_path(rel: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../corpus")
-            .join(rel)
-    }
+    use crate::test_support::corpus_path;
 
     #[test]
     fn parses_the_gh_pr_bot_repo_passport() {

@@ -1,0 +1,6 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "name": "truncated-bot",
+    "target_system": "github",
+    "identity": {"auth_method": "pat", "principal": "truncated-bot[bot]"
