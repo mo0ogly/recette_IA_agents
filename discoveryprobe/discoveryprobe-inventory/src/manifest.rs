@@ -251,13 +251,31 @@ impl Passport {
     /// multi-target shape this is the FIRST of the SORTED `target_systems`
     /// (deterministic representative, I4-stable across serializations).
     pub fn target_system(&self) -> String {
+        self.target_systems().into_iter().next().unwrap_or_default()
+    }
+
+    /// ALL declared target systems, sorted and deduplicated. The repo shape
+    /// wraps its single `agent.target_system` in a one-element vec; the
+    /// unified shape yields every entry of `target_systems`. Correlators MUST
+    /// use this (not the singular primary) so a multi-target MAF agent is not
+    /// flagged with a false UndeclaredAction on its secondary targets.
+    pub fn target_systems(&self) -> Vec<String> {
+        let mut targets: Vec<String> = match self {
+            Passport::Repo(m) => m.agent.target_system.clone().into_iter().collect(),
+            Passport::Unified(m) => m.target_systems.clone().unwrap_or_default(),
+        };
+        targets.sort();
+        targets.dedup();
+        targets
+    }
+
+    /// Declared stable agent id (slug). Only the unified corpus shape carries
+    /// one (`agent_id`); the repo shape has no id field, so this is `None`
+    /// there (callers key repo passports by their filesystem slug instead).
+    pub fn agent_id(&self) -> Option<&str> {
         match self {
-            Passport::Repo(m) => m.agent.target_system.clone().unwrap_or_default(),
-            Passport::Unified(m) => {
-                let mut targets: Vec<String> = m.target_systems.clone().unwrap_or_default();
-                targets.sort();
-                targets.into_iter().next().unwrap_or_default()
-            }
+            Passport::Repo(_) => None,
+            Passport::Unified(m) => m.agent_id.as_deref(),
         }
     }
 
@@ -303,6 +321,27 @@ impl Passport {
         targets
     }
 }
+
+/// Canonical git action names, copied VERBATIM from the unified schema enum
+/// (`corpus/schemas/agent-manifest.schema.json`, capability_scope git variant,
+/// `properties.action.enum`). Guards the unified git capability arm only: the
+/// repo shape (`.inspect_ia_agents/manifest.json`) is NOT enum-bound by any
+/// schema in `corpus/schemas/` (the recette validates only
+/// `discovery-ground-truth.json` for discovery repos), so repo capabilities
+/// stay unguarded by design.
+const KNOWN_GIT_ACTIONS: &[&str] = &[
+    "read_repo",
+    "list_repos",
+    "open_issue",
+    "comment_issue",
+    "open_pr",
+    "merge_pr",
+    "push",
+    "manage_webhook",
+    "manage_release",
+    "read_ci",
+    "trigger_ci",
+];
 
 /// Returns true for a missing or empty string field.
 fn blank(s: &Option<String>) -> bool {
@@ -434,8 +473,14 @@ fn validate_unified_capability(i: usize, cap: &UnifiedCapability, errors: &mut V
                 errors.push(format!("capability_scope[{i}] (handoff) is missing target"));
             }
         }
-        Some(_) => {
-            // Git action variant: mode + non-empty resources are required.
+        Some(action) => {
+            // Git action variant: the action must be a schema-known git
+            // action, and mode + non-empty resources are required.
+            if !KNOWN_GIT_ACTIONS.contains(&action) {
+                errors.push(format!(
+                    "capability_scope[{i}].action '{action}' is not a known git action"
+                ));
+            }
             if blank(&cap.mode) {
                 errors.push(format!("capability_scope[{i}] (git) is missing mode"));
             }
@@ -470,6 +515,9 @@ mod tests {
         let m = Passport::parse(&raw).expect("valid passport");
         assert_eq!(m.principal(), "acme-dependency-pr-bot[bot]");
         assert_eq!(m.target_system(), "github");
+        // Repo shape: single target wrapped in a one-element vec, no agent_id.
+        assert_eq!(m.target_systems(), vec!["github".to_string()]);
+        assert_eq!(m.agent_id(), None);
         assert_eq!(
             m.actions(),
             vec!["open_pr".to_string(), "read_repo".to_string()]
@@ -481,14 +529,28 @@ mod tests {
     #[test]
     fn invalid_json_yields_invalid_with_errors() {
         let err = Passport::parse("{not json").unwrap_err();
-        assert!(!err.to_string().is_empty());
+        assert!(matches!(err, PassportError::InvalidJson(_)));
+        assert!(
+            err.to_string().starts_with("invalid JSON:"),
+            "unexpected Display: {err}"
+        );
     }
 
     #[test]
     fn structurally_wrong_manifest_reports_missing_fields() {
-        // Present file, wrong shape: no agent.identity.principal.
+        // Present file, wrong shape: missing identity, target_system and
+        // capabilities -- the error must name all three fields.
         let err = Passport::parse(r#"{"schema_version":"1.0","agent":{"name":"x"}}"#).unwrap_err();
-        assert!(err.to_string().contains("identity"));
+        let msg = err.to_string();
+        assert!(msg.contains("identity"), "missing identity in: {msg}");
+        assert!(
+            msg.contains("target_system"),
+            "missing target_system in: {msg}"
+        );
+        assert!(
+            msg.contains("capabilities"),
+            "missing capabilities in: {msg}"
+        );
     }
 
     #[test]
@@ -502,6 +564,8 @@ mod tests {
         assert_eq!(m.kind(), "git_agent");
         assert_eq!(m.principal(), "acme-issue-triager[bot]");
         assert_eq!(m.target_system(), "github");
+        assert_eq!(m.target_systems(), vec!["github".to_string()]);
+        assert_eq!(m.agent_id(), Some("gh-issue-triager"));
         assert_eq!(
             m.actions(),
             vec![
@@ -528,6 +592,15 @@ mod tests {
         // sorted(["azureopenai", "web_search", "mcp"])[0] == "azureopenai".
         assert_eq!(m.target_system(), "azureopenai");
         assert_eq!(
+            m.target_systems(),
+            vec![
+                "azureopenai".to_string(),
+                "mcp".to_string(),
+                "web_search".to_string(),
+            ]
+        );
+        assert_eq!(m.agent_id(), Some("diagnostic-correct"));
+        assert_eq!(
             m.actions(),
             vec!["handoff".to_string(), "invoke_tool".to_string()]
         );
@@ -547,6 +620,28 @@ mod tests {
         }"#;
         let err = Passport::parse(raw).unwrap_err();
         assert!(err.to_string().contains("capability_scope"));
+    }
+
+    #[test]
+    fn unified_manifest_with_typo_git_action_names_index_and_action() {
+        // "raed_repo" is not in the schema enum (KNOWN_GIT_ACTIONS).
+        let raw = r#"{
+            "agent_id": "x-agent",
+            "name": "x",
+            "target_systems": ["github"],
+            "declared_identity": {"auth_method": "pat", "principal": "x-bot"},
+            "capability_scope": [
+                {"action": "raed_repo", "mode": "read", "resources": ["acme/*"]}
+            ],
+            "runtime": {"lab_mode": true, "real_mode": false},
+            "version": "1.0.0"
+        }"#;
+        let err = Passport::parse(raw).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("capability_scope[0].action 'raed_repo' is not a known git action"),
+            "missing enum-guard error in: {msg}"
+        );
     }
 
     #[test]
