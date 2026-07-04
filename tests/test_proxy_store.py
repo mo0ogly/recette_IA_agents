@@ -15,10 +15,20 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import sqlite3
 import tempfile
 import threading
 import unittest
 from pathlib import Path
+
+try:
+    from fastapi.testclient import TestClient
+
+    from recette.api.app import create_app
+
+    _HAS_FASTAPI = True
+except ImportError:  # pragma: no cover
+    _HAS_FASTAPI = False
 
 from recette.platform.events import PlatformActionEvent
 from recette.platform.proxy.protocol import ExecutionResult
@@ -806,6 +816,28 @@ class SqliteProxyStoreTests(unittest.TestCase):
         # Retention arrives in Task 3; the ceiling is only carried for now.
         store = SqliteProxyStore(":memory:", max_rows=7)
         self.assertEqual(store.max_rows, 7)
+
+    def test_close_is_idempotent_and_store_fails_closed(self) -> None:
+        # Double close must never raise (the shutdown path calls it defensively)
+        # and any subsequent operation fails loudly on the closed connection.
+        store = SqliteProxyStore(":memory:")
+        store.close()
+        store.close()
+        with self.assertRaises(sqlite3.ProgrammingError):
+            store.count_traces()
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class AppShutdownClosesProxyStoreTests(unittest.TestCase):
+    def test_lifespan_exit_closes_the_proxy_store(self) -> None:
+        # TestClient used as a context manager drives the lifespan: exiting it
+        # triggers shutdown, which must close the SQLite proxy store so the
+        # WAL connection (and its .db-wal/.db-shm sidecars) is released.
+        app = create_app()
+        with TestClient(app) as client:
+            self.assertEqual(client.get("/health").status_code, 200)
+        with self.assertRaises(sqlite3.ProgrammingError):
+            app.state.proxy_store.count_traces()
 
 
 class EnvHelperTests(unittest.TestCase):

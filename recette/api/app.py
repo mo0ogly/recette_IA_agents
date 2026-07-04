@@ -87,6 +87,7 @@ AUTH_ALLOWLIST = frozenset(
     {"/health", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/events/stream"}
 )
 _auth_logger = logging.getLogger("inspect_ia_agents.api.auth")
+_lifespan_logger = logging.getLogger("inspect_ia_agents.api.lifespan")
 
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
@@ -159,6 +160,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.probe_monitor.stop()
     app.state.server_manager.shutdown()
     app.state.realtime_transport.close()
+    try:
+        # Release the SQLite connection so WAL sidecar files (.db-wal/.db-shm)
+        # are checkpointed; a close failure must never break shutdown.
+        app.state.proxy_store.close()
+    except Exception as exc:
+        _lifespan_logger.warning("proxy store close failed at shutdown reason=%s", exc)
 
 
 class RestartSafeIdGenerator:
