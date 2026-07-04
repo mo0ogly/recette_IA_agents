@@ -78,21 +78,65 @@ def set_debug(request: Request, body: dict) -> dict:
 
 
 @router.get("/traces")
-def list_traces(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
+def list_traces(
+    request: Request,
+    tail: int | None = None,
+    run_id: str | None = None,
+    since_seq: int | None = None,
+    agent_id: str | None = None,
+    target: str | None = None,
+    outcome: str | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+) -> dict:
     """Recorded side-effect traces in monotone seq order (oldest first).
 
-    ``run_id`` narrows the view to the traces of one run (F3 run <-> traces
-    link); applied before ``tail``. ``tail`` keeps only the last N traces
-    (live-console backfill). Stays read-only.
+    Delta-poll + server-side filtering, all delegated to the SQLite store
+    (``recorder.query``): ``since_seq`` returns only rows newer than the
+    client's cursor; ``run_id``/``agent_id``/``target``/``outcome``/``q``
+    narrow the selection in SQL; ``limit`` keeps the first N of the ascending
+    delta; ``tail`` keeps the last N (compat: wins over ``limit`` and ignores
+    ``since_seq``). Envelope: ``last_seq`` is the unfiltered MAX(seq) (the
+    next cursor), ``total`` counts the filtered set ignoring cursor/limit/
+    tail, ``reset`` flags a client cursor AHEAD of the server (the buffer was
+    cleared or the store restarted) -- the full current selection is then
+    served so the client resyncs in one round trip. Stays read-only.
     """
-    traces = request.app.state.proxy_trace_recorder.snapshot()
-    if run_id is not None:
-        traces = [t for t in traces if t.run_id == run_id]
-    if tail is not None and tail >= 0:
-        traces = traces[-tail:]
+    # Validation split: the store's query IGNORES an unknown outcome by design
+    # (store-level latitude); the API boundary is where an explicit 422 lives
+    # (fail-safe: never silently ignore an operator filter).
+    if outcome is not None and outcome not in ("ok", "fail"):
+        raise HTTPException(status_code=422, detail='outcome must be "ok" or "fail"')
+    recorder = request.app.state.proxy_trace_recorder
+    items, last_seq, total = recorder.query(
+        since_seq=since_seq,
+        run_id=run_id,
+        agent_id=agent_id,
+        target=target,
+        outcome=outcome,
+        q=q,
+        limit=limit,
+        tail=tail,
+    )
+    reset = since_seq is not None and since_seq > last_seq
+    if reset:
+        # Cursor ahead of the server: re-issue without since_seq (same filters
+        # + limit) so the client gets the full current selection to resync.
+        items, last_seq, total = recorder.query(
+            run_id=run_id,
+            agent_id=agent_id,
+            target=target,
+            outcome=outcome,
+            q=q,
+            limit=limit,
+            tail=tail,
+        )
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
-        "traces": [_redacted_view(t.to_dict()) for t in traces],
+        "traces": [_redacted_view(t.to_dict()) for t in items],
+        "last_seq": last_seq,
+        "total": total,
+        "reset": reset,
     }
 
 

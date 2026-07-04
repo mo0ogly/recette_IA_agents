@@ -224,6 +224,9 @@ class TestReconcileStrictPersistedHash(unittest.TestCase):
         flow = {**_exec_flow(1, 9101), "response_body": altered_body}
         self.assertIsNotNone(wire_flow_side_effect_hash(flow))  # recompute WOULD diverge
         flow["side_effect_hash"] = wire_flow_side_effect_hash(_exec_flow(1, 9101))
+        # Explicit divergence the test relies on: a recompute over the altered
+        # bodies yields a hash DIFFERENT from the persisted one.
+        self.assertNotEqual(wire_flow_side_effect_hash(flow), flow["side_effect_hash"])
         report = reconcile_strict([flow], [_trace_for()], {"127.0.0.1:9101"})
         self.assertTrue(report.ok)
         self.assertEqual(report.bypass_flows, [])

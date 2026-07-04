@@ -46,7 +46,18 @@ SPECS = (
 
 
 class _StubProxy:
+    """Deterministic proxy double: a payload carrying ``fail`` produces a
+    failed ExecutionResult so the trace buffer holds both outcomes."""
+
     def execute(self, event):  # type: ignore[no-untyped-def]
+        if event.payload.get("fail"):
+            return ExecutionResult(
+                ok=False,
+                status_code=500,
+                response={"done": False},
+                side_effect_hash=None,
+                error="stub failure",
+            )
         response = {"done": True}
         return ExecutionResult(
             ok=True,
@@ -91,15 +102,33 @@ class ProxyTracesEndpointTest(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.addCleanup(lambda: os.environ.pop("INSPECT_IA_AGENTS_PROXY_DEBUG", None))
 
-    def _execute(self, client: TestClient):  # type: ignore[no-untyped-def]
+    def _add_agent(self, client: TestClient, agent_id: str) -> None:
+        resp = client.post(
+            "/config/agents",
+            json={
+                "id": agent_id,
+                "runtime": "lab",
+                "role": "identity_admin",
+                "capability_scope": ["okta"],
+            },
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+
+    def _execute(
+        self,
+        client: TestClient,
+        *,
+        agent_id: str = "agent-admin",
+        payload: dict | None = None,
+    ):  # type: ignore[no-untyped-def]
         return client.post(
             "/actions/execute",
             json={
-                "agent_id": "agent-admin",
+                "agent_id": agent_id,
                 "action_type": "list_users",
                 "target_system": "okta",
                 "resource": "org/acme",
-                "payload": {"reason": "test"},
+                "payload": payload if payload is not None else {"reason": "test"},
             },
         )
 
@@ -142,6 +171,98 @@ class ProxyTracesEndpointTest(unittest.TestCase):
         self._execute(client)
         self.assertEqual(client.delete("/proxy/traces").json(), {"cleared": True})
         self.assertEqual(client.get("/proxy/traces").json()["traces"], [])
+
+    # --- Task 6: delta-poll (since_seq) + server-side filters -------------
+
+    def test_tail_only_envelope_stays_backward_compatible(self) -> None:
+        # tail-only keeps the historical behavior (last N, ascending) and the
+        # old envelope keys; the new cursor keys ride along.
+        client = self._build(debug=True)
+        for _ in range(3):
+            self._execute(client)
+        body = client.get("/proxy/traces", params={"tail": 2}).json()
+        self.assertTrue(body["debug_enabled"])
+        self.assertEqual([t["seq"] for t in body["traces"]], [2, 3])
+        self.assertEqual(body["last_seq"], 3)
+        self.assertEqual(body["total"], 3)
+        self.assertFalse(body["reset"])
+
+    def test_since_seq_returns_delta_only(self) -> None:
+        client = self._build(debug=True)
+        for _ in range(5):
+            self._execute(client)
+        body = client.get("/proxy/traces", params={"since_seq": 3}).json()
+        self.assertEqual([t["seq"] for t in body["traces"]], [4, 5])
+        self.assertEqual(body["last_seq"], 5)
+        self.assertEqual(body["total"], 5)
+        self.assertFalse(body["reset"])
+
+    def test_agent_id_filter_is_server_side_and_totals_reflect_it(self) -> None:
+        client = self._build(debug=True)
+        self._add_agent(client, "agent-two")
+        self._execute(client)
+        self._execute(client, agent_id="agent-two")
+        self._execute(client)
+        body = client.get("/proxy/traces", params={"agent_id": "agent-two"}).json()
+        self.assertEqual([t["agent_id"] for t in body["traces"]], ["agent-two"])
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["last_seq"], 3)  # cursor stays unfiltered
+
+    def test_outcome_fail_returns_only_failures(self) -> None:
+        client = self._build(debug=True)
+        self._execute(client)
+        self._execute(client, payload={"reason": "boom", "fail": True})
+        body = client.get("/proxy/traces", params={"outcome": "fail"}).json()
+        self.assertEqual(len(body["traces"]), 1)
+        self.assertFalse(body["traces"][0]["ok"])
+        self.assertEqual(body["total"], 1)
+
+    def test_outcome_garbage_is_422(self) -> None:
+        client = self._build(debug=True)
+        resp = client.get("/proxy/traces", params={"outcome": "garbage"})
+        self.assertEqual(resp.status_code, 422)
+
+    def test_q_substring_matches_payload(self) -> None:
+        client = self._build(debug=True)
+        self._execute(client, payload={"reason": "needle-xyz"})
+        self._execute(client)
+        body = client.get("/proxy/traces", params={"q": "needle-xyz"}).json()
+        self.assertEqual(len(body["traces"]), 1)
+        self.assertEqual(body["traces"][0]["request_payload"], {"reason": "needle-xyz"})
+        self.assertEqual(body["total"], 1)
+
+    def test_limit_returns_first_n_ascending(self) -> None:
+        client = self._build(debug=True)
+        for _ in range(4):
+            self._execute(client)
+        body = client.get("/proxy/traces", params={"limit": 2}).json()
+        self.assertEqual([t["seq"] for t in body["traces"]], [1, 2])
+        self.assertEqual(body["last_seq"], 4)
+        self.assertEqual(body["total"], 4)
+
+    def test_reset_when_cursor_is_ahead_of_server(self) -> None:
+        # A since_seq beyond MAX(seq) means the client cursor survived a
+        # clear/restart: the server flags reset and serves the full selection.
+        client = self._build(debug=True)
+        for _ in range(3):
+            self._execute(client)
+        body = client.get("/proxy/traces", params={"since_seq": 999}).json()
+        self.assertTrue(body["reset"])
+        self.assertEqual([t["seq"] for t in body["traces"]], [1, 2, 3])
+        self.assertEqual(body["last_seq"], 3)
+        self.assertEqual(body["total"], 3)
+
+    def test_filtered_view_is_still_redacted(self) -> None:
+        # The query path emits through _redacted_view like the legacy path:
+        # a Bearer credential in the payload is masked in the VIEW only.
+        secret = "secrettoken" + "123"
+        client = self._build(debug=True)
+        self._execute(client, payload={"reason": f"Bearer {secret}"})
+        body = client.get("/proxy/traces", params={"since_seq": 0}).json()
+        self.assertEqual(len(body["traces"]), 1)
+        payload_text = str(body["traces"][0]["request_payload"])
+        self.assertNotIn(secret, payload_text)
+        self.assertIn("***REDACTED***", payload_text)
 
 
 if __name__ == "__main__":
