@@ -206,12 +206,11 @@ class DiscoveryRisk:
     target_system: str
     estimated_risk: dict
     generated_policy: str | None = None
-    passport_status: str | None = None
     # How the agent declares itself, surfaced by the scanner (never silently trusted):
     #   "present" -> a valid .inspect_ia_agents/manifest.json,
     #   "absent"  -> no manifest anywhere (shadow agent detected via code fallback),
     #   "invalid" -> manifest exists but is unparseable or fails the manifest shape.
-    attestation_status: str | None = None
+    passport_status: str | None = None
     # The signed-passport ATTESTATION axis (orthogonal to passport_status above),
     # mirroring the Rust agent-passport crate verdict over
     # .inspect_ia_agents/passport.json:
@@ -221,6 +220,7 @@ class DiscoveryRisk:
     #   "malformed" -> passport.json present but not parseable as a passport,
     #   None        -> not evaluated (e.g. the [bundle] crypto extra is absent):
     #                  never fabricate "trusted" without the signature check.
+    attestation_status: str | None = None
 
 
 @runtime_checkable
@@ -353,8 +353,9 @@ def _is_human_principal(entry: str) -> bool:
 
 def _passport_shape_ok(passport: dict) -> bool:
     """Mirror Passport::from_json laxness: required fields present with the right
-    type, spiffe_id optional, NO unknown fields (deny_unknown_fields). A dict that
-    fails this is `malformed` (a PARSE failure), not a verify-time untrust."""
+    type, spiffe_id optional (may be null, treated as absent), NO unknown fields
+    (deny_unknown_fields). A dict that fails this is `malformed` (a PARSE failure),
+    not a verify-time untrust."""
     if set(passport) - _PASSPORT_ALLOWED_FIELDS:
         return False
     for name in ("id", "tenant", "exp", "signature", "key_id"):
@@ -364,7 +365,8 @@ def _passport_shape_ok(passport: dict) -> bool:
         value = passport.get(name)
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             return False
-    if "spiffe_id" in passport and not isinstance(passport["spiffe_id"], str):
+    spiffe_id = passport.get("spiffe_id")
+    if spiffe_id is not None and not isinstance(spiffe_id, str):
         return False
     return True
 

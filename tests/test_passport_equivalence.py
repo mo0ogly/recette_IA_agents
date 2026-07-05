@@ -161,6 +161,44 @@ class TestPassportEquivalence(unittest.TestCase):
         self.assertIn("trusted", seen, seen)
         self.assertIn("untrusted", seen, seen)
 
+    def test_multi_reason_sort_canonical_order(self):
+        """Multi-reason untrust verdicts must be sorted by canonical order (I4 determinism).
+
+        The corpus subjects are all single-reason, so this test directly constructs a
+        passport with multiple defects:
+        - expired (exp <= now)
+        - empty_delegation (delegation is [])
+        - unknown_key_id (key_id not in trust)
+        - scope_overreach (declared family not in scope)
+
+        These trigger reasons with priorities [1, 2, 5, 4] in _UNTRUST_ORDER.
+        After sort, they must be [1, 2, 4, 5] = [expired, empty_delegation, scope_overreach, unknown_key_id].
+        """
+        # Construct a minimal passport with multiple defects (no crypto needed).
+        passport = {
+            "id": "test-agent-id",
+            "tenant": "test-tenant",
+            "exp": "2020-01-01T00:00:00Z",  # past, triggers expired
+            "signature": "0000000000000000000000000000000000000000000000000000000000000000",
+            "key_id": "nonexistent-key",  # not in trust, triggers unknown_key_id
+            "delegation": [],  # empty, triggers empty_delegation
+            "scope": ["read"],
+        }
+        trust = _load_trust()
+        declared = ["read", "write"]  # write is declared but not in scope, triggers scope_overreach
+
+        status, reasons = attest_passport(passport, trust, _NOW, declared)
+
+        self.assertEqual(status, "untrusted", "multi-reason passport must be untrusted")
+        self.assertEqual(len(reasons), 4, f"expected 4 reasons, got {len(reasons)}: {reasons}")
+
+        # Extract reason kinds in order.
+        kinds = [r["kind"] for r in reasons]
+
+        # The canonical sort order is: expired(1) < empty_delegation(2) < scope_overreach(4) < unknown_key_id(5).
+        expected_kinds = ["expired", "empty_delegation", "scope_overreach", "unknown_key_id"]
+        self.assertEqual(kinds, expected_kinds, f"reasons not in canonical order: {kinds}")
+
 
 if __name__ == "__main__":
     unittest.main()
