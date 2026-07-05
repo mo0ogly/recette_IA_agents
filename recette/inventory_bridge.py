@@ -19,6 +19,12 @@ Design choices (documented, per Task 13):
   "absent" / "invalid"), the single source of truth the Rust scanner already
   emits (never re-derived here).
 
+- ``attestation_status`` mirrors ``passport_status`` on the ORTHOGONAL signed-
+  credential axis: straight from ``attestation.kind`` ("trusted" / "untrusted" /
+  "unsigned" / "malformed"), the Rust scanner's single source of truth. It is
+  ``None`` only when the scan omitted the field (an older engine with no
+  attestation axis) -- the bridge never fabricates "trusted" without the check.
+
 - ``canonical_agent_id`` mirrors the Python reference adapter
   (``ReferenceSourceScanAdapter._build_risks``): ``sha256(principal)[:16]``. The
   principal is the declared principal when a valid passport exists, else the
@@ -127,6 +133,18 @@ def _record_risks(record: dict, has_violations: bool) -> list[DiscoveryRisk]:
         raise ValueError(f"agent record 'declared' is not an object: {record.get('agent_id')!r}")
     observed = record.get("observed") or {}
 
+    # Signed-credential attestation axis (orthogonal to passport_status above),
+    # straight from the Rust-emitted ``attestation.kind`` (trusted/untrusted/
+    # unsigned/malformed) -- the single source of truth, never re-derived here.
+    # ``None`` when the scan omitted the field (older engine / no attestation axis)
+    # so we never fabricate "trusted" without the signature check.
+    attestation = record.get("attestation")
+    attestation_status = (
+        str(attestation["kind"])
+        if isinstance(attestation, dict) and "kind" in attestation
+        else None
+    )
+
     principal = declared["principal"] if declared else str(record.get("agent_id", ""))
     canonical = _canonical_agent_id(principal)
     target = _record_target(declared)
@@ -139,6 +157,7 @@ def _record_risks(record: dict, has_violations: bool) -> list[DiscoveryRisk]:
             target_system=target,
             estimated_risk={"level": level},
             passport_status=passport_status,
+            attestation_status=attestation_status,
         )
         for action in _record_actions(declared, observed)
     ]

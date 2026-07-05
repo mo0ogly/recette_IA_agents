@@ -83,6 +83,37 @@ class TestProbeInventoryFallback(unittest.TestCase):
         second = self.client.get("/probe/inventory").text
         self.assertEqual(first, second)
 
+    def test_sample_agents_carry_attestation(self) -> None:
+        # Every agent record carries the signed-credential attestation axis with a
+        # kind-tagged value (R16: the fallback must match the live shape).
+        inv = self.client.get("/probe/inventory").json()["inventory"]
+        for agent in inv["agents"]:
+            self.assertIn("attestation", agent)
+            self.assertIn(
+                agent["attestation"]["kind"],
+                {"trusted", "untrusted", "unsigned", "malformed"},
+            )
+
+    def test_sample_covers_representative_attestation_states(self) -> None:
+        inv = self.client.get("/probe/inventory").json()["inventory"]
+        kinds = {a["attestation"]["kind"] for a in inv["agents"]}
+        # The fallback exercises at least the trusted + untrusted + unsigned states
+        # so the console fallback render is representative.
+        self.assertIn("trusted", kinds)
+        self.assertIn("untrusted", kinds)
+        self.assertIn("unsigned", kinds)
+
+    def test_sample_summary_has_attested_counters(self) -> None:
+        summary = self.client.get("/probe/inventory").json()["inventory"]["summary"]
+        for key in ("attested_trusted", "attested_untrusted", "unsigned", "attested_malformed"):
+            self.assertIn(key, summary)
+            self.assertIsInstance(summary[key], int)
+        # Counters match the agents (1 trusted, 1 untrusted, 1 unsigned, 0 malformed).
+        self.assertEqual(summary["attested_trusted"], 1)
+        self.assertEqual(summary["attested_untrusted"], 1)
+        self.assertEqual(summary["unsigned"], 1)
+        self.assertEqual(summary["attested_malformed"], 0)
+
 
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
 @unittest.skipUnless(_LIVE_BIN.is_file(), "requires the built discoveryprobe-inventory binary")
@@ -133,6 +164,31 @@ class TestProbeInventoryLive(unittest.TestCase):
         first = self.client.get("/probe/inventory").text
         second = self.client.get("/probe/inventory").text
         self.assertEqual(first, second)
+
+    def test_live_scan_agents_carry_attestation(self) -> None:
+        # The live scan is invoked with --trust/--now, so every record carries a
+        # kind-tagged attestation (a present passport.json can reach "trusted").
+        inv = self.client.get("/probe/inventory").json()["inventory"]
+        self.assertTrue(inv["agents"])
+        for agent in inv["agents"]:
+            self.assertIn("attestation", agent)
+            self.assertIn(
+                agent["attestation"]["kind"],
+                {"trusted", "untrusted", "unsigned", "malformed"},
+            )
+
+    def test_live_scan_summary_has_attested_counters(self) -> None:
+        summary = self.client.get("/probe/inventory").json()["inventory"]["summary"]
+        for key in ("attested_trusted", "attested_untrusted", "unsigned", "attested_malformed"):
+            self.assertIn(key, summary)
+            self.assertIsInstance(summary[key], int)
+        # The counters agree with the per-agent attestation kinds.
+        inv = self.client.get("/probe/inventory").json()["inventory"]
+        kinds = [a["attestation"]["kind"] for a in inv["agents"]]
+        self.assertEqual(summary["attested_trusted"], kinds.count("trusted"))
+        self.assertEqual(summary["attested_untrusted"], kinds.count("untrusted"))
+        self.assertEqual(summary["unsigned"], kinds.count("unsigned"))
+        self.assertEqual(summary["attested_malformed"], kinds.count("malformed"))
 
 
 if __name__ == "__main__":
