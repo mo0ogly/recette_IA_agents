@@ -66,15 +66,19 @@ Un binaire de workspace, sans dependance d'arg-parsing (JSON sur stdout, erreurs
 stderr ; codes de sortie 0 succes, 2 usage, 1 autre) :
 
 ```
-discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]
+discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>] [--trust <pubkeys.json>] [--now <rfc3339>]
 ```
 
 | Argument | Role |
 |----------|------|
-| `<path>` | l'arbre source a scanner (`scan::scan_tree`) |
+| `<path>` | l'arbre source a scanner (`scan::scan_tree_attested`) |
 | `--capture <file.json>` | un fichier `ObservedInput` JSON (observation runtime). Absent = scan statique seul, dont la conformite ne peut jamais etre `Conform` |
 | `--team <dir>` | un repertoire parcouru recursivement (trie) pour ses `team.json`. Le graphe declare = passeports + teams |
 | `--out <file>` | ecrit le JSON dans ce fichier au lieu de stdout |
+| `--trust <pubkeys.json>` / `--now <rfc3339>` | keyring + horloge injectee OPTIONNELS pour l'axe **attestation** (passeport signe). Sans les deux, un `passport.json` present est le fail-safe `untrusted`. Detail : `docs/runbooks/passport-recette.md` |
+
+Le binaire porte aussi deux sous-commandes passeport (`passport issue`, `passport
+verify`) documentees dans `docs/runbooks/passport-recette.md`.
 
 Flags verifies dans `discoveryprobe/discoveryprobe-inventory/src/main.rs` (const `USAGE`
 et `parse_args`).
@@ -153,6 +157,24 @@ Deux sujets ground-truth mono-axe (R20) exercent la reconnaissance de passeport 
   `passport_status: "invalid"`. Un manifest casse rapporte comme invalide, jamais
   silencieusement traite comme une declaration valide.
 
+## Le second axe : l'attestation (passeport signe)
+
+L'inventaire porte DEUX axes orthogonaux. Le passeport-manifest ci-dessus
+(`present` / `absent` / `invalid`) dit ce que l'agent DECLARE. Un **second axe,
+independant**, dit ce qu'une AUTORITE atteste : l'`attestation` d'un
+`.inspect_ia_agents/passport.json` SIGNE, avec quatre etats `trusted` / `untrusted` /
+`unsigned` / `malformed`. Le scan l'emet par agent quand on lui passe un keyring et une
+horloge injectee (`scan --trust <pubkeys.json> --now <rfc3339>`) ; sans les deux, un
+passeport present est le fail-safe `untrusted` (jamais `trusted` sans keyring). Les deux
+axes sont independants : un shadow-agent (`absent`) peut porter un credential `trusted`,
+un manifest `present` peut etre `unsigned`.
+
+L'emission (`passport issue`), la verification (`passport verify`, avec son contrat de
+codes de sortie et le controle de scope-overreach via `--declared`), les sujets de
+corpus attestation (4 positifs `trusted` + 3 negatifs mono-axe) et l'oracle
+d'equivalence Rust/Python sont couverts dans un runbook dedie :
+`docs/runbooks/passport-recette.md`.
+
 ## L'API et la console
 
 - **Endpoint** : `GET /probe/inventory` (`recette/api/routers/probe.py`) fait un **scan
@@ -160,6 +182,10 @@ Deux sujets ground-truth mono-axe (R20) exercent la reconnaissance de passeport 
   arbre d'agent sous `corpus/repos/*/repo` (racine et binaire configurables par
   `INSPECT_IA_AGENTS_INVENTORY_SCAN_ROOT` / `INSPECT_IA_AGENTS_INVENTORY_BIN`, R5), fusionne
   les inventaires et renvoie `{inventory, live: true, engine}` sous la cle `inventory`.
+  Quand le fichier de confiance du corpus (`corpus/keys/test-authority.trust.json`) existe,
+  le scan est invoque avec `--trust <file> --now <reference>` pour resoudre l'axe
+  attestation ; l'horloge de reference est une constante injectee (defaut
+  `2027-01-01T00:00:00Z`, surchargeable par `INSPECT_IA_AGENTS_INVENTORY_NOW`, I4/R5).
   Read-only (I1) : le moteur ne fait que lire les sources. Fail-safe (R7) : si le binaire
   n'est pas build (`./recette.sh discovery-build`), la route retombe sur l'echantillon
   committe (`corpus/inventory/sample-inventory.json`) avec `live: false` + `reason` -- le
@@ -168,6 +194,8 @@ Deux sujets ground-truth mono-axe (R20) exercent la reconnaissance de passeport 
 - **Console** : le panneau `InventoryPanel` (page **Probe**) rend, par agent : son
   id, l'**evidence** de code scanne, le **badge de passeport** (present / absent /
   invalide -- keyed off `passport.kind` seul, jamais sur une liste de violations non vide),
+  le **badge d'attestation** (trusted / untrusted / unsigned / malformed -- second axe
+  orthogonal keye sur `attestation.kind` seul, `docs/runbooks/passport-recette.md`),
   le kind du sujet, et le verdict de conformite. Un badge **LIVE SCAN** (vert) / **SAMPLE**
   (ambre) indique si l'inventaire vient d'un scan live ou de l'echantillon. Sous la table :
   la liste des violations et le graphe de communication (aretes declarees vs observees, non
