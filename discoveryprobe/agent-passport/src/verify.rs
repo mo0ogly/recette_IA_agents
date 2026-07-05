@@ -19,6 +19,7 @@
 use crate::hex::decode_hex;
 use crate::{canonical_bytes, Passport, PassportError, TrustStore};
 use ed25519_dalek::{Signature, Verifier};
+use serde::{Deserialize, Serialize};
 
 /// An RFC3339 UTC instant, reduced to whole epoch seconds for comparison.
 ///
@@ -185,8 +186,19 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 /// appropriate for **stable serialization and audit trails**, NOT for sorting by
 /// "severity" or "check priority". Callers sorting reasons for display or
 /// hashing should not infer a priority ranking from the Ord order; instead, all
-/// reasons are equally fatal to trust.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/// reasons are equally fatal to trust. [`verify`] sorts the reason list by this
+/// order before returning, so the serialized verdict is replay-stable.
+///
+/// # Serialization (kind-tagged)
+///
+/// Serialized with serde as an internally tagged object under `kind`, so a
+/// Python or console consumer dispatches on `value["kind"]` -- never on shape.
+/// The `kind` strings are the snake_case variant names: `bad_signature`,
+/// `expired`, `empty_delegation`, `no_human_principal`, `scope_overreach` (with
+/// its `extra` array), `unknown_key_id`, and `malformed_field` (with its `field`
+/// name).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UntrustReason {
     /// The Ed25519 signature did not verify (or was not decodable) against the
     /// trusted key.
@@ -206,21 +218,44 @@ pub enum UntrustReason {
     /// be checked.
     UnknownKeyId,
     /// A field could not be interpreted; the payload names the offending field.
-    MalformedField(String),
+    MalformedField {
+        /// The name of the offending field (e.g. `"exp"`).
+        field: String,
+    },
 }
 
 /// The outcome of [`verify`]: either fully trusted, or untrusted with the full
 /// set of accumulated reasons.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// # Serialization (kind-tagged)
+///
+/// Serialized with serde as an internally tagged object under `kind`: `Trusted`
+/// becomes `{"kind":"trusted"}` and `Untrusted` becomes
+/// `{"kind":"untrusted","reasons":[...]}`, where each reason is itself a
+/// kind-tagged [`UntrustReason`]. A consumer dispatches on `value["kind"]`,
+/// never on shape.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Verdict {
     /// No defect was found: the passport is authentic, unexpired, terminates on
     /// a human, and (if a declared scope was supplied) stays within scope.
     Trusted,
     /// At least one defect was found; `reasons` lists every applicable one.
     Untrusted {
-        /// Every [`UntrustReason`] that applied, in reason-check order.
+        /// Every [`UntrustReason`] that applied, sorted by the [`UntrustReason`]
+        /// [`Ord`] so the serialized verdict is replay-stable (I4).
         reasons: Vec<UntrustReason>,
     },
+}
+
+impl Verdict {
+    /// Returns `true` when the verdict is [`Verdict::Trusted`].
+    ///
+    /// A convenience for a governance decision path that only needs the boolean
+    /// outcome without matching the full reason set.
+    pub fn is_trusted(&self) -> bool {
+        matches!(self, Verdict::Trusted)
+    }
 }
 
 /// The action families a consumer's MANIFEST declares for the agent.
@@ -267,7 +302,9 @@ impl DeclaredScope {
 ///    pushes [`UntrustReason::ScopeOverreach`].
 ///
 /// With no accumulated reason the result is [`Verdict::Trusted`]; otherwise
-/// [`Verdict::Untrusted`] carrying the reasons in check order.
+/// [`Verdict::Untrusted`] carrying every applicable reason, SORTED by the
+/// [`UntrustReason`] [`Ord`] before returning so the serialized verdict is
+/// replay-stable (I4) regardless of the order the checks accumulated them.
 pub fn verify(
     passport: &Passport,
     trust: &TrustStore,
@@ -295,7 +332,9 @@ pub fn verify(
 
     // 2. Expiry.
     match Timestamp::parse(&passport.exp) {
-        Err(_) => reasons.push(UntrustReason::MalformedField("exp".to_string())),
+        Err(_) => reasons.push(UntrustReason::MalformedField {
+            field: "exp".to_string(),
+        }),
         Ok(exp) => {
             if exp.epoch_seconds() <= now.epoch_seconds() {
                 reasons.push(UntrustReason::Expired);
@@ -330,6 +369,9 @@ pub fn verify(
     if reasons.is_empty() {
         Verdict::Trusted
     } else {
+        // Sort by the UntrustReason Ord so the emitted verdict is byte-identical
+        // across runs regardless of the check order that accumulated them (I4).
+        reasons.sort();
         Verdict::Untrusted { reasons }
     }
 }

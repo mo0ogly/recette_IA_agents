@@ -239,7 +239,9 @@ fn malformed_exp_yields_malformed_field() {
     let verdict = verify(&passport, &trust, &now(), None);
     match verdict {
         Verdict::Untrusted { reasons } => {
-            assert!(reasons.contains(&UntrustReason::MalformedField("exp".to_string())));
+            assert!(reasons.contains(&UntrustReason::MalformedField {
+                field: "exp".to_string(),
+            }));
         }
         Verdict::Trusted => panic!("a malformed exp must not be trusted"),
     }
@@ -352,4 +354,156 @@ fn timestamp_rejects_non_utc_and_garbage() {
     assert!(Timestamp::parse("2023-02-29T00:00:00Z").is_err());
     assert!(Timestamp::parse("2027-13-01T00:00:00Z").is_err());
     assert!(Timestamp::parse("not-a-date").is_err());
+}
+
+#[test]
+fn trusted_serializes_to_exactly_kind_trusted() {
+    let json = serde_json::to_string(&Verdict::Trusted).expect("Trusted must serialize");
+    assert_eq!(json, r#"{"kind":"trusted"}"#);
+    assert!(Verdict::Trusted.is_trusted());
+}
+
+#[test]
+fn untrusted_serializes_with_kind_tag_and_reasons_array() {
+    let verdict = Verdict::Untrusted {
+        reasons: vec![UntrustReason::Expired, UntrustReason::UnknownKeyId],
+    };
+    let value = serde_json::to_value(&verdict).expect("Untrusted must serialize");
+    assert_eq!(value["kind"], "untrusted");
+    let reasons = value["reasons"]
+        .as_array()
+        .expect("reasons must be a JSON array");
+    assert_eq!(reasons.len(), 2);
+    assert_eq!(reasons[0]["kind"], "expired");
+    assert_eq!(reasons[1]["kind"], "unknown_key_id");
+    assert!(!verdict.is_trusted());
+}
+
+#[test]
+fn each_untrust_reason_serializes_to_its_exact_kind_string() {
+    let cases: Vec<(UntrustReason, &str)> = vec![
+        (UntrustReason::BadSignature, r#"{"kind":"bad_signature"}"#),
+        (UntrustReason::Expired, r#"{"kind":"expired"}"#),
+        (
+            UntrustReason::EmptyDelegation,
+            r#"{"kind":"empty_delegation"}"#,
+        ),
+        (
+            UntrustReason::NoHumanPrincipal,
+            r#"{"kind":"no_human_principal"}"#,
+        ),
+        (UntrustReason::UnknownKeyId, r#"{"kind":"unknown_key_id"}"#),
+    ];
+    for (reason, expected) in cases {
+        let json = serde_json::to_string(&reason).expect("reason must serialize");
+        assert_eq!(json, expected);
+    }
+}
+
+#[test]
+fn scope_overreach_carries_extra_and_malformed_field_carries_field() {
+    let overreach = UntrustReason::ScopeOverreach {
+        extra: vec!["delete".to_string(), "write".to_string()],
+    };
+    let overreach_json = serde_json::to_string(&overreach).expect("overreach must serialize");
+    assert_eq!(
+        overreach_json,
+        r#"{"kind":"scope_overreach","extra":["delete","write"]}"#
+    );
+
+    let malformed = UntrustReason::MalformedField {
+        field: "exp".to_string(),
+    };
+    let malformed_json = serde_json::to_string(&malformed).expect("malformed must serialize");
+    assert_eq!(
+        malformed_json,
+        r#"{"kind":"malformed_field","field":"exp"}"#
+    );
+}
+
+#[test]
+fn verdict_round_trips_through_serde() {
+    let original = Verdict::Untrusted {
+        reasons: vec![
+            UntrustReason::Expired,
+            UntrustReason::ScopeOverreach {
+                extra: vec!["delete".to_string()],
+            },
+            UntrustReason::MalformedField {
+                field: "exp".to_string(),
+            },
+            UntrustReason::UnknownKeyId,
+        ],
+    };
+    let json = serde_json::to_string(&original).expect("serialize");
+    let back: Verdict = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, original);
+
+    let trusted_json = serde_json::to_string(&Verdict::Trusted).expect("serialize trusted");
+    let trusted_back: Verdict = serde_json::from_str(&trusted_json).expect("deserialize trusted");
+    assert_eq!(trusted_back, Verdict::Trusted);
+}
+
+#[test]
+fn sorted_reasons_are_replay_stable() {
+    // Trigger UnknownKeyId (check 1) and Expired (check 2): the check order is
+    // [UnknownKeyId, Expired], which is NOT the Ord order (Expired precedes
+    // UnknownKeyId by enum declaration order). Sorting before return makes the
+    // emitted verdict byte-identical across runs regardless of check order.
+    let key_id = "test-key-1";
+    let claims = claims_with(
+        vec!["service:orch", "human:alice@acme.example"],
+        vec!["read_ledger"],
+        "2020-01-01T00:00:00Z",
+    );
+    let passport = issue_passport(claims, key_id);
+    // Empty trust store -> UnknownKeyId; past expiry -> Expired.
+    let trust = TrustStore::new();
+
+    let v1 = verify(&passport, &trust, &now(), None);
+    let v2 = verify(&passport, &trust, &now(), None);
+
+    let j1 = serde_json::to_string(&v1).expect("v1 must serialize");
+    let j2 = serde_json::to_string(&v2).expect("v2 must serialize");
+    assert_eq!(j1, j2, "the serialized verdict must be byte-stable");
+
+    match v1 {
+        Verdict::Untrusted { reasons } => {
+            assert_eq!(reasons.len(), 2);
+            // Sorted (Ord) order, NOT check order: Expired < UnknownKeyId.
+            assert!(
+                reasons[0] < reasons[1],
+                "reasons must be Ord-sorted before return"
+            );
+            assert_eq!(
+                reasons,
+                vec![UntrustReason::Expired, UntrustReason::UnknownKeyId],
+                "the sort must reorder check-order [UnknownKeyId, Expired] into Ord order"
+            );
+        }
+        Verdict::Trusted => panic!("a passport with defects must not be trusted"),
+    }
+}
+
+#[test]
+fn verify_emits_identical_json_across_runs() {
+    let key_id = "test-key-1";
+    let claims = claims_with(
+        vec!["service:orch", "human:alice@acme.example"],
+        vec!["read_ledger"],
+        "2027-01-01T00:00:00Z",
+    );
+    let passport = issue_passport(claims, key_id);
+    let trust = trust_with_test_key(key_id);
+    let declared = DeclaredScope::new(vec![
+        "read_ledger".to_string(),
+        "delete_all".to_string(),
+        "admin".to_string(),
+    ]);
+
+    let a = verify(&passport, &trust, &now(), Some(&declared));
+    let b = verify(&passport, &trust, &now(), Some(&declared));
+    let ja = serde_json::to_string(&a).expect("a must serialize");
+    let jb = serde_json::to_string(&b).expect("b must serialize");
+    assert_eq!(ja, jb);
 }
