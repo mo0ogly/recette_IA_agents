@@ -29,6 +29,7 @@ class EventKind(StrEnum):
     PLATFORM_ERROR = "platform_error"  # audited internal failure (fail-safe deny)
     BYPASS_DETECTED = "bypass_detected"  # unmediated path observed post-hoc (wire<->audit)
     RESOLUTION_DENIED = "resolution_denied"  # private-DNS name not in allowlist (containment)
+    AGENT_ADMISSION = "agent_admission"  # runtime admission verdict (I1/I3), audited at launch
 
 
 class PolicyVerdict(StrEnum):
