@@ -22,8 +22,10 @@ gateway + proxies (I5) are the **PEP** (Policy Enforcement Point), the deny-by-d
 policy engine is the **PDP** (Policy Decision Point); the passport is the **identity
 credential** the PEP presents to the PDP to bind an action to an attested identity (I3).
 Phase 1 (the recette, below) inspects agents that are NOT running: it creates the
-artifact, the inspector, and the oracle. Phase 2 (sketched, out of scope) has the gateway
-verify the passport at runtime-agent registration, reusing the SAME crate.
+artifact, the inspector, and the oracle. Phase 2 has the gateway verify the passport at
+runtime-agent registration AND on every action, reusing the SAME oracle -- see the
+dedicated runbook: `docs/runbooks/passport-admission.md` (runtime admission, observe/enforce
+modes, two gates).
 
 Signed fields (`Claims`): `id`, `tenant`, `delegation` (mandate chain), `scope`
 (permitted action families), `exp` (RFC 3339 UTC expiry), `spiffe_id` (optional). The

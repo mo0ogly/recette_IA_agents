@@ -24,9 +24,10 @@ sont le **PEP** (Policy Enforcement Point), le policy engine deny-by-default est
 **PDP** (Policy Decision Point) ; le passeport est le **credential d'identite** que le
 PEP presente au PDP pour lier une action a une identite attestee (I3). La phase 1
 (recette, ci-dessous) inspecte des agents NON executes : elle cree l'artefact,
-l'inspecteur et l'oracle. La phase 2 (esquissee, hors scope) fait verifier le
-passeport par la gateway a l'enregistrement d'un agent runtime, en reutilisant le
-MEME crate.
+l'inspecteur et l'oracle. La phase 2 fait verifier le passeport par la gateway a
+l'enregistrement d'un agent runtime ET a chaque action, en reutilisant le MEME
+oracle -- voir le runbook dedie : `docs/runbooks/passport-admission.md`
+(admission runtime, modes observe/enforce, deux gardes).
 
 Champs signes (`Claims`) : `id`, `tenant`, `delegation` (chaine de mandat), `scope`
 (familles d'actions permises), `exp` (expiration RFC 3339 UTC), `spiffe_id`
