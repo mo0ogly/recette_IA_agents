@@ -51,7 +51,7 @@
     "attestation_status": {
       "type": "string",
       "enum": ["trusted", "untrusted", "unsigned", "malformed"],
-      "description": "Optional expected attestation of the SIGNED Contrat-3 passport (.inspect_ia_agents/passport.json, agent-passport.schema.json). This is the orthogonal SIGNED-passport axis, distinct from passport_status (the unsigned manifest axis): trusted (valid signature from a trusted key), untrusted (well-formed but signature/key not trusted or expired), unsigned (no passport.json present), malformed (passport.json present but structurally invalid). Omitted when the ground-truth does not assert on attestation (existing subjects)."
+      "description": "Optional expected attestation of the SIGNED Contrat-3 passport (.inspect_ia_agents/passport.json, agent-passport.schema.json). This is the orthogonal SIGNED-passport axis, distinct from passport_status (the unsigned manifest axis). Per-value semantics: trusted = valid signature from a trusted key (Rust verify() succeeded); untrusted = passport.json parsed OK by Rust from_json() but signature/key verification failed or expired; unsigned = no passport.json present; malformed = passport.json present but NOT PARSEABLE by Rust from_json() (JSON structure or type conversion failed -- this is the Rust parse boundary, not schema validation). Omitted when the ground-truth does not assert on attestation (existing subjects)."
     },
     "notes": {
       "type": "string",
