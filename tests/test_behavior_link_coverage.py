@@ -35,6 +35,9 @@ _NO_TWIN: set[str] = {
     "gl-no-agent",
     "gh-shadow-agent",
     "gh-invalid-passport",
+    "gh-passport-expired",
+    "gh-passport-tampered",
+    "gh-passport-scope-overreach",
 }
 
 

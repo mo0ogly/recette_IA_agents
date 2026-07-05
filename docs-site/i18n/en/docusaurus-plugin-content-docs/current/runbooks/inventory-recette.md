@@ -63,18 +63,22 @@ A workspace binary, no arg-parsing dependency (JSON on stdout, errors on stderr;
 codes 0 success, 2 usage, 1 other):
 
 ```
-discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]
+discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>] [--trust <pubkeys.json>] [--now <rfc3339>]
 ```
 
 | Argument | Role |
 |----------|------|
-| `<path>` | the source tree to scan (`scan::scan_tree`) |
+| `<path>` | the source tree to scan (`scan::scan_tree_attested`) |
 | `--capture <file.json>` | an `ObservedInput` JSON file (runtime observation). Absent = static-only scan, whose conformity can never be `Conform` |
 | `--team <dir>` | a directory walked recursively (sorted) for its `team.json` files. The declared graph = passports + teams |
 | `--out <file>` | write the JSON to that file instead of stdout |
+| `--trust <pubkeys.json>` / `--now <rfc3339>` | OPTIONAL keyring + injected clock for the **attestation** axis (signed passport). Without both, a present `passport.json` is the fail-safe `untrusted`. Detail: `docs/runbooks/passport-recette.md` |
+
+The binary also carries two passport subcommands (`passport issue`, `passport verify`)
+documented in `docs/runbooks/passport-recette.md`.
 
 Flags verified in `discoveryprobe/discoveryprobe-inventory/src/main.rs` (const `USAGE`
-and `parse_args`).
+and `parse_command`).
 
 ### Shape of the `--capture` input (ObservedInput)
 
@@ -147,6 +151,24 @@ Two mono-axis (R20) ground-truth subjects exercise passport recognition:
   `passport_status: "invalid"`. A broken manifest reported as invalid, never silently
   trusted as a valid declaration.
 
+## The second axis: attestation (signed passport)
+
+The inventory carries TWO orthogonal axes. The manifest passport above (`present` /
+`absent` / `invalid`) states what the agent DECLARES. A **second, independent axis**
+states what an AUTHORITY attests: the `attestation` of a SIGNED
+`.inspect_ia_agents/passport.json`, with four states `trusted` / `untrusted` /
+`unsigned` / `malformed`. The scan emits it per agent when given a keyring and an
+injected clock (`scan --trust <pubkeys.json> --now <rfc3339>`); without both, a present
+passport is the fail-safe `untrusted` (never `trusted` without a keyring). The two axes
+are independent: a shadow agent (`absent`) can carry a `trusted` credential, a `present`
+manifest can be `unsigned`.
+
+Emission (`passport issue`), verification (`passport verify`, with its exit-code
+contract and the scope-overreach check via `--declared`), the attestation corpus
+subjects (4 `trusted` positives + 3 mono-axis negatives), and the Rust/Python
+equivalence oracle are covered in a dedicated runbook:
+`docs/runbooks/passport-recette.md`.
+
 ## The API and the console
 
 - **Endpoint**: `GET /probe/inventory` (`recette/api/routers/probe.py`) serves an
@@ -155,7 +177,9 @@ Two mono-axis (R20) ground-truth subjects exercise passport recognition:
   fabricated inventory.
 - **Console**: the `InventoryPanel` (page **Probe eBPF**) renders, per agent: its id, the
   scanned code **evidence**, the **passport badge** (present / absent / invalid -- keyed off
-  `passport.kind` alone, never off a non-empty violations list), the subject kind, and the
+  `passport.kind` alone, never off a non-empty violations list), the **attestation badge**
+  (trusted / untrusted / unsigned / malformed -- a second orthogonal axis keyed off
+  `attestation.kind` alone, `docs/runbooks/passport-recette.md`), the subject kind, and the
   conformity verdict. Below the table: the violations list and the communication graph
   (declared vs observed edges, undeclared in red, via-gateway apart). UI help: the panel's
   **? Aide** button (topic `inventory`).

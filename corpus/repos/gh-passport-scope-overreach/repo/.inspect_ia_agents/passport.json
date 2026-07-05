@@ -1,0 +1,15 @@
+{
+  "id": "acme-overreach-pr-bot[bot]",
+  "tenant": "acme",
+  "delegation": [
+    "acme-platform-team",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "spiffe_id": "spiffe://acme/agent/overreach-pr-bot",
+  "signature": "46a2f5677a706506807ce3a7e9d7ef6a48eedc2a102147ffcf4645bc2bd14c81b4b790b5a10478fefbe5fce7a58aefe05c532e615c28c5b15d561d2c817cbb07",
+  "key_id": "test-authority-1"
+}

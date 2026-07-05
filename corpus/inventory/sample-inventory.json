@@ -36,6 +36,9 @@
           }
         }
       },
+      "attestation": {
+        "kind": "trusted"
+      },
       "kind": "git_agent",
       "declared": {
         "principal": "acme-dependency-pr-bot[bot]",
@@ -72,6 +75,14 @@
           "agent/main.py: from github import"
         ]
       },
+      "attestation": {
+        "kind": "untrusted",
+        "reasons": [
+          {
+            "kind": "unknown_key_id"
+          }
+        ]
+      },
       "kind": null,
       "declared": null,
       "observed": {
@@ -98,6 +109,9 @@
           "repo shape: agent.identity is missing",
           "unified shape: agent_id is missing or empty; target_systems is missing; declared_identity is missing; capability_scope is missing"
         ]
+      },
+      "attestation": {
+        "kind": "unsigned"
       },
       "kind": null,
       "declared": null,
@@ -136,6 +150,10 @@
     "with_passport": 1,
     "without_passport": 1,
     "invalid_passport": 1,
-    "violation_count": 2
+    "violation_count": 2,
+    "attested_trusted": 1,
+    "attested_untrusted": 1,
+    "unsigned": 1,
+    "attested_malformed": 0
   }
 }

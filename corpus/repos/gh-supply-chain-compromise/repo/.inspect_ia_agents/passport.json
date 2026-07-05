@@ -1,0 +1,15 @@
+{
+  "id": "acme-release-builder",
+  "tenant": "acme",
+  "delegation": [
+    "acme-release-team",
+    "human:dave"
+  ],
+  "scope": [
+    "read_repo",
+    "push"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "signature": "2db217fef0231bb6ae3c9ea70a394c55d67d1fdf5bc865228ae04d8fe601311ae357f25a5a36b5fddc13baebb777dcbb95a0fe02d8d13fa1255d3065b8192a04",
+  "key_id": "test-authority-1"
+}

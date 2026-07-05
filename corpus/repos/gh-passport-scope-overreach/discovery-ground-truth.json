@@ -1,0 +1,12 @@
+{
+  "agent_repo": "gh-passport-scope-overreach",
+  "target_system": "github",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_repo", "push"],
+  "risk_rank": 3,
+  "policy_generated": true,
+  "passport_status": "present",
+  "attestation_status": "untrusted",
+  "notes": "Scope-overreach passport (mono-axis attestation miss, declared cross-check). The manifest is valid and declares read_repo + push; the signed passport is genuine and verifies on signature, expiry, and delegation, but its signed scope is only read_repo. The agent acts (push) beyond its signed passport. NUANCE for Task 11: this axis is exercised by verify-with-declared, not by a bare scan. verify(--now 2027-01-01T00:00:00Z) with NO --declared reports trusted (exit 0) -- that is the scan-level (Task 7) view, which passes declared=None and only checks signature/expiry/delegation. verify(--now 2027-01-01T00:00:00Z --declared read_repo,push) -- the manifest's actions -- reports untrusted with reason scope_overreach, extra ['push'] (exit 3). The ground-truth attestation_status = untrusted REFLECTS the verify-with-declared verdict; the Task 11 oracle produces it by applying the manifest capabilities (read_repo, push) as the declared set. All other axes conform: scanner detects one agent, surfaces read_repo + push, emits a policy. The miss this subject guards is a passport whose signed scope under-covers the agent's declared capabilities being trusted without the declared cross-check."
+}

@@ -55,8 +55,8 @@ use crate::graph::{DeclaredGraph, Edge};
 use crate::ipc_correlate::derive_ipc_edges;
 use crate::manifest::KNOWN_GIT_ACTIONS;
 use crate::model::{
-    AgentInventory, AgentRecord, CommGraph, Conformity, Declared, InventorySummary, Observed,
-    ObservedInput, Violation,
+    AgentInventory, AgentRecord, Attestation, CommGraph, Conformity, Declared, InventorySummary,
+    Observed, ObservedInput, Violation,
 };
 use crate::scan::{PassportStatus, ScannedAgent};
 use discoveryprobe_core::{CaptureRecording, ObservationSurface};
@@ -241,6 +241,9 @@ fn record_from_scanned(agent: &ScannedAgent) -> AgentRecord {
     AgentRecord {
         agent_id,
         passport: agent.passport.clone(),
+        // Attestation is a per-tree axis already resolved by the scan (with or
+        // without a keyring); the correlator carries it through unchanged.
+        attestation: agent.attestation.clone(),
         kind,
         declared,
         observed: Observed::default(),
@@ -257,6 +260,9 @@ fn runtime_shadow_record(agent_id: &str) -> AgentRecord {
         passport: PassportStatus::Absent {
             evidence: vec![RUNTIME_SHADOW_EVIDENCE.to_string()],
         },
+        // A runtime shadow has no scanned source tree, hence no passport.json:
+        // it carries no signed credential (Unsigned).
+        attestation: Attestation::Unsigned,
         kind: None,
         declared: None,
         observed: Observed::default(),
@@ -342,12 +348,24 @@ fn summarize(agents: &[AgentRecord]) -> InventorySummary {
         without_passport: 0,
         invalid_passport: 0,
         violation_count: 0,
+        attested_trusted: 0,
+        attested_untrusted: 0,
+        unsigned: 0,
+        attested_malformed: 0,
     };
     for record in agents {
+        // Manifest axis.
         match &record.passport {
             PassportStatus::Present { .. } => summary.with_passport += 1,
             PassportStatus::Absent { .. } => summary.without_passport += 1,
             PassportStatus::Invalid { .. } => summary.invalid_passport += 1,
+        }
+        // Signed-credential axis (orthogonal to the manifest axis).
+        match &record.attestation {
+            Attestation::Trusted => summary.attested_trusted += 1,
+            Attestation::Untrusted { .. } => summary.attested_untrusted += 1,
+            Attestation::Unsigned => summary.unsigned += 1,
+            Attestation::Malformed { .. } => summary.attested_malformed += 1,
         }
         if let Conformity::Violations { violations } = &record.conformity {
             summary.violation_count += violations.len();
@@ -361,7 +379,7 @@ mod tests {
     use super::*;
     use crate::graph::Edge;
     use crate::manifest::Passport;
-    use crate::model::{Conformity, Observed, Violation};
+    use crate::model::{Attestation, Conformity, Observed, Violation};
     use crate::scan::{scan_tree, PassportStatus};
     use crate::test_support::corpus_path;
     use discoveryprobe_core::{CaptureRecording, ObservationSurface};
@@ -381,6 +399,7 @@ mod tests {
             passport: PassportStatus::Present {
                 passport: Passport::parse(&raw).expect("test passport"),
             },
+            attestation: Attestation::Unsigned,
         }
     }
 
@@ -391,6 +410,7 @@ mod tests {
             passport: PassportStatus::Absent {
                 evidence: vec!["agent/bot.py: import github".to_string()],
             },
+            attestation: Attestation::Unsigned,
         }
     }
 
@@ -684,6 +704,7 @@ mod tests {
             passport: PassportStatus::Invalid {
                 errors: vec!["agent.name is missing or empty".to_string()],
             },
+            attestation: Attestation::Unsigned,
         };
         let inv = correlate(&[scanned], &DeclaredGraph::default(), None);
         assert_eq!(inv.agents.len(), 1);
@@ -704,6 +725,7 @@ mod tests {
                 passport: PassportStatus::Invalid {
                     errors: vec!["agent.name is missing or empty".to_string()],
                 },
+                attestation: Attestation::Unsigned,
             },
         ];
         let mut broken_rec = CaptureRecording::new("broken-agent");

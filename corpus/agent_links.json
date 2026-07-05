@@ -96,6 +96,30 @@
       "runtime_subject": null,
       "evidence_bundle": "corpus/evidence/gl-supply-chain-compromise",
       "expected": { "quadrant": "static_overflag" }
+    },
+    {
+      "agent_id": "passport-expired-gh",
+      "surface": "github",
+      "discovery_subject": "gh-passport-expired",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "detected": true }
+    },
+    {
+      "agent_id": "passport-tampered-gh",
+      "surface": "github",
+      "discovery_subject": "gh-passport-tampered",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "detected": true }
+    },
+    {
+      "agent_id": "passport-scope-overreach-gh",
+      "surface": "github",
+      "discovery_subject": "gh-passport-scope-overreach",
+      "runtime_subject": null,
+      "evidence_bundle": null,
+      "expected": { "detected": true }
     }
   ]
 }

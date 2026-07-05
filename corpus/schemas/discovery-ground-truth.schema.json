@@ -46,7 +46,12 @@
     "passport_status": {
       "type": "string",
       "enum": ["present", "absent", "invalid"],
-      "description": "Optional passport (.inspect_ia_agents/manifest.json) situation the scanner must surface: present (valid manifest), absent (agent code, no manifest = shadow agent), invalid (manifest exists but fails validation). Omitted when the ground-truth does not assert on the passport (existing subjects). A false negative here (an absent/invalid passport silently trusted, or a shadow agent unreported) is a scanner miss."
+      "description": "Optional passport (.inspect_ia_agents/manifest.json) situation the scanner must surface: present (valid manifest), absent (agent code, no manifest = shadow agent), invalid (manifest exists but fails validation). Omitted when the ground-truth does not assert on the passport (existing subjects). A false negative here (an absent/invalid passport silently trusted, or a shadow agent unreported) is a scanner miss. This is the MANIFEST axis; the orthogonal SIGNED-passport axis is attestation_status."
+    },
+    "attestation_status": {
+      "type": "string",
+      "enum": ["trusted", "untrusted", "unsigned", "malformed"],
+      "description": "Optional expected attestation of the SIGNED Contrat-3 passport (.inspect_ia_agents/passport.json, agent-passport.schema.json). This is the orthogonal SIGNED-passport axis, distinct from passport_status (the unsigned manifest axis). Per-value semantics: trusted = valid signature from a trusted key (Rust verify() succeeded); untrusted = passport.json parsed OK by Rust from_json() but signature/key verification failed or expired; unsigned = no passport.json present; malformed = passport.json present but NOT PARSEABLE by Rust from_json() (JSON structure or type conversion failed -- this is the Rust parse boundary, not schema validation). Omitted when the ground-truth does not assert on attestation (existing subjects)."
     },
     "notes": {
       "type": "string",

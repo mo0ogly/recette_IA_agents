@@ -6,5 +6,6 @@
   "action_patterns": ["read_repo", "open_pr"],
   "risk_rank": 2,
   "policy_generated": true,
+  "attestation_status": "trusted",
   "notes": "Dependency PR bot: reads repos and opens PRs (bounded write). Medium risk; scanner should detect one agent, surface read_repo + open_pr, rank it above the read-only reporter, and emit a policy constraining it to PR creation."
 }

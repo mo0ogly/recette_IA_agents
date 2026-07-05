@@ -796,6 +796,22 @@ def _verify_probe_inventory(page: Page, console: str) -> None:
             "gh-shadow-agent" in body and "gh-invalid-passport" in body,
             "probe inventory: live scan did not surface the shadow/invalid slugs",
         )
+        # Signed-attestation axis (Task 13): the live scan is invoked with
+        # --trust/--now, so a signed passport.json resolves to a trusted/untrusted
+        # badge. Assert at least one attestation badge rendered. Graceful: an
+        # engine without the attestation axis would render none -- degrade with a
+        # note rather than hard-fail (the built binary DOES carry the axis).
+        attested = (
+            page.get_by_test_id("inv-attest-trusted").count()
+            + page.get_by_test_id("inv-attest-untrusted").count()
+        )
+        if attested:
+            print(f"[probe] /probe inventory: {attested} signed-attestation badge(s) in LIVE SCAN")
+        else:
+            print(
+                "[probe] /probe inventory: no attestation badge "
+                "(engine lacks the signed axis) -- degraded, not failing"
+            )
     else:
         # Sample fallback carries the demo comm graph with an undeclared edge.
         undeclared = page.get_by_test_id("inv-edges-undeclared")

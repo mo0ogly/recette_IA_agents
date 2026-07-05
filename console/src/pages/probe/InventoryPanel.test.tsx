@@ -3,14 +3,19 @@
  * payload (__fixtures__/inventory-panel.fixture.json, the bytes of a live
  * GET /probe/inventory .inventory body) and assert the panel renders correctly.
  *
- * The fixture carries all THREE passport states so each badge is exercised
- * (present | absent | invalid). It also carries a PassportAbsent violation and
- * a real undeclared communication edge, so the violations list and the
- * undeclared-edge flag are asserted against real data -- not an invented payload.
+ * The fixture carries all THREE passport (manifest) states so each badge is
+ * exercised (present | absent | invalid) AND all FOUR attestation (signed) states
+ * on the orthogonal axis (trusted | untrusted | unsigned | malformed), with the
+ * untrusted agent carrying typed reasons (bad_signature + scope_overreach{extra}
+ * + malformed_field{field}) so the discriminated-union reason rendering is
+ * covered. It also carries a PassportAbsent violation and a real undeclared
+ * communication edge, so the violations list and the undeclared-edge flag are
+ * asserted against real data -- not an invented payload.
  *
  * Consumer contract asserted here: the INVALID agent shows the "invalid" badge
  * even though it carries NO violation (the badge keys off passport_status, not
- * a non-empty violations list).
+ * a non-empty violations list); and the attestation axis is INDEPENDENT of the
+ * manifest axis (a present manifest can be unsigned; a shadow can be untrusted).
  */
 
 import { render, screen } from "@testing-library/react";
@@ -42,9 +47,55 @@ describe("InventoryPanel (R16)", () => {
 
   it("shows the passport badge for EACH of present / absent / invalid", () => {
     render(<InventoryPanel inventory={REAL} />);
-    expect(screen.getByTestId("inv-badge-present").textContent).toBe("present");
+    // Two agents carry a present manifest (acme-dependency-pr-bot + the unsigned
+    // acme-release-notifier), so select all for the present badge.
+    expect(screen.getAllByTestId("inv-badge-present")[0].textContent).toBe("present");
     expect(screen.getByTestId("inv-badge-absent").textContent).toBe("absent");
     expect(screen.getByTestId("inv-badge-invalid").textContent).toBe("invalid");
+  });
+
+  it("shows the attestation badge for EACH of trusted / untrusted / unsigned / malformed", () => {
+    // R16 discriminated-union coverage of the signed-attestation axis: every one
+    // of the four Attestation kinds renders its own badge, keyed off kind alone.
+    render(<InventoryPanel inventory={REAL} />);
+    expect(screen.getByTestId("inv-attest-trusted").textContent).toContain("trusted");
+    expect(screen.getByTestId("inv-attest-untrusted").textContent).toContain(
+      "untrusted",
+    );
+    expect(screen.getByTestId("inv-attest-unsigned").textContent).toContain("unsigned");
+    expect(screen.getByTestId("inv-attest-malformed").textContent).toContain(
+      "malformed",
+    );
+  });
+
+  it("renders the untrusted reasons, including scope_overreach extra and malformed_field field", () => {
+    // The untrusted agent carries three typed reasons; the badge must surface
+    // WHY -- the bare reason kinds AND the distinguishing fields (extra scope,
+    // offending field) -- so an operator sees the cause.
+    render(<InventoryPanel inventory={REAL} />);
+    const badge = screen.getByTestId("inv-attest-untrusted");
+    expect(badge.textContent).toContain("bad_signature");
+    expect(badge.textContent).toContain("scope_overreach");
+    expect(badge.textContent).toContain("manage_webhook");
+    expect(badge.textContent).toContain("push");
+    expect(badge.textContent).toContain("malformed_field");
+    expect(badge.textContent).toContain("exp");
+  });
+
+  it("renders the malformed attestation parse message", () => {
+    render(<InventoryPanel inventory={REAL} />);
+    expect(screen.getByTestId("inv-attest-malformed").textContent).toContain(
+      "passport.json",
+    );
+  });
+
+  it("treats attestation as an axis orthogonal to the manifest passport", () => {
+    // A present manifest can be unsigned (acme-release-notifier) while another
+    // present manifest is trusted (acme-dependency-pr-bot): the two axes do not
+    // imply each other.
+    const presentAgents = REAL.agents.filter((a) => a.passport.kind === "present");
+    const attestKinds = presentAgents.map((a) => a.attestation.kind).sort();
+    expect(attestKinds).toEqual(["trusted", "unsigned"]);
   });
 
   it("keeps the invalid badge for an invalid passport that has NO violation", () => {

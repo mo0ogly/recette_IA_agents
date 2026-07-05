@@ -1,0 +1,16 @@
+{
+  "id": "acme-expired-pr-bot[bot]",
+  "tenant": "acme",
+  "delegation": [
+    "acme-platform-team",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo",
+    "open_pr"
+  ],
+  "exp": "2020-01-01T00:00:00Z",
+  "spiffe_id": "spiffe://acme/agent/expired-pr-bot",
+  "signature": "b6d1364ae694bf90dbaff4d813cffdb75d0ff4541af6bd28038e041be11225be55952a854b523776ed987be89a3b2783763e79f6d4dd2dc650d6db5bb0da3c07",
+  "key_id": "test-authority-1"
+}

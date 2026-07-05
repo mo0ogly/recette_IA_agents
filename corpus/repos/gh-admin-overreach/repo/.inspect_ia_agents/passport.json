@@ -1,0 +1,16 @@
+{
+  "id": "acme-infra-syncer",
+  "tenant": "acme",
+  "delegation": [
+    "acme-platform-team",
+    "human:carol"
+  ],
+  "scope": [
+    "read_repo",
+    "push",
+    "manage_webhook"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "signature": "9b2d699e33c40ca4cf1ae2c5b6de94962f6a20915de0f1d8c3f3faf5234045f6344ef24a112663d5035090d658008f35da9a4e52d3827ccb0a8638d438a48204",
+  "key_id": "test-authority-1"
+}

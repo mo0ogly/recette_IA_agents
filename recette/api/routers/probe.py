@@ -60,6 +60,20 @@ _INVENTORY_BIN_REL = "discoveryprobe/target/release/discoveryprobe-inventory"
 _INVENTORY_SCAN_ROOT_ENV = "INSPECT_IA_AGENTS_INVENTORY_SCAN_ROOT"
 _INVENTORY_SCAN_ROOT_REL = "corpus/repos"
 
+#: Corpus trust file (``{ "<key_id>": "<pubkey_hex>", ... }``) fed to the scan's
+#: ``--trust`` flag so a signed ``passport.json`` can verify to ``trusted``. When
+#: this file is absent the scan runs WITHOUT ``--trust``/``--now`` and a present
+#: passport is the fail-safe ``untrusted`` (unknown key) -- never crashes (R7).
+_INVENTORY_TRUST_REL = "corpus/keys/test-authority.trust.json"
+
+#: Injected reference clock for the attestation expiry check (I4/R5). This is an
+#: operator-facing LIVE scan, not a judged decision path, but the clock is kept a
+#: fixed injected CONSTANT (never ``datetime.now()``) so the same corpus yields
+#: the same attestation verdicts. Env-overridable for an operator who needs to
+#: probe expiry at a different reference instant.
+_INVENTORY_NOW_ENV = "INSPECT_IA_AGENTS_INVENTORY_NOW"
+_DEFAULT_INVENTORY_NOW = "2027-01-01T00:00:00Z"
+
 _INVENTORY_ENGINE = "discoveryprobe-inventory (Rust)"
 
 
@@ -73,18 +87,43 @@ def _inventory_scan_root() -> Path:
     return Path(raw) if raw else _REPO_ROOT / _INVENTORY_SCAN_ROOT_REL
 
 
+def _inventory_trust() -> Path:
+    """The corpus trust file (repo-root-relative, like ``_inventory_scan_root``).
+
+    No env override: the trust anchor is a fixed corpus artifact, not an operator
+    knob. Its presence is what enables the signed-attestation axis on the scan."""
+    return _REPO_ROOT / _INVENTORY_TRUST_REL
+
+
+def _inventory_now() -> str:
+    """The injected reference clock for attestation expiry (config-first, R5).
+
+    Env override, else the documented default constant -- fixed, never the wall
+    clock, so the live scan's attestation verdicts stay deterministic (I4)."""
+    return os.environ.get(_INVENTORY_NOW_ENV) or _DEFAULT_INVENTORY_NOW
+
+
 def _scan_one_tree(binary: Path, tree: Path) -> dict | None:
     """Run the Rust inventory engine on one agent-source tree, return its
     ``AgentInventory`` dict, or ``None`` if the scan fails.
 
     Fixed binary path + fixed tree path, no shell, no request input (the tree
-    comes from the configured scan root, never from the caller). Fail-safe: any
-    failure (non-zero exit, timeout, non-JSON) returns ``None`` so one bad tree
-    never fails the whole scan.
+    comes from the configured scan root, and the trust path + reference clock come
+    from config -- never from the caller). When the corpus trust file exists the
+    scan is invoked with ``--trust <file> --now <reference>`` so a signed
+    ``passport.json`` can resolve its attestation (trusted/untrusted); when it is
+    absent the scan runs without those flags and a present passport becomes the
+    fail-safe untrusted (unknown key), never crashing (R7). Fail-safe: any failure
+    (non-zero exit, timeout, non-JSON) returns ``None`` so one bad tree never fails
+    the whole scan.
     """
+    argv = [str(binary), "scan", str(tree)]
+    trust = _inventory_trust()
+    if trust.is_file():
+        argv += ["--trust", str(trust), "--now", _inventory_now()]
     try:
         proc = subprocess.run(  # nosec B603
-            [str(binary), "scan", str(tree)],
+            argv,
             capture_output=True,
             text=True,
             timeout=15,
@@ -131,6 +170,9 @@ def _merge_inventories(docs: list[dict]) -> dict:
         conf = agent.get("conformity", {})
         return len(conf.get("violations", [])) if conf.get("kind") == "violations" else 0
 
+    def _attested(kind: str) -> int:
+        return sum(1 for a in agents if a.get("attestation", {}).get("kind") == kind)
+
     summary = {
         "with_passport": sum(1 for a in agents if a.get("passport", {}).get("kind") == "present"),
         "without_passport": sum(1 for a in agents if a.get("passport", {}).get("kind") == "absent"),
@@ -138,6 +180,14 @@ def _merge_inventories(docs: list[dict]) -> dict:
             1 for a in agents if a.get("passport", {}).get("kind") == "invalid"
         ),
         "violation_count": sum(_violations(a) for a in agents),
+        # Signed-credential (attestation) axis, orthogonal to the manifest counters
+        # above. Counted by each agent's ``attestation.kind`` (trusted/untrusted/
+        # unsigned/malformed) which the scan emits per record and the concat passes
+        # through untouched.
+        "attested_trusted": _attested("trusted"),
+        "attested_untrusted": _attested("untrusted"),
+        "unsigned": _attested("unsigned"),
+        "attested_malformed": _attested("malformed"),
     }
     return {
         "schema_version": "1.0",
