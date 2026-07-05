@@ -703,11 +703,45 @@ fn detected_tree_with_passport(tag: &str, scope: &str, exp: &str) -> PathBuf {
     tree
 }
 
+/// Builds a self-contained agent tree with a manifest.json but NO passport.json.
+/// The manifest follows the standard shape (identity + capabilities). Returns the tree path.
+fn manifest_only_tree(tag: &str) -> PathBuf {
+    let tree = unique_temp_dir(tag);
+    let inspect_dir = tree.join(".inspect_ia_agents");
+    std::fs::create_dir_all(&inspect_dir).expect("create .inspect_ia_agents");
+    let manifest = serde_json::json!({
+        "schema_version": "1.0",
+        "agent": {
+            "name": "test-bot",
+            "description": "Test agent for manifest-only trees.",
+            "target_system": "github",
+            "identity": {
+                "auth_method": "github_app",
+                "principal": "test-bot[bot]"
+            },
+            "capabilities": [
+                {
+                    "action": "read_repo",
+                    "mode": "read",
+                    "resources": ["test/*"]
+                }
+            ]
+        }
+    });
+    std::fs::write(
+        inspect_dir.join("manifest.json"),
+        serde_json::to_string_pretty(&manifest).expect("encode manifest"),
+    )
+    .expect("write manifest.json");
+    tree
+}
+
 #[test]
 fn scan_without_passport_json_is_attestation_unsigned() {
-    // A corpus repo has a manifest but NO passport.json: manifest axis Present,
+    // A manifest-only tree (no passport.json): manifest axis Present,
     // attestation axis Unsigned. The two axes coexist and are independent.
-    let inventory = scan_inventory(Path::new(&corpus_path("repos/gh-pr-bot/repo")), &[]);
+    let tree = manifest_only_tree("scan-unsigned");
+    let inventory = scan_inventory(&tree, &[]);
     let agents = inventory["agents"].as_array().expect("agents array");
     assert_eq!(agents.len(), 1);
     assert_eq!(agents[0]["attestation"]["kind"], "unsigned");
@@ -716,6 +750,7 @@ fn scan_without_passport_json_is_attestation_unsigned() {
     assert_eq!(inventory["summary"]["unsigned"], 1);
     assert_eq!(inventory["summary"]["with_passport"], 1);
     assert_eq!(inventory["summary"]["attested_trusted"], 0);
+    let _ = std::fs::remove_dir_all(&tree);
 }
 
 #[test]
