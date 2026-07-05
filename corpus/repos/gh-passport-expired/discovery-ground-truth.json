@@ -1,0 +1,12 @@
+{
+  "agent_repo": "gh-passport-expired",
+  "target_system": "github",
+  "detected": true,
+  "agent_count": 1,
+  "action_patterns": ["read_repo", "open_pr"],
+  "risk_rank": 2,
+  "policy_generated": true,
+  "passport_status": "present",
+  "attestation_status": "untrusted",
+  "notes": "Expired passport (mono-axis attestation miss). The manifest is valid and the signed passport parses and verifies on signature, delegation (ends human:alice), and scope (read_repo + open_pr matching the manifest) -- the ONLY defect is temporal: exp = 2020-01-01T00:00:00Z, in the past. verify(--now 2027-01-01T00:00:00Z) => untrusted with reason expired (exit 3). Every other discovery axis conforms: scanner detects one agent, surfaces read_repo + open_pr, ranks it like the sanctioned pr-bot (risk_rank 2), emits a PR-only policy. The miss this subject guards is an expired attestation silently trusted."
+}

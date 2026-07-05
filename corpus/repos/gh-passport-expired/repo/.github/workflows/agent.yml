@@ -1,0 +1,22 @@
+name: weekly-dependency-prs
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install PyGithub
+      - run: python agent/main.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.PR_BOT_TOKEN }}

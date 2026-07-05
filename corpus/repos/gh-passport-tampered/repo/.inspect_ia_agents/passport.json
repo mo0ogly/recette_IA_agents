@@ -1,0 +1,16 @@
+{
+  "id": "acme-tampered-pr-bot[bot]",
+  "tenant": "acme-evil",
+  "delegation": [
+    "acme-platform-team",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo",
+    "open_pr"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "spiffe_id": "spiffe://acme/agent/tampered-pr-bot",
+  "signature": "845f00d33b5e0fedb2fe20185f86430738a33d5c5a7e6205d7398ef3a21aeba7b2dfba69ccb4bd5c8cdbbaaf7ab4a1c637ef6515cf49f34d0a37ad7c4f440704",
+  "key_id": "test-authority-1"
+}
