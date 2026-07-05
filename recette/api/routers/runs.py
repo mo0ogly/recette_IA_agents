@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
+from .._timestamp import capture_timestamp
 from ..runners import discovery_runner, identification_runner
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -38,6 +39,43 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
             raise HTTPException(
                 status_code=400,
                 detail=f"agent {agent_cfg['id']!r} missing required field(s): {missing}",
+            )
+        # Passport admission gate (Control Plane, I2/I3). `now` is captured here at
+        # the boundary (I4 INPUT); the decision is a pure function of the passport,
+        # the declared scope, the trust keyring and `now`. The verdict is ALWAYS
+        # audited (I1) BEFORE any enforce-mode 403, so the denial itself is on the
+        # log. Fail-safe: a non-trusted agent is denied only in enforce mode.
+        from ...platform.admission import admit_agent, load_agent_passport
+        from ...platform.events import SCHEMA_VERSION, EventKind
+
+        now = capture_timestamp()
+        passport = load_agent_passport(agent_cfg["id"], request.app.state.passport_dir)
+        verdict = admit_agent(
+            passport,
+            agent_cfg.get("capability_scope"),
+            request.app.state.passport_trust,
+            now,
+            request.app.state.passport_enforce,
+        )
+        request.app.state.event_store.append(
+            event_id=request.app.state.admission_ids.next_id(),
+            kind=EventKind.AGENT_ADMISSION,
+            payload={
+                "agent_id": agent_cfg["id"],
+                "status": verdict.status,
+                "reasons": list(verdict.reasons),
+                "mode": verdict.mode,
+                "admitted": verdict.admitted,
+            },
+            schema_version=SCHEMA_VERSION,
+        )
+        if request.app.state.passport_enforce and verdict.status != "trusted":
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"agent {agent_cfg['id']!r} admission denied: "
+                    f"{verdict.status} {list(verdict.reasons)}"
+                ),
             )
         from ...llm import LlmBackend
         from ..runners import build_stub_llm, make_lane_b_runner
@@ -94,7 +132,15 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 wire_proxy_url=request.app.state.proxy_route_registry.active_proxy_url(),
             ),
         )
-        return {"run_id": run.id, "status": run.status}
+        return {
+            "run_id": run.id,
+            "status": run.status,
+            "admission": {
+                "status": verdict.status,
+                "mode": verdict.mode,
+                "admitted": verdict.admitted,
+            },
+        }
     if kind == "lane_b_process":
         # Run the agent as a SEPARATE OS process (eBPF-observable). Mock-only:
         # the process path runs the deterministic StubLlm loop, never a live

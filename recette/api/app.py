@@ -13,6 +13,7 @@ import re
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from ..llm import build_llm
+from ..platform.admission import (
+    DEFAULT_PASSPORT_DIR,
+    PASSPORT_DIR_ENV,
+    enforce_from_env,
+    load_trust,
+)
 from ..platform.catalog import Catalog, load_catalog
 from ..platform.eventstore import EventStore, build_event_store_from_env
 from ..platform.gateway import AgentResolver, Gateway
@@ -78,6 +85,14 @@ from .server_manager import ServerManager
 from .verdict_store import VerdictStore
 
 BASELINE_POLICY_VERSION = "v1"
+# Repo root: recette/api/app.py -> parents[2] is the checkout root, the same
+# anchor used by the other config_store/secret_store repo-relative helpers.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+# Env override for the admission trust keyring; defaults to the corpus authority
+# keyring so the API admits corpus passports out of the box (R5, parity with the
+# passport-dir override).
+PASSPORT_TRUST_ENV = "INSPECT_IA_AGENTS_PASSPORT_TRUST"
+DEFAULT_PASSPORT_TRUST_PATH = _REPO_ROOT / "corpus" / "keys" / "test-authority.trust.json"
 # Routes reachable without a token: liveness + the OpenAPI surface. Everything
 # else requires a verified identity once a signing key is configured (I3).
 # /events/stream is allowlisted because EventSource (browser SSE) cannot set an
@@ -227,6 +242,9 @@ def create_app(
     secret_store: BackendSecretStore | None = None,
     realtime_transport: RealtimeTransport | None = None,
     proxy_db_path: str | None = None,
+    passport_enforce: bool | None = None,
+    passport_dir: str | None = None,
+    passport_trust: dict | None = None,
 ) -> FastAPI:
     app = FastAPI(title="inspect_ia_agents Recette API", version="0.1.0", lifespan=_lifespan)
 
@@ -327,6 +345,26 @@ def create_app(
     app.state.event_store = events
     app.state.policy_store = policies
     app.state.catalog = action_catalog
+    # ONE id generator shared by the gateway AND the admission audit path so both
+    # mint strictly-monotone, non-colliding event ids against the same store (two
+    # independent generators would both start at the same base and collide on the
+    # append -- UNIQUE constraint on events.event_id).
+    admission_ids = RestartSafeIdGenerator(events)
+    app.state.admission_ids = admission_ids
+    # Passport admission gate wiring (Control Plane, I2/I3). Config-driven (R5):
+    # the enforce toggle, the passport directory and the trust keyring resolve
+    # from the environment/corpus by default, and are injectable for tests.
+    app.state.passport_enforce = (
+        enforce_from_env() if passport_enforce is None else passport_enforce
+    )
+    app.state.passport_dir = (
+        passport_dir or os.environ.get(PASSPORT_DIR_ENV) or str(_REPO_ROOT / DEFAULT_PASSPORT_DIR)
+    )
+    if passport_trust is not None:
+        app.state.passport_trust = passport_trust
+    else:
+        trust_path = os.environ.get(PASSPORT_TRUST_ENV) or str(DEFAULT_PASSPORT_TRUST_PATH)
+        app.state.passport_trust = load_trust(trust_path)
     app.state.campaign_store = campaign_store if campaign_store is not None else CampaignStore()
     app.state.recette_campaign_catalog = (
         recette_campaign_catalog
@@ -341,7 +379,7 @@ def create_app(
         policy_store=policies,
         event_store=events,
         proxy=side_effect_proxy,
-        id_generator=RestartSafeIdGenerator(events),
+        id_generator=admission_ids,
         agent_resolver=AgentResolver(cfg_store.get_agent),
     )
     app.state.scheduler = build_scheduler_from_env(_maintenance_tasks(app, transport))
