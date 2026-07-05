@@ -66,8 +66,7 @@ describe("AdmissionBadge", () => {
 
   it("renders the denied state for an enforce non-trusted verdict", () => {
     render(<AdmissionBadge admission={admissionOf("untrusted_enforce_denied")} />);
-    const badge = screen.getByTestId("admission-badge-untrusted");
-    expect(badge).toHaveTextContent("enforce");
+    expect(screen.getByTestId("admission-badge-mode")).toHaveTextContent("enforce");
     expect(screen.getByTestId("admission-badge-admitted")).toHaveTextContent(
       "denied",
     );

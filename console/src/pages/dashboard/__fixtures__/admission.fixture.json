@@ -1,5 +1,5 @@
 {
-  "_note": "Realistic POST /runs (kind=lane_b) responses carrying the additive admission field. Shape verified against recette/api/routers/runs.py (run_id, status, admission{status,mode,admitted}) and recette/platform/admission.py (status in trusted|untrusted|unsigned|malformed, mode in observe|enforce, admitted folds the gate). run_id format matches a real capture from the running API (hex32).",
+  "_note": "POST /runs admission shape verified against recette/api/routers/runs.py (run_id, status, admission{status,mode,admitted}) and recette/platform/admission.py (status in trusted|untrusted|unsigned|malformed, mode in observe|enforce, admitted folds the gate). run_id values are SYNTHETIC PLACEHOLDERS (not captured from a live run); a real end-to-end proof with the admission-aware backend is performed at the final live-proof gate.",
   "trusted_observe": {
     "run_id": "d0cbc3afc4dd404ab71e5b9673935604",
     "status": "running",
