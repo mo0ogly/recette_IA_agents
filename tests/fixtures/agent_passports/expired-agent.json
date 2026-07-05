@@ -1,0 +1,15 @@
+{
+  "id": "expired-agent",
+  "tenant": "acme",
+  "delegation": [
+    "agent:expired-agent",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo",
+    "open_pr"
+  ],
+  "exp": "2020-01-01T00:00:00Z",
+  "signature": "a35c0d1806e5ad6e7a39a2c27c035dcddf6e3c199da5b47e75a1caef70678353d5dc832e3d8daa6341bdea9b3609dc70a31edc69be057d91ca6bf4d3dd16fc00",
+  "key_id": "test-authority-1"
+}

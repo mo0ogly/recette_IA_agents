@@ -1,0 +1,15 @@
+{
+  "id": "trusted-agent",
+  "tenant": "acme",
+  "delegation": [
+    "agent:trusted-agent",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo",
+    "open_pr"
+  ],
+  "exp": "2035-01-01T00:00:00Z",
+  "signature": "361e36a1ad7739ad4013081b75cad080c0f39fa86f352fdc74ec7a56a644c726a5bced381eae66ed6864ac22cadbc813de4609e9f78354cc3680d46860d6b400",
+  "key_id": "test-authority-1"
+}
