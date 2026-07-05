@@ -14,14 +14,20 @@
 //!
 //! This module provides the frozen shapes ([`Claims`], [`Passport`]),
 //! parsing ([`Passport::from_json`]), the canonical signing form
-//! ([`canonical_bytes`]), and issuing ([`issue`]). Verification arrives in a
-//! later task and reuses the same [`canonical_bytes`] contract.
+//! ([`canonical_bytes`]), issuing ([`issue`]), and fail-safe verification
+//! ([`verify`], [`TrustStore`], [`Verdict`]) -- all over the same
+//! [`canonical_bytes`] contract.
 
 mod canonical;
+mod hex;
 mod issue;
+mod trust;
+mod verify;
 
 pub use canonical::canonical_bytes;
 pub use issue::issue;
+pub use trust::TrustStore;
+pub use verify::{verify, DeclaredScope, Timestamp, UntrustReason, Verdict};
 
 use serde::{Deserialize, Serialize};
 
@@ -115,17 +121,23 @@ impl Passport {
 
 /// Errors produced while handling a passport.
 ///
-/// Only the variants needed for parse-only support exist today; crypto
-/// variants (signing/verification) are added in later tasks.
+/// These cover PARSING and SETUP failures only. Verification ([`verify`]) never
+/// produces a [`PassportError`]: a rotten passport is a [`Verdict::Untrusted`]
+/// with reasons, not an error.
 #[derive(Debug, thiserror::Error)]
 pub enum PassportError {
-    /// The passport is structurally invalid in a way not captured by a JSON
-    /// error (reserved for higher-level shape checks).
+    /// The passport (or a field such as a timestamp) is structurally invalid in
+    /// a way not captured by a JSON error.
     #[error("malformed passport: {0}")]
     Malformed(String),
     /// The raw bytes could not be deserialized as a passport.
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+    /// A public key supplied to the [`TrustStore`] is not a valid 32-byte
+    /// Ed25519 key (bad hex, wrong length, or an invalid curve point). This is
+    /// a trust-store SETUP error, not a verification failure.
+    #[error("bad key: {0}")]
+    BadKey(String),
 }
 
 #[cfg(test)]
