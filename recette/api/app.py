@@ -30,6 +30,8 @@ from ..platform.admission import (
 from ..platform.catalog import Catalog, load_catalog
 from ..platform.eventstore import EventStore, build_event_store_from_env
 from ..platform.gateway import AgentResolver, Gateway
+from ..platform.middleware import MiddlewarePipeline
+from ..platform.passport_middleware import PassportAdmissionMiddleware
 from ..platform.policy.model import baseline_from_catalog
 from ..platform.policy.store import PolicyStore
 from ..platform.proxy.lab_proxy import LabHttpProxy
@@ -379,6 +381,17 @@ def create_app(
     app.state.recording_store = recording_store if recording_store is not None else RecordingStore()
     app.state.verdict_store = verdict_store if verdict_store is not None else VerdictStore()
     app.state.kb_store = KnowledgeBaseStore()
+    # Per-action passport re-attestation (I2/I3). Built from the app.state
+    # passport_* values resolved just above, so it shares the SAME enforce
+    # toggle, passport directory and trust keyring as the launch-time gate. The
+    # middleware reads the action's captured timestamp as its clock (I4), so it
+    # catches a passport that expires mid-run. There is no other middleware today.
+    passport_middleware = PassportAdmissionMiddleware(
+        trust=app.state.passport_trust,
+        passport_dir=app.state.passport_dir,
+        enforce=app.state.passport_enforce,
+        declared_for=lambda aid: (cfg_store.get_agent(aid) or {}).get("capability_scope"),
+    )
     app.state.gateway = Gateway(
         catalog=action_catalog,
         policy_store=policies,
@@ -386,6 +399,7 @@ def create_app(
         proxy=side_effect_proxy,
         id_generator=admission_ids,
         agent_resolver=AgentResolver(cfg_store.get_agent),
+        middleware=MiddlewarePipeline([passport_middleware]),
     )
     app.state.scheduler = build_scheduler_from_env(_maintenance_tasks(app, transport))
     # Passive eBPF watch (start/stop via /probe/monitor); stopped on shutdown.
