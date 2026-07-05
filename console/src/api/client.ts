@@ -1341,10 +1341,38 @@ export interface InventoryDeclared {
   handoffs: string[];
 }
 
+/** Kind-tagged untrust reason from the signed-passport verifier (Contrat-3).
+ *  Only the fields for a given `kind` are present: `scope_overreach` carries the
+ *  extra (declared-beyond-delegated) scope, `malformed_field` names the offending
+ *  field. Mirrors the Rust `UntrustReason` (tag = "kind", snake_case). */
+export type InventoryUntrustReason =
+  | { kind: "bad_signature" }
+  | { kind: "expired" }
+  | { kind: "empty_delegation" }
+  | { kind: "no_human_principal" }
+  | { kind: "scope_overreach"; extra: string[] }
+  | { kind: "unknown_key_id" }
+  | { kind: "malformed_field"; field: string };
+
+/** Kind-tagged signed-attestation situation of a scanned agent -- the axis
+ *  ORTHOGONAL to `InventoryPassport` (the manifest axis). Reads the signed
+ *  `.inspect_ia_agents/passport.json`: `unsigned` (no signed credential),
+ *  `trusted` (parsed and verified), `untrusted` (parsed but failed verification,
+ *  carrying the typed reasons WHY), `malformed` (present but unparseable). An
+ *  agent has a manifest situation AND an attestation situation; neither implies
+ *  the other. Mirrors the Rust `Attestation` (tag = "kind", snake_case). */
+export type InventoryAttestation =
+  | { kind: "unsigned" }
+  | { kind: "trusted" }
+  | { kind: "untrusted"; reasons: InventoryUntrustReason[] }
+  | { kind: "malformed"; message: string };
+
 /** One identified agent in the inventory. */
 export interface InventoryAgent {
   agent_id: string;
   passport: InventoryPassport;
+  /** Signed-credential situation (orthogonal to `passport`, the manifest axis). */
+  attestation: InventoryAttestation;
   kind: string | null;
   declared: InventoryDeclared | null;
   observed: { actions: string[]; egress: string[] };
@@ -1370,6 +1398,14 @@ export interface AgentInventory {
     without_passport: number;
     invalid_passport: number;
     violation_count: number;
+    /** Records whose signed passport.json verified trusted (SIGNED axis). */
+    attested_trusted: number;
+    /** Records whose signed passport.json is present but not trusted. */
+    attested_untrusted: number;
+    /** Records with no signed passport.json at all. */
+    unsigned: number;
+    /** Records whose signed passport.json is present but unparseable. */
+    attested_malformed: number;
   };
 }
 

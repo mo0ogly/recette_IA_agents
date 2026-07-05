@@ -36,6 +36,9 @@
           }
         }
       },
+      "attestation": {
+        "kind": "trusted"
+      },
       "kind": "git_agent",
       "declared": {
         "principal": "acme-dependency-pr-bot[bot]",
@@ -72,6 +75,25 @@
           "agent/main.py: from github import"
         ]
       },
+      "attestation": {
+        "kind": "untrusted",
+        "reasons": [
+          {
+            "kind": "bad_signature"
+          },
+          {
+            "kind": "scope_overreach",
+            "extra": [
+              "manage_webhook",
+              "push"
+            ]
+          },
+          {
+            "kind": "malformed_field",
+            "field": "exp"
+          }
+        ]
+      },
       "kind": null,
       "declared": null,
       "observed": {
@@ -99,8 +121,71 @@
           "unified shape: agent_id is missing or empty; target_systems is missing; declared_identity is missing; capability_scope is missing"
         ]
       },
+      "attestation": {
+        "kind": "malformed",
+        "message": "passport.json: expected value at line 1 column 1"
+      },
       "kind": null,
       "declared": null,
+      "observed": {
+        "actions": [],
+        "egress": []
+      },
+      "conformity": {
+        "kind": "not_observed"
+      },
+      "evidence": []
+    },
+    {
+      "agent_id": "acme-release-notifier[bot]",
+      "passport": {
+        "kind": "present",
+        "passport": {
+          "Repo": {
+            "schema_version": "1.0",
+            "agent": {
+              "name": "acme-release-notifier",
+              "description": "Comments on merged pull requests to announce releases.",
+              "target_system": "github",
+              "identity": {
+                "auth_method": "github_app",
+                "principal": "acme-release-notifier[bot]"
+              },
+              "capabilities": [
+                {
+                  "action": "read_repo",
+                  "mode": "read",
+                  "resources": [
+                    "acme/*"
+                  ]
+                },
+                {
+                  "action": "comment_issue",
+                  "mode": "write",
+                  "resources": [
+                    "acme/*"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "attestation": {
+        "kind": "unsigned"
+      },
+      "kind": "git_agent",
+      "declared": {
+        "principal": "acme-release-notifier[bot]",
+        "target_systems": [
+          "github"
+        ],
+        "actions": [
+          "comment_issue",
+          "read_repo"
+        ],
+        "handoffs": []
+      },
       "observed": {
         "actions": [],
         "egress": []
@@ -133,9 +218,13 @@
     ]
   },
   "summary": {
-    "with_passport": 1,
+    "with_passport": 2,
     "without_passport": 1,
     "invalid_passport": 1,
-    "violation_count": 2
+    "violation_count": 2,
+    "attested_trusted": 1,
+    "attested_untrusted": 1,
+    "unsigned": 1,
+    "attested_malformed": 1
   }
 }

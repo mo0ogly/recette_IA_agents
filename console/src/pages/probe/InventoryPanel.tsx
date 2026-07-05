@@ -4,10 +4,19 @@
  * Renders, for every scanned agent: its id, the scanned code EVIDENCE (a shadow
  * agent's derived id can be a bland path component like "repo", so the evidence
  * is what lets the operator identify it -- consumer contract), the PASSPORT
- * BADGE, the subject kind, and the conformity verdict. The passport badge keys
- * off `passport.kind` (present | absent | invalid), NEVER off a non-empty
- * violations list -- an INVALID passport carries a status but no violation and
- * not_observed conformity, and must still read as invalid (not clean).
+ * BADGE, the ATTESTATION BADGE, the subject kind, and the conformity verdict.
+ * The passport badge keys off `passport.kind` (present | absent | invalid),
+ * NEVER off a non-empty violations list -- an INVALID passport carries a status
+ * but no violation and not_observed conformity, and must still read as invalid
+ * (not clean).
+ *
+ * The attestation badge is a SECOND, ORTHOGONAL axis: it keys off
+ * `attestation.kind` (unsigned | trusted | untrusted | malformed) -- the signed
+ * `.inspect_ia_agents/passport.json` credential, NOT the manifest. An agent can
+ * be a manifest shadow yet carry a trusted credential, or carry a present
+ * manifest yet be unsigned; neither axis implies the other, so both badges are
+ * shown side by side. The untrusted badge surfaces its typed reasons (WHY), the
+ * malformed badge its parse message.
  *
  * Below the table: the violations list (PassportAbsent, UndeclaredHandoff, ...)
  * and the communication graph -- declared vs observed edges, undeclared edges
@@ -22,9 +31,11 @@
 import type {
   AgentInventory,
   InventoryAgent,
+  InventoryAttestation,
   InventoryConformity,
   InventoryEdge,
   InventoryPassport,
+  InventoryUntrustReason,
   InventoryViolation,
 } from "../../api/client";
 
@@ -33,6 +44,14 @@ const PASSPORT_LABEL: Record<InventoryPassport["kind"], string> = {
   present: "present",
   absent: "absent",
   invalid: "invalid",
+};
+
+/** Human label for each attestation situation (keyed off `kind`). */
+const ATTESTATION_LABEL: Record<InventoryAttestation["kind"], string> = {
+  unsigned: "unsigned",
+  trusted: "trusted",
+  untrusted: "untrusted",
+  malformed: "malformed",
 };
 
 function PassportBadge({ passport }: { passport: InventoryPassport }): JSX.Element {
@@ -45,6 +64,71 @@ function PassportBadge({ passport }: { passport: InventoryPassport }): JSX.Eleme
       data-testid={`inv-badge-${kind}`}
     >
       {PASSPORT_LABEL[kind]}
+    </span>
+  );
+}
+
+/** One untrust reason as a compact, readable string carrying its distinguishing
+ *  field: `scope_overreach` shows the extra scope, `malformed_field` the field. */
+function untrustReasonText(reason: InventoryUntrustReason): string {
+  switch (reason.kind) {
+    case "scope_overreach":
+      return `scope_overreach: ${reason.extra.join(", ")}`;
+    case "malformed_field":
+      return `malformed_field: ${reason.field}`;
+    default:
+      return reason.kind;
+  }
+}
+
+/**
+ * Signed-attestation badge -- the axis ORTHOGONAL to the manifest PassportBadge.
+ *
+ * Keyed off `attestation.kind` ALONE (never inferred from anything else): the
+ * four states trusted / untrusted / unsigned / malformed each get a distinct
+ * badge. `untrusted` renders WHY (its typed reasons, with scope_overreach's
+ * extra scope and malformed_field's field), so an operator sees the cause;
+ * `malformed` renders the read/parse message. Inline spans only (no block inside
+ * a span) to keep the DOM valid. CSS tokens live in probe.css.
+ */
+function AttestationBadge({
+  attestation,
+}: {
+  attestation: InventoryAttestation;
+}): JSX.Element {
+  const kind = attestation.kind;
+  const className = `inv-attest inv-attest-${kind}`;
+  const testid = `inv-attest-${kind}`;
+
+  if (attestation.kind === "untrusted") {
+    const reasons = attestation.reasons.map(untrustReasonText);
+    return (
+      <span className={className} data-testid={testid} title={reasons.join("; ")}>
+        <span className="inv-attest-label">{ATTESTATION_LABEL[kind]}</span>
+        <span className="inv-attest-reasons">
+          {reasons.map((r, i) => (
+            <span key={i} className="inv-attest-reason">
+              {r}
+            </span>
+          ))}
+        </span>
+      </span>
+    );
+  }
+
+  if (attestation.kind === "malformed") {
+    return (
+      <span className={className} data-testid={testid} title={attestation.message}>
+        <span className="inv-attest-label">{ATTESTATION_LABEL[kind]}</span>
+        <span className="inv-attest-message">{attestation.message}</span>
+      </span>
+    );
+  }
+
+  // trusted | unsigned: label only, no reasons to surface.
+  return (
+    <span className={className} data-testid={testid}>
+      <span className="inv-attest-label">{ATTESTATION_LABEL[kind]}</span>
     </span>
   );
 }
@@ -168,6 +252,10 @@ export default function InventoryPanel({
         <span>without passport: {inventory.summary.without_passport}</span>
         <span>invalid passport: {inventory.summary.invalid_passport}</span>
         <span>violations: {inventory.summary.violation_count}</span>
+        <span>attested trusted: {inventory.summary.attested_trusted}</span>
+        <span>attested untrusted: {inventory.summary.attested_untrusted}</span>
+        <span>unsigned: {inventory.summary.unsigned}</span>
+        <span>attested malformed: {inventory.summary.attested_malformed}</span>
       </div>
 
       <table className="inv-table" data-testid="inv-agents-table">
@@ -175,6 +263,7 @@ export default function InventoryPanel({
           <tr>
             <th>agent_id</th>
             <th>passport</th>
+            <th>attestation</th>
             <th>kind</th>
             <th>conformity</th>
             <th>evidence</th>
@@ -189,6 +278,9 @@ export default function InventoryPanel({
               <td className="inv-agent-id">{agent.agent_id}</td>
               <td>
                 <PassportBadge passport={agent.passport} />
+              </td>
+              <td>
+                <AttestationBadge attestation={agent.attestation} />
               </td>
               <td>{agent.kind ?? "--"}</td>
               <td className="inv-conformity">{conformityText(agent.conformity)}</td>

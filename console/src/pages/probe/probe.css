@@ -755,6 +755,62 @@
   border-color: var(--badge-amber-fg);
 }
 
+/* Attestation badge -- the SIGNED-passport axis, ORTHOGONAL to the manifest
+ * passport badge above. One distinct style per state, keyed off attestation.kind:
+ * trusted = green, untrusted = red, unsigned = neutral grey, malformed = amber.
+ * A column layout so untrusted can stack its reasons under the label. */
+.inv-attest {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+
+.inv-attest-trusted {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  border-color: var(--badge-green-fg);
+}
+
+.inv-attest-untrusted {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-color: var(--badge-red-fg);
+}
+
+.inv-attest-unsigned {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+  border-color: var(--badge-gray-fg);
+}
+
+.inv-attest-malformed {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  border-color: var(--badge-amber-fg);
+}
+
+.inv-attest-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.inv-attest-reason,
+.inv-attest-message {
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .inv-conformity {
   font-size: 0.8rem;
   color: var(--color-text-muted);
