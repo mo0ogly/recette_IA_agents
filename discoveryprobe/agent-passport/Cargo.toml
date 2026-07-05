@@ -1,0 +1,18 @@
+# agent-passport -- standalone, exportable implementation of the "Contrat 3"
+# signed agent passport from the firewall governance spec. The passport is a
+# frozen, signed tuple (id, tenant, delegation chain, scope, exp, optional
+# spiffe_id) sealed with an Ed25519 signature and a key_id. This crate is PURE
+# (no I/O, no wall clock, no rand) so it can be lifted into a real-agent runtime
+# unchanged. It has ZERO dependency on any discoveryprobe-* crate by design.
+[package]
+name = "agent-passport"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Exportable, pure parser/issuer/verifier for the Contrat 3 signed agent passport (Ed25519)."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ed25519-dalek = "2.2"
+thiserror = "2"
