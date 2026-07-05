@@ -1,5 +1,7 @@
 # acme-tampered-pr-bot
 
+**IMPORTANT:** This repository contains an **intentionally tampered passport** for corpus testing. The `.inspect_ia_agents/passport.json` file has a deliberate cryptographic defect and **MUST NOT be regenerated** — see `.inspect_ia_agents/DO-NOT-REGENERATE.md` for details. If you run passport regeneration tools on this tree, the test subject will be destroyed.
+
 Opens pull requests to bump outdated dependencies across `acme/*` repositories.
 
 - Identity: GitHub App `acme-tampered-pr-bot[bot]`
