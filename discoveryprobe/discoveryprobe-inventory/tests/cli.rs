@@ -537,3 +537,114 @@ fn passport_verify_is_deterministic() {
     assert_eq!(run_once(), run_once());
     let _ = std::fs::remove_dir_all(&tree);
 }
+
+#[test]
+fn passport_verify_trust_file_as_json_array_exits_two() {
+    let tree = issue_passport("verify-array-trust", "read_repo", "2999-01-01T00:00:00Z");
+    let trust = tree.join("trust_array.json");
+    // Trust file is a JSON array instead of an object.
+    std::fs::write(&trust, "[]").expect("write array trust");
+    let output = Command::new(BIN)
+        .args([
+            "passport",
+            "verify",
+            &tree.display().to_string(),
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2026-01-01T00:00:00Z",
+        ])
+        .output()
+        .expect("spawn verify");
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "JSON array trust file is a config error (exit 2)"
+    );
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn passport_verify_trust_file_with_bad_hex_pubkey_exits_two() {
+    let tree = issue_passport("verify-badhex-trust", "read_repo", "2999-01-01T00:00:00Z");
+    let trust = tree.join("trust_badhex.json");
+    // Trust file has a bad-hex pubkey value (not valid hex).
+    std::fs::write(&trust, r#"{"acme-key-1":"nothex"}"#).expect("write badhex trust");
+    let output = Command::new(BIN)
+        .args([
+            "passport",
+            "verify",
+            &tree.display().to_string(),
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2026-01-01T00:00:00Z",
+        ])
+        .output()
+        .expect("spawn verify");
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "bad-hex pubkey in trust file is a config error (exit 2)"
+    );
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn passport_verify_corrupt_passport_json_exits_one() {
+    let tree = issue_passport("verify-corrupt", "read_repo", "2999-01-01T00:00:00Z");
+    // Overwrite the valid passport with valid JSON that is not a passport.
+    let passport_path = tree.join(".inspect_ia_agents").join("passport.json");
+    std::fs::write(&passport_path, r#"{"hello":"world"}"#).expect("write corrupt passport");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let output = Command::new(BIN)
+        .args([
+            "passport",
+            "verify",
+            &tree.display().to_string(),
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2026-01-01T00:00:00Z",
+        ])
+        .output()
+        .expect("spawn verify");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "corrupt passport (parse error) must exit 1, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // No verdict on stdout when the passport fails to parse.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("kind"),
+        "no verdict when passport is corrupt (not a valid passport): {stdout}"
+    );
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn passport_verify_malformed_now_flag_exits_two() {
+    let tree = issue_passport("verify-badnow", "read_repo", "2999-01-01T00:00:00Z");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let output = Command::new(BIN)
+        .args([
+            "passport",
+            "verify",
+            &tree.display().to_string(),
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "not-a-timestamp",
+        ])
+        .output()
+        .expect("spawn verify");
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "malformed --now is a config error (exit 2), stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let _ = std::fs::remove_dir_all(&tree);
+}
