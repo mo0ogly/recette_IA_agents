@@ -17,7 +17,8 @@
 //!
 //! Serialization: field names are serde-default snake_case (the Python
 //! bridge consumes them as-is). Enums crossing the bridge (`Conformity`,
-//! `Violation`, `scan::PassportStatus`) use UNIFORM kind-tagged JSON:
+//! `Violation`, `scan::PassportStatus`, `Attestation`, and the re-exported
+//! `UntrustReason` it carries) use UNIFORM kind-tagged JSON:
 //! internally tagged (`#[serde(tag = "kind")]`), snake_case tags, and no
 //! newtype variants (payloads are named fields), so EVERY enum value is a
 //! JSON object with a `"kind"` key -- Python dispatches on `value["kind"]`
@@ -33,6 +34,11 @@ use crate::scan::PassportStatus;
 use discoveryprobe_core::ipc::IpcEvents;
 use discoveryprobe_core::CaptureRecording;
 use serde::{Deserialize, Serialize};
+
+/// Re-export of the pure `agent-passport` untrust reason so a console/Python
+/// consumer receives the TYPED reasons (kind-tagged) an `Attestation::Untrusted`
+/// carries, without depending on the `agent-passport` crate directly.
+pub use agent_passport::UntrustReason;
 
 /// The correlated agent inventory: every identified agent, the declared vs
 /// observed communication graph, and roll-up counters.
@@ -61,6 +67,17 @@ pub struct InventorySummary {
     pub invalid_passport: usize,
     /// Total violations across all records.
     pub violation_count: usize,
+    /// Records whose signed `passport.json` verified `Attestation::Trusted`.
+    /// Mirrors `with_passport`, but on the SIGNED-CREDENTIAL axis.
+    pub attested_trusted: usize,
+    /// Records whose signed `passport.json` is present but not trusted
+    /// (`Attestation::Untrusted`, including the fail-safe no-keyring default).
+    pub attested_untrusted: usize,
+    /// Records with no signed `passport.json` at all (`Attestation::Unsigned`).
+    pub unsigned: usize,
+    /// Records whose signed `passport.json` is present but unparseable
+    /// (`Attestation::Malformed`). Mirrors `invalid_passport` on the signed axis.
+    pub attested_malformed: usize,
 }
 
 /// One identified agent: declared identity, observed behaviour, verdict.
@@ -69,8 +86,16 @@ pub struct AgentRecord {
     /// Stable id: passport `agent_id`, else declared principal, else the
     /// last path component of the scanned root (see `correlate` module doc).
     pub agent_id: String,
-    /// Passport situation (present / absent / invalid).
+    /// Manifest situation (present / absent / invalid). Reads
+    /// `.inspect_ia_agents/manifest.json` -- a SEPARATE, orthogonal axis from
+    /// `attestation`: an agent has a manifest situation AND an attestation
+    /// situation, and neither implies the other.
     pub passport: PassportStatus,
+    /// Signed-credential situation (unsigned / trusted / untrusted / malformed).
+    /// Reads the Contrat-3 `.inspect_ia_agents/passport.json` produced by
+    /// `passport issue` and verifies it against the injected keyring + clock.
+    /// Orthogonal to `passport` (the manifest axis).
+    pub attestation: Attestation,
     /// Subject family from the passport (`git_agent` / `maf_agent`);
     /// `None` when no valid passport exists.
     pub kind: Option<String>,
@@ -83,6 +108,61 @@ pub struct AgentRecord {
     /// Auditor-facing proof strings (shadow-agent code evidence, the
     /// runtime-shadow marker); sorted and deduplicated.
     pub evidence: Vec<String>,
+}
+
+/// Signed-attestation situation of an agent tree: the verdict of the Contrat-3
+/// `.inspect_ia_agents/passport.json` signed credential.
+///
+/// This is a NEW axis, ORTHOGONAL to [`PassportStatus`] (the manifest axis):
+/// `PassportStatus` reads `manifest.json` (present/absent/invalid), while this
+/// enum reads the SIGNED `passport.json` produced by `passport issue`. An agent
+/// can be a manifest shadow ([`PassportStatus::Absent`]) yet carry a
+/// [`Attestation::Trusted`] credential, or the reverse -- the two never imply
+/// each other.
+///
+/// Kind-tagged JSON like every bridge-crossing enum (uniform style, see the
+/// module header): each value is an object with a `"kind"` key, so a
+/// Python/console consumer dispatches on `value["kind"]` without shape checks.
+///
+/// # Malformed vs Untrusted (decision)
+///
+/// A `passport.json` that is PRESENT but does not PARSE (`from_json` errors:
+/// corrupt JSON, missing/unknown field, not a passport) is a distinct
+/// [`Attestation::Malformed`] -- the parallel of the manifest axis'
+/// [`PassportStatus::Invalid`] -- kept separate from
+/// [`Attestation::Untrusted`], which is a passport that PARSED but failed
+/// verification (bad signature, expired, unknown key, ...). "Present but
+/// unparseable" and "parsed but not trusted" are different auditor signals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Attestation {
+    /// No `.inspect_ia_agents/passport.json` in the tree. The manifest may still
+    /// exist (separate axis); the agent simply carries no signed credential.
+    Unsigned,
+    /// `passport.json` is present, parsed, and verified [`Verdict::Trusted`]
+    /// against the injected keyring and clock.
+    ///
+    /// [`Verdict::Trusted`]: agent_passport::Verdict::Trusted
+    Trusted,
+    /// `passport.json` is present and parsed, but verification returned
+    /// [`Verdict::Untrusted`]: it carries every applicable typed
+    /// [`UntrustReason`]. This ALSO covers the fail-safe no-keyring default (a
+    /// scan without `--trust`/`--now` cannot establish trust, so a present
+    /// passport is [`UntrustReason::UnknownKeyId`], never optimistically
+    /// trusted).
+    ///
+    /// [`Verdict::Untrusted`]: agent_passport::Verdict::Untrusted
+    Untrusted {
+        /// Every applicable untrust reason, sorted by the [`UntrustReason`]
+        /// derived `Ord` (I4), exactly as the pure verifier emits them.
+        reasons: Vec<UntrustReason>,
+    },
+    /// `passport.json` is present but could not be read or parsed as a passport
+    /// (corrupt/not-a-passport). The parallel of [`PassportStatus::Invalid`].
+    Malformed {
+        /// The read/parse error string (auditor-facing).
+        message: String,
+    },
 }
 
 /// The declared side of an agent record, extracted from its passport.

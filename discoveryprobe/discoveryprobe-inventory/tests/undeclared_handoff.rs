@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use discoveryprobe_inventory::correlate::correlate;
 use discoveryprobe_inventory::graph::{DeclaredGraph, Edge};
 use discoveryprobe_inventory::manifest::Passport;
-use discoveryprobe_inventory::model::{Conformity, ObservedInput, Violation};
+use discoveryprobe_inventory::model::{Attestation, Conformity, ObservedInput, Violation};
 use discoveryprobe_inventory::scan::{PassportStatus, ScannedAgent};
 
 /// Resolves a committed fixture file under `tests/fixtures/undeclared-handoff/`.
@@ -46,6 +46,7 @@ fn scanned_maf(agent_id: &str, capability: &str) -> ScannedAgent {
     ScannedAgent {
         root: format!("tests/fixtures/undeclared-handoff/{agent_id}"),
         passport: PassportStatus::Present { passport },
+        attestation: Attestation::Unsigned,
     }
 }
 

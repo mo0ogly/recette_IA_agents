@@ -2,9 +2,14 @@
 //!
 //! Runs the static pipeline (scan -> declared graph -> correlate -> JSON) and
 //! prints the `AgentInventory` report. Usage:
-//!   discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]
+//!   discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>] [--trust <pubkeys.json>] [--now <rfc3339>]
 //!
-//! - `<path>`: the source tree to scan (`scan::scan_tree`).
+//! - `<path>`: the source tree to scan (`scan::scan_tree_attested`).
+//! - `--trust` / `--now`: OPTIONAL keyring + injected clock for the signed
+//!   `passport.json` ATTESTATION axis (orthogonal to the manifest axis). Loaded
+//!   exactly like `passport verify`. Without BOTH, a present `passport.json` is
+//!   the fail-safe `Attestation::Untrusted` (unknown key) -- the scan never
+//!   claims trusted without a keyring. I4: `--now` is the only clock.
 //! - `--capture`: an `ObservedInput` JSON file (runtime observation). Absent
 //!   means a static-only run, whose conformity can never be `Conform`
 //!   (fail-safe, see the lib doc).
@@ -51,7 +56,7 @@ use discoveryprobe_inventory::correlate::correlate;
 use discoveryprobe_inventory::graph::DeclaredGraph;
 use discoveryprobe_inventory::model::ObservedInput;
 use discoveryprobe_inventory::report::{self, ReportError};
-use discoveryprobe_inventory::scan::{scan_tree, PassportStatus, ScanError};
+use discoveryprobe_inventory::scan::{scan_tree_attested, PassportStatus, ScanError};
 use ed25519_dalek::SigningKey;
 
 /// Environment variable carrying the Ed25519 signing seed (32-byte hex) used by
@@ -59,7 +64,7 @@ use ed25519_dalek::SigningKey;
 const PASSPORT_KEY_ENV: &str = "INSPECT_IA_AGENTS_PASSPORT_KEY";
 
 /// Multi-line usage string printed on any usage error, covering both commands.
-const USAGE: &str = "usage:\n  discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]\n  discoveryprobe-inventory passport issue <tree> --agent-id <id> --tenant <t> --scope <a,b,c> --delegation <x,human:alice> --exp <rfc3339> --key-id <k> [--spiffe-id <spiffe://...>] [--out <file>]\n  discoveryprobe-inventory passport verify <tree> --trust <pubkeys.json> --now <rfc3339> [--declared <a,b,c>]";
+const USAGE: &str = "usage:\n  discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>] [--trust <pubkeys.json>] [--now <rfc3339>]\n  discoveryprobe-inventory passport issue <tree> --agent-id <id> --tenant <t> --scope <a,b,c> --delegation <x,human:alice> --exp <rfc3339> --key-id <k> [--spiffe-id <spiffe://...>] [--out <file>]\n  discoveryprobe-inventory passport verify <tree> --trust <pubkeys.json> --now <rfc3339> [--declared <a,b,c>]";
 
 /// Errors of the CLI layer. Everything is rendered to stderr via `Display`;
 /// `Usage` exits 2, every other variant exits 1.
@@ -195,6 +200,15 @@ struct ScanArgs {
     team: Option<PathBuf>,
     /// Optional output file for the JSON (default: stdout).
     out: Option<PathBuf>,
+    /// Optional trust file (`{ "<key_id>": "<pubkey_hex>", ... }`) for the
+    /// signed-`passport.json` attestation axis. Absent OR without `--now` ->
+    /// a present passport is the fail-safe untrusted (unknown key), never
+    /// trusted.
+    trust: Option<PathBuf>,
+    /// Optional injected clock (RFC3339 UTC) for the attestation expiry check
+    /// (I4: never the system clock). Required alongside `--trust` to reach a
+    /// trusted attestation.
+    now: Option<String>,
 }
 
 /// Parsed command line of the `passport issue` subcommand.
@@ -256,26 +270,28 @@ fn parse_scan(args: &[String]) -> Result<ScanArgs, CliError> {
     let mut capture: Option<PathBuf> = None;
     let mut team: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
+    let mut trust: Option<PathBuf> = None;
+    let mut now: Option<String> = None;
     while let Some(flag) = iter.next() {
-        let slot = match flag.as_str() {
-            "--capture" => &mut capture,
-            "--team" => &mut team,
-            "--out" => &mut out,
-            other => return Err(CliError::Usage(format!("unknown argument '{other}'"))),
-        };
         let Some(value) = iter.next() else {
             return Err(CliError::Usage(format!("{flag} requires a value")));
         };
-        if slot.is_some() {
-            return Err(CliError::Usage(format!("{flag} given twice")));
+        match flag.as_str() {
+            "--capture" => set_once(&mut capture, PathBuf::from(value), flag)?,
+            "--team" => set_once(&mut team, PathBuf::from(value), flag)?,
+            "--out" => set_once(&mut out, PathBuf::from(value), flag)?,
+            "--trust" => set_once(&mut trust, PathBuf::from(value), flag)?,
+            "--now" => set_once(&mut now, value.clone(), flag)?,
+            other => return Err(CliError::Usage(format!("unknown argument '{other}'"))),
         }
-        *slot = Some(PathBuf::from(value));
     }
     Ok(ScanArgs {
         path,
         capture,
         team,
         out,
+        trust,
+        now,
     })
 }
 
@@ -443,7 +459,21 @@ fn run(args: &[String]) -> Result<Outcome, CliError> {
 /// for STDOUT: the inventory JSON, or an empty string when `--out` already
 /// consumed it (JSON goes to exactly one place).
 fn run_scan(cli: ScanArgs) -> Result<String, CliError> {
-    let scanned = scan_tree(&cli.path).map_err(CliError::Scan)?;
+    // Attestation axis (signed passport.json): the optional keyring + injected
+    // clock. Loaded like `passport verify` (DRY: same `load_trust_store` +
+    // `Timestamp::parse`). A bad trust file exits 2 (config); a bad --now exits
+    // 2 (config). Without BOTH, a present passport is the fail-safe untrusted
+    // (never trusted without a keyring). I4: --now is the ONLY clock.
+    let trust = match &cli.trust {
+        Some(path) => Some(load_trust_store(path)?),
+        None => None,
+    };
+    let now = match &cli.now {
+        Some(text) => Some(Timestamp::parse(text).map_err(|e| CliError::Clock(e.to_string()))?),
+        None => None,
+    };
+    let scanned =
+        scan_tree_attested(&cli.path, trust.as_ref(), now.as_ref()).map_err(CliError::Scan)?;
 
     // Declared graph = passports + teams (module doc): every scanned Present
     // passport contributes its handoff edges, then every team.json under

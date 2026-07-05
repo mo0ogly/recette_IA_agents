@@ -23,6 +23,10 @@
 //! Unlike `adapters.py` which uses early-return precedence between heuristics (temporal wins over openapi wins over github), this scan unions evidence from ALL heuristics: a tree with both temporalio code and github SDK imports emits evidence from both. Detection yes/no parity with the oracle holds for the corpus; consumers must not assume first-match evidence.
 
 use crate::manifest::{Passport, PassportError, KNOWN_GIT_ACTIONS};
+use crate::model::Attestation;
+use agent_passport::{
+    verify, Passport as SignedPassport, Timestamp, TrustStore, UntrustReason, Verdict,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -74,21 +78,55 @@ pub enum PassportStatus {
     },
 }
 
-/// One agent located by the scan: the tree root plus its passport status.
+/// One agent located by the scan: the tree root, its manifest status, and its
+/// signed-credential attestation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScannedAgent {
     /// Scanned tree root (display path as given to the scan, deterministic).
     pub root: String,
-    /// Passport situation of the tree.
+    /// Manifest situation of the tree (`.inspect_ia_agents/manifest.json`).
     pub passport: PassportStatus,
+    /// Signed-credential situation of the tree
+    /// (`.inspect_ia_agents/passport.json`) -- a SEPARATE axis from `passport`.
+    /// Set to [`Attestation::Unsigned`] when scanned without a keyring
+    /// (`scan_tree`), or resolved against an injected keyring + clock by
+    /// [`scan_tree_attested`].
+    pub attestation: Attestation,
 }
 
-/// Scans one source tree for an agent. Returns at most one `ScannedAgent`:
-/// the tree either declares a passport (present/invalid) or shows agent-code
-/// evidence (absent passport = shadow agent); with neither, the result is
-/// empty -- never an agent claim without proof.
+/// Scans one source tree for an agent WITHOUT a keyring: the manifest axis is
+/// resolved as usual, and the signed-credential `attestation` is computed with
+/// no trust anchors and no clock (`scan_tree_attested(root, None, None)`), so a
+/// present `passport.json` is the fail-safe [`Attestation::Untrusted`] with
+/// [`UntrustReason::UnknownKeyId`] -- never trusted without a keyring.
+///
+/// Returns at most one `ScannedAgent`: the tree either declares a manifest
+/// (present/invalid) or shows agent-code evidence (absent manifest = shadow
+/// agent); with neither, the result is empty -- never an agent claim without
+/// proof. A tree that carries ONLY a `passport.json` (no manifest, no code) is
+/// therefore not detected here; the attestation axis surfaces on a tree already
+/// detected on the manifest/code axis.
 pub fn scan_tree(root: &Path) -> Result<Vec<ScannedAgent>, ScanError> {
+    scan_tree_attested(root, None, None)
+}
+
+/// Scans one source tree, resolving the signed-credential attestation against an
+/// injected keyring (`trust`) and clock (`now`). Both are OPTIONAL: when either
+/// is absent, a present `passport.json` is the fail-safe
+/// [`Attestation::Untrusted`] ([`UntrustReason::UnknownKeyId`]) -- the scan
+/// never claims [`Attestation::Trusted`] without an injected keyring AND clock.
+/// When both are present, the passport is verified via the pure `agent-passport`
+/// [`verify`] (declared scope is `None` here -- see [`read_attestation`]).
+///
+/// I4: `now` is an INJECTED input; the wall clock is never read.
+pub fn scan_tree_attested(
+    root: &Path,
+    trust: Option<&TrustStore>,
+    now: Option<&Timestamp>,
+) -> Result<Vec<ScannedAgent>, ScanError> {
     let root_display = root.display().to_string();
+    // The attestation axis is per-tree (same root) -- compute it once.
+    let attestation = read_attestation(root, trust, now);
     let manifest_path = root.join(".inspect_ia_agents").join("manifest.json");
     if manifest_path.exists() {
         let raw = read_file(&manifest_path)?;
@@ -101,6 +139,7 @@ pub fn scan_tree(root: &Path) -> Result<Vec<ScannedAgent>, ScanError> {
         return Ok(vec![ScannedAgent {
             root: root_display,
             passport,
+            attestation,
         }]);
     }
     let mut evidence: Vec<String> = Vec::new();
@@ -115,7 +154,68 @@ pub fn scan_tree(root: &Path) -> Result<Vec<ScannedAgent>, ScanError> {
     Ok(vec![ScannedAgent {
         root: root_display,
         passport: PassportStatus::Absent { evidence },
+        attestation,
     }])
+}
+
+/// Reads `<root>/.inspect_ia_agents/passport.json` and resolves it to an
+/// [`Attestation`], fail-safe (never panics, never errors the scan):
+///
+/// - no file -> [`Attestation::Unsigned`];
+/// - present but unreadable or unparseable -> [`Attestation::Malformed`]
+///   (the signed-axis parallel of [`PassportStatus::Invalid`]);
+/// - parsed, with BOTH `trust` and `now` -> the pure [`verify`] verdict, mapped
+///   to [`Attestation::Trusted`] / [`Attestation::Untrusted`];
+/// - parsed, but `trust` OR `now` absent -> fail-safe
+///   [`Attestation::Untrusted`] with [`UntrustReason::UnknownKeyId`]: without an
+///   injected keyring AND clock the scan cannot establish trust, so it never
+///   claims trusted.
+///
+/// The declared scope is `None`: the scan attestation covers
+/// signature + expiry + delegation, NOT scope overreach. The manifest-vs-passport
+/// scope cross-check is exercised by the standalone `passport verify --declared`
+/// (and the corpus subject), out of scope for the inventory scan.
+fn read_attestation(
+    root: &Path,
+    trust: Option<&TrustStore>,
+    now: Option<&Timestamp>,
+) -> Attestation {
+    let passport_path = root.join(".inspect_ia_agents").join("passport.json");
+    if !passport_path.exists() {
+        return Attestation::Unsigned;
+    }
+    let raw = match std::fs::read(&passport_path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return Attestation::Malformed {
+                message: format!("cannot read passport.json: {e}"),
+            }
+        }
+    };
+    let passport = match SignedPassport::from_json(&raw) {
+        Ok(p) => p,
+        Err(e) => {
+            return Attestation::Malformed {
+                message: e.to_string(),
+            }
+        }
+    };
+    match (trust, now) {
+        // Real verification only with an injected keyring AND clock.
+        (Some(trust), Some(now)) => attestation_from_verdict(verify(&passport, trust, now, None)),
+        // Fail-safe: no keyring/clock -> cannot establish trust -> unknown key.
+        _ => Attestation::Untrusted {
+            reasons: vec![UntrustReason::UnknownKeyId],
+        },
+    }
+}
+
+/// Maps a pure [`verify`] [`Verdict`] to an inventory [`Attestation`].
+fn attestation_from_verdict(verdict: Verdict) -> Attestation {
+    match verdict {
+        Verdict::Trusted => Attestation::Trusted,
+        Verdict::Untrusted { reasons } => Attestation::Untrusted { reasons },
+    }
 }
 
 /// Flattens a `PassportError` into auditor-facing strings: one string for a
@@ -303,5 +403,81 @@ mod tests {
             "invalid-passport fixture must produce exactly one result"
         );
         assert!(matches!(found[0].passport, PassportStatus::Invalid { .. }));
+    }
+
+    // --- attestation axis (signed passport.json) --------------------------
+    //
+    // These build throwaway temp trees: a shadow agent (`agent/bot.py` with a
+    // github import) so the tree is DETECTED on the manifest/code axis, plus an
+    // optional `passport.json` to exercise the ORTHOGONAL attestation axis.
+
+    /// Creates a fresh temp tree containing an `agent/bot.py` that imports the
+    /// github SDK (so the tree scans as a shadow agent) and returns its path.
+    fn shadow_tree(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "discoveryprobe-scan-attest-{tag}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("agent")).expect("create tree");
+        std::fs::write(dir.join("agent").join("bot.py"), "import github\n").expect("write bot");
+        dir
+    }
+
+    /// A minimal, parseable (but unsigned-in-practice) `passport.json` body:
+    /// every required field is present, so `SignedPassport::from_json` succeeds;
+    /// the signature is a placeholder (verification is exercised end-to-end via
+    /// the CLI integration tests with a real key).
+    const MINIMAL_PASSPORT: &str = r#"{"id":"a","tenant":"t","delegation":["human:alice"],"scope":["read_repo"],"exp":"2999-01-01T00:00:00Z","signature":"00","key_id":"k"}"#;
+
+    #[test]
+    fn no_passport_json_is_attestation_unsigned() {
+        let tree = shadow_tree("unsigned");
+        let found = scan_tree(&tree).expect("scan");
+        assert_eq!(found.len(), 1);
+        // Manifest axis: shadow (Absent). Attestation axis: Unsigned. Orthogonal.
+        assert!(matches!(found[0].passport, PassportStatus::Absent { .. }));
+        assert_eq!(found[0].attestation, Attestation::Unsigned);
+        let _ = std::fs::remove_dir_all(&tree);
+    }
+
+    #[test]
+    fn present_passport_without_keyring_is_untrusted_unknown_key() {
+        let tree = shadow_tree("nokeyring");
+        std::fs::create_dir_all(tree.join(".inspect_ia_agents")).expect("mk .inspect_ia_agents");
+        std::fs::write(
+            tree.join(".inspect_ia_agents").join("passport.json"),
+            MINIMAL_PASSPORT,
+        )
+        .expect("write passport");
+        // scan_tree passes no trust/no clock: fail-safe unknown key.
+        let found = scan_tree(&tree).expect("scan");
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            found[0].attestation,
+            Attestation::Untrusted {
+                reasons: vec![UntrustReason::UnknownKeyId],
+            }
+        );
+        let _ = std::fs::remove_dir_all(&tree);
+    }
+
+    #[test]
+    fn corrupt_passport_json_is_attestation_malformed() {
+        let tree = shadow_tree("malformed");
+        std::fs::create_dir_all(tree.join(".inspect_ia_agents")).expect("mk .inspect_ia_agents");
+        std::fs::write(
+            tree.join(".inspect_ia_agents").join("passport.json"),
+            "not a passport at all",
+        )
+        .expect("write corrupt");
+        let found = scan_tree(&tree).expect("scan");
+        assert_eq!(found.len(), 1);
+        assert!(
+            matches!(found[0].attestation, Attestation::Malformed { .. }),
+            "expected Malformed, got {:?}",
+            found[0].attestation
+        );
+        let _ = std::fs::remove_dir_all(&tree);
     }
 }

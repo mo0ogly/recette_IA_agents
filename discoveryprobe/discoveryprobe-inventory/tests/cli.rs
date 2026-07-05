@@ -648,3 +648,189 @@ fn passport_verify_malformed_now_flag_exits_two() {
     );
     let _ = std::fs::remove_dir_all(&tree);
 }
+
+// --- scan attestation axis (signed passport.json) --------------------------
+//
+// The scan `--trust`/`--now` flags resolve the ORTHOGONAL attestation axis of
+// each detected agent. These trees are detected as SHADOW agents (an
+// `agent/bot.py` importing the github SDK -> manifest-axis Absent) AND carry a
+// signed `passport.json` -> attestation axis. The two coexist on one record.
+
+/// Runs `scan <tree>` with optional extra args and returns the parsed inventory.
+fn scan_inventory(tree: &Path, extra: &[&str]) -> serde_json::Value {
+    let mut argv = vec!["scan".to_string(), tree.display().to_string()];
+    argv.extend(extra.iter().map(|s| s.to_string()));
+    let output = Command::new(BIN).args(&argv).output().expect("spawn scan");
+    assert!(
+        output.status.success(),
+        "scan exit: {:?}, stderr: {}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    serde_json::from_str(stdout.trim()).expect("parse inventory")
+}
+
+/// Builds a detected shadow-agent tree (`agent/bot.py` importing github) and
+/// seals a signed `passport.json` into it via `passport issue`. Returns the
+/// tree path.
+fn detected_tree_with_passport(tag: &str, scope: &str, exp: &str) -> PathBuf {
+    let tree = unique_temp_dir(tag);
+    std::fs::create_dir_all(tree.join("agent")).expect("create agent dir");
+    std::fs::write(tree.join("agent").join("bot.py"), "import github\n").expect("write bot");
+    let status = Command::new(BIN)
+        .env(KEY_ENV, test_seed_hex())
+        .args([
+            "passport",
+            "issue",
+            &tree.display().to_string(),
+            "--agent-id",
+            "attested-bot",
+            "--tenant",
+            "acme",
+            "--scope",
+            scope,
+            "--delegation",
+            "svc:ci,human:alice",
+            "--exp",
+            exp,
+            "--key-id",
+            "acme-key-1",
+        ])
+        .status()
+        .expect("spawn issue");
+    assert!(status.success(), "issue must seed the passport.json");
+    tree
+}
+
+#[test]
+fn scan_without_passport_json_is_attestation_unsigned() {
+    // A corpus repo has a manifest but NO passport.json: manifest axis Present,
+    // attestation axis Unsigned. The two axes coexist and are independent.
+    let inventory = scan_inventory(Path::new(&corpus_path("repos/gh-pr-bot/repo")), &[]);
+    let agents = inventory["agents"].as_array().expect("agents array");
+    assert_eq!(agents.len(), 1);
+    assert_eq!(agents[0]["attestation"]["kind"], "unsigned");
+    // Manifest axis is independent: the manifest is Present here.
+    assert_eq!(agents[0]["passport"]["kind"], "present");
+    assert_eq!(inventory["summary"]["unsigned"], 1);
+    assert_eq!(inventory["summary"]["with_passport"], 1);
+    assert_eq!(inventory["summary"]["attested_trusted"], 0);
+}
+
+#[test]
+fn scan_signed_passport_with_trust_before_exp_is_attested_trusted() {
+    let tree =
+        detected_tree_with_passport("scan-trusted", "read_repo,open_pr", "2999-01-01T00:00:00Z");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let inventory = scan_inventory(
+        &tree,
+        &[
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2026-01-01T00:00:00Z",
+        ],
+    );
+    let agents = inventory["agents"].as_array().expect("agents array");
+    assert_eq!(agents.len(), 1);
+    // Attestation axis: Trusted. Manifest axis: Absent (shadow). Orthogonal.
+    assert_eq!(agents[0]["attestation"]["kind"], "trusted", "{inventory}");
+    assert_eq!(agents[0]["passport"]["kind"], "absent");
+    assert_eq!(inventory["summary"]["attested_trusted"], 1);
+    assert_eq!(inventory["summary"]["unsigned"], 0);
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn scan_signed_passport_after_exp_is_attested_untrusted_expired() {
+    let tree = detected_tree_with_passport("scan-expired", "read_repo", "2026-01-01T00:00:00Z");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let inventory = scan_inventory(
+        &tree,
+        &[
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2027-01-01T00:00:00Z",
+        ],
+    );
+    let attestation = &inventory["agents"][0]["attestation"];
+    assert_eq!(attestation["kind"], "untrusted", "{inventory}");
+    let reasons = attestation["reasons"].as_array().expect("reasons array");
+    assert!(
+        reasons.iter().any(|r| r["kind"] == "expired"),
+        "expected an expired reason: {inventory}"
+    );
+    assert_eq!(inventory["summary"]["attested_untrusted"], 1);
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn scan_present_passport_without_keyring_is_untrusted_unknown_key() {
+    // Fail-safe: a present passport.json with NO --trust/--now cannot be
+    // established as trusted, so it is Untrusted with unknown_key_id.
+    let tree = detected_tree_with_passport("scan-nokeyring", "read_repo", "2999-01-01T00:00:00Z");
+    let inventory = scan_inventory(&tree, &[]);
+    let attestation = &inventory["agents"][0]["attestation"];
+    assert_eq!(attestation["kind"], "untrusted", "{inventory}");
+    let reasons = attestation["reasons"].as_array().expect("reasons array");
+    assert!(
+        reasons.iter().any(|r| r["kind"] == "unknown_key_id"),
+        "fail-safe without a keyring must be unknown_key_id: {inventory}"
+    );
+    assert_eq!(inventory["summary"]["attested_untrusted"], 1);
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn scan_corrupt_passport_json_is_attestation_malformed() {
+    let tree = detected_tree_with_passport("scan-malformed", "read_repo", "2999-01-01T00:00:00Z");
+    // Corrupt the sealed passport.json: present but unparseable.
+    std::fs::write(
+        tree.join(".inspect_ia_agents").join("passport.json"),
+        "not a passport",
+    )
+    .expect("corrupt passport");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let inventory = scan_inventory(
+        &tree,
+        &[
+            "--trust",
+            &trust.display().to_string(),
+            "--now",
+            "2026-01-01T00:00:00Z",
+        ],
+    );
+    assert_eq!(
+        inventory["agents"][0]["attestation"]["kind"], "malformed",
+        "{inventory}"
+    );
+    assert_eq!(inventory["summary"]["attested_malformed"], 1);
+    let _ = std::fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn scan_with_attestation_is_deterministic() {
+    let tree = detected_tree_with_passport("scan-det", "read_repo", "2999-01-01T00:00:00Z");
+    let trust = write_trust_file(&tree, &[("acme-key-1", &test_pubkey_hex())]);
+    let run_once = || -> Vec<u8> {
+        let output = Command::new(BIN)
+            .args([
+                "scan",
+                &tree.display().to_string(),
+                "--trust",
+                &trust.display().to_string(),
+                "--now",
+                "2026-01-01T00:00:00Z",
+            ])
+            .output()
+            .expect("spawn scan");
+        assert!(output.status.success());
+        output.stdout
+    };
+    // The scan pipeline is deterministic and --now is the only clock (I4):
+    // byte-identical inventory JSON across runs.
+    assert_eq!(run_once(), run_once());
+    let _ = std::fs::remove_dir_all(&tree);
+}
