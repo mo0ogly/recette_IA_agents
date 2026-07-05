@@ -81,7 +81,7 @@ Le binaire porte aussi deux sous-commandes passeport (`passport issue`, `passpor
 verify`) documentees dans `docs/runbooks/passport-recette.md`.
 
 Flags verifies dans `discoveryprobe/discoveryprobe-inventory/src/main.rs` (const `USAGE`
-et `parse_args`).
+et `parse_command`).
 
 ### Forme de l'entree `--capture` (ObservedInput)
 

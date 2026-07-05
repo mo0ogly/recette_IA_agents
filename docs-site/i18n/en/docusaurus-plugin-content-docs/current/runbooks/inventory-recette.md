@@ -78,7 +78,7 @@ The binary also carries two passport subcommands (`passport issue`, `passport ve
 documented in `docs/runbooks/passport-recette.md`.
 
 Flags verified in `discoveryprobe/discoveryprobe-inventory/src/main.rs` (const `USAGE`
-and `parse_args`).
+and `parse_command`).
 
 ### Shape of the `--capture` input (ObservedInput)
 
