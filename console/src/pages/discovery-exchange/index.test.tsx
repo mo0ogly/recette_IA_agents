@@ -265,6 +265,9 @@ describe("DiscoveryExchangePage", () => {
       wire_named: {
         "dx-live-bot": [{ raw: "connect:127.0.0.1:9101", name: "gh-mock", undeclared: false }],
         "leak-bot": [{ raw: "connect:203.0.113.7:443", name: null, undeclared: true }],
+        // Captured with ZERO wire tokens (window missed its traffic): the page
+        // must SKIP this entry -- a bare-id row carries no information.
+        "silent-bot": [],
       },
       undeclared_hosts: ["203.0.113.7:443"],
     });
@@ -278,6 +281,8 @@ describe("DiscoveryExchangePage", () => {
     expect(within(named).getByText(/gh-mock \(127\.0\.0\.1:9101\)/)).toBeInTheDocument();
     // the undeclared endpoint carries the distinct badge
     expect(screen.getByTestId("wire-undeclared")).toHaveTextContent("host non declare");
+    // the empty-endpoint agent renders NO wire row at all
+    expect(screen.queryByTestId("wire-agent-silent-bot")).not.toBeInTheDocument();
     expect(vi.mocked(processCapture)).toHaveBeenCalledWith("dx-live-bot");
   });
 

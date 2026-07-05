@@ -105,6 +105,12 @@ def _seed(api: str, server_port: int) -> None:
     status, body = _api("GET", f"{api}/health")
     _expect(status == 200, f"API not reachable at {api} (GET /health -> {status})")
     _cleanup(api)
+    # The proxy observability buffers now PERSIST across runs (SQLite store,
+    # .run/proxy_traces.db). The smoke's exchange/wire assertions assume a fresh
+    # slate, so purge the DEBUG buffers explicitly (documented DELETE semantics;
+    # the append-only audit log is untouched, I1).
+    _api("DELETE", f"{api}/proxy/traces")
+    _api("DELETE", f"{api}/proxy/wire")
     status, _ = _api(
         "POST",
         f"{api}/config/servers",

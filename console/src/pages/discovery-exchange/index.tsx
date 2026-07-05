@@ -460,7 +460,12 @@ export default function DiscoveryExchangePage(): JSX.Element {
                   <span className="dx-surfaces">aucune surface (eBPF)</span>
                 </li>
               ))}
-              {Object.entries(wireNamed).map(([agentId, endpoints]) => (
+              {/* An agent recorded with ZERO wire tokens (capture window missed
+                  its traffic) yields an empty endpoint list: rendering it would
+                  show a bare id row that says nothing -- skip it. */}
+              {Object.entries(wireNamed)
+                .filter(([, endpoints]) => endpoints.length > 0)
+                .map(([agentId, endpoints]) => (
                 <li
                   key={`wire-${agentId}`}
                   className="dx-agent dx-wire-agent"
