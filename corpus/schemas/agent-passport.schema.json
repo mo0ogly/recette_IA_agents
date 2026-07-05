@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inspect_ia_agents.local/schemas/agent-passport.schema.json",
+  "title": "AgentPassport",
+  "description": "Contrat-3 signed agent passport (.inspect_ia_agents/passport.json): a frozen, Ed25519-signed attestation that binds an agent identity to a mandate chain (delegation up to a human), a permitted action scope, and an expiry. This is the SIGNED artifact behind the discovery attestation axis (trusted/untrusted/unsigned/malformed), distinct from the unsigned .inspect_ia_agents/manifest.json (the passport_status axis). The shape is frozen: additionalProperties is false so no extra attestation data can ride past the signature boundary. Mirrors the Rust reference in discoveryprobe/agent-passport/src/lib.rs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "tenant", "delegation", "scope", "exp", "signature", "key_id"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable identifier of the agent this passport is issued to."
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Tenant (governance boundary) the agent belongs to."
+    },
+    "delegation": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Mandate chain from the direct issuer outward, up to a human principal. A passport MUST delegate up to a human, so the chain is never empty (minItems 1); the terminal element is expected to be a human principal (e.g. human:...)."
+    },
+    "scope": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Permitted action families (the capability scope) granted to the agent."
+    },
+    "exp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiry as an RFC3339 date-time string (temporal validation is a verification concern, not a schema one)."
+    },
+    "spiffe_id": {
+      "type": "string",
+      "pattern": "^spiffe://",
+      "description": "Optional SPIFFE identity (spiffe://...) bound to the agent."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$",
+      "description": "Ed25519 signature over the canonical JSON of the signed claims, hex-encoded: exactly 128 lowercase hex characters (64 bytes)."
+    },
+    "key_id": {
+      "type": "string",
+      "description": "Identifier of the public key that verifies the signature."
+    }
+  }
+}
