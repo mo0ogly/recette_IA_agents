@@ -48,11 +48,12 @@ class AdmissionVerdict:
     dicts). ``admitted`` folds the gate in: a ``trusted`` agent is always
     admitted; a non-trusted agent is admitted ONLY in ``observe`` mode. ``mode``
     records which gate applied. Frozen so two verdicts over identical inputs
-    compare equal (I4 replay stability).
+    compare equal (I4 replay stability). ``reasons`` is a tuple (immutable,
+    hashable) to maintain frozen semantics.
     """
 
     status: str
-    reasons: list[dict]
+    reasons: tuple[dict[str, object], ...]
     admitted: bool
     mode: str
 
@@ -73,7 +74,7 @@ def admit_agent(
 
     Fail-safe (never fail-open): the oracle call is guarded; ANY exception (e.g. a
     missing ``cryptography`` extra, an invalid injected clock) collapses to
-    ``status="untrusted"`` with ``reasons=[{"kind": "oracle_error"}]`` -- never
+    ``status="untrusted"`` with ``reasons=({"kind": "oracle_error"},)`` -- never
     ``trusted``. Admission then follows the same gate: denied in ``enforce``,
     admitted in ``observe``.
     """
@@ -83,7 +84,7 @@ def admit_agent(
     except Exception:  # noqa: BLE001 - fail-safe: any oracle failure denies, never admits trusted
         status, reasons = "untrusted", [{"kind": "oracle_error"}]
     admitted = (status == "trusted") or (not enforce)
-    return AdmissionVerdict(status=status, reasons=reasons, admitted=admitted, mode=mode)
+    return AdmissionVerdict(status=status, reasons=tuple(reasons), admitted=admitted, mode=mode)
 
 
 def enforce_from_env() -> bool:

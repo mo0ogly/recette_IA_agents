@@ -63,7 +63,7 @@ class UnsignedAdmissionTest(unittest.TestCase):
         self.assertEqual(verdict.status, "unsigned")
         self.assertTrue(verdict.admitted)
         self.assertEqual(verdict.mode, "observe")
-        self.assertEqual(verdict.reasons, [])
+        self.assertEqual(verdict.reasons, ())
 
     def test_unsigned_enforce_denies(self) -> None:
         verdict = admit_agent(None, ["read_repo"], self.trust, _NOW, enforce=True)
@@ -88,7 +88,7 @@ class TrustedAdmissionTest(unittest.TestCase):
                 )
                 self.assertEqual(verdict.status, "trusted")
                 self.assertTrue(verdict.admitted)
-                self.assertEqual(verdict.reasons, [])
+                self.assertEqual(verdict.reasons, ())
 
 
 class ExpiredAdmissionTest(unittest.TestCase):
@@ -179,6 +179,16 @@ class LoadTrustTest(unittest.TestCase):
         self.assertIn("test-authority-1", trust)
         self.assertIsInstance(trust["test-authority-1"], str)
 
+    def test_non_dict_json_returns_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            array_path = Path(tmp) / "array.json"
+            array_path.write_text("[]", encoding="utf-8")
+            self.assertEqual(load_trust(array_path), {})
+
+            null_path = Path(tmp) / "null.json"
+            null_path.write_text("null", encoding="utf-8")
+            self.assertEqual(load_trust(null_path), {})
+
 
 class FailSafeTest(unittest.TestCase):
     """An oracle exception NEVER yields trusted; enforce denies, observe admits."""
@@ -199,7 +209,7 @@ class FailSafeTest(unittest.TestCase):
             with self.subTest(enforce=enforce):
                 verdict = admit_agent(None, ["read_repo"], {}, _NOW, enforce=enforce)
                 self.assertEqual(verdict.status, "untrusted")
-                self.assertEqual(verdict.reasons, [{"kind": "oracle_error"}])
+                self.assertEqual(verdict.reasons, ({"kind": "oracle_error"},))
                 self.assertEqual(verdict.admitted, not enforce)
                 self.assertNotEqual(verdict.status, "trusted")
 
