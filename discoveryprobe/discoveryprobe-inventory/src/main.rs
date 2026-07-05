@@ -23,15 +23,30 @@
 //! echoed (R8). Any error before the write (missing/invalid key, issuing
 //! failure) is fail-safe: NO passport file is produced.
 //!
+//! A third command, `passport verify`, is the fail-safe VERIFIER: it reads an
+//! EXISTING `<tree>/.inspect_ia_agents/passport.json`, loads a trust file
+//! (`--trust`, a JSON object `{ "<key_id>": "<pubkey_hex>", ... }`) into a
+//! `TrustStore`, and checks the passport against an INJECTED clock (`--now`,
+//! I4 -- never `SystemTime::now`) and an optional declared scope (`--declared`
+//! csv, for the overreach check). The `Verdict` JSON is printed to stdout in
+//! BOTH the trusted and untrusted cases (the JSON is the product); the exit
+//! code is the gate. Task 7 owns the inventory-level "absent/unsigned" state;
+//! this command verifies an EXISTING passport file, so an absent passport.json
+//! is a plain error (exit 1), not a verdict.
+//!
 //! Conventions (same as discoveryprobe-catalog): no arg-parsing dependency,
-//! errors on stderr only, JSON only on stdout. Exit codes: 0 success,
-//! 2 usage error, 1 any other error.
+//! errors on stderr only, JSON only on stdout. Exit codes: for `scan`/`passport
+//! issue`, 0 success / 2 usage error / 1 any other error. For `passport verify`,
+//! a richer gate contract: 0 Trusted, 3 Untrusted (verdict still printed),
+//! 2 usage or config error (bad flags, unreadable/malformed `--trust`, malformed
+//! `--now`), 1 io/other (absent or unparseable passport.json).
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use agent_passport::{issue, Claims};
+use agent_passport::{issue, verify, Claims, DeclaredScope, Passport, Timestamp, TrustStore};
 use discoveryprobe_inventory::correlate::correlate;
 use discoveryprobe_inventory::graph::DeclaredGraph;
 use discoveryprobe_inventory::model::ObservedInput;
@@ -44,7 +59,7 @@ use ed25519_dalek::SigningKey;
 const PASSPORT_KEY_ENV: &str = "INSPECT_IA_AGENTS_PASSPORT_KEY";
 
 /// Multi-line usage string printed on any usage error, covering both commands.
-const USAGE: &str = "usage:\n  discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]\n  discoveryprobe-inventory passport issue <tree> --agent-id <id> --tenant <t> --scope <a,b,c> --delegation <x,human:alice> --exp <rfc3339> --key-id <k> [--spiffe-id <spiffe://...>] [--out <file>]";
+const USAGE: &str = "usage:\n  discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]\n  discoveryprobe-inventory passport issue <tree> --agent-id <id> --tenant <t> --scope <a,b,c> --delegation <x,human:alice> --exp <rfc3339> --key-id <k> [--spiffe-id <spiffe://...>] [--out <file>]\n  discoveryprobe-inventory passport verify <tree> --trust <pubkeys.json> --now <rfc3339> [--declared <a,b,c>]";
 
 /// Errors of the CLI layer. Everything is rendered to stderr via `Display`;
 /// `Usage` exits 2, every other variant exits 1.
@@ -82,8 +97,38 @@ enum CliError {
     Key(String),
     /// Sealing the passport (agent-passport `issue`) failed.
     Passport(agent_passport::PassportError),
-    /// Serializing the issued passport to JSON failed.
+    /// Serializing the issued passport (or a verdict) to JSON failed.
     Encode(String),
+    /// The `--trust` file (verify) is absent, unreadable, not a JSON object of
+    /// `{key_id: pubkey_hex}`, or carries an invalid key. A trust-anchor config
+    /// error. Exits 2.
+    TrustFile {
+        /// The trust file path as given.
+        path: String,
+        /// The read, parse, or bad-key error message.
+        message: String,
+    },
+    /// The injected `--now` clock (verify) is not a valid RFC3339 UTC timestamp.
+    /// A config error. Exits 2.
+    Clock(String),
+    /// The passport file to verify could not be read (absent or unreadable).
+    /// Exits 1 (io/other): this command verifies an EXISTING passport; the
+    /// inventory-level "absent" state is Task 7's concern.
+    PassportRead {
+        /// The passport.json path as given.
+        path: String,
+        /// The I/O error message.
+        message: String,
+    },
+    /// The passport file to verify could not be parsed as a passport. Exits 1:
+    /// an unparseable file is an error, whereas a parseable-but-defective
+    /// passport is a printed [`Verdict::Untrusted`] (exit 3), never an error.
+    PassportParse {
+        /// The passport.json path as given.
+        path: String,
+        /// The parse error message.
+        message: String,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -98,6 +143,14 @@ impl fmt::Display for CliError {
             CliError::Key(message) => write!(f, "signing key: {message}"),
             CliError::Passport(e) => write!(f, "passport issue failed: {e}"),
             CliError::Encode(message) => write!(f, "encode passport: {message}"),
+            CliError::TrustFile { path, message } => write!(f, "trust file {path}: {message}"),
+            CliError::Clock(message) => write!(f, "invalid --now: {message}"),
+            CliError::PassportRead { path, message } => {
+                write!(f, "read passport {path}: {message}")
+            }
+            CliError::PassportParse { path, message } => {
+                write!(f, "parse passport {path}: {message}")
+            }
         }
     }
 }
@@ -105,10 +158,16 @@ impl fmt::Display for CliError {
 impl std::error::Error for CliError {}
 
 impl CliError {
-    /// Process exit code for this error: 2 for usage, 1 otherwise.
+    /// Process exit code for this error. Usage and config errors (bad flags,
+    /// signing key, trust file, clock) exit 2; everything else exits 1. The
+    /// Untrusted verdict is NOT an error -- it is a printed verdict with exit 3
+    /// (see [`Outcome`]).
     fn exit_code(&self) -> u8 {
         match self {
-            CliError::Usage(_) | CliError::Key(_) => 2,
+            CliError::Usage(_)
+            | CliError::Key(_)
+            | CliError::TrustFile { .. }
+            | CliError::Clock(_) => 2,
             _ => 1,
         }
     }
@@ -121,6 +180,8 @@ enum Command {
     Scan(ScanArgs),
     /// `passport issue <tree> [...]` -- seal claims into a signed passport.
     PassportIssue(PassportIssueArgs),
+    /// `passport verify <tree> [...]` -- fail-safe verification of a passport.
+    PassportVerify(PassportVerifyArgs),
 }
 
 /// Parsed command line of the `scan` command.
@@ -159,13 +220,27 @@ struct PassportIssueArgs {
     out: Option<PathBuf>,
 }
 
+/// Parsed command line of the `passport verify` subcommand.
+#[derive(Debug, PartialEq, Eq)]
+struct PassportVerifyArgs {
+    /// The agent tree whose `.inspect_ia_agents/passport.json` is verified.
+    tree: PathBuf,
+    /// The trust file: a JSON object `{ "<key_id>": "<pubkey_hex>", ... }`.
+    trust: PathBuf,
+    /// The injected clock as RFC3339 UTC (I4: never the system clock).
+    now: String,
+    /// Optional declared action families (comma-separated) for the overreach
+    /// check; absent means no scope check is performed.
+    declared: Option<Vec<String>>,
+}
+
 /// Parses program arguments (without argv[0]) into a [`Command`]. The first
 /// token selects the command; `scan` and `passport` are the only two.
 fn parse_command(args: &[String]) -> Result<Command, CliError> {
     let mut iter = args.iter();
     match iter.next().map(String::as_str) {
         Some("scan") => parse_scan(iter.as_slice()).map(Command::Scan),
-        Some("passport") => parse_passport(iter.as_slice()).map(Command::PassportIssue),
+        Some("passport") => parse_passport(iter.as_slice()),
         Some(other) => Err(CliError::Usage(format!("unknown command '{other}'"))),
         None => Err(CliError::Usage("missing command".to_string())),
     }
@@ -204,20 +279,24 @@ fn parse_scan(args: &[String]) -> Result<ScanArgs, CliError> {
     })
 }
 
-/// Parses the arguments that follow the `passport` command token: the `issue`
-/// subcommand and its flags. All of agent-id/tenant/scope/delegation/exp/
-/// key-id are REQUIRED; a missing one is a usage error.
-fn parse_passport(args: &[String]) -> Result<PassportIssueArgs, CliError> {
+/// Parses the arguments that follow the `passport` command token, dispatching
+/// on the subcommand: `issue` (seal claims) or `verify` (fail-safe check).
+fn parse_passport(args: &[String]) -> Result<Command, CliError> {
     let mut iter = args.iter();
     match iter.next().map(String::as_str) {
-        Some("issue") => {}
-        Some(other) => {
-            return Err(CliError::Usage(format!(
-                "unknown passport subcommand '{other}'"
-            )))
-        }
-        None => return Err(CliError::Usage("missing passport subcommand".to_string())),
+        Some("issue") => parse_passport_issue(iter.as_slice()).map(Command::PassportIssue),
+        Some("verify") => parse_passport_verify(iter.as_slice()).map(Command::PassportVerify),
+        Some(other) => Err(CliError::Usage(format!(
+            "unknown passport subcommand '{other}'"
+        ))),
+        None => Err(CliError::Usage("missing passport subcommand".to_string())),
     }
+}
+
+/// Parses the flags of `passport issue`. All of agent-id/tenant/scope/
+/// delegation/exp/key-id are REQUIRED; a missing one is a usage error.
+fn parse_passport_issue(args: &[String]) -> Result<PassportIssueArgs, CliError> {
+    let mut iter = args.iter();
     let tree = match iter.next() {
         Some(p) if !p.starts_with("--") => PathBuf::from(p),
         _ => {
@@ -266,6 +345,43 @@ fn parse_passport(args: &[String]) -> Result<PassportIssueArgs, CliError> {
     })
 }
 
+/// Parses the flags of `passport verify`. `--trust` and `--now` are REQUIRED;
+/// `--declared` is optional. A missing required flag is a usage error.
+fn parse_passport_verify(args: &[String]) -> Result<PassportVerifyArgs, CliError> {
+    let mut iter = args.iter();
+    let tree = match iter.next() {
+        Some(p) if !p.starts_with("--") => PathBuf::from(p),
+        _ => {
+            return Err(CliError::Usage(
+                "missing <tree> for passport verify".to_string(),
+            ))
+        }
+    };
+
+    let mut trust: Option<PathBuf> = None;
+    let mut now: Option<String> = None;
+    let mut declared: Option<Vec<String>> = None;
+
+    while let Some(flag) = iter.next() {
+        let Some(value) = iter.next() else {
+            return Err(CliError::Usage(format!("{flag} requires a value")));
+        };
+        match flag.as_str() {
+            "--trust" => set_once(&mut trust, PathBuf::from(value), flag)?,
+            "--now" => set_once(&mut now, value.clone(), flag)?,
+            "--declared" => set_once(&mut declared, parse_csv(value, flag)?, flag)?,
+            other => return Err(CliError::Usage(format!("unknown argument '{other}'"))),
+        }
+    }
+
+    Ok(PassportVerifyArgs {
+        tree,
+        trust: require(trust, "--trust")?,
+        now: require(now, "--now")?,
+        declared,
+    })
+}
+
 /// Assigns `value` into `slot`, rejecting a second occurrence of `flag`.
 fn set_once<T>(slot: &mut Option<T>, value: T, flag: &str) -> Result<(), CliError> {
     if slot.is_some() {
@@ -292,12 +408,33 @@ fn parse_csv(raw: &str, flag: &str) -> Result<Vec<String>, CliError> {
     Ok(items)
 }
 
-/// Dispatches the parsed command. Returns the payload for STDOUT (may be empty
-/// when the output went to a file instead).
-fn run(args: &[String]) -> Result<String, CliError> {
+/// A successful command result: the STDOUT payload plus the process exit code.
+///
+/// Most commands succeed with exit 0; `passport verify` uses the exit code as a
+/// GATE (0 Trusted, 3 Untrusted) while still emitting the verdict JSON on
+/// stdout, so the outcome carries the code explicitly.
+#[derive(Debug)]
+struct Outcome {
+    /// The payload to print on stdout (empty when it went to `--out`).
+    stdout: String,
+    /// The process exit code.
+    code: u8,
+}
+
+impl Outcome {
+    /// A plain success (exit 0) carrying `stdout`.
+    fn success(stdout: String) -> Self {
+        Outcome { stdout, code: 0 }
+    }
+}
+
+/// Dispatches the parsed command. Returns the STDOUT payload and exit code (the
+/// payload may be empty when the output went to a file instead).
+fn run(args: &[String]) -> Result<Outcome, CliError> {
     match parse_command(args)? {
-        Command::Scan(scan) => run_scan(scan),
-        Command::PassportIssue(issue_args) => run_passport_issue(issue_args),
+        Command::Scan(scan) => run_scan(scan).map(Outcome::success),
+        Command::PassportIssue(issue_args) => run_passport_issue(issue_args).map(Outcome::success),
+        Command::PassportVerify(verify_args) => run_passport_verify(verify_args),
     }
 }
 
@@ -398,6 +535,61 @@ fn run_passport_issue(args: PassportIssueArgs) -> Result<String, CliError> {
     Ok(format!("passport written to {}", out_path.display()))
 }
 
+/// Runs `passport verify`: load the trust file and the injected clock (config;
+/// any failure exits 2), read+parse the EXISTING passport (absent/unparseable
+/// exits 1), then run the pure fail-safe [`verify`]. The [`Verdict`] JSON is
+/// returned on stdout in BOTH the trusted and untrusted cases; the exit code is
+/// the gate (0 Trusted, 3 Untrusted). I4: `--now` is the ONLY clock -- the
+/// system clock is never read.
+fn run_passport_verify(args: PassportVerifyArgs) -> Result<Outcome, CliError> {
+    // Config first (exit 2 on failure): trust anchors and the injected clock.
+    let trust = load_trust_store(&args.trust)?;
+    let now = Timestamp::parse(&args.now).map_err(|e| CliError::Clock(e.to_string()))?;
+
+    // Read + parse the EXISTING passport (exit 1 on absent/unparseable).
+    let passport_path = args.tree.join(".inspect_ia_agents").join("passport.json");
+    let raw = std::fs::read(&passport_path).map_err(|e| CliError::PassportRead {
+        path: passport_path.display().to_string(),
+        message: e.to_string(),
+    })?;
+    let passport = Passport::from_json(&raw).map_err(|e| CliError::PassportParse {
+        path: passport_path.display().to_string(),
+        message: e.to_string(),
+    })?;
+
+    // Optional declared scope drives the overreach check; absent -> None.
+    let declared = args.declared.map(DeclaredScope::new);
+    let verdict = verify(&passport, &trust, &now, declared.as_ref());
+    let json =
+        serde_json::to_string_pretty(&verdict).map_err(|e| CliError::Encode(e.to_string()))?;
+
+    // The JSON is the product (printed either way); the exit code is the gate.
+    let code = if verdict.is_trusted() { 0 } else { 3 };
+    Ok(Outcome { stdout: json, code })
+}
+
+/// Loads a [`TrustStore`] from a JSON object file `{ "<key_id>": "<pubkey_hex>",
+/// ... }`. Every failure (unreadable file, non-object JSON, or an invalid key)
+/// is a [`CliError::TrustFile`] (config, exit 2). A [`BTreeMap`] is used so the
+/// insertion order is deterministic (I4), though the store itself is unordered
+/// for lookup.
+fn load_trust_store(path: &Path) -> Result<TrustStore, CliError> {
+    let trust_error = |message: String| CliError::TrustFile {
+        path: path.display().to_string(),
+        message,
+    };
+    let raw = std::fs::read_to_string(path).map_err(|e| trust_error(e.to_string()))?;
+    let entries: BTreeMap<String, String> =
+        serde_json::from_str(&raw).map_err(|e| trust_error(e.to_string()))?;
+    let mut trust = TrustStore::new();
+    for (key_id, pubkey_hex) in &entries {
+        trust
+            .add_hex(key_id, pubkey_hex)
+            .map_err(|e| trust_error(e.to_string()))?;
+    }
+    Ok(trust)
+}
+
 /// Reads and decodes the Ed25519 signing seed from [`PASSPORT_KEY_ENV`].
 ///
 /// Returns [`CliError::Key`] (exit 2, fail-safe) when the variable is absent,
@@ -479,11 +671,11 @@ fn collect_team_json(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), CliError>
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
-        Ok(stdout_payload) => {
-            if !stdout_payload.is_empty() {
-                println!("{stdout_payload}");
+        Ok(outcome) => {
+            if !outcome.stdout.is_empty() {
+                println!("{}", outcome.stdout);
             }
-            ExitCode::SUCCESS
+            ExitCode::from(outcome.code)
         }
         Err(err) => {
             eprintln!("{err}");
@@ -543,7 +735,9 @@ mod tests {
 
     #[test]
     fn static_scan_of_the_corpus_pr_bot_yields_one_not_observed_agent() {
-        let json = run(&args(&["scan", &corpus("repos/gh-pr-bot/repo")])).expect("run");
+        let json = run(&args(&["scan", &corpus("repos/gh-pr-bot/repo")]))
+            .expect("run")
+            .stdout;
         let inventory: AgentInventory = serde_json::from_str(&json).expect("parse");
         assert_eq!(inventory.agents.len(), 1);
         assert_eq!(inventory.agents[0].agent_id, "acme-dependency-pr-bot[bot]");
@@ -559,7 +753,8 @@ mod tests {
             "--team",
             &corpus("maf_orchestration/correct/finance-approval-handoff-correct"),
         ]))
-        .expect("run");
+        .expect("run")
+        .stdout;
         let inventory: AgentInventory = serde_json::from_str(&json).expect("parse");
         // The finance team.json declares 4 handoff edges (see graph tests).
         assert_eq!(inventory.comm_graph.declared_edges.len(), 4);
@@ -573,7 +768,8 @@ mod tests {
             "--capture",
             &fixture("capture-pr-bot.json"),
         ]))
-        .expect("run");
+        .expect("run")
+        .stdout;
         let inventory: AgentInventory = serde_json::from_str(&json).expect("parse");
         assert_eq!(inventory.agents.len(), 1);
         // The fixture records the declared open_pr action: Conform.
@@ -590,7 +786,8 @@ mod tests {
             "--out",
             &out_path.display().to_string(),
         ]))
-        .expect("run");
+        .expect("run")
+        .stdout;
         assert!(stdout_payload.is_empty());
         let written = std::fs::read_to_string(&out_path).expect("read out file");
         let inventory: AgentInventory = serde_json::from_str(&written).expect("parse");
