@@ -87,7 +87,9 @@ class TestDiscoveryOverview(unittest.TestCase):
     def test_overview_includes_the_surface_corpus_pillar(self) -> None:
         client = TestClient(create_app())
         surfaces = client.get("/discovery/overview").json()["surfaces"]
-        self.assertEqual(surfaces["total_agents"], 2)
+        # 4 green subjects in corpus/surface/: pr-bot-sdk + ghost-direct-db,
+        # then exfil-to-sink + hook-only-mock (added by the 4-pattern thesis wave).
+        self.assertEqual(surfaces["total_agents"], 4)
         self.assertTrue(surfaces["ok"])
         self.assertEqual(surfaces["ghosts"], 0)
         self.assertIn("ebpf_wire", surfaces["detected_per_surface"])

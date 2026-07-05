@@ -51,6 +51,12 @@ class DiscoveryExchangeEndpointTest(unittest.TestCase):
             create_app(
                 event_store=InMemoryEventStore(),
                 config_store=ConfigStore(cfg_path),
+                # Explicit :memory: proxy store: under `unittest discover -s
+                # tests` modules import top-level, so the tests/__init__.py
+                # env pin never runs and bare create_app() would share the
+                # persistent .run/proxy_traces.db -- wire flows posted by one
+                # test would leak into the next (order-dependent failures).
+                proxy_db_path=":memory:",
             )
         )
 
