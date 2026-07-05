@@ -1,0 +1,15 @@
+{
+  "id": "acme-readonly-reporter[bot]",
+  "tenant": "acme",
+  "delegation": [
+    "acme-platform-team",
+    "human:bob"
+  ],
+  "scope": [
+    "read_repo",
+    "read_ci"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "signature": "1d209d5a5dd4e05a63f039edf1818bd4ebbeb3889080fe9a1830c129351bd80e18b6edb90f09eadc1038426a239270d3ff94715296a59899acf270b07113b704",
+  "key_id": "test-authority-1"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "acme-dependency-pr-bot[bot]",
+  "tenant": "acme",
+  "delegation": [
+    "acme-platform-team",
+    "human:alice"
+  ],
+  "scope": [
+    "read_repo",
+    "open_pr"
+  ],
+  "exp": "2030-01-01T00:00:00Z",
+  "spiffe_id": "spiffe://acme/agent/dependency-pr-bot",
+  "signature": "9c16a33e84bed9ec84625f175b9571b60b3cb81904639acf77c1b79e532fb52e0c14f53148454eb25f048590a151182adef8118ab11be293747f3077a880d00b",
+  "key_id": "test-authority-1"
+}

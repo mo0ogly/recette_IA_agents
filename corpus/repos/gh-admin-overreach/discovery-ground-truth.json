@@ -6,5 +6,6 @@
   "action_patterns": ["read_repo", "push", "manage_webhook"],
   "risk_rank": 3,
   "policy_generated": true,
+  "attestation_status": "trusted",
   "notes": "Infra syncer: direct push to default branches + webhook management + write-all CI. Highest blast radius in the corpus; scanner must detect one agent, surface push + manage_webhook, rank it above the PR bot, and emit a restrictive policy."
 }
