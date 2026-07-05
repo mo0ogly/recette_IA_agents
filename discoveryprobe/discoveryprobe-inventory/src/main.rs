@@ -14,6 +14,15 @@
 //!   `from_team_json` graph found under the directory.
 //! - `--out`: write the JSON to that file instead of stdout.
 //!
+//! A second command, `passport issue`, is the I/O CONSUMER of the pure
+//! `agent-passport` crate: it reads a 32-byte Ed25519 signing seed from the
+//! `INSPECT_IA_AGENTS_PASSPORT_KEY` environment variable (hex), builds a
+//! `SigningKey`, seals the supplied claims into a signed passport, and writes
+//! it to `<tree>/.inspect_ia_agents/passport.json` (or `--out`). The seed is
+//! read from the environment ONLY -- never hardcoded, never logged, never
+//! echoed (R8). Any error before the write (missing/invalid key, issuing
+//! failure) is fail-safe: NO passport file is produced.
+//!
 //! Conventions (same as discoveryprobe-catalog): no arg-parsing dependency,
 //! errors on stderr only, JSON only on stdout. Exit codes: 0 success,
 //! 2 usage error, 1 any other error.
@@ -22,14 +31,20 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use agent_passport::{issue, Claims};
 use discoveryprobe_inventory::correlate::correlate;
 use discoveryprobe_inventory::graph::DeclaredGraph;
 use discoveryprobe_inventory::model::ObservedInput;
 use discoveryprobe_inventory::report::{self, ReportError};
 use discoveryprobe_inventory::scan::{scan_tree, PassportStatus, ScanError};
+use ed25519_dalek::SigningKey;
 
-/// One-line usage string printed on any usage error.
-const USAGE: &str = "usage: discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]";
+/// Environment variable carrying the Ed25519 signing seed (32-byte hex) used by
+/// `passport issue`. Read at issue time only; never logged or echoed (R8).
+const PASSPORT_KEY_ENV: &str = "INSPECT_IA_AGENTS_PASSPORT_KEY";
+
+/// Multi-line usage string printed on any usage error, covering both commands.
+const USAGE: &str = "usage:\n  discoveryprobe-inventory scan <path> [--capture <file.json>] [--team <dir>] [--out <file>]\n  discoveryprobe-inventory passport issue <tree> --agent-id <id> --tenant <t> --scope <a,b,c> --delegation <x,human:alice> --exp <rfc3339> --key-id <k> [--spiffe-id <spiffe://...>] [--out <file>]";
 
 /// Errors of the CLI layer. Everything is rendered to stderr via `Display`;
 /// `Usage` exits 2, every other variant exits 1.
@@ -62,6 +77,13 @@ enum CliError {
         /// The I/O error message.
         message: String,
     },
+    /// The signing key from the environment is absent, empty, or malformed.
+    /// The message NEVER contains the key material (R8). Exits 2.
+    Key(String),
+    /// Sealing the passport (agent-passport `issue`) failed.
+    Passport(agent_passport::PassportError),
+    /// Serializing the issued passport to JSON failed.
+    Encode(String),
 }
 
 impl fmt::Display for CliError {
@@ -73,6 +95,9 @@ impl fmt::Display for CliError {
             CliError::Team { path, message } => write!(f, "team {path}: {message}"),
             CliError::Report(e) => write!(f, "{e}"),
             CliError::Write { path, message } => write!(f, "write {path}: {message}"),
+            CliError::Key(message) => write!(f, "signing key: {message}"),
+            CliError::Passport(e) => write!(f, "passport issue failed: {e}"),
+            CliError::Encode(message) => write!(f, "encode passport: {message}"),
         }
     }
 }
@@ -83,15 +108,24 @@ impl CliError {
     /// Process exit code for this error: 2 for usage, 1 otherwise.
     fn exit_code(&self) -> u8 {
         match self {
-            CliError::Usage(_) => 2,
+            CliError::Usage(_) | CliError::Key(_) => 2,
             _ => 1,
         }
     }
 }
 
+/// The parsed top-level command.
+#[derive(Debug, PartialEq, Eq)]
+enum Command {
+    /// `scan <path> [...]` -- the static inventory pipeline.
+    Scan(ScanArgs),
+    /// `passport issue <tree> [...]` -- seal claims into a signed passport.
+    PassportIssue(PassportIssueArgs),
+}
+
 /// Parsed command line of the `scan` command.
 #[derive(Debug, PartialEq, Eq)]
-struct CliArgs {
+struct ScanArgs {
     /// The source tree to scan.
     path: PathBuf,
     /// Optional `ObservedInput` JSON file.
@@ -102,14 +136,44 @@ struct CliArgs {
     out: Option<PathBuf>,
 }
 
-/// Parses program arguments (without argv[0]) into `CliArgs`.
-fn parse_args(args: &[String]) -> Result<CliArgs, CliError> {
+/// Parsed command line of the `passport issue` subcommand.
+#[derive(Debug, PartialEq, Eq)]
+struct PassportIssueArgs {
+    /// The agent tree the passport belongs to (default output location root).
+    tree: PathBuf,
+    /// The agent identity -- becomes `Claims.id`.
+    agent_id: String,
+    /// The tenant the agent runs under.
+    tenant: String,
+    /// The action-family scope (comma-separated on the CLI).
+    scope: Vec<String>,
+    /// The delegation chain, terminal entry a human principal (comma-separated).
+    delegation: Vec<String>,
+    /// The RFC3339 UTC expiry timestamp.
+    exp: String,
+    /// The identifier of the key that seals (and later verifies) the passport.
+    key_id: String,
+    /// Optional SPIFFE identity.
+    spiffe_id: Option<String>,
+    /// Optional output file (default: `<tree>/.inspect_ia_agents/passport.json`).
+    out: Option<PathBuf>,
+}
+
+/// Parses program arguments (without argv[0]) into a [`Command`]. The first
+/// token selects the command; `scan` and `passport` are the only two.
+fn parse_command(args: &[String]) -> Result<Command, CliError> {
     let mut iter = args.iter();
     match iter.next().map(String::as_str) {
-        Some("scan") => {}
-        Some(other) => return Err(CliError::Usage(format!("unknown command '{other}'"))),
-        None => return Err(CliError::Usage("missing command".to_string())),
+        Some("scan") => parse_scan(iter.as_slice()).map(Command::Scan),
+        Some("passport") => parse_passport(iter.as_slice()).map(Command::PassportIssue),
+        Some(other) => Err(CliError::Usage(format!("unknown command '{other}'"))),
+        None => Err(CliError::Usage("missing command".to_string())),
     }
+}
+
+/// Parses the arguments that follow the `scan` command token.
+fn parse_scan(args: &[String]) -> Result<ScanArgs, CliError> {
+    let mut iter = args.iter();
     let path = match iter.next() {
         Some(p) if !p.starts_with("--") => PathBuf::from(p),
         _ => return Err(CliError::Usage("missing <path> to scan".to_string())),
@@ -132,7 +196,7 @@ fn parse_args(args: &[String]) -> Result<CliArgs, CliError> {
         }
         *slot = Some(PathBuf::from(value));
     }
-    Ok(CliArgs {
+    Ok(ScanArgs {
         path,
         capture,
         team,
@@ -140,12 +204,108 @@ fn parse_args(args: &[String]) -> Result<CliArgs, CliError> {
     })
 }
 
-/// Runs the CLI: scan, build the declared graph (passports + teams),
-/// correlate with the optional capture, serialize. Returns the payload for
-/// STDOUT: the inventory JSON, or an empty string when `--out` already
-/// consumed it (JSON goes to exactly one place).
+/// Parses the arguments that follow the `passport` command token: the `issue`
+/// subcommand and its flags. All of agent-id/tenant/scope/delegation/exp/
+/// key-id are REQUIRED; a missing one is a usage error.
+fn parse_passport(args: &[String]) -> Result<PassportIssueArgs, CliError> {
+    let mut iter = args.iter();
+    match iter.next().map(String::as_str) {
+        Some("issue") => {}
+        Some(other) => {
+            return Err(CliError::Usage(format!(
+                "unknown passport subcommand '{other}'"
+            )))
+        }
+        None => return Err(CliError::Usage("missing passport subcommand".to_string())),
+    }
+    let tree = match iter.next() {
+        Some(p) if !p.starts_with("--") => PathBuf::from(p),
+        _ => {
+            return Err(CliError::Usage(
+                "missing <tree> for passport issue".to_string(),
+            ))
+        }
+    };
+
+    let mut agent_id: Option<String> = None;
+    let mut tenant: Option<String> = None;
+    let mut scope: Option<Vec<String>> = None;
+    let mut delegation: Option<Vec<String>> = None;
+    let mut exp: Option<String> = None;
+    let mut key_id: Option<String> = None;
+    let mut spiffe_id: Option<String> = None;
+    let mut out: Option<PathBuf> = None;
+
+    while let Some(flag) = iter.next() {
+        let Some(value) = iter.next() else {
+            return Err(CliError::Usage(format!("{flag} requires a value")));
+        };
+        match flag.as_str() {
+            "--agent-id" => set_once(&mut agent_id, value.clone(), flag)?,
+            "--tenant" => set_once(&mut tenant, value.clone(), flag)?,
+            "--exp" => set_once(&mut exp, value.clone(), flag)?,
+            "--key-id" => set_once(&mut key_id, value.clone(), flag)?,
+            "--spiffe-id" => set_once(&mut spiffe_id, value.clone(), flag)?,
+            "--scope" => set_once(&mut scope, parse_csv(value, flag)?, flag)?,
+            "--delegation" => set_once(&mut delegation, parse_csv(value, flag)?, flag)?,
+            "--out" => set_once(&mut out, PathBuf::from(value), flag)?,
+            other => return Err(CliError::Usage(format!("unknown argument '{other}'"))),
+        }
+    }
+
+    Ok(PassportIssueArgs {
+        tree,
+        agent_id: require(agent_id, "--agent-id")?,
+        tenant: require(tenant, "--tenant")?,
+        scope: require(scope, "--scope")?,
+        delegation: require(delegation, "--delegation")?,
+        exp: require(exp, "--exp")?,
+        key_id: require(key_id, "--key-id")?,
+        spiffe_id,
+        out,
+    })
+}
+
+/// Assigns `value` into `slot`, rejecting a second occurrence of `flag`.
+fn set_once<T>(slot: &mut Option<T>, value: T, flag: &str) -> Result<(), CliError> {
+    if slot.is_some() {
+        return Err(CliError::Usage(format!("{flag} given twice")));
+    }
+    *slot = Some(value);
+    Ok(())
+}
+
+/// Unwraps a required flag value, mapping absence to a usage error.
+fn require<T>(slot: Option<T>, flag: &str) -> Result<T, CliError> {
+    slot.ok_or_else(|| CliError::Usage(format!("missing required {flag}")))
+}
+
+/// Splits a comma-separated flag value into trimmed, non-empty entries. An
+/// empty overall value or any empty entry is a usage error.
+fn parse_csv(raw: &str, flag: &str) -> Result<Vec<String>, CliError> {
+    let items: Vec<String> = raw.split(',').map(|s| s.trim().to_string()).collect();
+    if items.iter().any(String::is_empty) {
+        return Err(CliError::Usage(format!(
+            "{flag} has an empty entry in {raw:?}"
+        )));
+    }
+    Ok(items)
+}
+
+/// Dispatches the parsed command. Returns the payload for STDOUT (may be empty
+/// when the output went to a file instead).
 fn run(args: &[String]) -> Result<String, CliError> {
-    let cli = parse_args(args)?;
+    match parse_command(args)? {
+        Command::Scan(scan) => run_scan(scan),
+        Command::PassportIssue(issue_args) => run_passport_issue(issue_args),
+    }
+}
+
+/// Runs the `scan` command: scan, build the declared graph (passports +
+/// teams), correlate with the optional capture, serialize. Returns the payload
+/// for STDOUT: the inventory JSON, or an empty string when `--out` already
+/// consumed it (JSON goes to exactly one place).
+fn run_scan(cli: ScanArgs) -> Result<String, CliError> {
     let scanned = scan_tree(&cli.path).map_err(CliError::Scan)?;
 
     // Declared graph = passports + teams (module doc): every scanned Present
@@ -198,6 +358,90 @@ fn run(args: &[String]) -> Result<String, CliError> {
             Ok(String::new())
         }
         None => Ok(json),
+    }
+}
+
+/// Runs `passport issue`: load the signing seed from the environment, seal the
+/// claims into a signed passport, and write it to disk. Fail-safe: the seed is
+/// resolved and the passport issued+encoded BEFORE any filesystem write, so no
+/// passport file is ever produced on an error path. Returns a short
+/// confirmation naming the file (the key is never echoed). R8.
+fn run_passport_issue(args: PassportIssueArgs) -> Result<String, CliError> {
+    let seed = load_signing_seed()?;
+    let signing_key = SigningKey::from_bytes(&seed);
+
+    let claims = Claims {
+        id: args.agent_id,
+        tenant: args.tenant,
+        delegation: args.delegation,
+        scope: args.scope,
+        exp: args.exp,
+        spiffe_id: args.spiffe_id,
+    };
+    let passport = issue(claims, &signing_key, &args.key_id).map_err(CliError::Passport)?;
+    let json =
+        serde_json::to_string_pretty(&passport).map_err(|e| CliError::Encode(e.to_string()))?;
+
+    let out_path = args
+        .out
+        .unwrap_or_else(|| args.tree.join(".inspect_ia_agents").join("passport.json"));
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| CliError::Write {
+            path: parent.display().to_string(),
+            message: e.to_string(),
+        })?;
+    }
+    std::fs::write(&out_path, &json).map_err(|e| CliError::Write {
+        path: out_path.display().to_string(),
+        message: e.to_string(),
+    })?;
+    Ok(format!("passport written to {}", out_path.display()))
+}
+
+/// Reads and decodes the Ed25519 signing seed from [`PASSPORT_KEY_ENV`].
+///
+/// Returns [`CliError::Key`] (exit 2, fail-safe) when the variable is absent,
+/// empty, or not exactly 32 bytes of hex. The error message NEVER contains the
+/// key material (R8).
+fn load_signing_seed() -> Result<[u8; 32], CliError> {
+    let raw = match std::env::var(PASSPORT_KEY_ENV) {
+        Ok(value) if !value.trim().is_empty() => value,
+        _ => {
+            return Err(CliError::Key(format!(
+                "{PASSPORT_KEY_ENV} is not set (expected 32-byte hex seed)"
+            )))
+        }
+    };
+    decode_seed_hex(raw.trim()).ok_or_else(|| {
+        CliError::Key(format!(
+            "{PASSPORT_KEY_ENV} must be 32 bytes of hex (64 hex characters)"
+        ))
+    })
+}
+
+/// Decodes exactly 64 hex characters into a 32-byte seed, or `None` on any
+/// wrong length or non-hex character.
+fn decode_seed_hex(text: &str) -> Option<[u8; 32]> {
+    if text.len() != 64 {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let mut out = [0u8; 32];
+    for (i, slot) in out.iter_mut().enumerate() {
+        let hi = hex_digit(bytes[i * 2])?;
+        let lo = hex_digit(bytes[i * 2 + 1])?;
+        *slot = (hi << 4) | lo;
+    }
+    Some(out)
+}
+
+/// Maps a single ASCII hex digit byte to its value (0-15), or `None`.
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
