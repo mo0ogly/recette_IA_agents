@@ -176,6 +176,16 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 ///
 /// Derives [`Ord`] so a caller (a later task) can sort a reason list into a
 /// deterministic order before rendering or hashing.
+///
+/// # Ord semantics (important)
+///
+/// The derived [`Ord`] implementation follows the **canonical enumeration order**
+/// (the order variants are declared, as defined by Rust's enum variant ordering)
+/// for deterministic, stable ordering across audit systems. This ordering is
+/// appropriate for **stable serialization and audit trails**, NOT for sorting by
+/// "severity" or "check priority". Callers sorting reasons for display or
+/// hashing should not infer a priority ranking from the Ord order; instead, all
+/// reasons are equally fatal to trust.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UntrustReason {
     /// The Ed25519 signature did not verify (or was not decodable) against the
@@ -383,6 +393,10 @@ mod tests {
         assert!(Timestamp::parse("2027-00-01T00:00:00Z").is_err());
         assert!(Timestamp::parse("2027-01-01T24:00:00Z").is_err());
         assert!(Timestamp::parse("garbage").is_err());
+        // Adversarial day values: day=0 is invalid.
+        assert!(Timestamp::parse("2027-01-00T00:00:00Z").is_err());
+        // Adversarial day values: day=32 exceeds max for a 31-day month.
+        assert!(Timestamp::parse("2027-01-32T00:00:00Z").is_err());
     }
 
     #[test]

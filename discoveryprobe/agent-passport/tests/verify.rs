@@ -45,13 +45,23 @@ fn trust_with_test_key(key_id: &str) -> TrustStore {
 /// Builds claims with caller-chosen delegation, scope and expiry; the identity
 /// fields are fixed and irrelevant to verification.
 fn claims_with(delegation: Vec<&str>, scope: Vec<&str>, exp: &str) -> Claims {
+    claims_with_spiffe(delegation, scope, exp, None)
+}
+
+/// Builds claims with caller-chosen delegation, scope, expiry, and optional spiffe_id.
+fn claims_with_spiffe(
+    delegation: Vec<&str>,
+    scope: Vec<&str>,
+    exp: &str,
+    spiffe_id: Option<&str>,
+) -> Claims {
     Claims {
         id: "agent:subject".to_string(),
         tenant: "acme-finance".to_string(),
         delegation: delegation.into_iter().map(String::from).collect(),
         scope: scope.into_iter().map(String::from).collect(),
         exp: exp.to_string(),
-        spiffe_id: None,
+        spiffe_id: spiffe_id.map(String::from),
     }
 }
 
@@ -267,6 +277,33 @@ fn verify_is_deterministic() {
     let a = verify(&passport, &trust, &now(), None);
     let b = verify(&passport, &trust, &now(), None);
     assert_eq!(a, b);
+}
+
+#[test]
+fn spiffe_id_round_trip_through_verify_is_trusted() {
+    // Proves the spiffe_id field round-trips through issue and verify
+    // end-to-end: canonical_bytes includes the Some-branch, Passport::claims()
+    // clones it, and verify's signature check covers it.
+    let key_id = "test-key-1";
+    let claims = claims_with_spiffe(
+        vec!["service:orch", "human:alice@acme.example"],
+        vec!["read_ledger"],
+        "2027-01-01T00:00:00Z",
+        Some("spiffe://cluster/ns/agent"),
+    );
+    let passport = issue_passport(claims, key_id);
+    let trust = trust_with_test_key(key_id);
+    let declared = DeclaredScope::new(vec!["read_ledger".to_string()]);
+
+    // Verify that spiffe_id is preserved in the passport.
+    assert_eq!(
+        passport.spiffe_id.as_deref(),
+        Some("spiffe://cluster/ns/agent")
+    );
+
+    // Verify with a future clock, valid delegation, and subset scope -> Trusted.
+    let verdict = verify(&passport, &trust, &now(), Some(&declared));
+    assert_eq!(verdict, Verdict::Trusted);
 }
 
 #[test]
