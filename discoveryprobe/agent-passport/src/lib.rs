@@ -139,7 +139,7 @@ mod tests {
         "scope": ["read_ledger", "post_journal_entry", "open_pr"],
         "exp": "2026-12-31T23:59:59Z",
         "spiffe_id": "spiffe://acme.example/ns/finance/sa/invoice-reconciler",
-        "signature": "3d4f8a1c9b2e7f6058a1c4d2e9f0b8a7561d3c2b4e5f6a7089c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071829304a5b6c7",
+        "signature": "3d4f8a1c9b2e7f6058a1c4d2e9f0b8a7561d3c2b4e5f6a7089c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071829304a5b6c",
         "key_id": "ed25519:acme-issuer-2026-q3"
     }"#;
 
@@ -173,7 +173,7 @@ mod tests {
         );
         assert_eq!(
             passport.signature,
-            "3d4f8a1c9b2e7f6058a1c4d2e9f0b8a7561d3c2b4e5f6a7089c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071829304a5b6c7"
+            "3d4f8a1c9b2e7f6058a1c4d2e9f0b8a7561d3c2b4e5f6a7089c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071829304a5b6c"
         );
         assert_eq!(passport.key_id, "ed25519:acme-issuer-2026-q3");
     }
@@ -255,5 +255,38 @@ mod tests {
             spiffe_id: Some("spiffe://acme.example/ns/finance/sa/invoice-reconciler".to_string()),
         };
         assert_eq!(claims, expected);
+    }
+
+    #[test]
+    fn passport_json_structure_matches_field_definition() {
+        let passport = Passport::from_json(VALID_PASSPORT.as_bytes())
+            .expect("a well-formed Contrat 3 passport must parse");
+
+        let json_value =
+            serde_json::to_value(&passport).expect("serialization to JSON must succeed");
+
+        let obj = json_value
+            .as_object()
+            .expect("serialized Passport must be a JSON object");
+
+        let mut actual_keys: Vec<&str> = obj.keys().map(|k| k.as_str()).collect();
+        actual_keys.sort_unstable();
+
+        let mut expected_keys = vec![
+            "id",
+            "tenant",
+            "delegation",
+            "scope",
+            "exp",
+            "spiffe_id",
+            "signature",
+            "key_id",
+        ];
+        expected_keys.sort_unstable();
+
+        assert_eq!(
+            actual_keys, expected_keys,
+            "Passport JSON structure must contain exactly the signed fields (Claims) plus signature and key_id"
+        );
     }
 }
