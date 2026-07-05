@@ -357,9 +357,14 @@ def create_app(
     app.state.passport_enforce = (
         enforce_from_env() if passport_enforce is None else passport_enforce
     )
-    app.state.passport_dir = (
-        passport_dir or os.environ.get(PASSPORT_DIR_ENV) or str(_REPO_ROOT / DEFAULT_PASSPORT_DIR)
-    )
+    # `is not None` (not truthiness): an explicit passport_dir="" must not fall
+    # through to the env/default, matching the passport_trust resolution below.
+    if passport_dir is not None:
+        app.state.passport_dir = passport_dir
+    else:
+        app.state.passport_dir = os.environ.get(PASSPORT_DIR_ENV) or str(
+            _REPO_ROOT / DEFAULT_PASSPORT_DIR
+        )
     if passport_trust is not None:
         app.state.passport_trust = passport_trust
     else:
