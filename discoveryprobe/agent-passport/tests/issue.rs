@@ -36,11 +36,11 @@ fn sample_claims() -> Claims {
 }
 
 /// Decodes a lowercase-hex string into bytes for verification.
+/// Uses `% 2 == 0` instead of `is_multiple_of(2)` for MSRV portability:
+/// `is_multiple_of` requires Rust >= 1.87, but this crate targets older toolchains.
+#[allow(clippy::manual_is_multiple_of)]
 fn from_hex(text: &str) -> Vec<u8> {
-    assert!(
-        text.len().is_multiple_of(2),
-        "hex string must have even length"
-    );
+    assert!(text.len() % 2 == 0, "hex string must have even length");
     (0..text.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&text[i..i + 2], 16).expect("valid hex byte"))

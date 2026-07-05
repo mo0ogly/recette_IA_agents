@@ -52,6 +52,15 @@ pub fn canonical_bytes(claims: &Claims) -> Vec<u8> {
 ///
 /// Keys are inserted in ascending order so the compact serialization is stable
 /// regardless of the map's backing store (see the module docs).
+///
+/// # Canonicalization scope limitation
+///
+/// This function sorts keys at the **root level only**, and is valid for the
+/// current flat [`Claims`] shape where all fields are primitive (String) or
+/// homogeneous arrays of primitives (Vec<String>). If a future version of
+/// [`Claims`] introduces nested objects or heterogeneous collections, this
+/// function would need to be extended to recursively sort all nested levels
+/// to maintain canonical stability.
 fn canonical_value(claims: &Claims) -> Value {
     let mut map = Map::new();
     map.insert(
