@@ -101,6 +101,71 @@
   border-radius: 4px;
 }
 
+/* Virtualized trace list: the VirtualList inner container owns the scroll
+   viewport (fixed pixel height), so the flexible max-height/scroll of
+   .proxy-list is neutralised on the wrapper. */
+.proxy-vlist {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Windowed rows MUST be a uniform fixed height (28px, mirrored by
+   ROW_HEIGHT_PX in AppTracesPanel): no wrapping, overflow clipped. */
+.proxy-vlist .proxy-list-item {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 0.6rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Windowed wire rows MUST be a uniform fixed height (44px, mirrored by
+   ROW_HEIGHT_PX in WirePanel): the select button keeps its two-line layout
+   (summary + latency bar) inside the fixed row, the compare button sits to
+   the right, overflow clipped. */
+.proxy-wire-vlist .proxy-wire-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.proxy-wire-vlist .proxy-wire-row .proxy-list-item {
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-bottom: none;
+  /* Re-allow the two-line layout inside the fixed row (the shared
+     .proxy-vlist .proxy-list-item rule forces nowrap for trace rows). */
+  flex-wrap: wrap;
+  white-space: normal;
+  padding: 0.2rem 0.6rem;
+}
+
+.proxy-wire-vlist .proxy-wire-compare-btn {
+  flex: 0 0 auto;
+}
+
+/* "N new traces" affordance shown while the user is scrolled away from the
+   tail and rows keep landing; reuses the amber badge tokens (no new colors). */
+.proxy-new-badge {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
 .proxy-empty {
   padding: 0.75rem;
   color: var(--color-text-muted);

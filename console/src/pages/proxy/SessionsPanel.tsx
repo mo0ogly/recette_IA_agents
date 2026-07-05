@@ -11,15 +11,22 @@
  * concurrent run arriving on the next poll never steals the current selection,
  * and an aged-out selection degrades to a hint, not a crash.
  *
- * Live: V1 reuses the lightweight poll (2s). The SSE mode is opt-in and wired in
- * phase 2; the selector renders it disabled until then.
+ * Live: a 1s COALESCED delta poll (getProxySessionsDelta) replaces the old
+ * four-calls-per-tick refresh: traces + wire flows + reconcile arrive in ONE
+ * round trip, each side with its OWN cursor (last_seq / wire_last_seq) merged
+ * through the pure mergeDelta with per-side reset semantics. useDeltaFeed does
+ * not fit here (one feed, one cursor), so the two-cursor merge is written
+ * inline, mirroring the hook's internals (busy guard, epoch guard, alive flag).
+ * getRunEvents stays a separate fetch, issued only when a run is deep-linked.
+ * The SSE mode is opt-in and wired in phase 2; the selector renders it
+ * disabled until then.
  */
 
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getProxyTraces, getReconcile, getRunEvents, getWireFlows } from "../../api/client";
+import { getProxySessionsDelta, getRunEvents } from "../../api/client";
 import type { ProxyTrace, WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
@@ -32,10 +39,11 @@ import {
   type Session,
   sessionsFailed,
 } from "./sessionModel";
+import { mergeDelta } from "./useDeltaFeed";
 
 const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
 type LiveMode = "poll" | "sse";
 
 interface BoundaryState {
@@ -100,38 +108,68 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
     onStatusRef.current = onStatus;
   }, [onStatus]);
 
-  const refresh = useCallback(async (): Promise<void> => {
+  // Two-cursor delta merge, mirroring useDeltaFeed's internals (busy guard,
+  // epoch guard, alive flag) but coalesced: ONE response carries BOTH deltas
+  // (traces via last_seq/reset, wire via wire_last_seq/wire_reset), so the
+  // single-feed hook does not fit. Cursors live in refs so the interval
+  // closure always reads the current value without re-arming the timer.
+  const aliveRef = useRef(true);
+  const busyRef = useRef(false);
+  const traceSeqRef = useRef<number | null>(null);
+  const wireSeqRef = useRef<number | null>(null);
+  // Bumped on a feed restart (runParam change): a delta that was in flight
+  // when the feed restarted is discarded instead of merging stale rows.
+  const epochRef = useRef(0);
+
+  const tick = useCallback(async (): Promise<void> => {
+    if (busyRef.current) {
+      return;
+    }
+    busyRef.current = true;
+    const epoch = epochRef.current;
     try {
-      const res = await getProxyTraces();
-      setTraces(res.traces);
+      const res = await getProxySessionsDelta({
+        sinceSeq: traceSeqRef.current ?? undefined,
+        wireSinceSeq: wireSeqRef.current ?? undefined,
+        runId: runParam ?? undefined,
+        strict: true,
+      });
+      if (!aliveRef.current || epoch !== epochRef.current) {
+        return;
+      }
+      // Each side advances its OWN cursor and honors its OWN reset flag; a
+      // stale cursor on one side never forces a resync of the other.
+      traceSeqRef.current = res.last_seq;
+      wireSeqRef.current = res.wire_last_seq;
+      setTraces(
+        (prev) =>
+          mergeDelta(prev, { items: res.traces, last_seq: res.last_seq, reset: res.reset })
+            .items,
+      );
+      setWireFlows(
+        (prev) =>
+          mergeDelta(prev, {
+            items: res.wire_flows,
+            last_seq: res.wire_last_seq,
+            reset: res.wire_reset,
+          }).items,
+      );
+      // Side channels of the coalesced envelope: the debug toggle state and
+      // the strict wire<->audit join marking the ghost (non-mediated)
+      // exchanges (same mapping as the old getReconcile call).
       setDebugEnabled(res.debug_enabled);
+      setBypassHashes(
+        new Set(
+          res.reconcile.bypass_flows
+            .map((f) => f.side_effect_hash)
+            .filter((h): h is string => !!h),
+        ),
+      );
       setError(null);
-      // Wire overlay is optional: when the overlay is off (or the fetch fails)
-      // the traces must still render, so this never propagates to the panel.
-      try {
-        const w = await getWireFlows(undefined, runParam ?? undefined);
-        setWireFlows(w.flows);
-      } catch {
-        setWireFlows([]);
-      }
-      // Reconcile overlay is optional too: a strict wire<->audit join marks the
-      // ghost (non-mediated) exchanges. A failure must NOT blank the view (I1:
-      // this only reads + marks, it never mutates a recorded effect).
-      try {
-        const rec = await getReconcile(runParam ?? undefined, true);
-        setBypassHashes(
-          new Set(
-            rec.bypass_flows
-              .map((f) => f.side_effect_hash)
-              .filter((h): h is string => !!h),
-          ),
-        );
-      } catch {
-        setBypassHashes(new Set());
-      }
       // DECIDE altitude (the agent's "why"): pull the run's ordered tool_call
-      // decisions when a run is preselected. Optional overlay -- a failure must
-      // never blank the view (it only reads run frames, mutates nothing).
+      // decisions when a run is preselected. Separate fetch BY DESIGN (run
+      // events are not proxy-owned); optional overlay -- a failure must never
+      // blank the view (it only reads run frames, mutates nothing).
       if (runParam) {
         try {
           setDecisions(decisionsFromEvents(await getRunEvents(runParam)));
@@ -142,7 +180,11 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
         setDecisions([]);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (aliveRef.current && epoch === epochRef.current) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      busyRef.current = false;
     }
   }, [runParam]);
 
@@ -155,17 +197,31 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
   }, [paused]);
 
   useEffect(() => {
-    void refresh();
+    aliveRef.current = true;
+    // Full restart of BOTH cursors: `tick` changes identity only on a
+    // runParam change, which re-scopes the wire delta + reconcile join
+    // server-side, so the buffered rows and cursors are invalidated together.
+    epochRef.current += 1;
+    traceSeqRef.current = null;
+    wireSeqRef.current = null;
+    setTraces([]);
+    setWireFlows([]);
+    void tick();
     if (liveMode !== "poll") {
-      return;
+      return () => {
+        aliveRef.current = false;
+      };
     }
     const timer = setInterval(() => {
       if (!pausedRef.current) {
-        void refresh();
+        void tick();
       }
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [refresh, liveMode]);
+    return () => {
+      aliveRef.current = false;
+      clearInterval(timer);
+    };
+  }, [tick, liveMode]);
 
   const sessions = useMemo(
     () => groupSessions(traces, groupKey, wireFlows),
@@ -228,7 +284,7 @@ export default function SessionsPanel({ onStatus, paused }: SourcePanelProps): J
             value={liveMode}
             onChange={(e) => setLiveMode(e.target.value as LiveMode)}
           >
-            <option value="poll">poll (2s)</option>
+            <option value="poll">poll (1s)</option>
             <option value="sse" disabled>
               sse (bientot)
             </option>

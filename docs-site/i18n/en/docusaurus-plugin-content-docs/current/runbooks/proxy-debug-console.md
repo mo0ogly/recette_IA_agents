@@ -11,8 +11,9 @@ proxy `execute()` and the **Monaco console** that displays it, plus the
   one `ProxyTrace` per `execute()`: the request intent (event id, agent, action,
   target system, resource, payload) and the outcome (`ok`, status code,
   `side_effect_hash`, error).
-- Traces live in a bounded in-memory ring (`RingTraceRecorder`). The ring is a
-  **throwaway view** -- the durable truth stays in the append-only audit log (I1).
+- Traces live in the SQLite debug store (`SqliteTraceRecorder` on
+  `SqliteProxyStore`, retention by prune). The store is a **throwaway view** --
+  the durable truth stays in the append-only audit log (I1).
 - The console (`/proxy`) renders traces read-only in Monaco: a list on the left,
   a JSON inspector / JSONL stream on the right.
 
@@ -45,23 +46,110 @@ Two paths feed the same shared recorder:
 An agent with **no** `server` binding uses the in-memory `LabForge`, which
 produces no external side effect and is therefore not traced.
 
+## The SQLite debug store (retention, persistence, fail-safe)
+
+Both buffers (app traces AND wire flows) live in ONE SQLite database
+(`SqliteProxyStore`, two tables, independent `seq` counters) replacing the
+old in-memory rings:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `INSPECT_IA_AGENTS_PROXY_DB` | `.run/proxy_traces.db` | SQLite file path |
+| `INSPECT_IA_AGENTS_PROXY_DB_MAX_ROWS` | `50000` | retention ceiling PER TABLE (`<= 0` disables the prune; an unparseable value falls back to the default, fail-safe) |
+
+- **Retention by amortized prune**: after a committed insert whose rowid lands
+  on the prune cadence, the oldest rows beyond `max_rows` are deleted. A prune
+  failure is logged and swallowed (the insert already committed) and never
+  sets `store_error`.
+- **Persistence across restart**: the file survives an API restart -- a long
+  campaign keeps its traces. Client cursors resync via `reset` (see the
+  delta-poll contract below).
+- **Hash at insert (wire)**: a governed flow's `side_effect_hash` is computed
+  ONCE at insert and persisted as a column -- `GET /proxy/wire` reads it, it
+  no longer recomputes it on every call.
+- **Fail-safe `store_error`**: a broken store (full disk, corrupted database)
+  NEVER blocks execution (I5) -- the recording fails, the trace / flow is
+  dropped (it is a debug buffer), the failure message is surfaced as
+  `store_error` on `GET /proxy/debug` (the console flags the degraded
+  buffer), and it is cleared on the next successful insert.
+- **DELETE keeps its purge semantics**: `DELETE /proxy/traces` /
+  `DELETE /proxy/wire` empty the debug table; `seq` stays monotone
+  (AUTOINCREMENT survives DELETE); the append-only audit log is untouched
+  (I1). This store is the DEBUG buffer, never the event store.
+
 ## API
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/proxy/debug` | `{debug_enabled, trace_count}` |
+| GET | `/proxy/debug` | `{debug_enabled, trace_count, store_error}` (`trace_count` = SQL COUNT, never a full snapshot; `store_error` = last store failure, `null` when healthy) |
 | POST | `/proxy/debug` | toggles tracing at runtime `{enabled: bool}` -> `{debug_enabled}` (operator action, logged via tracing, never written to the event store; 422 if non-bool) |
-| GET | `/proxy/traces?tail=N&run_id=...` | recorded traces (oldest first; `tail` keeps last N; `run_id` filters a run) |
+| GET | `/proxy/traces` | delta-poll: `since_seq` (cursor) + server-side filters `run_id`/`agent_id`/`target`/`outcome`/`q` + `limit` (`tail` for compat) -> envelope `{debug_enabled, traces, last_seq, total, reset}` |
 | DELETE | `/proxy/traces` | discard the buffer (the audit log is untouched, I1) |
+| GET | `/proxy/sessions/delta` | coalesced sessions-panel poll: traces + wire + reconcile in ONE call (see below) |
 
 Example:
 
 ```
 curl -s http://127.0.0.1:8080/proxy/debug
 curl -s -X POST http://127.0.0.1:8080/proxy/debug -H 'Content-Type: application/json' -d '{"enabled":true}'
-curl -s "http://127.0.0.1:8080/proxy/traces?tail=50"
+curl -s "http://127.0.0.1:8080/proxy/traces?since_seq=42&outcome=fail&limit=100"
 curl -s -X DELETE http://127.0.0.1:8080/proxy/traces
 ```
+
+### Delta-poll contract (since_seq / last_seq / total / reset)
+
+`GET /proxy/traces` and `GET /proxy/wire` share the same incremental-poll
+contract, evaluated in SQL (never a full snapshot re-filtered in Python):
+
+- `since_seq`: the client cursor; only rows strictly newer than it are
+  returned (ascending delta, oldest first).
+- `last_seq`: the UNFILTERED table MAX(seq) -- the client's next cursor.
+- `total`: the count of the FILTERED set ignoring `since_seq`/`limit`/`tail`
+  (header counters without shipping the rows).
+- `reset`: true when the client cursor is AHEAD of the server (buffer emptied
+  by DELETE or store recreated); the server then re-serves the full current
+  selection WITHOUT the cursor and the client resyncs in one round trip.
+- `limit` keeps the first N rows of the ascending delta; `tail` (compat)
+  keeps the last N, wins over `limit` and ignores `since_seq`.
+
+Server-side filters per endpoint (AND-combined; `q` = case-insensitive
+substring):
+
+| Endpoint | Filters |
+|----------|---------|
+| `GET /proxy/traces` | `run_id`, `agent_id`, `target`, `outcome` (`ok` \| `fail`, any other value -> 422), `q` (action_type + resource + request_payload + response) |
+| `GET /proxy/wire` | `run_id`, `host`, `method`, `status`, `q` (path + bodies) |
+
+The source-menu badges are fed by the LIGHTWEIGHT status endpoints
+(`GET /proxy/debug` -> `trace_count`, `GET /proxy/wire/status` ->
+`flow_count`, `GET /proxy/reconcile/status` -> `{ok, bypass_count}`): SQL
+COUNTs, never the full payload.
+
+### GET /proxy/sessions/delta -- the coalesced sessions-panel poll
+
+Replaces the sessions panel's three parallel requests per tick
+(`/proxy/traces` + `/proxy/wire` + `/proxy/reconcile`) with ONE round trip:
+
+```
+GET /proxy/sessions/delta?since_seq=..&wire_since_seq=..&run_id=..&strict=true
+-> {debug_enabled, traces, last_seq, reset,
+    wire_flows, wire_last_seq, wire_reset,
+    reconcile: {run_id, strict, ...}}
+```
+
+- INDEPENDENT cursors per side: `since_seq` for traces, `wire_since_seq` for
+  wire -- each with the same `reset` semantics as the per-source endpoints; a
+  stale cursor on one side never forces a resync of the other.
+- The `run_id` asymmetry is BY DESIGN (mirroring the panel exactly): `run_id`
+  scopes only the WIRE delta and the reconcile join; traces stay UNFILTERED
+  (the panel groups all traces client-side).
+- `strict` defaults to `true` (the strict per-flow hash join; `reconcile`
+  carries the same shape as `GET /proxy/reconcile`).
+- No `tail`/`limit` (the panel does not use them); both views go through
+  redaction; read-only (I1).
+- Reconcile takes its OWN recorder snapshots: a new wire flow may appear in
+  the reconcile badge one poll tick before the wire delta -- benign, resolves
+  on the next tick.
 
 `POST /proxy/debug` lets you **toggle tracing from the UI** (a switch in the
 "app traces" source sub-header) without restarting the app: it flips both the
@@ -104,7 +192,9 @@ allowlisted test orgs.
 
 | Test | Proves |
 |------|--------|
-| `tests/test_proxy_tracing.py` | decorator records/returns verbatim, fail-safe, bounded ring, env toggle |
+| `tests/test_proxy_tracing.py` | decorator records/returns verbatim, fail-safe, env toggle (retention now lives in the store) |
+| `tests/test_proxy_store.py` | SQLite store: golden-field mapping, `store_error` (failure -> never raised, recovery), wire hash-at-insert, delta/filter/tail queries, clear + monotone `seq` |
+| `tests/test_api_proxy_sessions_delta.py` | `GET /proxy/sessions/delta`: full snapshot without cursors, incremental deltas, `run_id` scopes wire not traces, independent resets, `strict` default, redaction |
 | `tests/test_real_proxy.py` | success -> hash; allowlist/write/forge errors -> fail-safe |
 | `tests/test_proxy_router.py` | real_saas uses the injected factory; no factory -> error (backward compat) |
 | `tests/test_api_proxy_traces.py` | `/proxy/*` endpoints; debug on/off; tail; clear |
@@ -116,8 +206,12 @@ allowlisted test orgs.
 - Recording exception -> swallowed; `execute()` always returns the wrapped result
   (observability must never break the I5 path).
 - Debug off -> no recording, no console data, banner shown.
-- Buffer full -> oldest traces drop (bounded ring); `seq` stays monotone; the
-  audit log remains complete.
+- Retention reached -> the oldest rows are pruned
+  (`INSPECT_IA_AGENTS_PROXY_DB_MAX_ROWS`); `seq` stays monotone; the audit
+  log remains complete.
+- Broken SQLite store -> execution is NEVER blocked: the trace / flow is
+  dropped (debug buffer), the failure is surfaced as `store_error` on
+  `GET /proxy/debug` and cleared on the next successful insert.
 
 ## Wire interception overlay (mitmproxy) -- the network-level view
 
@@ -157,7 +251,7 @@ session (`/proxy?source=sessions&run=<id>`).
 The **sessions** source (`SessionsPanel`) groups `ProxyTrace`s into SESSIONS
 selectable by key (`run` / `agent` / `agent->target`). The grouping is PURE and
 deterministic (I4: stable sort by `seq`, no clock; it handles concurrent runs
-interleaved in the global ring without cross-contamination). Each session lists
+interleaved in the global buffer without cross-contamination). Each session lists
 its exchanges; expanding an exchange shows the **request<->response** pair (intent
 `action_type`+`resource`+`payload` AND the server response), and "full JSON"
 opens the raw trace in Monaco.
@@ -168,7 +262,10 @@ captured carries a **`wire (bytes)`** badge; clicking it opens the raw bytes
 the canonical `side_effect_hash` (see run correlation below). Overlay off -> no
 badge, the rest of the view is intact (graceful degradation).
 
-Live: 2s poll (near real-time; no SSE push). Read-only end to end (I1).
+Live: **1s** coalesced delta poll -- ONE `GET /proxy/sessions/delta` per tick
+(traces + wire + reconcile, two independent cursors; see the contract in the
+API section) instead of three parallel requests. Near real-time; no SSE push.
+Read-only end to end (I1).
 
 ### Choosing the transport route (proxy selector)
 
@@ -193,18 +290,21 @@ LiteLLM overlay (`http://127.0.0.1:4000`); see `llm-gateway-litellm.md`.
 agent --(HTTP proxy)--> [mitmproxy container] --> lab / real system
                              | addon POSTs each flow
                              v
-                     API POST /proxy/wire --> WireFlowRecorder (bounded ring, I1)
+                     API POST /proxy/wire --> SqliteWireRecorder (bounded debug store, I1)
                              ^
                 Proxy page <--GET /proxy/wire (status + flows)
 ```
 
-- `recette/platform/proxy/wire.py` -- `WireFlow` + `WireFlowRecorder` (mirrors
-  the trace ring: bounded, monotone `seq`, throwaway) + pure `normalize_flow`.
+- `recette/platform/proxy/wire.py` -- `WireFlow` + `normalize_flow` pure function;
+  the buffer is `SqliteWireRecorder` (store.py: bounded, monotone `seq`, throwaway).
 - `scripts/mitm_wire_addon.py` -- mitmdump addon: normalizes each flow and POSTs
   it to the API ingest (fail-safe, never alters traffic).
-- Endpoints: `POST /proxy/wire` (ingest), `GET /proxy/wire` (+ `tail`, `run_id`;
-  each flow also carries its `side_effect_hash` recomputed for the sessions
-  fusion), `DELETE /proxy/wire`, `GET /proxy/wire/status`,
+- Endpoints: `POST /proxy/wire` (ingest), `GET /proxy/wire` (delta-poll:
+  `since_seq` + filters `run_id`/`host`/`method`/`status`/`q` + `limit`,
+  `tail` for compat -> envelope `{enabled, proxy_url, flows, last_seq, total,
+  reset}`; each flow carries its PERSISTED `side_effect_hash`, computed at
+  insert, for the sessions fusion), `DELETE /proxy/wire`,
+  `GET /proxy/wire/status` (`flow_count` = SQL COUNT),
   `POST /proxy/wire/overlay {action: up|down}` (controls the overlay from the UI;
   see below).
 
@@ -279,7 +379,7 @@ overlay up, drives a request through it to the lab, and asserts the flow reaches
 
 | Test | Proves |
 |------|--------|
-| `tests/test_wire_proxy.py` | WireFlow normalize/clamp, bounded ring, monotone seq, immutability |
+| `tests/test_wire_proxy.py` | WireFlow normalize/clamp, immutability (retention + monotone seq: `test_proxy_store.py`) |
 | `tests/test_api_wire.py` | `/proxy/wire*` endpoints; ingest/list/clear/status; tail; run_id; 422 |
 | `tests/test_api_wire_overlay.py` | `POST /proxy/wire/overlay`: deny by default (403), 422 invalid action, validation-before-gate ordering, subprocess mocked |
 | `tests/test_wire_run_correlation.py` | `LabHttpProxy(run_id=...)` sets the `x-inspect-run-id` header; `resolve_proxy(run_id=...)` threads it; absent otherwise |
@@ -332,13 +432,29 @@ communication. Everything is client-side, pure (I4) and read-only (I1); the two
 backend exceptions (latency, redaction) are VIEW transforms that never touch the
 audit log.
 
+### 1s delta poll + virtualized lists
+- The app traces / wire / sessions panels poll in **1s deltas**
+  (`useDeltaFeed`: full fetch on mount, then `since_seq` per tick, pure
+  client-side merge, automatic resync on `reset`). Each tick only ships the
+  NEW rows, never the whole buffer.
+- The app traces and wire lists are **windowed** (`VirtualList`, fixed row
+  height): only the visible window is rendered in the DOM, so a buffer of
+  tens of thousands of rows stays smooth.
+- **Smart follow**: when the operator scrolls away from the tail, tail-follow
+  stops and a badge counts what lands ("N nouvelles traces -- reprendre le
+  suivi" / "N nouveaux flux -- reprendre le suivi"); one click jumps back to
+  live.
+- The menu badges (per-source counters) come from the COUNT status endpoints
+  (5s poll), never the full payload.
+
 ### Record, freeze, export
 - **Recording toggle** ("app traces" source sub-header): `POST /proxy/debug
   {enabled}` -- start/stop hot, no restart.
 - **Pause / Resume** (page-level button, `PAUSE` badge): freezes the poll of all
-  3 sources to inspect cold; the backend ring keeps running, Resume catches up.
-- **Follow (tail -f)** on the wire list: auto-scroll to the latest flow (off when
-  paused).
+  3 sources to inspect cold; the backend store keeps recording, Resume catches
+  up through the delta cursor.
+- **Follow (tail -f)** on the app traces and wire lists: auto-scroll to the
+  latest row (off when paused); see smart follow above.
 - **Export**: `Export JSONL` on any source + `Export HAR` on wire (importable in
   devtools/Charles/Fiddler). Exports the current filter.
 - **Copy as curl** per wire flow / per exchange: replays the call in one paste
@@ -347,7 +463,9 @@ audit log.
 ### Target the packets of interest
 - **Filters + search**: wire (host/method/status/run + text in path+bodies), app
   traces (agent/target/run/outcome + text), sessions (run/agent/target grouping +
-  text). Filters are **deep-linkable** in the URL
+  text). The wire and app-traces filters are evaluated **server-side** (indexed
+  SQL, see the delta-poll contract); changing a clause invalidates the cursor
+  and restarts the feed. Filters are **deep-linkable** in the URL
   (`/proxy?source=wire&host=...&q=...`), shareable.
 - **Pretty-print** of bodies + a **size indicator (UTF-8 bytes)** + a
   `(truncated)` marker when the body was clamped.
@@ -377,9 +495,13 @@ line + `regression`. Proof on a real recording (`camp-pr.00.gh-pr-bot`) in
 `docs/screenshots/sim/proxy-replay-diff.png`.
 
 ### Persistence (long run)
-`INSPECT_IA_AGENTS_PROXY_ROTATE_DIR`: the entry evicted from the bounded ring is
-written to JSONL before the deque drops it (fail-safe), so a long run keeps its
-first packets. A debug convenience, not a second event store (I1).
+Traces and wire flows are persisted in the SQLite debug store
+(`INSPECT_IA_AGENTS_PROXY_DB`, default `.run/proxy_traces.db`) and survive an
+API restart; retention by `INSPECT_IA_AGENTS_PROXY_DB_MAX_ROWS` (default
+50000 rows per table, amortized prune of oldest rows). A long run thus keeps
+its packets without a JSONL rotation mechanism. A debug convenience, not a
+second event store (I1) -- detail in the "SQLite debug store" section at the
+top of this runbook.
 
 ### Reference screenshots
 - `proxy-sessions-launch.png` -- launch an agent and land on its live session.
@@ -390,5 +512,5 @@ first packets. A debug convenience, not a second event store (I1).
 ### Deferred (infra-gated, not built -- honest)
 - **Live eBPF source in the session**: needs `CAP_BPF` + a probe; the `recording
   -> recette/surface` bridge exists for the recorded path.
-- **SSE `/proxy/stream`**: known SSE-hang gotcha; the 2s poll + pause cover the
-  need. Poll stays the deterministic default.
+- **SSE `/proxy/stream`**: known SSE-hang gotcha; the 1s delta poll + pause
+  cover the need. Poll stays the deterministic default.

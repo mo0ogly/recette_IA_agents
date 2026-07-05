@@ -3,8 +3,9 @@
 The mitmproxy container (an OPTIONAL Docker overlay, off by default) intercepts
 the real HTTP(S) traffic an agent emits towards target systems (the lab, or a
 real forge). Its addon POSTs one normalized flow per request/response pair to
-``POST /proxy/wire``; this module owns the server-side model and the bounded
-buffer those flows land in.
+``POST /proxy/wire``; this module owns the server-side model (``WireFlow``) and
+the pure normalizer. The bounded buffer those flows land in is the SQLite-backed
+``SqliteWireRecorder`` (store.py).
 
 Relationship to ``ProxyTrace`` (tracing.py): ``ProxyTrace`` is the APPLICATION
 level view (the agent's intent at the ``ExternalSystemProxy`` boundary, I5).
@@ -15,22 +16,18 @@ observability over the same side effect, at two altitudes -- the wire flow is th
 Determinism (I4): the wire overlay is OFF in every deterministic recette and
 never sits in the decision/replay path. A ``WireFlow`` therefore carries no
 wall-clock value; ordering comes from a monotone ``seq`` assigned by the
-recorder, exactly like ``ProxyTrace``. The recorder + normalizer here are pure
-and unit-testable without a live container.
+recorder, exactly like ``ProxyTrace``. The normalizer here is pure and
+unit-testable without a live container.
 
-Immutability (I1): the buffer is a bounded, jettable ring (the durable truth is
-the append-only audit log). A ``clear`` discards the debug buffer, never the log.
+Immutability (I1): the buffer is a bounded, jettable debug store (the durable
+truth is the append-only audit log). A ``clear`` discards the debug buffer,
+never the log.
 """
 
 from __future__ import annotations
 
 import os
-import threading
-from collections import deque
 from dataclasses import asdict, dataclass
-from pathlib import Path
-
-from .rotate import append_jsonl
 
 # The proxy URL an agent's HTTP client routes through when the wire overlay is
 # active (R5: no hardcoded address). Unset/empty => wire OFF, the client talks to
@@ -40,8 +37,7 @@ WIRE_PROXY_ENV = "INSPECT_IA_AGENTS_WIRE_PROXY"
 # real systems (real_saas) and LLM providers. Unset => default system trust.
 WIRE_CA_ENV = "INSPECT_IA_AGENTS_WIRE_CA"
 
-DEFAULT_RING_CAPACITY = 512
-# Cap each captured body so a large response cannot blow up the in-memory ring.
+# Cap each captured body so a large response cannot blow up the debug store.
 # A wire flow is a debug view, not the audit truth: a truncated body is enough to
 # read the exchange, and the marker makes the truncation explicit (never silent).
 MAX_BODY_CHARS = 16_384
@@ -149,51 +145,3 @@ def normalize_flow(payload: dict, seq: int) -> WireFlow:
         run_id=str(run_id) if isinstance(run_id, str) and run_id else None,
         duration_ms=duration_ms,
     )
-
-
-class WireFlowRecorder:
-    """Bounded, thread-safe in-memory ring of the most recent wire flows.
-
-    Mirrors ``RingTraceRecorder`` (tracing.py): ``capacity`` caps memory (oldest
-    flows drop), ``seq`` is monotone across the recorder's life so ordering is
-    stable even after the ring wraps. ``record`` never raises on a malformed
-    payload it can normalize; ``normalize_flow`` only rejects a non-dict, which
-    the endpoint screens first.
-    """
-
-    def __init__(
-        self, capacity: int = DEFAULT_RING_CAPACITY, *, rotate_dir: Path | None = None
-    ) -> None:
-        if capacity <= 0:
-            raise ValueError("WireFlowRecorder capacity must be positive")
-        self._ring: deque[WireFlow] = deque(maxlen=capacity)
-        self._seq = 0
-        self._lock = threading.Lock()
-        # When set, the flow about to be evicted by maxlen is appended to this
-        # file BEFORE the deque drops it, so a long run keeps its early packets.
-        # Debug convenience only -- the audit log stays the durable truth (I1).
-        self._rotate_dir = rotate_dir
-
-    def record(self, payload: dict) -> WireFlow:
-        """Normalize and append one ingested flow; return the stored flow."""
-        with self._lock:
-            self._seq += 1
-            flow = normalize_flow(payload, self._seq)
-            if (
-                self._rotate_dir is not None
-                and self._ring.maxlen is not None
-                and len(self._ring) == self._ring.maxlen
-            ):
-                # The deque is full: this append will evict self._ring[0]. Export
-                # it first so the early packet is retained (fail-safe sink).
-                append_jsonl(self._rotate_dir / "wire-flows.jsonl", self._ring[0].to_dict())
-            self._ring.append(flow)
-            return flow
-
-    def snapshot(self) -> list[WireFlow]:
-        with self._lock:
-            return list(self._ring)
-
-    def clear(self) -> None:
-        with self._lock:
-            self._ring.clear()

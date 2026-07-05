@@ -7,6 +7,13 @@
  * a flow describes an exchange that already happened; the panel only views and
  * clears the jettable buffer.
  *
+ * Data path: a 1s DELTA poll (useDeltaFeed + getWireFlowsDelta) fetches only
+ * the rows past the server cursor, and every filter clause (host/method/status/
+ * run/free text) is pushed SERVER-SIDE as query params -- a filter change
+ * restarts the feed (resetFeed) so the buffered rows always match the current
+ * selection. The list itself is windowed (VirtualList) so a full client buffer
+ * stays cheap to render, with tail-following while the follow toggle is on.
+ *
  * When the overlay is not configured (INSPECT_IA_AGENTS_WIRE_PROXY unset) the panel
  * says so and how to enable it, instead of showing an empty list as a steady
  * state. The bodies are rendered in a plain read-only pane (no Monaco): the
@@ -14,10 +21,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, getWireFlowsDelta } from "../../api/client";
 import ProxySelector from "../../components/ProxySelector";
+import { VirtualList } from "../../components/VirtualList";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
@@ -25,16 +34,33 @@ import { lineDiff } from "./diff";
 import { byteLen, downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
   distinctWireValues,
-  filterWireFlows,
   type WireFlowFilter,
   maxDuration,
   wireFailureCount,
   wireFlowToLine,
 } from "./wireFlowModel";
+import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
+/** Fixed row height of a virtualized wire row; MUST match the
+ *  `.proxy-wire-vlist .proxy-wire-row` height in proxy.css (windowing math).
+ *  Taller than the trace rows: a wire row carries the latency bar line. */
+const ROW_HEIGHT_PX = 44;
+/** Height of the windowed list viewport (VirtualList needs a fixed pixel
+ *  height for its slice arithmetic). */
+const LIST_HEIGHT_PX = 420;
 
 const WIRE_TRUNCATION_MARKER = "...[truncated]"; // appended by recette/platform/proxy/wire.py _clamp_body when a body exceeds MAX_BODY_CHARS
+
+/** One virtualized row: the flow's console line plus its relative-latency
+ *  width (precomputed so renderRow stays a pure presentation callback). */
+interface WireRow {
+  seq: number;
+  outcome: "ok" | "fail";
+  label: string;
+  /** Waterfall width in percent of the slowest buffered flow (layout only). */
+  durationPct: number;
+}
 
 /** Render a body for display: pretty-print valid JSON when requested, else raw.
  *  Pure (no clock, no I/O); non-JSON falls back to the raw text. */
@@ -48,10 +74,9 @@ function renderBody(body: string, pretty: boolean): string {
 }
 
 export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.Element {
-  const [flows, setFlows] = useState<WireFlow[]>([]);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   // Second selection: the flow to compare the selected one against (a line diff
   // of their pretty-printed JSON -- e.g. a failing call vs a passing one).
@@ -61,14 +86,14 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // Pretty-print toggle for the request/response body panes (display-only).
   const [pretty, setPretty] = useState(false);
   // Follow/tail toggle: when ON (and the page is not paused) the flow list
-  // auto-scrolls to the latest flow after each poll. Display-only, no I4 impact.
+  // auto-pins to the latest flow after each poll. Display-only, no I4 impact.
   const [follow, setFollow] = useState(false);
 
   // Filter clauses live in the URL query string (deep-linkable + shareable):
   // host/method/status/q (free text) own their own keys, plus a read of the
   // page-owned `run`. The derived filter is the single source of truth -- there
-  // is no duplicate local state for these keys. The status reported up via
-  // onStatus stays on the FULL buffer, not the filtered view.
+  // is no duplicate local state for these keys. Every clause is pushed
+  // SERVER-SIDE through the delta query params.
   const [params, setParams] = useSearchParams();
   const filter: WireFlowFilter = useMemo(
     () => ({
@@ -102,93 +127,141 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     [setParams],
   );
 
-  const refresh = useCallback(async (): Promise<void> => {
-    try {
-      const res = await getWireFlows();
-      setFlows(res.flows);
-      setEnabled(res.enabled);
-      setProxyUrl(res.proxy_url);
-      setError(null);
-      onStatus?.({
-        count: res.flows.length,
-        failed: wireFailureCount(res.flows),
-        disabled: !res.enabled,
+  // The delta fetcher is rebuilt whenever a filter changes so it always reads
+  // the CURRENT clause values (no stale closure). useDeltaFeed consumes the
+  // fetcher through a ref, so a new identity does NOT tear down the poll
+  // interval; the filter-change effect below restarts the feed instead.
+  const fetcher = useCallback(
+    (sinceSeq: number | null): Promise<DeltaEnvelope<WireFlow>> => {
+      // The URL carries `status` as text (free input); the server takes an
+      // exact integer status_code. A non-numeric value is not sent (the local
+      // input still reflects it, the clause just matches nothing extra).
+      const statusNum = filter.status && /^\d+$/.test(filter.status)
+        ? Number(filter.status)
+        : undefined;
+      return getWireFlowsDelta({
+        sinceSeq: sinceSeq ?? undefined,
+        host: filter.host || undefined,
+        method: filter.method || undefined,
+        status: statusNum,
+        runId: filter.runId || undefined,
+        q: filter.text || undefined,
+      }).then((res) => {
+        // Side channel: every delta envelope carries enabled/proxy_url, so the
+        // overlay state stays fresh WITHOUT a second status poll. The state
+        // update runs in a promise callback (after commit, never during
+        // render), so it is a safe place for this side effect.
+        setEnabled(res.enabled);
+        setProxyUrl(res.proxy_url);
+        return { items: res.flows, last_seq: res.last_seq, reset: res.reset };
       });
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+    },
+    [filter],
+  );
+
+  const { items, error: feedError, refresh, resetFeed } = useDeltaFeed<WireFlow>(fetcher, {
+    intervalMs: POLL_INTERVAL_MS,
+    paused: paused ?? false,
+  });
+
+  // Server-side filters: any clause change invalidates the cursor AND the
+  // buffered rows (they belong to the previous selection), so the feed is
+  // restarted. Skipped on mount -- the hook already fetches full there.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
     }
-  }, [onStatus]);
+    resetFeed();
+  }, [filter.host, filter.method, filter.status, filter.runId, filter.text, resetFeed]);
 
-  // Read `paused` from a ref inside the tick so toggling pause does NOT tear
-  // down and re-run the effect (which would re-fire the initial fetch). The
-  // initial fetch runs once on mount; only the recurring tick is gated.
-  const pausedRef = useRef(paused);
+  // Headline status for the source menu. Gated on the first envelope so the
+  // badge never flashes "off" before the backend has answered once.
   useEffect(() => {
-    pausedRef.current = paused;
-  }, [paused]);
+    if (enabled === null) {
+      return;
+    }
+    onStatus?.({
+      count: items.length,
+      failed: wireFailureCount(items),
+      disabled: !enabled,
+    });
+  }, [items, enabled, onStatus]);
 
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(() => {
-      if (!pausedRef.current) {
-        void refresh();
-      }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [refresh]);
+  // Follow UX: while the user is scrolled away from the tail, count the flows
+  // that landed since they left; a badge lets them jump back to live tailing
+  // by bumping the VirtualList scroll-to-tail signal.
+  const [awayFromTail, setAwayFromTail] = useState(false);
+  const [tailSignal, setTailSignal] = useState(0);
+  // Latest-value ref so the (stable) scroll callback reads the current count.
+  const itemCountRef = useRef(0);
+  itemCountRef.current = items.length;
+  const awayBaselineRef = useRef(0);
+  const onScrollAwayFromTail = useCallback((away: boolean): void => {
+    if (away) {
+      awayBaselineRef.current = itemCountRef.current;
+    }
+    setAwayFromTail(away);
+  }, []);
+  const newSinceAway = awayFromTail ? Math.max(0, items.length - awayBaselineRef.current) : 0;
+  const onResumeFollow = useCallback((): void => {
+    setTailSignal((s) => s + 1);
+    setAwayFromTail(false);
+  }, []);
 
   const onClear = useCallback(async (): Promise<void> => {
     try {
       await clearWireFlows();
       setSelectedSeq(null);
       setCompareSeq(null);
-      await refresh();
+      setActionError(null);
+      resetFeed();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setActionError(err instanceof Error ? err.message : String(err));
     }
-  }, [refresh]);
+  }, [resetFeed]);
 
   const onToggleOverlay = useCallback(async (): Promise<void> => {
     setBusy(true);
     try {
       const res = await controlWireOverlay(enabled === true ? "down" : "up");
       setNextStep(res.next_step);
-      setError(null);
+      setActionError(null);
       await refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }, [enabled, refresh]);
 
-  // Filtered view drives the list, the detail selection and the exports; the
-  // full `flows` set still feeds the select options and the header counts.
-  const shown = useMemo(() => filterWireFlows(flows, filter), [flows, filter]);
-  // Auto-scroll the flow list to the latest flow when following (and not
-  // paused), whenever the shown count changes. jsdom has no layout, so this is
-  // a no-op there; the contract test asserts the toggle state, not the pixels.
-  const listRef = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    if (follow && !paused && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [follow, paused, shown.length]);
-  const hosts = useMemo(() => distinctWireValues(flows, "host"), [flows]);
-  const methods = useMemo(() => distinctWireValues(flows, "method"), [flows]);
-  const runIds = useMemo(() => distinctWireValues(flows, "run_id"), [flows]);
-  const lines = useMemo(() => shown.map(wireFlowToLine), [shown]);
-  // Waterfall scale: the largest latency among the SHOWN flows. duration_ms is
-  // OPS metadata on the view only, never a judge/decision/replay input (I4).
-  const maxDur = useMemo(() => maxDuration(shown), [shown]);
-  const fails = useMemo(() => wireFailureCount(flows), [flows]);
+  // The select options derive from the CURRENTLY buffered (already filtered)
+  // rows: once a clause is set the other options narrow with it. Accepted
+  // trade-off of server-side filtering -- clearing the clause widens again.
+  const hosts = useMemo(() => distinctWireValues(items, "host"), [items]);
+  const methods = useMemo(() => distinctWireValues(items, "method"), [items]);
+  const runIds = useMemo(() => distinctWireValues(items, "run_id"), [items]);
+  // Waterfall scale: the largest latency among the buffered flows. duration_ms
+  // is OPS metadata on the view only, never a judge/decision/replay input (I4).
+  const maxDur = useMemo(() => maxDuration(items), [items]);
+  const rows: WireRow[] = useMemo(
+    () =>
+      items.map((f) => ({
+        ...wireFlowToLine(f),
+        // Width % is layout (relative latency), not a hardcoded color.
+        durationPct: maxDur > 0 ? Math.round(((f.duration_ms ?? 0) / maxDur) * 100) : 0,
+      })),
+    [items, maxDur],
+  );
+  const fails = useMemo(() => wireFailureCount(items), [items]);
   const selected = useMemo(
-    () => shown.find((f) => f.seq === selectedSeq) ?? null,
-    [shown, selectedSeq],
+    () => items.find((f) => f.seq === selectedSeq) ?? null,
+    [items, selectedSeq],
   );
   const compareFlow = useMemo(
-    () => shown.find((f) => f.seq === compareSeq) ?? null,
-    [shown, compareSeq],
+    () => items.find((f) => f.seq === compareSeq) ?? null,
+    [items, compareSeq],
   );
   // Side-by-side line diff of the two flows' pretty-printed JSON. Pure (I4):
   // a deterministic function of the two selected flows (no clock, no I/O).
@@ -204,20 +277,54 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   );
 
   const onExportJsonl = useCallback((): void => {
-    // Forensic snapshot of the CURRENTLY shown flows (bounded by the ring).
-    downloadFile(`${toJsonl(shown)}\n`, "wire-flows.jsonl", "application/x-ndjson");
-  }, [shown]);
+    // Forensic snapshot of the CURRENTLY buffered flows (bounded by the ring).
+    downloadFile(`${toJsonl(items)}\n`, "wire-flows.jsonl", "application/x-ndjson");
+  }, [items]);
 
   const onExportHar = useCallback((): void => {
-    downloadFile(flowsToHar(shown), "wire-flows.har", "application/json");
-  }, [shown]);
+    downloadFile(flowsToHar(items), "wire-flows.har", "application/json");
+  }, [items]);
+
+  const itemKey = useCallback((r: WireRow): number => r.seq, []);
+  const renderRow = useCallback(
+    (r: WireRow): ReactNode => (
+      <div className="proxy-wire-row">
+        <button
+          type="button"
+          className="proxy-list-item"
+          data-active={r.seq === selectedSeq}
+          data-outcome={r.outcome}
+          onClick={() => setSelectedSeq(r.seq)}
+        >
+          <span className="proxy-seq">#{r.seq}</span>
+          <span className="proxy-badge" data-outcome={r.outcome}>
+            {r.outcome}
+          </span>
+          <span className="proxy-label">{r.label}</span>
+          <span className="proxy-wire-bar" style={{ width: `${r.durationPct}%` }} />
+        </button>
+        <button
+          type="button"
+          className="proxy-export proxy-wire-compare-btn"
+          data-testid={`wire-compare-${r.seq}`}
+          data-active={r.seq === compareSeq}
+          onClick={() => setCompareSeq(r.seq)}
+        >
+          comparer
+        </button>
+      </div>
+    ),
+    [selectedSeq, compareSeq],
+  );
+
+  const shownError = actionError ?? feedError;
 
   return (
     <section className="proxy-wire" data-testid="wire-panel">
       <header className="proxy-header">
         <ProxySelector />
         <span className="proxy-summary">
-          {flows.length} flux, {fails} echec(s)
+          {items.length} flux, {fails} echec(s)
         </span>
         {enabled === true && proxyUrl !== null && (
           <span className="proxy-wire-proxy" data-testid="wire-proxy-url">
@@ -343,7 +450,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {/* Flows can arrive via the transport-route registry even when
           INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
           how-to-enable banner to actual data. */}
-      {enabled === false && flows.length === 0 && (
+      {enabled === false && items.length === 0 && (
         <p className="proxy-banner" role="status" data-testid="wire-disabled">
           Surcouche wire desactivee. Demarrer mitmproxy avec
           <code> ./recette.sh wire up</code>, puis exporter
@@ -352,44 +459,42 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           au travers.
         </p>
       )}
-      {error !== null && <p className="proxy-error">{error}</p>}
+      {shownError !== null && <p className="proxy-error">{shownError}</p>}
 
       <div className="proxy-grid">
-        <ul className="proxy-list" aria-label="wire flows" ref={listRef}>
-          {lines.length === 0 && <li className="proxy-empty">aucun flux</li>}
-          {lines.map((l, i) => {
-            const dur = shown[i]?.duration_ms ?? 0;
-            // Width % is layout (relative latency), not a hardcoded color.
-            const pct = maxDur > 0 ? Math.round((dur / maxDur) * 100) : 0;
-            return (
-              <li key={l.seq}>
-                <button
-                  type="button"
-                  className="proxy-list-item"
-                  data-active={l.seq === selectedSeq}
-                  data-outcome={l.outcome}
-                  onClick={() => setSelectedSeq(l.seq)}
-                >
-                  <span className="proxy-seq">#{l.seq}</span>
-                  <span className="proxy-badge" data-outcome={l.outcome}>
-                    {l.outcome}
-                  </span>
-                  <span className="proxy-label">{l.label}</span>
-                  <span className="proxy-wire-bar" style={{ width: `${pct}%` }} />
-                </button>
-                <button
-                  type="button"
-                  className="proxy-export proxy-wire-compare-btn"
-                  data-testid={`wire-compare-${l.seq}`}
-                  data-active={l.seq === compareSeq}
-                  onClick={() => setCompareSeq(l.seq)}
-                >
-                  comparer
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {/* The wrapper keeps the list role/label the page contract asserts on;
+            the rows themselves are windowed by VirtualList. */}
+        <div
+          className="proxy-list proxy-vlist proxy-wire-vlist"
+          role="list"
+          aria-label="wire flows"
+        >
+          {newSinceAway > 0 && (
+            <button
+              type="button"
+              className="proxy-new-badge"
+              data-testid="wire-new-flows"
+              onClick={onResumeFollow}
+            >
+              {newSinceAway} nouveaux flux -- reprendre le suivi
+            </button>
+          )}
+          {rows.length === 0 ? (
+            <div className="proxy-empty">aucun flux</div>
+          ) : (
+            <VirtualList<WireRow>
+              items={rows}
+              rowHeight={ROW_HEIGHT_PX}
+              height={LIST_HEIGHT_PX}
+              renderRow={renderRow}
+              itemKey={itemKey}
+              followTail={follow && !paused}
+              onScrollAwayFromTail={onScrollAwayFromTail}
+              scrollToTailSignal={tailSignal}
+              testId="wire-flow-vlist"
+            />
+          )}
+        </div>
         <div className="proxy-viewer proxy-wire-detail">
           {selected === null ? (
             <p className="proxy-viewer-msg">selectionner un flux a gauche</p>

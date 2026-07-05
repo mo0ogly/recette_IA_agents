@@ -613,10 +613,17 @@ export interface ProxyTrace {
   response: Record<string, unknown>;
 }
 
-/** Response of GET /proxy/traces: the recorded traces plus the debug toggle. */
+/** Response of GET /proxy/traces: the recorded traces plus the debug toggle.
+ *  Delta envelope: `last_seq` is the unfiltered MAX(seq) (the next cursor for
+ *  a since_seq poll), `total` counts the filtered set ignoring cursor/limit/
+ *  tail, and `reset` flags a client cursor ahead of the server (buffer cleared
+ *  or store restarted) -- the full current selection is then served. */
 export interface ProxyTraceResponse {
   debug_enabled: boolean;
   traces: ProxyTrace[];
+  last_seq: number;
+  total: number;
+  reset: boolean;
 }
 
 /** One typed capability gap between declared scope and a real action (F1). */
@@ -677,13 +684,18 @@ export interface WireFlow {
   duration_ms?: number | null;
 }
 
-/** Response of GET /proxy/wire: the captured flows plus the overlay state. */
+/** Response of GET /proxy/wire: the captured flows plus the overlay state.
+ *  Same delta envelope as ProxyTraceResponse: `last_seq` is the next cursor,
+ *  `total` the filtered count, `reset` the cursor-ahead resync flag. */
 export interface WireFlowResponse {
   /** True when INSPECT_IA_AGENTS_WIRE_PROXY is configured (the overlay is wired). */
   enabled: boolean;
   /** The proxy URL agents route through, or null when the overlay is off. */
   proxy_url: string | null;
   flows: WireFlow[];
+  last_seq: number;
+  total: number;
+  reset: boolean;
 }
 
 /**
@@ -704,6 +716,28 @@ export interface ReconcileReport {
   audited_run_ids: string[];
   /** Echoes whether the phase-3 per-flow side_effect_hash join was used. */
   strict?: boolean;
+}
+
+/**
+ * Response of GET /proxy/sessions/delta: the coalesced SessionsPanel poll --
+ * traces + wire flows + reconcile in ONE round trip instead of three.
+ *
+ * Cursors are independent per side: `last_seq`/`reset` cover the trace delta
+ * (since_seq), `wire_last_seq`/`wire_reset` cover the wire delta
+ * (wire_since_seq). Reset semantics match the per-source endpoints: a cursor
+ * ahead of the server flags the reset and the full current selection is
+ * served so the client resyncs in one round trip. `reconcile` carries the
+ * same shape as GET /proxy/reconcile (run_id/strict always echoed).
+ */
+export interface SessionsDeltaResponse {
+  debug_enabled: boolean;
+  traces: ProxyTrace[];
+  last_seq: number;
+  reset: boolean;
+  wire_flows: WireFlow[];
+  wire_last_seq: number;
+  wire_reset: boolean;
+  reconcile: ReconcileReport & { strict: boolean };
 }
 
 /** Response of GET /proxy/reconcile/status: the reconciliation verdict and the

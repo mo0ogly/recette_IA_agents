@@ -403,8 +403,10 @@ def _drive_proxy_launch(page: Page, console: str, api: str) -> None:
     traces_list.get_by_role("button").first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
     before = traces_list.get_by_role("button").count()
     page.get_by_test_id("app-filter-text").fill("open_pr")
-    # The filter is synchronous (useMemo over fetched traces); the list narrows to
-    # the matching action only.
+    # The text filter is a server-side clause: it resets the delta feed and the
+    # panel refetches the narrowed rows on its 1s poll. Rows are windowed by
+    # VirtualList, but the rendered-button count still drops because the filter
+    # shrinks the whole buffer, not just the visible slice.
     page.wait_for_function(
         "(n) => document.querySelectorAll('[aria-label=\"proxy traces\"] button').length < n",
         arg=before,

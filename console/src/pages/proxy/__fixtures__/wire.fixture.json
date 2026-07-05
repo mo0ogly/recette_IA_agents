@@ -30,5 +30,8 @@
       "response_body": "{\"success\":false,\"error\":\"policy deny\"}",
       "run_id": "run-demo"
     }
-  ]
+  ],
+  "last_seq": 2,
+  "total": 2,
+  "reset": false
 }

@@ -36,7 +36,7 @@ Deux proprietes complementaires sont fournies :
 flowchart LR
   subgraph DATA["Data Plane -- effet de bord (I5)"]
     G["Gateway -> TracingProxy\n(recette/platform/proxy/tracing.py)"]
-    R["RingTraceRecorder\nanneau borne en memoire (jettable, I1)"]
+    R["SqliteTraceRecorder\nstore SQLite de debug borne (jettable, I1)"]
   end
   subgraph PURE["Coeur pur (I4) -- recette/context_receipt.py"]
     RC["receipt(trace)\nintention + taille + SHA-256"]
@@ -64,7 +64,7 @@ flowchart LR
 ```
 
 Chaque `execute()` cote gateway passe par le `TracingProxy`, qui enregistre un
-`ProxyTrace` dans un anneau borne (`RingTraceRecorder`). Les endpoints de recus
+`ProxyTrace` dans le store SQLite de debug borne (`SqliteTraceRecorder`). Les endpoints de recus
 lisent ce buffer via `snapshot()`, projettent chaque trace en recu et chainent le
 tout. Le buffer est jettable -- la verite durable reste l'audit log append-only
 (I1) ; les recus sont une vue de lecture.

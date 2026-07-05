@@ -1,51 +1,83 @@
 /**
- * R16 contract tests for the wire-overlay panel.
+ * R16 contract tests for the wire-overlay panel (delta-poll rewrite).
  *
  * The fixture in __fixtures__/wire.fixture.json was captured from the real
  * backend (recette.api driven through TestClient: POST /proxy/wire then GET
  * /proxy/wire), not invented. The api client is mocked so the panel renders
- * against the exact payload shape the backend returns. Covers both overlay
- * states (disabled -> hint banner; enabled -> proxy URL shown) and the
- * select-and-inspect flow.
+ * against the exact payload shape the backend returns; the mock simulates the
+ * SERVER side of the delta endpoint (the panel now pushes every filter clause
+ * as a query param, so the mock applies them plus the sinceSeq cursor exactly
+ * like the backend does). Covers both overlay states (disabled -> hint banner;
+ * enabled -> proxy URL shown) and the select-and-inspect flow.
  */
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { WireFlowResponse } from "../../types/platform";
+import type { WireFlow, WireFlowResponse } from "../../types/platform";
 import wireFixture from "./__fixtures__/wire.fixture.json";
 
 vi.mock("../../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/client")>();
   return {
     ...actual,
-    getWireFlows: vi.fn(),
+    getWireFlowsDelta: vi.fn(),
     clearWireFlows: vi.fn(),
     controlWireOverlay: vi.fn(),
   };
 });
 
-import { clearWireFlows, controlWireOverlay, getWireFlows } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, getWireFlowsDelta } from "../../api/client";
 import WirePanel from "./WirePanel";
 
 const fixture = wireFixture as WireFlowResponse;
 
+/** Simulate the SERVER side of the wire delta endpoint over a fixed dataset:
+ *  apply every clause (host/method/status/run/q) plus the sinceSeq cursor,
+ *  mirroring the backend's filtered-delta contract. */
+function mockWireDelta(response: WireFlowResponse): void {
+  vi.mocked(getWireFlowsDelta).mockImplementation((params) => {
+    const filtered = response.flows.filter(
+      (f: WireFlow) =>
+        (params.host === undefined || f.host === params.host) &&
+        (params.method === undefined ||
+          f.method.toUpperCase() === params.method.toUpperCase()) &&
+        (params.status === undefined || f.status_code === params.status) &&
+        (params.runId === undefined || f.run_id === params.runId) &&
+        (params.q === undefined ||
+          `${f.path}\n${f.request_body}\n${f.response_body}`
+            .toLowerCase()
+            .includes(params.q.toLowerCase())) &&
+        (params.sinceSeq === undefined || f.seq > params.sinceSeq),
+    );
+    return Promise.resolve({
+      enabled: response.enabled,
+      proxy_url: response.proxy_url,
+      flows: filtered,
+      last_seq:
+        filtered.length > 0 ? filtered[filtered.length - 1].seq : (params.sinceSeq ?? 0),
+      total: filtered.length,
+      reset: false,
+    });
+  });
+}
+
 /**
- * WirePanel now reads its filter clauses from the URL query string
+ * WirePanel reads its filter clauses from the URL query string
  * (useSearchParams), so every render needs a router. `entries` lets a test
  * open the panel pre-filtered (deep-link) on first render.
  */
 function renderWire(entries: string[] = ["/proxy"]): void {
   render(
     <MemoryRouter initialEntries={entries}>
-      <WirePanel />
+      <WirePanel paused={false} />
     </MemoryRouter>,
   );
 }
 
 /**
- * The per-flow SELECT buttons (one per flow). Each list row now carries two
+ * The per-flow SELECT buttons (one per flow). Each virtualized row carries two
  * buttons -- the select button (`proxy-list-item`) and a "comparer" button --
  * so the flow count is the count of select buttons, queried by class rather
  * than the raw button role.
@@ -56,10 +88,10 @@ function selectButtons(list: HTMLElement): HTMLElement[] {
     .filter((b) => b.classList.contains("proxy-list-item"));
 }
 
-describe("WirePanel (R16 contract)", () => {
+describe("WirePanel (R16 contract, delta poll)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getWireFlows).mockResolvedValue(fixture);
+    mockWireDelta(fixture);
     vi.mocked(clearWireFlows).mockResolvedValue({ cleared: true });
     // jsdom has no Blob URL plumbing; stub it so the export download path runs.
     (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => "blob:x");
@@ -71,8 +103,8 @@ describe("WirePanel (R16 contract)", () => {
   it("renders the captured flows without crashing", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    // The fixture has two flows; both lines show up, newest-first ordering kept.
-    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+    // The fixture has two flows; both lines show up once the delta lands.
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     expect(screen.getByText(/2 flux, 1 echec/)).toBeInTheDocument();
   });
 
@@ -80,10 +112,13 @@ describe("WirePanel (R16 contract)", () => {
     // enabled=false (no INSPECT_IA_AGENTS_WIRE_PROXY in the capture env) AND an
     // empty buffer: the panel must explain how to enable it, not show a bare
     // empty list as a steady state.
-    vi.mocked(getWireFlows).mockResolvedValue({
+    mockWireDelta({
       enabled: false,
       proxy_url: null,
       flows: [],
+      last_seq: 0,
+      total: 0,
+      reset: false,
     });
     renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
@@ -95,25 +130,29 @@ describe("WirePanel (R16 contract)", () => {
     // exactly that case: enabled=false WITH real flows. The how-to-enable
     // banner must yield to the actual data, not sit on top of it.
     renderWire();
+    // The list container renders before the first fetch lands: wait for rows.
     const list = await screen.findByLabelText("wire flows");
-    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     expect(screen.queryByText(/wire up/)).toBeNull();
     expect(screen.queryByText(/INSPECT_IA_AGENTS_WIRE_PROXY/)).toBeNull();
     expect(screen.queryByTestId("wire-disabled")).toBeNull();
   });
 
   it("shows the how-to-enable banner when the overlay is off and there are no flows", async () => {
-    vi.mocked(getWireFlows).mockResolvedValue({
+    mockWireDelta({
       enabled: false,
       proxy_url: null,
       flows: [],
+      last_seq: 0,
+      total: 0,
+      reset: false,
     });
     renderWire();
     expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
   });
 
   it("shows the proxy URL when the overlay is enabled", async () => {
-    vi.mocked(getWireFlows).mockResolvedValue({
+    mockWireDelta({
       ...fixture,
       enabled: true,
       proxy_url: "http://127.0.0.1:8083",
@@ -127,6 +166,7 @@ describe("WirePanel (R16 contract)", () => {
   it("inspects a selected flow's request and response bodies", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     // The first fixture flow is the open_pr request -> 201 success body.
@@ -138,6 +178,7 @@ describe("WirePanel (R16 contract)", () => {
   it("pretty-prints a JSON body on toggle and shows a UTF-8 size indicator", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     // A byte-size indicator (number followed by " o") is shown for the bodies.
@@ -150,6 +191,7 @@ describe("WirePanel (R16 contract)", () => {
   it("copies a curl command for the selected flow", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     fireEvent.click(selectButtons(list)[0]);
     const copy = await screen.findByTestId("wire-copy-curl");
     fireEvent.click(copy);
@@ -178,19 +220,25 @@ describe("WirePanel (R16 contract)", () => {
     ).toBeInTheDocument();
   });
 
-  it("clears the buffer on demand", async () => {
+  it("clears the buffer on demand and restarts the feed", async () => {
     renderWire();
     await screen.findByLabelText("wire flows");
     fireEvent.click(screen.getByText("Vider le tampon"));
     await waitFor(() => expect(clearWireFlows).toHaveBeenCalledTimes(1));
+    // The feed restarts full after a clear: a fresh cursorless delta call.
+    await waitFor(() =>
+      expect(getWireFlowsDelta).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sinceSeq: undefined }),
+      ),
+    );
   });
 
-  it("narrows the flow list when a text filter matches only some flows", async () => {
+  it("narrows the flow list when a text filter matches only some flows (server-side)", async () => {
     // The fixture has two flows on the same host/method/path; only flow #1's
     // request_body carries the "open_pr" token, so it is the only match.
     renderWire();
     const list = await screen.findByLabelText("wire flows");
-    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
 
     const text = screen.getByTestId("wire-filter-text");
     fireEvent.change(text, { target: { value: "open_pr" } });
@@ -201,11 +249,27 @@ describe("WirePanel (R16 contract)", () => {
     expect(selectButtons(list)).toHaveLength(1);
   });
 
+  it("pushes the host filter server-side (delta query param)", async () => {
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    const filterGroup = screen.getByRole("group", { name: "wire filter" });
+    const hostSelect = within(filterGroup).getAllByRole("combobox")[0];
+    fireEvent.change(hostSelect, { target: { value: "127.0.0.1" } });
+    // The feed restarts filtered: the SERVER receives the clause, the client
+    // no longer narrows locally.
+    await waitFor(() =>
+      expect(getWireFlowsDelta).toHaveBeenCalledWith(
+        expect.objectContaining({ host: "127.0.0.1" }),
+      ),
+    );
+  });
+
   it("flags a body clamped by the backend (truncation marker) and not a normal body", async () => {
     // The detector keys off the literal marker appended by wire.py _clamp_body,
     // not a numeric length, so a body ending in the marker is flagged truncated
     // while a normal short body is not (zero false-positive).
-    vi.mocked(getWireFlows).mockResolvedValue({
+    mockWireDelta({
       enabled: false,
       proxy_url: null,
       flows: [
@@ -215,9 +279,13 @@ describe("WirePanel (R16 contract)", () => {
           request_body: '{"big":"x"}...[truncated]',
         },
       ],
+      last_seq: 7,
+      total: 1,
+      reset: false,
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
     fireEvent.click(selectButtons(list)[0]);
     await screen.findByTestId("wire-detail");
     expect(screen.getByTestId("wire-req-truncated")).toBeInTheDocument();
@@ -228,6 +296,7 @@ describe("WirePanel (R16 contract)", () => {
     // truncation marker -> no truncated badge.
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     fireEvent.click(selectButtons(list)[0]);
     await screen.findByTestId("wire-detail");
     expect(screen.queryByTestId("wire-req-truncated")).toBeNull();
@@ -237,13 +306,17 @@ describe("WirePanel (R16 contract)", () => {
   it("shows the per-exchange latency in the detail pane when duration_ms is set", async () => {
     // duration_ms is OPS metadata on the wire view only (never a judge input,
     // I4). When present, the detail pane surfaces it as a latency line.
-    vi.mocked(getWireFlows).mockResolvedValue({
+    mockWireDelta({
       enabled: false,
       proxy_url: null,
       flows: [{ ...fixture.flows[0], seq: 5, duration_ms: 42 }],
+      last_seq: 5,
+      total: 1,
+      reset: false,
     });
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
     fireEvent.click(selectButtons(list)[0]);
     const detail = await screen.findByTestId("wire-detail");
     expect(detail).toHaveTextContent("42 ms");
@@ -259,12 +332,11 @@ describe("WirePanel (R16 contract)", () => {
   it("opens pre-filtered by free text from ?q= on first render (deep-link)", async () => {
     // Both fixture flows share host/method/path; only flow #1 carries the
     // "open_pr" token in its request_body. Opening at ?q=open_pr must narrow
-    // the list to that single flow WITHOUT any typing.
+    // the list to that single flow WITHOUT any typing (the clause rides the
+    // very first delta call).
     renderWire(["/proxy?source=wire&q=open_pr"]);
     const list = await screen.findByLabelText("wire flows");
-    await waitFor(() =>
-      expect(selectButtons(list)).toHaveLength(1),
-    );
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
     // The free-text input reflects the URL value (controlled by the query).
     expect(screen.getByTestId("wire-filter-text")).toHaveValue("open_pr");
   });
@@ -275,10 +347,12 @@ describe("WirePanel (R16 contract)", () => {
     // empties the list.
     renderWire(["/proxy?source=wire&host=127.0.0.1"]);
     const list = await screen.findByLabelText("wire flows");
-    await waitFor(() =>
-      expect(selectButtons(list)).toHaveLength(fixture.flows.length),
-    );
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     expect(screen.getByDisplayValue("127.0.0.1")).toBeInTheDocument();
+    // And the clause was pushed server-side on the first fetch.
+    expect(getWireFlowsDelta).toHaveBeenCalledWith(
+      expect.objectContaining({ host: "127.0.0.1" }),
+    );
   });
 
   it("empties the list when ?host= matches no flow (deep-link)", async () => {
@@ -295,6 +369,7 @@ describe("WirePanel (R16 contract)", () => {
     // least one differing line (e.g. the seq or the status_code).
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     // Select flow A (first list-item button is its select button).
     fireEvent.click(selectButtons(list)[0]);
     await screen.findByTestId("wire-detail");
@@ -319,6 +394,7 @@ describe("WirePanel (R16 contract)", () => {
   it("clears the compare selection (X resets the diff)", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     fireEvent.click(selectButtons(list)[0]);
     fireEvent.click(screen.getByTestId("wire-compare-2"));
     await screen.findByTestId("wire-diff");

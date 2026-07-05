@@ -7,7 +7,6 @@ from .real_slack_proxy import ProxyConfigError, RealSlackProxy, build_slack_prox
 from .router import resolve_proxy
 from .tracing import (
     ProxyTrace,
-    RingTraceRecorder,
     TraceRecorder,
     TracingProxy,
     debug_enabled_from_env,
@@ -21,7 +20,6 @@ __all__ = [
     "ProxyTrace",
     "RealForgeProxy",
     "RealSlackProxy",
-    "RingTraceRecorder",
     "TraceRecorder",
     "TracingProxy",
     "build_real_proxy_factory",

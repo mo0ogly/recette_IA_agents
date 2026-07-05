@@ -1,6 +1,6 @@
 """In-memory per-run capture store for LlmCallTraces.
 
-Mirrors ``RingTraceRecorder`` (bounded, thread-safe): the durable truth is the
+A bounded, thread-safe in-memory ring: the durable truth is the
 audit log (I1); this ring is a jettable view the Probe UX reads. A run's
 ``capture_sink`` (the wrapped ``CapturingLlm``) appends here; ``GET
 /capture/llm-traces`` reads it back. Unknown run -> empty list (fail-safe).

@@ -12,7 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProxyTraceResponse } from "../../types/platform";
+import type { ProxyTrace, ProxyTraceResponse } from "../../types/platform";
 import tracesFixture from "./__fixtures__/traces.fixture.json";
 
 vi.mock("../../components/MonacoJsonViewer", () => ({
@@ -26,8 +26,39 @@ vi.mock("../../api/client", async (importOriginal) => {
   return {
     ...actual,
     getProxyTraces: vi.fn(),
+    getProxyTracesDelta: vi.fn(),
     clearProxyTraces: vi.fn(),
     setProxyDebug: vi.fn(),
+    // The wire and sessions sources poll their delta endpoints on mount; stub
+    // them with empty envelopes so selecting those sources stays off-network.
+    getWireFlowsDelta: vi.fn(() =>
+      Promise.resolve({
+        enabled: false,
+        proxy_url: null,
+        flows: [],
+        last_seq: 0,
+        total: 0,
+        reset: false,
+      }),
+    ),
+    getProxySessionsDelta: vi.fn(() =>
+      Promise.resolve({
+        debug_enabled: true,
+        traces: [],
+        last_seq: 0,
+        reset: false,
+        wire_flows: [],
+        wire_last_seq: 0,
+        wire_reset: false,
+        reconcile: {
+          run_id: null,
+          strict: true,
+          ok: true,
+          bypass_flows: [],
+          audited_run_ids: [],
+        },
+      }),
+    ),
     // The page mounts the agent-only LaunchPanel, which loads agents on mount;
     // stub them so the page test does not hit the network and stays deterministic.
     listAgents: vi.fn(() => Promise.resolve([])),
@@ -38,10 +69,35 @@ vi.mock("../../api/client", async (importOriginal) => {
   };
 });
 
-import { clearProxyTraces, getProxyTraces, setProxyDebug } from "../../api/client";
+import { clearProxyTraces, getProxyTracesDelta, setProxyDebug } from "../../api/client";
 import ProxyPage from "./index";
 
 const fixture = tracesFixture as ProxyTraceResponse;
+
+/** Simulate the SERVER side of the delta endpoint over a fixed dataset: the
+ *  panel now pushes every filter clause as a query param, so the mock applies
+ *  them (plus the sinceSeq cursor) exactly like the backend does. */
+function mockDelta(response: ProxyTraceResponse): void {
+  vi.mocked(getProxyTracesDelta).mockImplementation((params) => {
+    const filtered = response.traces.filter(
+      (t: ProxyTrace) =>
+        (params.agentId === undefined || t.agent_id === params.agentId) &&
+        (params.target === undefined || t.target_system === params.target) &&
+        (params.runId === undefined || t.run_id === params.runId) &&
+        (params.outcome === undefined || (t.ok ? "ok" : "fail") === params.outcome) &&
+        (params.q === undefined ||
+          JSON.stringify(t).toLowerCase().includes(params.q.toLowerCase())) &&
+        (params.sinceSeq === undefined || t.seq > params.sinceSeq),
+    );
+    return Promise.resolve({
+      debug_enabled: response.debug_enabled,
+      traces: filtered,
+      last_seq: filtered.length > 0 ? filtered[filtered.length - 1].seq : (params.sinceSeq ?? 0),
+      total: filtered.length,
+      reset: false,
+    });
+  });
+}
 
 function renderPage(entries: string[] = ["/proxy"]): void {
   render(
@@ -54,15 +110,18 @@ function renderPage(entries: string[] = ["/proxy"]): void {
 describe("ProxyPage (R16 contract)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getProxyTraces).mockResolvedValue(fixture);
+    mockDelta(fixture);
     vi.mocked(clearProxyTraces).mockResolvedValue({ cleared: true });
   });
 
   it("renders one list item per recorded trace from the real payload", async () => {
     renderPage();
+    // The list wrapper renders before the first delta lands: wait for rows.
     const list = await screen.findByRole("list", { name: "proxy traces" });
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button")).toHaveLength(fixture.traces.length),
+    );
     const items = within(list).getAllByRole("button");
-    expect(items).toHaveLength(fixture.traces.length);
     expect(items[0]).toHaveTextContent("list_repos");
     expect(items[0]).toHaveTextContent("ok");
   });
@@ -70,6 +129,9 @@ describe("ProxyPage (R16 contract)", () => {
   it("shows the trace JSON in the viewer when a trace is selected", async () => {
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button")).toHaveLength(fixture.traces.length),
+    );
     fireEvent.click(within(list).getAllByRole("button")[0]);
     const viewer = screen.getByTestId("monaco-stub") as HTMLTextAreaElement;
     expect(viewer.value).toContain("side_effect_hash");
@@ -78,20 +140,23 @@ describe("ProxyPage (R16 contract)", () => {
 
   it("switches to stream mode and serializes every trace as JSONL", async () => {
     renderPage();
-    await screen.findByRole("list", { name: "proxy traces" });
+    const list = await screen.findByRole("list", { name: "proxy traces" });
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button")).toHaveLength(fixture.traces.length),
+    );
     fireEvent.click(screen.getByRole("button", { name: "stream" }));
     const viewer = screen.getByTestId("monaco-stub") as HTMLTextAreaElement;
     expect(viewer.value.split("\n")).toHaveLength(fixture.traces.length);
   });
 
   it("renders the debug-off banner when tracing is disabled", async () => {
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
+    mockDelta({ debug_enabled: false, traces: [], last_seq: 0, total: 0, reset: false });
     renderPage();
     expect(await screen.findByRole("status")).toHaveTextContent("INSPECT_IA_AGENTS_PROXY_DEBUG");
   });
 
   it("toggles proxy debug on from the UI when it is off", async () => {
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: false, traces: [] });
+    mockDelta({ debug_enabled: false, traces: [], last_seq: 0, total: 0, reset: false });
     vi.mocked(setProxyDebug).mockResolvedValue({ debug_enabled: true });
     renderPage();
     const toggle = await screen.findByTestId("proxy-debug-toggle");
@@ -107,7 +172,7 @@ describe("ProxyPage (R16 contract)", () => {
   });
 
   it("surfaces a load error instead of crashing", async () => {
-    vi.mocked(getProxyTraces).mockRejectedValue(new Error("network down"));
+    vi.mocked(getProxyTracesDelta).mockRejectedValue(new Error("network down"));
     renderPage();
     expect(await screen.findByText(/network down/)).toBeInTheDocument();
   });
@@ -130,18 +195,21 @@ describe("ProxyPage (R16 contract)", () => {
     expect(await screen.findByRole("list", { name: "proxy traces" })).toBeInTheDocument();
   });
 
-  it("filters the list by agent_id", async () => {
+  it("filters the list by agent_id (server-side)", async () => {
     const t0 = fixture.traces[0];
-    vi.mocked(getProxyTraces).mockResolvedValue({
+    mockDelta({
       debug_enabled: true,
       traces: [
         { ...t0, seq: 1, agent_id: "agent-a" },
         { ...t0, seq: 2, agent_id: "agent-b" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
-    expect(within(list).getAllByRole("button")).toHaveLength(2);
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(2));
     const filterGroup = screen.getByRole("group", { name: "trace filter" });
     const agentSelect = within(filterGroup).getAllByRole("combobox")[0];
     fireEvent.change(agentSelect, { target: { value: "agent-a" } });
@@ -153,16 +221,19 @@ describe("ProxyPage (R16 contract)", () => {
 
   it("filters the list by outcome (ok vs fail)", async () => {
     const t0 = fixture.traces[0];
-    vi.mocked(getProxyTraces).mockResolvedValue({
+    mockDelta({
       debug_enabled: true,
       traces: [
         { ...t0, seq: 1, ok: true, status_code: 200 },
         { ...t0, seq: 2, ok: false, status_code: 503 },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
-    expect(within(list).getAllByRole("button")).toHaveLength(2);
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(2));
     const filterGroup = screen.getByRole("group", { name: "trace filter" });
     // Selects order: agent_id, target_system, run_id, outcome.
     const outcomeSelect = within(filterGroup).getAllByRole("combobox")[3];
@@ -176,12 +247,15 @@ describe("ProxyPage (R16 contract)", () => {
     // is deep-linkable: opening at /proxy?q=open_pr must narrow the list on the
     // first render with no typing. Two distinct traces, only #2 matches.
     const t0 = fixture.traces[0];
-    vi.mocked(getProxyTraces).mockResolvedValue({
+    mockDelta({
       debug_enabled: true,
       traces: [
         { ...t0, seq: 1, action_type: "list_repos" },
         { ...t0, seq: 2, action_type: "open_pr" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage(["/proxy?q=open_pr"]);
     const list = await screen.findByRole("list", { name: "proxy traces" });
@@ -193,16 +267,19 @@ describe("ProxyPage (R16 contract)", () => {
 
   it("filters the list by run_id (F3 run <-> traces link)", async () => {
     const t0 = fixture.traces[0];
-    vi.mocked(getProxyTraces).mockResolvedValue({
+    mockDelta({
       debug_enabled: true,
       traces: [
         { ...t0, seq: 1, run_id: "run-aaa" },
         { ...t0, seq: 2, run_id: "run-bbb" },
       ],
+      last_seq: 2,
+      total: 2,
+      reset: false,
     });
     renderPage();
     const list = await screen.findByRole("list", { name: "proxy traces" });
-    expect(within(list).getAllByRole("button")).toHaveLength(2);
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(2));
     const filterGroup = screen.getByRole("group", { name: "trace filter" });
     // Selects order: agent_id, target_system, run_id.
     const runSelect = within(filterGroup).getAllByRole("combobox")[2];
@@ -233,15 +310,15 @@ describe("ProxyPage (R16 contract)", () => {
   it("pauses the live poll: no refetch while paused", async () => {
     vi.useFakeTimers();
     try {
-      vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+      mockDelta({ debug_enabled: true, traces: [], last_seq: 0, total: 0, reset: false });
       renderPage();
       // let the initial fetch resolve
       await vi.advanceTimersByTimeAsync(0);
-      const afterMount = vi.mocked(getProxyTraces).mock.calls.length; // >= 1 (initial)
+      const afterMount = vi.mocked(getProxyTracesDelta).mock.calls.length; // >= 1 (initial)
       // click Pause
       fireEvent.click(screen.getByTestId("proxy-pause"));
       await vi.advanceTimersByTimeAsync(5000); // 2+ poll intervals
-      expect(vi.mocked(getProxyTraces).mock.calls.length).toBe(afterMount); // no extra fetch
+      expect(vi.mocked(getProxyTracesDelta).mock.calls.length).toBe(afterMount); // no extra fetch
     } finally {
       vi.useRealTimers();
     }

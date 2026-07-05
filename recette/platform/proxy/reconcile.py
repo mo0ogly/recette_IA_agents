@@ -147,14 +147,25 @@ def reconcile_strict(
       matching audit event.
 
     Non-``/execute`` traffic to a mediated target (health probes, etc.) is benign
-    and never flagged. Pure: same inputs -> same report, byte for byte."""
+    and never flagged.
+
+    Per-flow hash source: when a flow dict carries the ``side_effect_hash`` KEY
+    (the persisted column served by ``snapshot_dicts``/``query``), that value is
+    used as-is -- no JSON re-parse. Key present with value ``None`` means a
+    non-governed flow persisted as NULL: benign, same as a computed ``None``.
+    Key ABSENT means a legacy dict: the hash is recomputed from the bytes
+    (back-compat). Pure: same inputs -> same report, byte for byte."""
     audited_hashes = {t["side_effect_hash"] for t in proxy_traces if t.get("side_effect_hash")}
     bypass: list[dict] = []
     for flow in sorted(wire_flows, key=lambda f: f.get("seq", 0)):
         if target_of(flow) not in allowlist:
             bypass.append({**flow, "bypass_reason": "non_mediated_target"})
             continue
-        digest = wire_flow_side_effect_hash(flow)
+        digest = (
+            flow["side_effect_hash"]
+            if "side_effect_hash" in flow
+            else wire_flow_side_effect_hash(flow)
+        )
         if digest is None:
             continue  # not a governed-action call to a mediated target -> benign
         if digest not in audited_hashes:

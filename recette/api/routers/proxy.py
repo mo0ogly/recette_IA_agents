@@ -6,10 +6,11 @@ Two altitudes over the SAME side effects:
 - ``/proxy/wire`` -- the NETWORK view (WireFlow), the bytes on the wire, fed by
   the OPTIONAL mitmproxy Docker overlay (``POST /proxy/wire`` ingest).
 
-Both rings are jettable views (I1 keeps the durable truth in the append-only
-audit log), so a ``clear`` is allowed -- it discards the debug buffer, never the
-log. The ingest is the only mutating route here and it only appends to a bounded
-in-memory ring; it never touches the event store.
+Both buffers are jettable views persisted in the SQLite proxy store (I1 keeps
+the durable truth in the append-only audit log), so a ``clear`` is allowed -- it
+discards the debug buffer, never the log. The ingest is the only mutating route
+here and it only appends to the bounded debug store; it never touches the event
+store.
 """
 
 from __future__ import annotations
@@ -17,11 +18,12 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ...platform.proxy.reconcile import wire_flow_side_effect_hash
 from ...platform.proxy.redact import redact_mapping, redaction_enabled
 
 
@@ -40,16 +42,36 @@ def _redacted_view(d: dict) -> dict:
     return out
 
 
+def _query_with_reset(
+    query: Callable[..., tuple[list[Any], int, int]],
+    since_seq: int | None,
+    **kwargs: Any,
+) -> tuple[list[Any], int, int, bool]:
+    """Run a delta query; when the client cursor is ahead of the store
+    (buffer cleared or server restarted), re-issue WITHOUT the cursor so the
+    client resyncs in one round trip. Returns (items, last_seq, total, reset)."""
+    items, last_seq, total = query(since_seq=since_seq, **kwargs)
+    reset = since_seq is not None and since_seq > last_seq
+    if reset:
+        items, last_seq, total = query(**kwargs)
+    return items, last_seq, total, reset
+
+
 router = APIRouter(prefix="/proxy", tags=["proxy"])
 
 
 @router.get("/debug")
 def get_debug_status(request: Request) -> dict:
-    """Whether proxy debug tracing is on, and how many traces are buffered."""
+    """Whether proxy debug tracing is on, and how many traces are buffered.
+
+    ``store_error`` surfaces the last storage failure of the SQLite debug
+    store (``None`` when healthy) so the console can flag a degraded buffer."""
     recorder = request.app.state.proxy_trace_recorder
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
-        "trace_count": len(recorder.snapshot()),
+        # COUNT(*) in SQL -- never rebuild the full snapshot for a badge.
+        "trace_count": recorder.count(),
+        "store_error": recorder.store_error,
     }
 
 
@@ -74,21 +96,53 @@ def set_debug(request: Request, body: dict) -> dict:
 
 
 @router.get("/traces")
-def list_traces(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
+def list_traces(
+    request: Request,
+    tail: int | None = None,
+    run_id: str | None = None,
+    since_seq: int | None = None,
+    agent_id: str | None = None,
+    target: str | None = None,
+    outcome: str | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+) -> dict:
     """Recorded side-effect traces in monotone seq order (oldest first).
 
-    ``run_id`` narrows the view to the traces of one run (F3 run <-> traces
-    link); applied before ``tail``. ``tail`` keeps only the last N traces
-    (live-console backfill). Stays read-only.
+    Delta-poll + server-side filtering, all delegated to the SQLite store
+    (``recorder.query``): ``since_seq`` returns only rows newer than the
+    client's cursor; ``run_id``/``agent_id``/``target``/``outcome``/``q``
+    narrow the selection in SQL; ``limit`` keeps the first N of the ascending
+    delta; ``tail`` keeps the last N (compat: wins over ``limit`` and ignores
+    ``since_seq``). Envelope: ``last_seq`` is the unfiltered MAX(seq) (the
+    next cursor), ``total`` counts the filtered set ignoring cursor/limit/
+    tail, ``reset`` flags a client cursor AHEAD of the server (the buffer was
+    cleared or the store restarted) -- the full current selection is then
+    served so the client resyncs in one round trip. Stays read-only.
     """
-    traces = request.app.state.proxy_trace_recorder.snapshot()
-    if run_id is not None:
-        traces = [t for t in traces if t.run_id == run_id]
-    if tail is not None and tail >= 0:
-        traces = traces[-tail:]
+    # Validation split: the store's query IGNORES an unknown outcome by design
+    # (store-level latitude); the API boundary is where an explicit 422 lives
+    # (fail-safe: never silently ignore an operator filter).
+    if outcome is not None and outcome not in ("ok", "fail"):
+        raise HTTPException(status_code=422, detail='outcome must be "ok" or "fail"')
+    recorder = request.app.state.proxy_trace_recorder
+    items, last_seq, total, reset = _query_with_reset(
+        recorder.query,
+        since_seq,
+        run_id=run_id,
+        agent_id=agent_id,
+        target=target,
+        outcome=outcome,
+        q=q,
+        limit=limit,
+        tail=tail,
+    )
     return {
         "debug_enabled": bool(request.app.state.proxy_debug_enabled),
-        "traces": [_redacted_view(t.to_dict()) for t in traces],
+        "traces": [_redacted_view(t.to_dict()) for t in items],
+        "last_seq": last_seq,
+        "total": total,
+        "reset": reset,
     }
 
 
@@ -237,7 +291,8 @@ def get_wire_status(request: Request) -> dict:
     return {
         "enabled": proxy_url is not None,
         "proxy_url": proxy_url,
-        "flow_count": len(recorder.snapshot()),
+        # COUNT(*) in SQL -- never rebuild the full snapshot for a badge.
+        "flow_count": recorder.count(),
     }
 
 
@@ -292,7 +347,7 @@ def control_wire_overlay(request: Request, body: dict) -> dict:
 def ingest_wire_flow(request: Request, payload: dict) -> dict:
     """Ingest one normalized flow from the mitmproxy overlay addon.
 
-    Appends to the bounded wire ring only; never the audit log. A non-object
+    Appends to the bounded wire debug buffer only; never the audit log. A non-object
     payload is a malformed ingest -> 422 (the addon controls the shape, but the
     body crosses a process boundary, so it is validated, not trusted)."""
     try:
@@ -303,28 +358,54 @@ def ingest_wire_flow(request: Request, payload: dict) -> dict:
 
 
 @router.get("/wire")
-def list_wire_flows(request: Request, tail: int | None = None, run_id: str | None = None) -> dict:
+def list_wire_flows(
+    request: Request,
+    tail: int | None = None,
+    run_id: str | None = None,
+    since_seq: int | None = None,
+    host: str | None = None,
+    method: str | None = None,
+    status: int | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+) -> dict:
     """Recorded wire flows in monotone seq order (oldest first).
 
-    ``run_id`` narrows to one run's flows (applied before ``tail``); ``tail``
-    keeps only the last N. Read-only."""
-    flows = request.app.state.wire_flow_recorder.snapshot()
-    if run_id is not None:
-        flows = [f for f in flows if f.run_id == run_id]
-    if tail is not None and tail >= 0:
-        flows = flows[-tail:]
-
-    def _enrich(flow_dict: dict) -> dict:
-        # Derived VIEW field: canonical side_effect_hash recomputed from the bytes
-        # so the console can join a wire flow to its app-level exchange (None when
-        # the flow is not a governed-action shape). Recorded WireFlow stays pure;
-        # computed read-only here (I1/I4).
-        return {**flow_dict, "side_effect_hash": wire_flow_side_effect_hash(flow_dict)}
-
+    Delta-poll + server-side filtering, all delegated to the SQLite store
+    (``recorder.query``): ``since_seq`` returns only rows newer than the
+    client's cursor; ``run_id``/``host``/``method``/``status``/``q`` narrow
+    the selection in SQL (``method`` is uppercased by the store before the
+    comparison -- the column is stored uppercased by ``normalize_flow``, so a
+    lowercase input still matches; ``status`` is an exact status_code match;
+    ``q`` is a literal substring over path, request_body and response_body);
+    ``limit`` keeps the first N of the ascending delta; ``tail`` keeps the
+    last N (compat: wins over ``limit`` and ignores ``since_seq``). Envelope
+    keeps the historical ``enabled``/``proxy_url``/``flows`` keys and grows
+    ``last_seq`` (the unfiltered MAX(seq), the next cursor), ``total`` (the
+    filtered count ignoring cursor/limit/tail) and ``reset``. ``reset`` flags
+    a client cursor AHEAD of the server (the buffer was cleared or the store
+    restarted) -- the full current selection is then served so the client
+    resyncs in one round trip. Each emitted dict carries the persisted
+    ``side_effect_hash`` and goes through redaction. Stays read-only."""
+    recorder = request.app.state.wire_flow_recorder
+    items, last_seq, total, reset = _query_with_reset(
+        recorder.query,
+        since_seq,
+        run_id=run_id,
+        host=host,
+        method=method,
+        status=status,
+        q=q,
+        limit=limit,
+        tail=tail,
+    )
     return {
         "enabled": request.app.state.wire_proxy_url is not None,
         "proxy_url": request.app.state.wire_proxy_url,
-        "flows": [_redacted_view(_enrich(f.to_dict())) for f in flows],
+        "flows": [_redacted_view(f) for f in items],
+        "last_seq": last_seq,
+        "total": total,
+        "reset": reset,
     }
 
 
@@ -376,10 +457,13 @@ def _build_run_allowlist(request: Request, run_id: str | None):
     from ...platform.proxy.lab_proxy import lab_url_from_env
     from ...platform.proxy.reconcile import build_allowlist, target_of
 
-    flows = request.app.state.wire_flow_recorder.snapshot()
+    # Wire dicts come from snapshot_dicts() WITH the persisted side_effect_hash,
+    # so reconcile_strict never re-parses the bodies. run_id is filtered here
+    # in Python (snapshot_dicts has no run filter).
+    flow_dicts = request.app.state.wire_flow_recorder.snapshot_dicts()
     traces = request.app.state.proxy_trace_recorder.snapshot()
     if run_id is not None:
-        flows = [f for f in flows if f.run_id == run_id]
+        flow_dicts = [f for f in flow_dicts if f["run_id"] == run_id]
         traces = [t for t in traces if t.run_id == run_id]
     lab = urlparse(lab_url_from_env())
     # Normalize through target_of so "localhost:8082" matches a flow recorded as
@@ -398,7 +482,7 @@ def _build_run_allowlist(request: Request, run_id: str | None):
         lab_host=lab_host,
         llm_hosts=llm_hosts,
     )
-    return allow, [f.to_dict() for f in flows], [t.to_dict() for t in traces]
+    return allow, flow_dicts, [t.to_dict() for t in traces]
 
 
 def _reconcile_report(request: Request, run_id: str | None, *, strict: bool = False):
@@ -458,6 +542,54 @@ def get_reconcile(request: Request, run_id: str | None = None, strict: bool = Fa
     POST /proxy/reconcile/raise records the bypass as a compensatory event."""
     report = _reconcile_report(request, run_id, strict=strict)
     return {"run_id": run_id, "strict": strict, **report.to_dict()}
+
+
+@router.get("/sessions/delta")
+def get_sessions_delta(
+    request: Request,
+    since_seq: int | None = None,
+    wire_since_seq: int | None = None,
+    run_id: str | None = None,
+    strict: bool = True,
+) -> dict:
+    """Coalesced SessionsPanel poll: traces + wire + reconcile in ONE call.
+
+    Replaces the panel's three parallel proxy-owned requests per tick
+    (GET /proxy/traces + GET /proxy/wire + GET /proxy/reconcile) with a single
+    round trip. Cursors are INDEPENDENT per side -- ``since_seq`` for traces,
+    ``wire_since_seq`` for wire -- each with the same reset semantics as the
+    per-source endpoints: a cursor AHEAD of the server (buffer cleared or store
+    restarted) flags ``reset``/``wire_reset`` and re-issues the full query
+    without the cursor so the client resyncs in one round trip; a stale cursor
+    on one side never forces a resync of the other.
+
+    Asymmetry BY DESIGN, mirroring today's panel behavior exactly: the panel
+    groups ALL traces client-side but scopes wire + reconcile to the
+    deep-linked run, so ``run_id`` applies to the WIRE delta and the reconcile
+    join only -- traces stay unfiltered. ``strict`` defaults to true (the
+    panel uses the strict per-flow hash join). ``reconcile`` carries the same
+    shape as GET /proxy/reconcile. Both views emit through redaction. No
+    tail/limit knobs (the panel does not use them). Stays read-only (I1).
+    Reconcile takes its own recorder snapshots, so a new wire flow may appear
+    in the reconcile badge one poll tick before the wire delta -- benign.
+    """
+    trace_recorder = request.app.state.proxy_trace_recorder
+    items, last_seq, _total, reset = _query_with_reset(trace_recorder.query, since_seq)
+    wire_recorder = request.app.state.wire_flow_recorder
+    wire_items, wire_last_seq, _wire_total, wire_reset = _query_with_reset(
+        wire_recorder.query, wire_since_seq, run_id=run_id
+    )
+    report = _reconcile_report(request, run_id, strict=strict)
+    return {
+        "debug_enabled": bool(request.app.state.proxy_debug_enabled),
+        "traces": [_redacted_view(t.to_dict()) for t in items],
+        "last_seq": last_seq,
+        "reset": reset,
+        "wire_flows": [_redacted_view(f) for f in wire_items],
+        "wire_last_seq": wire_last_seq,
+        "wire_reset": wire_reset,
+        "reconcile": {"run_id": run_id, "strict": strict, **report.to_dict()},
+    }
 
 
 @router.get("/reconcile/status")

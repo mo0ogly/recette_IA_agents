@@ -48,10 +48,11 @@ class ReceiptMerkleEndpointTest(unittest.TestCase):
     def setUp(self) -> None:
         self.app = create_app()
         self.client = TestClient(self.app)
-        # Feed a few traces into the proxy recorder so receipts exist.
-        recorder = self.app.state.proxy_trace_recorder
+        # Feed a few traces into the proxy store so receipts exist. The store
+        # ignores the passed seq and assigns 1..3 via AUTOINCREMENT (same values).
+        store = self.app.state.proxy_store
         for i in range(1, 4):
-            recorder._ring.append(_proxy_trace(i))  # noqa: SLF001 -- test seam
+            store.insert_trace(_proxy_trace(i))
 
     def test_empty_recorder_has_empty_root(self) -> None:
         client = TestClient(create_app())  # fresh app, no traces

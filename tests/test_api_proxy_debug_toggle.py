@@ -30,6 +30,13 @@ class ProxyDebugToggleTest(unittest.TestCase):
         r = self.client.post("/proxy/debug", json={"enabled": "yes"})
         self.assertEqual(r.status_code, 422)
 
+    def test_get_debug_surfaces_store_error_none_when_healthy(self) -> None:
+        # The SQLite debug store's last failure is surfaced (None = healthy),
+        # so the console can flag a degraded observability buffer.
+        body = self.client.get("/proxy/debug").json()
+        self.assertIn("store_error", body)
+        self.assertIsNone(body["store_error"])
+
 
 if __name__ == "__main__":
     unittest.main()

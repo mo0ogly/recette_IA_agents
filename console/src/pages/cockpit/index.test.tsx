@@ -72,7 +72,7 @@ describe("CockpitPage network log", () => {
   it("shows the empty network log before any run, without polling traces", async () => {
     vi.mocked(listAgents).mockResolvedValue([]);
     vi.mocked(listAiBackends).mockResolvedValue([]);
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [], last_seq: 0, total: 0, reset: false });
 
     renderCockpit();
 
@@ -236,7 +236,7 @@ describe("CockpitPage network log", () => {
       close: vi.fn(),
     };
     vi.mocked(openRunSocket).mockReturnValue(socket as unknown as WebSocket);
-    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [] });
+    vi.mocked(getProxyTraces).mockResolvedValue({ debug_enabled: true, traces: [], last_seq: 0, total: 0, reset: false });
 
     renderCockpit();
     await screen.findByText(/gh-pr-bot/);

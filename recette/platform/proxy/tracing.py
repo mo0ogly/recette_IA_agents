@@ -14,23 +14,22 @@ identical trace sequence.
 
 Immutability (I1): traces are a read-only VIEW over execution. They never mutate the
 audit log; the recorder is a bounded, jettable buffer (rebuildable from the log).
+
+The concrete recorder is ``SqliteTraceRecorder`` (store.py), a facade over the
+SQLite-backed ``SqliteProxyStore``; this module keeps the ``ProxyTrace`` model,
+the ``TraceRecorder`` protocol, and the ``TracingProxy`` decorator.
 """
 
 from __future__ import annotations
 
 import os
-import threading
-from collections import deque
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ..events import PlatformActionEvent
 from .protocol import ExecutionResult, ExternalSystemProxy
-from .rotate import append_jsonl
 
 DEBUG_ENV = "INSPECT_IA_AGENTS_PROXY_DEBUG"
-DEFAULT_RING_CAPACITY = 512
 
 
 def debug_enabled_from_env() -> bool:
@@ -55,8 +54,8 @@ class ProxyTrace:
     # The resolved server name (fqdn) the side effect was routed to, for trace
     # realism (reads ``api.github.com`` instead of ``127.0.0.1:9101``). Falls
     # back to ``target_system`` when no name was resolved (back-compat). Required
-    # (str, never None) by construction: ``RingTraceRecorder.record`` falls back to
-    # ``event.target_system`` (always a non-empty str), unlike the optional
+    # (str, never None) by construction: ``SqliteTraceRecorder.record`` falls back
+    # to ``event.target_system`` (always a non-empty str), unlike the optional
     # ``ExecutionResult.target: str | None``.
     target: str
     action_type: str
@@ -104,70 +103,6 @@ class TraceRecorder(Protocol):
     ) -> None: ...
 
     def snapshot(self) -> list[ProxyTrace]: ...
-
-
-class RingTraceRecorder:
-    """Bounded, thread-safe in-memory ring of the most recent traces.
-
-    ``capacity`` caps memory (oldest traces drop, I1 keeps the durable truth in the
-    audit log -- this buffer is jettable). ``seq`` is monotone across the recorder's
-    life so trace ordering is stable even after the ring has wrapped.
-    """
-
-    def __init__(
-        self, capacity: int = DEFAULT_RING_CAPACITY, *, rotate_dir: Path | None = None
-    ) -> None:
-        if capacity <= 0:
-            raise ValueError("RingTraceRecorder capacity must be positive")
-        self._ring: deque[ProxyTrace] = deque(maxlen=capacity)
-        self._seq = 0
-        self._lock = threading.Lock()
-        # When set, the trace about to be evicted by maxlen is appended to this
-        # file BEFORE the deque drops it, so a long run keeps its early packets.
-        # Debug convenience only -- the audit log stays the durable truth (I1).
-        self._rotate_dir = rotate_dir
-
-    def record(
-        self, event: PlatformActionEvent, result: ExecutionResult, run_id: str | None = None
-    ) -> None:
-        with self._lock:
-            self._seq += 1
-            trace = ProxyTrace(
-                seq=self._seq,
-                event_id=event.event_id,
-                timestamp=event.timestamp,
-                agent_id=event.agent_id,
-                target_system=event.target_system,
-                # Fallback to event.target_system (always a non-empty str) keeps
-                # ProxyTrace.target a str by construction (see the field comment).
-                target=result.target or event.target_system,
-                action_type=event.action_type,
-                resource=event.resource,
-                request_payload=dict(event.payload),
-                ok=result.ok,
-                status_code=result.status_code,
-                side_effect_hash=result.side_effect_hash,
-                error=result.error,
-                run_id=run_id,
-                response=dict(result.response),
-            )
-            if (
-                self._rotate_dir is not None
-                and self._ring.maxlen is not None
-                and len(self._ring) == self._ring.maxlen
-            ):
-                # The deque is full: this append will evict self._ring[0]. Export
-                # it first so the early packet is retained (fail-safe sink).
-                append_jsonl(self._rotate_dir / "traces.jsonl", self._ring[0].to_dict())
-            self._ring.append(trace)
-
-    def snapshot(self) -> list[ProxyTrace]:
-        with self._lock:
-            return list(self._ring)
-
-    def clear(self) -> None:
-        with self._lock:
-            self._ring.clear()
 
 
 class TracingProxy:

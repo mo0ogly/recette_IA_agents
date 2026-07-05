@@ -17,5 +17,8 @@
       "run_id": "1e9b7889ec614c45894e8c855ea72543",
       "side_effect_hash": "f8e2690c2ca18f35a54e2f5a11351d03091cde454fa097427b3b60c94cf19db9"
     }
-  ]
+  ],
+  "last_seq": 1,
+  "total": 1,
+  "reset": false
 }

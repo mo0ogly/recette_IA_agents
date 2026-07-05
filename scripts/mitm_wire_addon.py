@@ -1,11 +1,11 @@
-"""mitmproxy addon: stream intercepted flows to the inspect_ia_agents API wire ring.
+"""mitmproxy addon: stream intercepted flows to the inspect_ia_agents API wire buffer.
 
 Loaded by the OPTIONAL mitmproxy Docker overlay (``mitmdump -s
 scripts/mitm_wire_addon.py``). On each completed request/response it normalizes
-the flow and POSTs it to ``{API_URL}/proxy/wire``, where ``WireFlowRecorder``
-buffers it for the console. The overlay is observability only: it never alters
-the traffic and a POST failure is swallowed (fail-safe -- interception must never
-break the agent's call, failure-modes.md).
+the flow and POSTs it to ``{API_URL}/proxy/wire``, where the SQLite-backed
+``SqliteWireRecorder`` buffers it for the console. The overlay is observability
+only: it never alters the traffic and a POST failure is swallowed (fail-safe --
+interception must never break the agent's call, failure-modes.md).
 
 Zero hard dependency beyond mitmproxy itself: the POST uses stdlib urllib, and
 ``build_ingest_payload`` is a pure function (no mitmproxy import) so it is unit
@@ -14,7 +14,7 @@ testable without a live proxy.
 Config (R5, no hardcoded address):
 - INSPECT_IA_AGENTS_API_URL    -- base URL of the governed API (default http://host.docker.internal:8090)
 - INSPECT_IA_AGENTS_WIRE_RUN_HEADER -- request header carrying the originating run id
-                              (default x-inspect-run-id); forwarded to the ring.
+                              (default x-inspect-run-id); forwarded to the buffer.
 """
 
 from __future__ import annotations

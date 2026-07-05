@@ -19,7 +19,11 @@
       "run_id": "3f9c1a7be0d24e8fae21c5b09d4477aa",
       "response": {
         "action": "list_repos",
-        "repositories": ["acme/widgets/6e23-0", "acme/widgets/6e23-1", "acme/widgets/6e23-2"],
+        "repositories": [
+          "acme/widgets/6e23-0",
+          "acme/widgets/6e23-1",
+          "acme/widgets/6e23-2"
+        ],
         "resource": "acme/widgets",
         "result_id": "6e23711da8ea"
       }
@@ -42,10 +46,17 @@
       "run_id": "3f9c1a7be0d24e8fae21c5b09d4477aa",
       "response": {
         "action": "list_repos",
-        "repositories": ["acme/widgets/6e23-0", "acme/widgets/6e23-1", "acme/widgets/6e23-2"],
+        "repositories": [
+          "acme/widgets/6e23-0",
+          "acme/widgets/6e23-1",
+          "acme/widgets/6e23-2"
+        ],
         "resource": "acme/widgets",
         "result_id": "6e23711da8ea"
       }
     }
-  ]
+  ],
+  "last_seq": 2,
+  "total": 2,
+  "reset": false
 }
