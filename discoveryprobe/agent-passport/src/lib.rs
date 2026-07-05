@@ -12,9 +12,16 @@
 //! lifted into a real-agent runtime unchanged. It has no dependency on any
 //! discoveryprobe-* crate.
 //!
-//! This module currently provides parse-only support: the [`Claims`] and
-//! [`Passport`] types and [`Passport::from_json`]. Issuing (signing) and
-//! verification arrive in later tasks and reuse the same frozen shapes.
+//! This module provides the frozen shapes ([`Claims`], [`Passport`]),
+//! parsing ([`Passport::from_json`]), the canonical signing form
+//! ([`canonical_bytes`]), and issuing ([`issue`]). Verification arrives in a
+//! later task and reuses the same [`canonical_bytes`] contract.
+
+mod canonical;
+mod issue;
+
+pub use canonical::canonical_bytes;
+pub use issue::issue;
 
 use serde::{Deserialize, Serialize};
 
