@@ -7,7 +7,6 @@ the decision path downstream never reads the host clock.
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 from typing import Any
 
@@ -16,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from ...platform.approvals.service import ApprovalService
 from ...platform.events import ApprovalState, EventKind
 from ...platform.gateway import ActionRequest
+from .._timestamp import capture_timestamp as _capture_timestamp
 
 router = APIRouter(prefix="/actions", tags=["actions"])
 
@@ -38,11 +38,6 @@ def _bind_identity(request: Request, agent_id: str) -> None:
         raise HTTPException(
             status_code=403, detail="agent_id does not match the authenticated identity"
         )
-
-
-def _capture_timestamp() -> str:
-    """I4 capture point: ISO-8601 UTC with Z suffix, captured at the boundary."""
-    return _dt.datetime.now(_dt.UTC).isoformat().replace("+00:00", "Z")
 
 
 @router.post("/execute")

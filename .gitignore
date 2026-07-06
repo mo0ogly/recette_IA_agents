@@ -76,6 +76,10 @@ data/lab/
 # Per-backend AI API keys (R8: secrets, never committed)
 data/backend_secrets.json
 
+# Runtime agent passports (R8: local attestation store, never committed --
+# only TEST fixtures under tests/fixtures/agent_passports/ are versioned)
+data/agent_passports/
+
 # Coverage measurement artifact (local only)
 .coverage
 

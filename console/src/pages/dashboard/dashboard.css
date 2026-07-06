@@ -216,3 +216,58 @@
 .dash-camp-head {
   margin-top: 2rem;
 }
+
+/* Passport admission badge -- the WARN surface for a non-trusted launch
+ * (observe mode: the run proceeded but the passport is suspect). Keyed off the
+ * admission status; token-driven so it tracks the theme (no hardcoded colors),
+ * mirroring the probe attestation badge. trusted = green (never shown here),
+ * untrusted = red, unsigned = neutral grey, malformed = amber. */
+.dash-admission {
+  margin-top: 0.35rem;
+}
+
+.admission-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+
+.admission-badge-trusted {
+  background-color: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+  border-color: var(--badge-green-fg);
+}
+
+.admission-badge-untrusted {
+  background-color: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+  border-color: var(--badge-red-fg);
+}
+
+.admission-badge-unsigned {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+  border-color: var(--badge-gray-fg);
+}
+
+.admission-badge-malformed {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  border-color: var(--badge-amber-fg);
+}
+
+.admission-badge-mode,
+.admission-badge-admitted {
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}

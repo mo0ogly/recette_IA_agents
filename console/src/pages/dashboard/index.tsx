@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ApiError,
   clearProxyTraces,
   launchLaneB,
   listAgents,
@@ -22,12 +23,19 @@ import {
   stopRun,
   submitRunVerdict,
 } from "../../api/client";
-import type { AgentConfig, Campaign, RunSummary } from "../../types/platform";
+import type {
+  AdmissionVerdict,
+  AgentConfig,
+  Campaign,
+  RunHandle,
+  RunSummary,
+} from "../../types/platform";
 import { isRealAi, isRealTarget } from "../../lib/aiBackend";
 import PageHelp from "../../components/help/PageHelp";
 import AgentRunModal from "../../components/AgentRunModal";
 import PreciseLaunchModal from "../../components/PreciseLaunchModal";
 import AgentExplainModal from "../../components/AgentExplainModal";
+import AdmissionBadge from "./AdmissionBadge";
 import EyeIcon from "../../components/EyeIcon";
 import { launchTally, voyantFor } from "../../lib/runStatus";
 import "./dashboard.css";
@@ -53,12 +61,47 @@ interface AgentRow {
   runId: string | null;
 }
 
+/** Pull the FastAPI `detail` string out of an ApiError message body, so an
+ *  enforce-mode 403 ("agent X admission denied: <status> <reasons>") reads
+ *  legibly instead of as a raw "API request failed (403) ..." envelope. */
+function apiDetail(message: string): string {
+  const brace = message.indexOf("{");
+  if (brace >= 0) {
+    try {
+      const parsed = JSON.parse(message.slice(brace)) as { detail?: unknown };
+      if (typeof parsed.detail === "string") {
+        return parsed.detail;
+      }
+    } catch {
+      // not a JSON body -- fall through to the raw message
+    }
+  }
+  return message;
+}
+
+/** Turn a launch failure into an operator-facing message. An enforce-mode
+ *  admission denial (403) surfaces its reason (WHY the passport was refused);
+ *  any other failure keeps its message. */
+function launchErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 403) {
+    return `Admission refusee (enforce): ${apiDetail(err.message)}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 export default function DashboardPage(): JSX.Element {
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [launching, setLaunching] = useState<Set<string>>(new Set());
+  // Last NON-trusted admission verdict per agent (observe mode: the run
+  // proceeded but the passport is suspect -- surfaced as a WARN badge on the
+  // agent row). A trusted verdict clears the entry. Enforce-mode denials never
+  // reach here (they 403 and surface in the error banner).
+  const [admissions, setAdmissions] = useState<Map<string, AdmissionVerdict>>(
+    new Map(),
+  );
   const [launchingCampaign, setLaunchingCampaign] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Viewing | null>(null);
@@ -139,18 +182,32 @@ export default function DashboardPage(): JSX.Element {
       setLaunching((prev) => new Set(prev).add(agent.id));
       setNotice(`Lancement de ${agent.id}...`);
       try {
+        let handle: RunHandle;
         if (isRealAi(agent)) {
-          await launchLaneB({ agent_id: agent.id });
+          handle = await launchLaneB({ agent_id: agent.id });
         } else {
           const scenario = (agent.scenario && agent.scenario.length > 0
             ? agent.scenario
             : DEFAULT_SCENARIO) as Array<Record<string, unknown>>;
-          await launchLaneB({ agent_id: agent.id, stub_script: scenario });
+          handle = await launchLaneB({ agent_id: agent.id, stub_script: scenario });
         }
+        // Surface a non-trusted passport (observe mode): the run proceeded but
+        // the operator must SEE why the passport is suspect. A trusted verdict
+        // (or an admission-unaware backend, admission undefined) clears it.
+        const verdict = handle?.admission;
+        setAdmissions((prev) => {
+          const next = new Map(prev);
+          if (verdict !== undefined && verdict.status !== "trusted") {
+            next.set(agent.id, verdict);
+          } else {
+            next.delete(agent.id);
+          }
+          return next;
+        });
         await poll();
         setNotice(`Run lance pour ${agent.id}`);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(launchErrorMessage(err));
         setNotice(null);
       } finally {
         setLaunching((prev) => {
@@ -344,6 +401,11 @@ export default function DashboardPage(): JSX.Element {
                         </span>
                       );
                     })()}
+                    {admissions.has(agent.id) && (
+                      <div className="dash-admission">
+                        <AdmissionBadge admission={admissions.get(agent.id)!} />
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div className="dash-actions">

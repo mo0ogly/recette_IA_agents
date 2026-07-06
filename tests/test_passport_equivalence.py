@@ -172,7 +172,8 @@ class TestPassportEquivalence(unittest.TestCase):
         - scope_overreach (declared family not in scope)
 
         These trigger reasons with priorities [1, 2, 5, 4] in _UNTRUST_ORDER.
-        After sort, they must be [1, 2, 4, 5] = [expired, empty_delegation, scope_overreach, unknown_key_id].
+        After sort, they must be [1, 2, 4, 5] =
+        [expired, empty_delegation, scope_overreach, unknown_key_id].
         """
         # Construct a minimal passport with multiple defects (no crypto needed).
         passport = {
@@ -195,7 +196,8 @@ class TestPassportEquivalence(unittest.TestCase):
         # Extract reason kinds in order.
         kinds = [r["kind"] for r in reasons]
 
-        # The canonical sort order is: expired(1) < empty_delegation(2) < scope_overreach(4) < unknown_key_id(5).
+        # Canonical sort order: expired(1) < empty_delegation(2) <
+        # scope_overreach(4) < unknown_key_id(5).
         expected_kinds = ["expired", "empty_delegation", "scope_overreach", "unknown_key_id"]
         self.assertEqual(kinds, expected_kinds, f"reasons not in canonical order: {kinds}")
 

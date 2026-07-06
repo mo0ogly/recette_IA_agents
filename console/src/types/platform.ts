@@ -325,9 +325,27 @@ export type RunStatus =
   | "failed"
   | "stopped";
 
+/**
+ * Passport admission verdict attached to a lane_b launch response (additive).
+ *
+ * `status` is the signed-passport trust outcome; `mode` is the gate mode
+ * (observe records the verdict and admits regardless; enforce denies a
+ * non-trusted agent with a 403 before any RunHandle is returned). `admitted`
+ * folds the two: a trusted agent is always admitted; a non-trusted agent is
+ * admitted ONLY in observe mode. Mirrors recette/platform/admission.py.
+ */
+export interface AdmissionVerdict {
+  status: "trusted" | "untrusted" | "unsigned" | "malformed";
+  mode: "observe" | "enforce";
+  admitted: boolean;
+}
+
 export interface RunHandle {
   run_id: string;
   status: RunStatus;
+  /** Present on lane_b launches from an admission-aware backend; older backends
+   *  and non-lane_b launches omit it. */
+  admission?: AdmissionVerdict;
 }
 
 export interface RunInfo {
