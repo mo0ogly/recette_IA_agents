@@ -369,6 +369,26 @@ Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
   hors projet pour un token de push : SSH + push-option suffisent, aucune elevation
   requise. "push sur les deux git" = `git push origin HEAD` PUIS la MR gitlab ci-dessus.
 
+**R27 Docker Runtime Mandatory (LOI -- fin de la derive bare-host) :** La plateforme
+gouvernee (API :8090 + lab :8082) TOURNE EN DOCKER. Le service compose `api`
+(`python -m recette.api`, image `railgun-recette:runtime`, depend de `lab-mock` +
+`platform-init`) est le runtime de reference : `docker compose up -d api`. Lancer la
+plateforme en process BARE-HOST (`./recette.sh platform up`, `cicd/api.sh start`,
+cgroup non-docker) est une commodite DEV UNIQUEMENT -- JAMAIS la base d'un "done",
+"ca marche", "preuve live", "smoke pass" ou "recette passee". Toute preuve live /
+smoke / demo du plateforme EN MARCHE s'execute DANS le conteneur, sinon elle ne
+compte pas (une preuve bare-host n'exerce pas l'image qui est deployee -- R22). Avant
+d'affirmer une preuve : `docker compose ps` (api Up healthy) OU
+`cat /proc/$(cat .run/api.pid)/cgroup | grep docker`. Un `API-BARE-HOST` = pas une
+preuve Docker ; si tu prouves sur l'hote pour un check dev rapide, l'ecrire
+EXPLICITEMENT ("preuve bare-host, non-Docker"), jamais laisser croire a du Docker
+(R13/R14). Incident 2026-07-06 : toute la preuve live de l'admission passeport a
+tourne bare-host (`bash cicd/api.sh start`) -- derive inadmissible. Gap a fermer :
+recette.sh n'expose PAS de commande montant l'`api` gouvernee en Docker (`docker.sh
+up` ne fait que `discovery-mock`) ; d'ici la, `docker compose up -d api` en direct,
+puis cabler `recette.sh platform up --docker` (concilie R19 + R27). Detail :
+`.claude/rules/docker-runtime-mandatory.md`.
+
 ---
 
 ## REFERENCES RULES
@@ -390,6 +410,7 @@ Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
 | `.claude/rules/no-hardcoded-secrets.md` | R8/R15 |
 | `.claude/rules/secrets-source-of-truth.md` | R18 -- ou vivent les cles (.env + data/backend_secrets.json), ne pas redemander |
 | `.claude/rules/recette-sh-single-entrypoint.md` | R19 -- recette.sh seul lanceur, ne pas hand-launch ni changer de port |
+| `.claude/rules/docker-runtime-mandatory.md` | R27 -- LA plateforme tourne en Docker (compose `api`), bare-host = dev-only, jamais une preuve live |
 | `.claude/rules/no-work-loss-multisession-merge.md` | R21 -- merge multi-session sans perte : status avant switch, snapshot, commit+push, reflog/stash recovery, worktree par session |
 | `.claude/rules/recette-and-test-constraints.md` | R20 -- contraintes recettes+tests : unittest stdlib, determinisme, coverage guard, R16, smoke versionne (pas /tmp) |
 | `.claude/rules/docker-dependency-adequation.md` | R22 -- coherence deps Docker : pyproject/Dockerfile/requirements/env de verif alignes ; extras lourds opt-in hors image, pin a l'API verifiee |
