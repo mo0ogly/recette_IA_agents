@@ -111,8 +111,8 @@ report_status() {
   fi
   if docker_ready; then
     ok "docker: $(docker --version 2>&1 | head -1)"
-    docker image inspect railgun-recette:runtime >/dev/null 2>&1 && ok "image railgun-recette:runtime present" || warn "image railgun-recette:runtime absent"
-    docker image inspect railgun-recette:audit   >/dev/null 2>&1 && ok "image railgun-recette:audit present"   || warn "image railgun-recette:audit absent"
+    docker image inspect ia_agent-recette:runtime >/dev/null 2>&1 && ok "image ia_agent-recette:runtime present" || warn "image ia_agent-recette:runtime absent"
+    docker image inspect ia_agent-recette:audit   >/dev/null 2>&1 && ok "image ia_agent-recette:audit present"   || warn "image ia_agent-recette:audit absent"
   else
     warn "docker (with compose v2) not available"
   fi
@@ -197,7 +197,7 @@ if [ "$DO_DOCKER" -eq 1 ]; then
     # Isolate from any parallel session: unique compose project (so our teardown
     # never touches another run's containers) + ephemeral host port (so we do not
     # fight over :8081). Images are tagged explicitly so the build cache is shared.
-    export COMPOSE_PROJECT_NAME="railgun-recette-$$"
+    export COMPOSE_PROJECT_NAME="ia_agent-recette-$$"
     export DISCOVERY_HOST_PORT=0
     info "Isolated compose project: ${COMPOSE_PROJECT_NAME} (ephemeral host port)."
     if [ ! -f "${REPO_ROOT}/docker-compose.yml" ]; then

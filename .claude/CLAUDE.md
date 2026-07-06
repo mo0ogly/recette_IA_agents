@@ -5,7 +5,7 @@
 
 **Projet:** inspect_ia_agents -- Runtime governance layer pour agents IA (plateforme de recette + discovery d'agents IA)
 **Maintainer:** gabrielhociel@gmail.com
-**Base:** `/home/mo0ogly/Bureau/recette_railgun/`
+**Base:** `/home/mo0ogly/Bureau/recette_ia_agent/`
 **Stack:** Rust (Axum gateway) + Temporal (approvals) + NATS JetStream (event bus) + React/TS (console approbation + audit)
 **Persistance event store:** PHASEE -- Phase 1 SQLite (debut mono-hote) -> Phase 2 PostgreSQL (quand distribue). Trait `EventStore` obligatoire. Detail : `.claude/rules/event-store-decision.md`
 
@@ -371,7 +371,7 @@ Ce repo a DEUX destinations. Procedure figee (verifie 2026-06-25) :
 
 **R27 Docker Runtime Mandatory (LOI -- fin de la derive bare-host) :** La plateforme
 gouvernee (API :8090 + lab :8082) TOURNE EN DOCKER. Le service compose `api`
-(`python -m recette.api`, image `railgun-recette:runtime`, depend de `lab-mock` +
+(`python -m recette.api`, image `ia_agent-recette:runtime`, depend de `lab-mock` +
 `platform-init`) est le runtime de reference : `docker compose up -d api`. Lancer la
 plateforme en process BARE-HOST (`./recette.sh platform up`, `cicd/api.sh start`,
 cgroup non-docker) est une commodite DEV UNIQUEMENT -- JAMAIS la base d'un "done",

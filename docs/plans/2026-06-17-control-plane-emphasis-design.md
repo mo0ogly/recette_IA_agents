@@ -60,7 +60,7 @@ gouvernance, deterministe (pas d'horloge dans le calcul) :
 ## YAGNI (exclu)
 - Pas de graphes temporels / time-series (juste des compteurs courants).
 - Pas de filtres avances (l'audit a deja sa page filtrable).
-- Pas de rename de l'identifiant `railgun-recette` (hors scope, decide avant).
+- Pas de rename de l'identifiant `ia_agent-recette` (hors scope, decide avant).
 
 ## Invariants
 - I1 : lecture seule sur le log (jamais d'ecriture). I2/I6 : le concept MONTRE

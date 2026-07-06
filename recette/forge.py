@@ -117,14 +117,14 @@ class RealForge:
                 from github import Github  # type: ignore
             except ImportError as exc:  # pragma: no cover - depends on optional dep
                 raise RuntimeError(
-                    "RealForge(github) requires PyGithub (pip install 'railgun-recette[real]')"
+                    "RealForge(github) requires PyGithub (pip install 'ia_agent-recette[real]')"
                 ) from exc
             return Github(self._token)
         try:
             import gitlab  # type: ignore
         except ImportError as exc:  # pragma: no cover - depends on optional dep
             raise RuntimeError(
-                "RealForge(gitlab) requires python-gitlab (pip install 'railgun-recette[real]')"
+                "RealForge(gitlab) requires python-gitlab (pip install 'ia_agent-recette[real]')"
             ) from exc
         return gitlab.Gitlab(private_token=self._token)
 

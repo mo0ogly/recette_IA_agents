@@ -232,7 +232,7 @@ def load_maf(path: Path) -> dict:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:  # pragma: no cover - depends on optional extra
             raise ValueError(
-                f"reading {path.name} needs PyYAML (pip install 'railgun-recette[maf]'); "
+                f"reading {path.name} needs PyYAML (pip install 'ia_agent-recette[maf]'); "
                 "or provide the spec as .json"
             ) from exc
         data = yaml.safe_load(text)

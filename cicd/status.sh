@@ -29,9 +29,9 @@ done
 
 hdr "IMAGES DOCKER"
 if command -v docker >/dev/null 2>&1; then
-    docker images --filter reference='railgun-recette:*' \
+    docker images --filter reference='ia_agent-recette:*' \
         --format '  {{.Repository}}:{{.Tag}}  {{.Size}}  {{.CreatedSince}}' \
-        || warn "aucune image railgun-recette"
+        || warn "aucune image ia_agent-recette"
 else
     warn "docker introuvable"
 fi

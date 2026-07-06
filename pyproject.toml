@@ -1,5 +1,5 @@
 [project]
-name = "railgun-recette"
+name = "ia_agent-recette"
 version = "0.1.0"
 description = "Ground-truth test-agent corpus and validation harness for the inspect_ia_agents discovery and identification tools."
 requires-python = ">=3.11"
