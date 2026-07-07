@@ -32,6 +32,7 @@ import type {
 } from "../../types/platform";
 import { isRealAi, isRealTarget } from "../../lib/aiBackend";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import AgentRunModal from "../../components/AgentRunModal";
 import PreciseLaunchModal from "../../components/PreciseLaunchModal";
 import AgentExplainModal from "../../components/AgentExplainModal";
@@ -292,6 +293,7 @@ export default function DashboardPage(): JSX.Element {
       <div className="page-head">
         <h1>Tableau de bord -- agents de recette</h1>
         <PageHelp topic="dashboard" />
+        <AssistButton topic="dashboard.overview" label="Vue d'ensemble du tableau de bord" />
         <button
           type="button"
           className="dash-reset"

@@ -39,6 +39,7 @@ import type {
   SimView,
 } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./sim.css";
 
 const DIMS = ["identity", "capabilities", "policy", "behavior"] as const;
@@ -1036,6 +1037,7 @@ export default function SimPage(): JSX.Element {
       <div className="page-head">
         <h1>Recette red-team : l'outil d'identification attrape-t-il l'anomalie ?</h1>
         <PageHelp topic="redteam" />
+        <AssistButton topic="redteam.summary" label="Synthese red-team" />
       </div>
       <p className="sim-intro">
         Chaque scenario attaque un agent ; on verifie que le verdict attendu est

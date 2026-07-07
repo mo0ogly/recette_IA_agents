@@ -32,6 +32,7 @@ import type {
   RunSummary,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import { LogConsole } from "../../components/LogConsole";
 import { useRunStream } from "../../hooks/useRunStream";
 import AgentRunModal from "../../components/AgentRunModal";
@@ -234,6 +235,7 @@ export default function AgentsPage(): JSX.Element {
       <div className="page-head">
         <h1>Agents</h1>
         <PageHelp topic="agents" />
+        <AssistButton topic="agents.list" label="Agents de recette configures" />
       </div>
 
       <div className="agents-tabs" role="tablist" aria-label="Vue des agents">

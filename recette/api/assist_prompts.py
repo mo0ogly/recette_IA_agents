@@ -98,6 +98,37 @@ _HELP_SYSTEM_DEFAULT = (
     "- Termine par le point d'attention principal pour la recette."
 )
 
+# Per-family additions to the shared help frame, keyed by the first segment
+# of the grounding topic ("agents.detail" -> help.agents). Operator-editable
+# like every other catalog entry.
+_HELP_FAMILY_DEFAULTS = {
+    "help.dashboard": (
+        "Contexte: l'operateur regarde le tableau de bord (agents configures, "
+        "backends IA, campagnes, derniers verdicts). Mets en avant ce qui merite "
+        "une action de recette."
+    ),
+    "help.agents": (
+        "Contexte: l'operateur regarde des agents de recette (role, cible, "
+        "capability_scope, mode IA). Explique ce que l'agent est cense faire et "
+        "ce que sa configuration implique pour la gouvernance."
+    ),
+    "help.campaigns": (
+        "Contexte: l'operateur regarde des campagnes de recette (objectif, "
+        "enseignement, actions et verdicts attendus allow/escalate/deny). "
+        "Explique ce que la campagne prouve."
+    ),
+    "help.verdicts": (
+        "Contexte: l'operateur regarde des verdicts (PASS/FAIL/SKIP par agent, "
+        "checks en echec). Explique ce que les echecs signifient et quoi "
+        "verifier ensuite."
+    ),
+    "help.redteam": (
+        "Contexte: l'operateur regarde la synthese red-team (scenarios, "
+        "distribution OWASP ASI, anomalies detectees). Explique la couverture "
+        "et les trous eventuels."
+    ),
+}
+
 _LEVELS_DEFAULT = {
     "debutant": (
         "L'operateur debute sur la plateforme: definis les termes techniques "
@@ -148,6 +179,28 @@ def default_catalog() -> list[dict[str, Any]]:
             },
             "default": _HELP_SYSTEM_DEFAULT,
         },
+        *[
+            {
+                "id": prompt_id,
+                "kind": "text",
+                "label": f"Aide contextuelle -- famille {prompt_id.split('.', 1)[1]}",
+                "description": (
+                    "Complement de contexte ajoute au cadre commun pour les "
+                    f"topics {prompt_id.split('.', 1)[1]}.*"
+                ),
+                "localisation": {
+                    "view": f"/{prompt_id.split('.', 1)[1]}"
+                    if prompt_id != "help.redteam"
+                    else "/sim",
+                    "trigger": "Cliquer un bouton IA de cette famille",
+                    "endpoint": "POST /assist/help",
+                    "component": "AssistButton",
+                    "loc": f"assist-{prompt_id.split('.', 1)[1]}",
+                },
+                "default": default,
+            }
+            for prompt_id, default in _HELP_FAMILY_DEFAULTS.items()
+        ],
         {
             "id": "help.levels",
             "kind": "json",

@@ -265,6 +265,45 @@
   background-color: var(--color-surface);
 }
 
+/* Contextual AI help button, styled like the .help-trigger it sits next to
+ * but accent-tinted so "ask the copilot" reads distinct from "read the doc". */
+.assist-help-btn {
+  font-size: 0.78rem;
+  font-weight: 650;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.assist-help-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* "Localiser dans l'UI" flash (Prompts IA page): brief accent pulse. */
+.assist-locate-flash {
+  animation: assist-locate 1.2s ease-in-out 2;
+}
+
+@keyframes assist-locate {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--color-accent-soft), 0 0 0 5px var(--color-accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assist-locate-flash {
+    animation: none;
+    outline: 2px solid var(--color-accent);
+  }
+}
+
 /* Operator console is a desktop tool; on narrow viewports the dock yields
  * the full width to the page (mobile treatment tracked in the backlog). */
 @media (max-width: 900px) {

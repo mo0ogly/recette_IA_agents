@@ -35,6 +35,7 @@ import type {
   VerdictSubmissionRequest,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
 import { useAuditTail } from "../../hooks/useAuditTail";
 import "./verdicts.css";
@@ -284,6 +285,7 @@ export default function VerdictsPage(): JSX.Element {
       <div className="page-head">
         <h1>Verdicts</h1>
         <PageHelp topic="verdicts" />
+        <AssistButton topic="verdicts.recent" label="Derniers verdicts" />
       </div>
 
       {error !== null && (

@@ -44,13 +44,14 @@ export interface AssistSessionMemory {
   insights: AssistInsight[];
 }
 
-/** POST /assist/help response (insight is also appended to the journal). */
+/** POST /assist/help response. insight is null on source "error" (nothing
+ *  is journaled for a failed call); otherwise it is the journaled entry. */
 export interface AssistHelpResponse {
   answer: string;
   source: AssistSource;
   model: string | null;
   error: string | null;
-  insight: AssistInsight;
+  insight: AssistInsight | null;
 }
 
 /** Where a prompt is used in the UI ("Localiser dans l'UI" support). */

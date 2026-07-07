@@ -70,6 +70,12 @@ export function useAssist(): AssistContextValue {
   return value;
 }
 
+/** Nullable variant for optional consumers (AssistButton renders nothing
+ *  outside the provider, so pages stay testable standalone). */
+export function useAssistOptional(): AssistContextValue | null {
+  return useContext(AssistContext);
+}
+
 export default function AssistProvider({ children }: { children: ReactNode }): JSX.Element {
   const [sessionId] = useState<string>(loadSessionId);
   const [backendId, setBackendIdState] = useState<string>(
@@ -149,7 +155,11 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
           label,
           params,
         });
-        setInsights((current) => [...current, response.insight]);
+        if (response.insight !== null) {
+          setInsights((current) => [...current, response.insight!]);
+        } else if (response.source === "error" && response.error !== null) {
+          setLastError(response.error);
+        }
       } catch (error) {
         setLastError(error instanceof Error ? error.message : String(error));
       } finally {

@@ -44,6 +44,7 @@ import type {
   RunSummary,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import { LogConsole } from "../../components/LogConsole";
 import type { LogLine } from "../../components/LogConsole";
 import AgentRunModal from "../../components/AgentRunModal";
@@ -325,6 +326,7 @@ export default function CampaignsPage(): JSX.Element {
       <div className="page-head">
         <h1>Campagnes</h1>
         <PageHelp topic="campaigns" />
+        <AssistButton topic="campaigns.list" label="Catalogue des campagnes" />
       </div>
 
       {error !== null && (
