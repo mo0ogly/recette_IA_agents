@@ -1,0 +1,23 @@
+{
+  "categories": [
+    {
+      "category": "skynet",
+      "groups": [
+        {
+          "group_id": "megacamp-demo",
+          "eurodate": "2026-06-25T14-30-00",
+          "label": "megacamp demo",
+          "status": "open",
+          "runs": [
+            {
+              "id": "agents-fleet",
+              "kind": "agents",
+              "eurodate": "2026-06-25T14-30-00",
+              "status": "sealed"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

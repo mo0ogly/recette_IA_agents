@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "id": "agents-fleet",
+    "kind": "agents",
+    "eurodate": "2026-06-25T14-30-00",
+    "parent_group": "megacamp-demo",
+    "status": "sealed",
+    "artifacts": [
+      {
+        "file": "agents.jsonl",
+        "sha256": "6f50dfb15d264c54f330a56ad512b3d0f32379ffaf2fc8935bebf3e1c1f4b7b3"
+      }
+    ],
+    "root_hash": "053a57987da415a80bc1369dff9d2d58e9ba4d99c8d1f4614af7f0ddaaaf5f82",
+    "replay_of": null
+  },
+  "annotations": {
+    "tags": [],
+    "comment": "",
+    "label": "",
+    "retention": "keep"
+  },
+  "artifacts": [
+    "agents.jsonl"
+  ]
+}
