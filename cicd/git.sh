@@ -56,6 +56,16 @@ git_branches() {
     g branch -vv
 }
 
+# push-gitlab: clean GitLab mirror. The scrubber lives in a separate file that
+# excludes itself from the mirror (it is the only file that must spell out the
+# internal-tooling tokens). See cicd/gitlab-mirror.sh.
+_load_gitlab_mirror() {
+    local f="${CICD_DIR}/gitlab-mirror.sh"
+    [ -f "${f}" ] || { err "cicd/gitlab-mirror.sh introuvable"; return 1; }
+    # shellcheck disable=SC1090
+    . "${f}"
+}
+
 git_clean_merged() {
     hdr "Branches mergees dans main (hors main)"
     local merged
@@ -80,9 +90,10 @@ case "${action}" in
     status)       git_status ;;
     pull)         git_pull ;;
     push)         git_push ;;
+    push-gitlab)  shift; _load_gitlab_mirror && git_push_gitlab "$@" ;;
     sync)         git_sync ;;
     branches)     git_branches ;;
     clean-merged) git_clean_merged ;;
     *) err "action inconnue: ${action}"; \
-       echo "  status|pull|push|sync|branches|clean-merged"; exit 1 ;;
+       echo "  status|pull|push|push-gitlab|sync|branches|clean-merged"; exit 1 ;;
 esac
