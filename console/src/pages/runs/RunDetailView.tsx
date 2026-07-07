@@ -10,6 +10,7 @@
 
 import { lazy, Suspense } from "react";
 import type { RunDetail, ReplayResult } from "../../api/client";
+import AssistButton from "../../components/assist/AssistButton";
 
 const MonacoJsonViewer = lazy(() => import("../../components/MonacoJsonViewer"));
 
@@ -94,6 +95,11 @@ export default function RunDetailView({
         </span>
         <span className="runs-detail-kind">{detail.meta.kind}</span>
         <span className="runs-detail-status">{detail.meta.status}</span>
+        <AssistButton
+          topic="runs.run"
+          label={`Detail du run ${detail.meta.id}`}
+          params={{ run_id: detail.meta.id }}
+        />
         <button
           type="button"
           className="runs-delete-btn"

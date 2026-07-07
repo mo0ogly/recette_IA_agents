@@ -72,6 +72,36 @@ describe("AssistProvider", () => {
     expect(ctx.latest().backendId).toBe("skynet-gpt-oss-120b");
   });
 
+  it("persists the level and sends it to help", async () => {
+    const helpResponse: AssistHelpResponse = {
+      answer: "reponse",
+      source: "llm",
+      model: "m",
+      error: null,
+      insight: {
+        id: "i-1",
+        topic: "dashboard.overview",
+        label: "Vue",
+        answer: "reponse",
+        model: "m",
+        created_at: "2026-07-07T08:00:00Z",
+      },
+    };
+    vi.mocked(postAssistHelp).mockResolvedValue(helpResponse);
+    const ctx = renderProvider();
+    // Default is debutant.
+    expect(ctx.latest().level).toBe("debutant");
+    act(() => {
+      ctx.latest().setBackendId("b1");
+      ctx.latest().setLevel("expert");
+    });
+    expect(window.localStorage.getItem("assist.level")).toBe("expert");
+    await act(async () => {
+      await ctx.latest().askHelp("dashboard.overview", "Vue");
+    });
+    expect(vi.mocked(postAssistHelp).mock.calls[0][0].level).toBe("expert");
+  });
+
   it("consolidates a help answer into the insights journal", async () => {
     const helpResponse: AssistHelpResponse = {
       answer: "Le dashboard resume l'etat de la plateforme.",

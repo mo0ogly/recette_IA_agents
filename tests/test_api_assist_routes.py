@@ -15,6 +15,7 @@ try:
     from fastapi.testclient import TestClient
 
     from recette.api.app import create_app
+    from recette.api.assist_sessions import AssistSessionStore
     from recette.api.config_store import ConfigStore
     from recette.api.prompt_store import PromptStore
     from recette.api.recette_campaigns import RecetteCampaignCatalog
@@ -41,12 +42,14 @@ class AssistRoutesBase(unittest.TestCase):
         campaigns_dir = root / "campaigns"
         campaigns_dir.mkdir()
         self.campaigns_dir = campaigns_dir
+        self.sessions_path = root / "sessions.runtime.json"
         self.app = create_app(
             config_store=self.config_store,
             secret_store=self.secret_store,
             prompt_store=self.prompt_store,
             verdict_store=self.verdict_store,
             recette_campaign_catalog=RecetteCampaignCatalog(campaigns_dir),
+            assist_sessions=AssistSessionStore(path=self.sessions_path),
         )
         self.client = TestClient(self.app)
 
@@ -448,6 +451,30 @@ class TestAssistGrounding(AssistRoutesBase):
         assert grounding is not None
         self.assertIn('"found": false', grounding)
         self.assertIsNone(ground_topic(self.app.state, "no.such.topic", {}))
+        # Detail topics report not-found the same way (never a crash).
+        for topic, param in (("runs.run", "run_id"), ("proxy.trace", "trace_id")):
+            grounding = ground_topic(self.app.state, topic, {param: "ghost"})
+            assert grounding is not None
+            self.assertIn('"found": false', grounding)
+
+    def test_runs_run_grounds_a_sealed_run(self) -> None:
+        from recette.api.assist_grounding import ground_topic
+        from recette.runs.registry import RunRegistry
+
+        registry = RunRegistry(Path(self.tmp.name) / "runs")
+        group = registry.new_group(
+            category="agents", group_id="g1", eurodate="2026-07-07T10-00-00", label="g"
+        )
+        run = registry.new_run(
+            group=group, run_id="r-1", kind="agents", eurodate="2026-07-07T10-00-01"
+        )
+        registry.write_artifact(run, "agents.jsonl", "{}\n")
+        registry.seal(run)
+        self.app.state.runs_registry = registry
+        grounding = ground_topic(self.app.state, "runs.run", {"run_id": "r-1"})
+        assert grounding is not None
+        self.assertIn('"found": true', grounding)
+        self.assertIn("agents.jsonl", grounding)
 
 
 class TestAssistSessions(AssistRoutesBase):
@@ -488,6 +515,55 @@ class TestAssistSessions(AssistRoutesBase):
             self.assertIn("topic", entry)
             self.assertIn("label", entry)
             self.assertIsInstance(entry["params"], list)
+
+
+class TestAssistSessionPersistence(AssistRoutesBase):
+    def test_sessions_survive_an_api_restart(self) -> None:
+        self._add_backend()
+        self.app.state.llm_factory = self._stub_factory(["reponse un"])
+        self.client.post(
+            "/assist/chat", json={"session_id": "s-1", "backend_id": "b1", "message": "salut"}
+        )
+        self.assertTrue(self.sessions_path.exists())
+        # A NEW app over the same sidecar (restart) rehydrates the memory.
+        app2 = create_app(
+            config_store=self.config_store,
+            secret_store=self.secret_store,
+            prompt_store=self.prompt_store,
+            assist_sessions=AssistSessionStore(path=self.sessions_path),
+        )
+        client2 = TestClient(app2)
+        memory = client2.get("/assist/sessions/s-1").json()
+        self.assertEqual(len(memory["thread"]), 2)
+        self.assertEqual(memory["thread"][0]["content"], "salut")
+        # Message ids keep counting after the restart (no duplicate m-1).
+        app2.state.llm_factory = self._stub_factory(["reponse deux"])
+        body = client2.post(
+            "/assist/chat", json={"session_id": "s-1", "backend_id": "b1", "message": "suite"}
+        ).json()
+        ids = [m["id"] for m in body["thread"]]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_clear_persists_the_forgetting(self) -> None:
+        self._add_backend()
+        self.app.state.llm_factory = self._stub_factory(["ok"])
+        self.client.post(
+            "/assist/chat", json={"session_id": "s-1", "backend_id": "b1", "message": "salut"}
+        )
+        self.client.delete("/assist/sessions/s-1")
+        app2 = create_app(
+            config_store=self.config_store,
+            secret_store=self.secret_store,
+            prompt_store=self.prompt_store,
+            assist_sessions=AssistSessionStore(path=self.sessions_path),
+        )
+        memory = TestClient(app2).get("/assist/sessions/s-1").json()
+        self.assertEqual(memory["thread"], [])
+
+    def test_corrupt_sidecar_reads_as_empty(self) -> None:
+        self.sessions_path.write_text("{broken", encoding="utf-8")
+        memory = self.client.get("/assist/sessions/s-1").json()
+        self.assertEqual(memory, {"thread": [], "insights": []})
 
 
 class TestAssistSessionStoreBounds(unittest.TestCase):

@@ -252,6 +252,47 @@ def _topic_ai_backends_list(state: Any, params: dict[str, str]) -> dict[str, Any
     }
 
 
+def _topic_runs_run(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    from ..runs.registry import RunRegistry
+
+    registry = getattr(state, "runs_registry", None) or RunRegistry()
+    run_id = params["run_id"]
+    try:
+        run = registry.read_run(run_id)
+    except KeyError:
+        return {"run_id": run_id, "found": False}
+    meta = run.get("meta") or {}
+    annotations = run.get("annotations") or {}
+    return {
+        "found": True,
+        "id": meta.get("id"),
+        "kind": meta.get("kind"),
+        "eurodate": meta.get("eurodate"),
+        "status": meta.get("status"),
+        "parent_group": meta.get("parent_group"),
+        "artifacts": [a.get("file") for a in (meta.get("artifacts") or [])[:MAX_LIST_ITEMS]],
+        "tags": annotations.get("tags"),
+        "label": annotations.get("label"),
+    }
+
+
+def _topic_proxy_trace(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    wanted = params["trace_id"]
+    for trace in reversed(state.proxy_store.snapshot_traces()):
+        if trace.event_id == wanted or str(trace.seq) == wanted:
+            return {
+                "found": True,
+                "event_id": trace.event_id,
+                "agent_id": trace.agent_id,
+                "target_system": trace.target_system,
+                "target": trace.target,
+                "action_type": trace.action_type,
+                "resource": trace.resource,
+                "ok": trace.ok,
+            }
+    return {"trace_id": wanted, "found": False}
+
+
 def _topic_audit_recent(state: Any, params: dict[str, str]) -> dict[str, Any]:
     events = state.event_store.read_from(0)
     kinds: dict[str, int] = {}
@@ -337,6 +378,16 @@ TOPICS: dict[str, dict[str, Any]] = {
         "label": "Journal d'audit recent",
         "params": [],
         "ground": _topic_audit_recent,
+    },
+    "runs.run": {
+        "label": "Detail d'un run",
+        "params": ["run_id"],
+        "ground": _topic_runs_run,
+    },
+    "proxy.trace": {
+        "label": "Detail d'une trace proxy",
+        "params": ["trace_id"],
+        "ground": _topic_proxy_trace,
     },
 }
 

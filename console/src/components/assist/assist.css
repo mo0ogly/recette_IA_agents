@@ -77,6 +77,50 @@
   max-width: 100%;
 }
 
+.assist-level-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.85rem 0.5rem;
+}
+
+.assist-level-toggle {
+  display: flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.assist-level-btn {
+  border: none;
+  border-radius: 0;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  background-color: var(--color-surface);
+}
+
+.assist-level-btn[data-active="true"] {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.assist-journal-filter {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.assist-journal-filter:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 .assist-tabs {
   display: flex;
   gap: 0.25rem;

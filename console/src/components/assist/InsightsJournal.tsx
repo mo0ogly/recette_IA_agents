@@ -4,6 +4,8 @@
  * operator clicks an AI help button somewhere in the console.
  */
 
+import { useMemo, useState } from "react";
+
 import type { AssistInsight } from "../../types/assist";
 
 export default function InsightsJournal({
@@ -11,6 +13,22 @@ export default function InsightsJournal({
 }: {
   insights: AssistInsight[];
 }): JSX.Element {
+  const [filter, setFilter] = useState("");
+
+  const newestFirst = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    const ordered = [...insights].reverse();
+    if (needle.length === 0) {
+      return ordered;
+    }
+    return ordered.filter(
+      (i) =>
+        i.label.toLowerCase().includes(needle) ||
+        i.topic.toLowerCase().includes(needle) ||
+        i.answer.toLowerCase().includes(needle),
+    );
+  }, [insights, filter]);
+
   if (insights.length === 0) {
     return (
       <div className="assist-empty" data-testid="assist-journal-empty">
@@ -20,9 +38,21 @@ export default function InsightsJournal({
     );
   }
 
-  const newestFirst = [...insights].reverse();
   return (
     <div className="assist-journal" data-testid="assist-journal">
+      <input
+        type="search"
+        className="assist-journal-filter"
+        placeholder="Filtrer le journal..."
+        value={filter}
+        onChange={(event) => setFilter(event.target.value)}
+        aria-label="Filtrer le journal"
+      />
+      {newestFirst.length === 0 ? (
+        <div className="assist-empty" data-testid="assist-journal-nomatch">
+          Aucune entree ne correspond a &quot;{filter}&quot;.
+        </div>
+      ) : null}
       {newestFirst.map((insight) => (
         <article key={insight.id} className="assist-insight">
           <header className="assist-insight-head">

@@ -47,7 +47,7 @@ from ..platform.realtime import (
 )
 from ..platform.scheduler import ScheduledTask, build_scheduler_from_env
 from ..rag_store import KnowledgeBaseStore
-from .assist_sessions import AssistSessionStore
+from .assist_sessions import AssistSessionStore, default_sessions_path
 from .auth import AuthError, decode_token, principal_from_claims
 from .campaign_store import CampaignStore, RecordingStore
 from .capture_store import CaptureStore
@@ -246,6 +246,7 @@ def create_app(
     verdict_store: VerdictStore | None = None,
     secret_store: BackendSecretStore | None = None,
     prompt_store: PromptStore | None = None,
+    assist_sessions: AssistSessionStore | None = None,
     realtime_transport: RealtimeTransport | None = None,
     proxy_db_path: str | None = None,
     passport_enforce: bool | None = None,
@@ -286,10 +287,15 @@ def create_app(
     app.state.secret_store = secret_store if secret_store is not None else BackendSecretStore()
     app.state.run_manager = RunManager()
     app.state.server_manager = ServerManager()
-    # Assist copilot state: prompt overrides (gitignored JSON) + in-memory
-    # per-session chat/insights registry. Diagnostic path, I4 N/A.
+    # Assist copilot state: prompt overrides (gitignored JSON) + the
+    # per-session chat/insights registry persisted to a gitignored runtime
+    # sidecar (survives API restarts). Diagnostic path, I4 N/A.
     app.state.prompt_store = prompt_store if prompt_store is not None else PromptStore()
-    app.state.assist_sessions = AssistSessionStore()
+    app.state.assist_sessions = (
+        assist_sessions
+        if assist_sessions is not None
+        else AssistSessionStore(path=default_sessions_path())
+    )
     # Connectivity-probe factory; tests override it with a stub (no key/network).
     app.state.llm_factory = build_llm
 

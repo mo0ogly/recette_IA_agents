@@ -25,6 +25,9 @@ import type { AssistInsight, AssistMessage } from "../../types/assist";
 
 const SESSION_KEY = "assist.session.id";
 const BACKEND_KEY = "assist.backend.id";
+const LEVEL_KEY = "assist.level";
+
+export type AssistLevel = "debutant" | "expert";
 
 function mintSessionId(): string {
   const uuid =
@@ -48,6 +51,8 @@ export interface AssistContextValue {
   sessionId: string;
   backendId: string;
   setBackendId: (id: string) => void;
+  level: AssistLevel;
+  setLevel: (level: AssistLevel) => void;
   thread: AssistMessage[];
   insights: AssistInsight[];
   chatBusy: boolean;
@@ -81,6 +86,9 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
   const [backendId, setBackendIdState] = useState<string>(
     () => window.localStorage.getItem(BACKEND_KEY) ?? "",
   );
+  const [level, setLevelState] = useState<AssistLevel>(
+    () => (window.localStorage.getItem(LEVEL_KEY) === "expert" ? "expert" : "debutant"),
+  );
   const [thread, setThread] = useState<AssistMessage[]>([]);
   const [insights, setInsights] = useState<AssistInsight[]>([]);
   const [chatBusy, setChatBusy] = useState(false);
@@ -111,6 +119,11 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
   const setBackendId = useCallback((id: string) => {
     setBackendIdState(id);
     window.localStorage.setItem(BACKEND_KEY, id);
+  }, []);
+
+  const setLevel = useCallback((next: AssistLevel) => {
+    setLevelState(next);
+    window.localStorage.setItem(LEVEL_KEY, next);
   }, []);
 
   const sendChat = useCallback(
@@ -154,6 +167,7 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
           topic,
           label,
           params,
+          level,
         });
         if (response.insight !== null) {
           setInsights((current) => [...current, response.insight!]);
@@ -170,7 +184,7 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
         });
       }
     },
-    [backendId, sessionId],
+    [backendId, sessionId, level],
   );
 
   const clearSession = useCallback(async () => {
@@ -189,6 +203,8 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
       sessionId,
       backendId,
       setBackendId,
+      level,
+      setLevel,
       thread,
       insights,
       chatBusy,
@@ -202,6 +218,8 @@ export default function AssistProvider({ children }: { children: ReactNode }): J
       sessionId,
       backendId,
       setBackendId,
+      level,
+      setLevel,
       thread,
       insights,
       chatBusy,

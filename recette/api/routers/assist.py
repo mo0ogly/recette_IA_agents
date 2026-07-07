@@ -115,7 +115,9 @@ def get_session(request: Request, session_id: str) -> dict:
 @router.delete("/sessions/{session_id}", status_code=204)
 def clear_session(request: Request, session_id: str) -> Response:
     """Forget one session's chat thread + journal. Idempotent."""
-    _sessions(request).clear(session_id)
+    store = _sessions(request)
+    store.clear(session_id)
+    store.persist()
     return Response(status_code=204)
 
 
@@ -197,6 +199,7 @@ def chat(request: Request, body: dict[str, Any]) -> dict:
         source=source,
         model=model if source == "llm" else None,
     )
+    _sessions(request).persist()
     return {
         "reply": reply,
         "source": source,
@@ -261,6 +264,7 @@ def contextual_help(request: Request, body: dict[str, Any]) -> dict:
     insight = None
     if source == "llm":
         insight = session.add_insight(topic=topic, label=label_text, answer=answer, model=model)
+        _sessions(request).persist()
     return {
         "answer": answer,
         "source": source,

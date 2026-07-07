@@ -41,6 +41,7 @@ import { clearProxyTraces, getProxyTracesDelta, setProxyDebug } from "../../api/
 import { VirtualList } from "../../components/VirtualList";
 import type { ProxyTrace } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
+import AssistButton from "../../components/assist/AssistButton";
 import { downloadFile } from "./proxyExport";
 import {
   distinctValues,
@@ -279,6 +280,13 @@ export default function AppTracesPanel({ onStatus, paused }: SourcePanelProps): 
         <span className="proxy-summary">
           {items.length} trace(s), {fails} echec(s)
         </span>
+        {selectedSeq !== null ? (
+          <AssistButton
+            topic="proxy.trace"
+            label={`Detail de la trace #${selectedSeq}`}
+            params={{ trace_id: String(selectedSeq) }}
+          />
+        ) : null}
         <span className="proxy-mode" role="group" aria-label="viewer mode">
           <button
             type="button"

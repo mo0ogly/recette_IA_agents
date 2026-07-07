@@ -137,6 +137,28 @@ export default function AssistDock(): JSX.Element {
         </div>
       ) : null}
 
+      <div className="assist-level-row" role="group" aria-label="Niveau des explications">
+        <span className="assist-backend-label">Niveau</span>
+        <div className="assist-level-toggle">
+          <button
+            type="button"
+            className="assist-level-btn"
+            data-active={assist.level === "debutant"}
+            onClick={() => assist.setLevel("debutant")}
+          >
+            Debutant
+          </button>
+          <button
+            type="button"
+            className="assist-level-btn"
+            data-active={assist.level === "expert"}
+            onClick={() => assist.setLevel("expert")}
+          >
+            Expert
+          </button>
+        </div>
+      </div>
+
       <nav className="assist-tabs" aria-label="Sections du copilote">
         <button
           type="button"

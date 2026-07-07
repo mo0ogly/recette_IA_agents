@@ -522,6 +522,66 @@ def _verify_agent_ui(page: Page, console: str) -> None:
     _shot(page, "agent-wizard-dryrun")
 
 
+def _verify_assist_copilot(page: Page, console: str, api: str) -> None:
+    # The Copilote IA cockpit, deterministic path (no real key needed):
+    # 1) the Prompts IA page edits chat.system, the API serves the override
+    #    hot, then resets it -- pure CRUD, no LLM call.
+    # 2) the left dock sends a chat through the seeded keyless backend, which
+    #    fails deterministically -> a source:error turn renders in place
+    #    (fail-safe wiring, never a stuck spinner or a crash).
+    mark = "SMOKE-COPILOTE: reponds toujours en francais."
+    page.goto(f"{console}/ia-prompts", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    row = page.locator("tr", has=page.get_by_text("chat.system", exact=True)).first
+    row.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    row.get_by_role("button", name="Modifier").click()
+    dialog = page.get_by_role("dialog")
+    dialog.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    editor = dialog.locator(".monaco-editor").first
+    editor.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    editor.click()
+    page.keyboard.press("Control+a")
+    page.keyboard.type(mark)
+    dialog.get_by_role("button", name="Enregistrer").click()
+    page.get_by_text("modifie").first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    status, body = _api("GET", f"{api}/assist/prompts")
+    _expect(status == 200, f"GET /assist/prompts -> {status}")
+    entry = next(p for p in body["prompts"] if p["id"] == "chat.system")  # type: ignore[index]
+    _expect(
+        entry["overridden"] and mark in str(entry["value"]),
+        "prompt override not hot-served by the API",
+    )
+    print("[assist] /ia-prompts: chat.system override saved + hot-served by the API")
+    page.locator("tr", has=page.get_by_text("chat.system", exact=True)).first.get_by_role(
+        "button", name="Reinitialiser"
+    ).click()
+    page.wait_for_timeout(500)
+    _, body = _api("GET", f"{api}/assist/prompts")
+    entry = next(p for p in body["prompts"] if p["id"] == "chat.system")  # type: ignore[index]
+    _expect(not entry["overridden"], "prompt override not reset to default")
+
+    # The dock chat: a terminal assistant turn through the seeded backend. The
+    # outcome is not asserted llm/error (a GROQ_API_KEY in the env would make it
+    # answer; without one it fails deterministically) -- what matters is the
+    # fail-safe wiring: the turn always reaches a terminal source, never a
+    # stuck spinner, same stance as the /ai-backends probe.
+    page.goto(f"{console}/dashboard", wait_until="networkidle", timeout=UI_TIMEOUT_MS)
+    dock = page.get_by_test_id("assist-dock")
+    dock.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    if dock.get_attribute("data-open") == "false":
+        page.get_by_role("button", name="Ouvrir le Copilote IA").click()
+    page.locator("#assist-backend-select").select_option(AI_BACKEND_ID)
+    page.locator(".assist-input").fill("Explique la plateforme en une phrase.")
+    page.get_by_role("button", name="Envoyer").click()
+    turn = page.locator(
+        '.assist-msg-assistant[data-source="llm"], .assist-msg-assistant[data-source="error"]'
+    )
+    turn.first.wait_for(state="visible", timeout=UI_TIMEOUT_MS)
+    source = turn.first.get_attribute("data-source")
+    _expect(source in ("llm", "error"), f"chat turn not terminal (got {source!r})")
+    _shot(page, "assist-copilote")
+    print(f"[assist] dock chat: seeded backend -> terminal source {source!r} turn rendered")
+
+
 def _verify_help_modals(page: Page, console: str) -> None:
     # Every top-level page exposes a "? Aide" modal; /probe and /observability
     # were missing one. Assert each opens, shows its topic, and -- for /probe --
@@ -854,6 +914,9 @@ def run_smoke(console: str, api: str, server_port: int) -> None:
             # New agent-creation UX: the wizard + executing dry-run, and the
             # previously-missing help modals on /probe and /observability.
             _verify_agent_ui(page, console)
+            # The Copilote IA cockpit: Prompts IA override hot-reload + the
+            # left dock's fail-safe chat (keyless backend -> source:error).
+            _verify_assist_copilot(page, console, api)
             _verify_help_modals(page, console)
             # The /probe agent-inventory panel: static-scan passports + comm graph.
             _verify_probe_inventory(page, console)
