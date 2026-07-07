@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getAgentRegistry } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type { AgentRegistry, RegistryAgent } from "../../types/platform";
 import "./agent-registry.css";
 
@@ -36,6 +37,7 @@ export default function AgentRegistryPage(): JSX.Element {
       <div className="page-head">
         <h1>Agent registry</h1>
         <PageHelp topic="agent_registry" />
+        <AssistButton topic="agents.list" label="Agents connus" />
       </div>
       <p className="registry-note">
         Registre <strong>genere</strong> des sujets du corpus (jamais ecrit a la main) : identite,

@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import { getMetricsSummary } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type { MetricGroup, MetricsSummary } from "../../types/platform";
 import "./metrics.css";
 
@@ -92,6 +93,7 @@ export default function MetricsPage(): JSX.Element {
       <div className="page-head">
         <h1>Metriques</h1>
         <PageHelp topic="metrics" />
+        <AssistButton topic="metrics.summary" label="Synthese des metriques" />
       </div>
       <p className="metrics-note">
         Metriques operationnelles sur les traces LLM <strong>capturees</strong> (surface hook,

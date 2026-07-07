@@ -23,6 +23,7 @@ import type {
   PolicyVerdict,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./catalog.css";
 
 const VERDICTS: PolicyVerdict[] = ["allow", "deny", "escalate"];
@@ -299,6 +300,7 @@ export default function CatalogPage(): JSX.Element {
       <div className="page-head">
         <h1>Catalog and policy</h1>
         <PageHelp topic="catalog" />
+        <AssistButton topic="catalog.overview" label="Catalogue d'actions" />
       </div>
 
       {error !== null && (

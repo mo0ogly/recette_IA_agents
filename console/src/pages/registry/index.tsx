@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
+import AssistButton from "../../components/assist/AssistButton";
 import { getCatalogRustSummary, getCatalogSummary } from "../../api/client";
 import type { CatalogRustSummary, CatalogSummary } from "../../types/platform";
 import RegistryAgentCard from "./RegistryAgentCard";
@@ -51,7 +52,10 @@ export default function RegistryPage(): JSX.Element {
 
   return (
     <section className="registry-page">
-      <h1>Catalogue</h1>
+      <div className="page-head">
+        <h1>Catalogue</h1>
+        <AssistButton topic="agents.list" label="Catalogue d'agents" />
+      </div>
       <p className="registry-note">
         Le registre des agents publies au catalogue : ce que chaque agent declare
         (nom, version, editeur, tags, nombre d&apos;outils). Un agent sans outil

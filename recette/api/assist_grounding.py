@@ -316,6 +316,99 @@ def _topic_audit_recent(state: Any, params: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def _topic_servers_list(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    servers = state.config_store.read().get("servers", [])
+    manager = getattr(state, "server_manager", None)
+    out = []
+    for s in servers[:MAX_LIST_ITEMS]:
+        entry = {
+            "id": s.get("id"),
+            "system": s.get("system"),
+            "mode": s.get("mode"),
+            "port": s.get("port"),
+        }
+        if manager is not None:
+            try:
+                entry["status"] = manager.status(str(s.get("id")))
+            except Exception:  # noqa: BLE001 -- status is best-effort context
+                entry["status"] = "unknown"
+        out.append(entry)
+    return {"count": len(servers), "servers": out}
+
+
+def _topic_catalog_overview(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    catalog = getattr(state, "catalog", None)
+    policy = getattr(state, "policy_store", None)
+    actions = list(catalog.all()) if catalog is not None else []
+    systems: dict[str, int] = {}
+    for spec in actions:
+        target = str(getattr(spec, "target_system", "unknown"))
+        systems[target] = systems.get(target, 0) + 1
+    active_version = None
+    if policy is not None:
+        try:
+            active_version = policy.active_version_id()
+        except Exception:  # noqa: BLE001 -- policy read is best-effort context
+            active_version = None
+    return {
+        "action_count": len(actions),
+        "systems": dict(sorted(systems.items())),
+        "active_policy_version": active_version,
+    }
+
+
+def _topic_control_status(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    cfg = state.config_store
+    data = cfg.read()
+    containment = False
+    try:
+        containment = cfg.containment_enabled()
+    except Exception:  # noqa: BLE001 -- best-effort context
+        containment = False
+    return {
+        "containment_enabled": containment,
+        "agents_configured": len(data.get("agents", [])),
+        "target_servers": len(data.get("servers", [])),
+        "ai_backends": len(data.get("ai_backends", [])),
+    }
+
+
+def _topic_metrics_summary(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    events = state.event_store.read_from(0)
+    kinds: dict[str, int] = {}
+    verdicts: dict[str, int] = {}
+    for event in events:
+        kinds[str(getattr(event, "kind", "unknown"))] = (
+            kinds.get(str(getattr(event, "kind", "unknown")), 0) + 1
+        )
+        verdict = getattr(event, "verdict", None)
+        if verdict:
+            verdicts[str(verdict)] = verdicts.get(str(verdict), 0) + 1
+    return {
+        "event_count": len(events),
+        "event_kinds": dict(sorted(kinds.items())),
+        "verdict_distribution": dict(sorted(verdicts.items())),
+    }
+
+
+def _topic_approvals_pending(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    from ..platform.approvals.service import ApprovalService
+
+    pending = ApprovalService(state.event_store).pending()
+    items = []
+    for p in pending[:MAX_LIST_ITEMS]:
+        record = p.to_dict() if hasattr(p, "to_dict") else {}
+        items.append(
+            {
+                "agent_id": record.get("agent_id"),
+                "action_type": record.get("action_type"),
+                "target_system": record.get("target_system"),
+                "risk_score": record.get("risk_score"),
+            }
+        )
+    return {"pending_count": len(pending), "pending": items}
+
+
 # topic key -> (label fr, required params, grounding fn). The label feeds
 # GET /assist/topics (the console introspection + the Prompts IA page table).
 TOPICS: dict[str, dict[str, Any]] = {
@@ -388,6 +481,31 @@ TOPICS: dict[str, dict[str, Any]] = {
         "label": "Detail d'une trace proxy",
         "params": ["trace_id"],
         "ground": _topic_proxy_trace,
+    },
+    "servers.list": {
+        "label": "Serveurs cibles configures",
+        "params": [],
+        "ground": _topic_servers_list,
+    },
+    "catalog.overview": {
+        "label": "Catalogue d'actions + politique active",
+        "params": [],
+        "ground": _topic_catalog_overview,
+    },
+    "control.status": {
+        "label": "Etat du plan de controle",
+        "params": [],
+        "ground": _topic_control_status,
+    },
+    "metrics.summary": {
+        "label": "Synthese des metriques",
+        "params": [],
+        "ground": _topic_metrics_summary,
+    },
+    "approvals.pending": {
+        "label": "Approbations en attente",
+        "params": [],
+        "ground": _topic_approvals_pending,
     },
 }
 

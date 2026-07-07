@@ -12,6 +12,7 @@ import { launchRunner } from "../../api/client";
 import { useRunStream } from "../../hooks/useRunStream";
 import type { RunFrame } from "../../hooks/useRunStream";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./recette.css";
 
 interface ScorecardData {
@@ -49,6 +50,7 @@ export default function RecettePage(): JSX.Element {
       <div className="page-head">
         <h1>Recette -- discovery &amp; identification</h1>
         <PageHelp topic="recette" />
+        <AssistButton topic="verdicts.recent" label="Recette d'identification" />
       </div>
 
       <div className="recette-grid">

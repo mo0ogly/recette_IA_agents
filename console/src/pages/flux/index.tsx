@@ -28,6 +28,7 @@ import {
 } from "../../components/FluxAnalyzer";
 import { distinctPayloadValues, type FluxFilter } from "../../components/fluxModel";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import { auditEventToLogLine, LogConsole } from "../../components/LogConsole";
 import { useAuditTail } from "../../hooks/useAuditTail";
 import type { AgentConfig } from "../../types/platform";
@@ -156,6 +157,7 @@ export default function FluxPage(): JSX.Element {
       <header className="flux-header">
         <h1>Flux</h1>
         <PageHelp topic="flux" />
+        <AssistButton topic="proxy.recent" label="Flux des side-effects" />
         <label className="flux-agent-label">
           Agent
           <select

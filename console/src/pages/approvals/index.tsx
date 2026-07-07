@@ -28,6 +28,7 @@ import type {
 } from "../../types/platform";
 import { StatusBadge } from "../../components/StatusBadge";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./approvals.css";
 
 const RISK_LEVELS: readonly RiskLevel[] = ["low", "medium", "high", "critical"];
@@ -238,6 +239,7 @@ export default function ApprovalsPage(): JSX.Element {
       <div className="page-head">
         <h1>Approval Inbox</h1>
         <PageHelp topic="approvals" />
+        <AssistButton topic="approvals.pending" label="Approbations en attente" />
       </div>
 
       {error !== null ? (

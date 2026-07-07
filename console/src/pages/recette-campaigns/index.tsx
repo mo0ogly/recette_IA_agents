@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { listRecetteCampaigns } from "../../api/client";
 import type { RecetteCampaignSummary } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import RecetteCampaignExplainModal from "../../components/RecetteCampaignExplainModal";
 import "./recette-campaigns.css";
 
@@ -42,6 +43,7 @@ export default function RecetteCampaignsPage(): JSX.Element {
       <div className="page-head">
         <h1>Campagnes recette</h1>
         <PageHelp topic="recette_campaigns" />
+        <AssistButton topic="campaigns.list" label="Campagnes de recette" />
       </div>
 
       <p className="rc-intro">

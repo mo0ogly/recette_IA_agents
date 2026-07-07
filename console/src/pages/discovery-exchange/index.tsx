@@ -37,6 +37,7 @@ import type {
   WireEndpoint,
 } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type { AgentConfig, Campaign, ExchangeReport } from "../../types/platform";
 import {
   agentOutcome,
@@ -219,6 +220,7 @@ export default function DiscoveryExchangePage(): JSX.Element {
       <div className="page-head">
         <h1>Discovery x Echange</h1>
         <PageHelp topic="discovery_exchange" />
+        <AssistButton topic="dashboard.overview" label="Discovery x Echange" />
         {report !== null && (
           <span
             className={`dx-ghost dx-ghost-${ghosts === 0 ? "ok" : "alert"}`}

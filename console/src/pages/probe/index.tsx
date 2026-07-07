@@ -23,6 +23,7 @@ import BehaviorWavePanel from "./BehaviorWavePanel";
 import CorrelationPanel from "./CorrelationPanel";
 import InventoryPanel from "./InventoryPanel";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./probe.css";
 
 // Lazy so the monaco-editor payload stays out of the base bundle (same posture
@@ -225,6 +226,7 @@ export default function ProbePage(): JSX.Element {
           </span>
         )}
         <PageHelp topic="probe" />
+        <AssistButton topic="agents.list" label="Inventaire des sondes" />
       </div>
       {configured && mode === "replay" && (
         <p className="probe-note probe-replay-note" data-testid="probe-replay-note">

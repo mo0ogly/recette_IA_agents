@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { getControlSummary } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import Mermaid from "../../components/help/Mermaid";
 import type { ControlSummary } from "../../types/platform";
 import "./control.css";
@@ -63,6 +64,7 @@ export default function ControlPage(): JSX.Element {
       <div className="page-head">
         <h1>Control plane</h1>
         <PageHelp topic="control" />
+        <AssistButton topic="control.status" label="Etat du plan de controle" />
       </div>
       <p className="control-note">
         Le coeur de la gouvernance : chaque action agent est mediee par le Control plane

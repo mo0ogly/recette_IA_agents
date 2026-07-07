@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
+import AssistButton from "../../components/assist/AssistButton";
 import { Link } from "react-router-dom";
 
 import { getDiscoveryOverview } from "../../api/client";
@@ -72,7 +73,10 @@ export default function DiscoveryPage(): JSX.Element {
 
   return (
     <section className="discovery-overview-page">
-      <h1>Discovery</h1>
+      <div className="page-head">
+        <h1>Discovery</h1>
+        <AssistButton topic="dashboard.overview" label="Discovery overview" />
+      </div>
       <p className="discovery-overview-note">
         La vue d&apos;ensemble operateur des trois piliers de discovery : le
         catalogue des agents publies (ce qu&apos;ils declarent), le reperage des

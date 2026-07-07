@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getOrchestrationGraph, listSubjects } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import Mermaid from "../../components/help/Mermaid";
 import type { OrchestrationGraph } from "../../types/platform";
 import "./graph.css";
@@ -65,6 +66,7 @@ export default function GraphPage(): JSX.Element {
       <div className="page-head">
         <h1>Graphe d&apos;interaction</h1>
         <PageHelp topic="graph" />
+        <AssistButton topic="dashboard.overview" label="Graphe d'orchestration" />
       </div>
       <p className="graph-note">
         Un run d&apos;orchestration multi-agent vu comme un <strong>graphe dirige</strong> : noeuds

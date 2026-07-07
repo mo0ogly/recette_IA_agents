@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import AssistButton from "../../components/assist/AssistButton";
 import { getDetectSignatures, scanForObservability } from "../../api/client";
 import type {
   DetectMatch,
@@ -83,7 +84,10 @@ export default function DetectPage(): JSX.Element {
 
   return (
     <section className="detect-page">
-      <h1>Reperage</h1>
+      <div className="page-head">
+        <h1>Reperage</h1>
+        <AssistButton topic="dashboard.overview" label="Reperage" />
+      </div>
       <p className="detect-note">
         Les outils d&apos;observabilite qu&apos;un scanner peut reperer dans le
         code ou la configuration d&apos;un agent : tracage, passerelle LLM,

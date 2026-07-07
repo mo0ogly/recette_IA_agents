@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listSubjects } from "../../api/client";
 import type { CorpusListing, CorpusSubject } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import SubjectExplainModal from "../../components/SubjectExplainModal";
 import RunViewer from "./RunViewer";
 import "../discovery/discovery.css";
@@ -64,6 +65,7 @@ export default function CorpusPage(): JSX.Element {
       <div className="page-head">
         <h1>Corpus</h1>
         <PageHelp topic="corpus" />
+        <AssistButton topic="agents.list" label="Sujets du corpus" />
       </div>
       <p className="discovery-note">
         Tous les sujets de test, toutes familles confondues : agents git, sujets

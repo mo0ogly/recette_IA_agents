@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { getRealtimeStatus, realtimeStreamUrl } from "../../api/client";
 import { StatusBadge } from "../../components/StatusBadge";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type {
   ApprovalState,
   AuditEvent,
@@ -164,6 +165,7 @@ export default function LivePage(props: LivePageProps): JSX.Element {
       <div className="page-head">
         <h1>Flux temps reel</h1>
         <PageHelp topic="live" />
+        <AssistButton topic="audit.recent" label="Evenements temps reel" />
       </div>
 
       <div className="live-toolbar">

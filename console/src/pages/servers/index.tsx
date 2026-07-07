@@ -29,6 +29,7 @@ import type {
   ServerStatus,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import ServerTestPanel from "../../components/ServerTestPanel";
 import { LogConsole } from "../../components/LogConsole";
 import type { LogLine } from "../../components/LogConsole";
@@ -433,6 +434,7 @@ export default function ServersPage(): JSX.Element {
       <div className="page-head">
         <h1>Serveurs</h1>
         <PageHelp topic="servers" />
+        <AssistButton topic="servers.list" label="Serveurs cibles" />
       </div>
 
       {error !== null && (

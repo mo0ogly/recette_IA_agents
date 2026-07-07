@@ -151,6 +151,31 @@ _HELP_FAMILY_DEFAULTS = {
         "types d'evenements, verdicts allow/deny/escalate. Explique ce que "
         "l'historique montre."
     ),
+    "help.servers": (
+        "Contexte: l'operateur regarde les serveurs cibles (systemes externes "
+        "mockes ou reels, mode, port, statut). Explique la posture des cibles "
+        "et ce qui est en marche."
+    ),
+    "help.catalog": (
+        "Contexte: l'operateur regarde le catalogue d'actions gouvernables et "
+        "la politique active (allow/deny/escalate). Explique la surface "
+        "d'actions et la couverture de politique."
+    ),
+    "help.control": (
+        "Contexte: l'operateur regarde le plan de controle (containment "
+        "on/off, agents, cibles, backends). Explique l'etat de gouvernance "
+        "global et l'effet du containment."
+    ),
+    "help.metrics": (
+        "Contexte: l'operateur regarde les metriques agregees (nombre "
+        "d'evenements, distribution des verdicts). Explique les tendances et "
+        "les points d'attention."
+    ),
+    "help.approvals": (
+        "Contexte: l'operateur regarde la file d'approbations en attente (I6): "
+        "actions bloquees requerant une decision humaine. Explique ce qui "
+        "attend et le risque associe."
+    ),
 }
 
 _LEVELS_DEFAULT = {
