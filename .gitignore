@@ -76,6 +76,9 @@ data/lab/
 # Per-backend AI API keys (R8: secrets, never committed)
 data/backend_secrets.json
 
+# Assist copilot prompt overrides (operator preference, not corpus ground truth)
+data/assist_prompt_overrides.json
+
 # Runtime agent passports (R8: local attestation store, never committed --
 # only TEST fixtures under tests/fixtures/agent_passports/ are versioned)
 data/agent_passports/
