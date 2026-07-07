@@ -26,14 +26,22 @@ vi.mock("../../api/assistClient", () => ({
   clearAssistSession: vi.fn(),
 }));
 
+import type { AssistHelpResponse } from "../../types/assist";
+
 vi.mock("../../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/client")>();
   return { ...actual, listAiBackends: vi.fn() };
 });
 
 import { listAiBackends } from "../../api/client";
-import { clearAssistSession, getAssistSession, postAssistChat } from "../../api/assistClient";
+import {
+  clearAssistSession,
+  getAssistSession,
+  postAssistChat,
+  postAssistHelp,
+} from "../../api/assistClient";
 
+import AssistButton from "./AssistButton";
 import AssistDock from "./AssistDock";
 import AssistProvider from "./AssistProvider";
 
@@ -119,6 +127,43 @@ describe("AssistDock (R16 contract)", () => {
     expect(window.localStorage.getItem("assist.dock.open")).toBe("false");
     fireEvent.click(screen.getByRole("button", { name: "Ouvrir le Copilote IA" }));
     expect(screen.getByTestId("assist-dock")).toHaveAttribute("data-open", "true");
+  });
+
+  it("opens on the Journal tab when a help answer arrives (button feedback)", async () => {
+    const helpResponse: AssistHelpResponse = {
+      answer: "Le registre liste les agents connus.",
+      source: "llm",
+      model: "m",
+      error: null,
+      insight: {
+        id: "i-1",
+        topic: "agents.list",
+        label: "Agents connus",
+        answer: "Le registre liste les agents connus.",
+        model: "m",
+        created_at: "2026-07-07T08:00:00Z",
+      },
+    };
+    vi.mocked(postAssistHelp).mockResolvedValue(helpResponse);
+    render(
+      <AssistProvider>
+        <AssistButton topic="agents.list" label="Agents connus" />
+        <AssistDock />
+      </AssistProvider>,
+    );
+    await screen.findByTestId("assist-dock");
+    // Start collapsed to prove the click both opens AND switches the tab.
+    fireEvent.click(screen.getByRole("button", { name: "Replier le Copilote IA" }));
+    expect(screen.getByTestId("assist-dock")).toHaveAttribute("data-open", "false");
+    fireEvent.click(screen.getByRole("button", { name: "IA" }));
+    await waitFor(() => expect(postAssistHelp).toHaveBeenCalledTimes(1));
+    // Dock re-opened and the journal now shows the answer.
+    await waitFor(() =>
+      expect(screen.getByTestId("assist-dock")).toHaveAttribute("data-open", "true"),
+    );
+    expect(await screen.findByTestId("assist-journal")).toHaveTextContent(
+      "Le registre liste les agents connus.",
+    );
   });
 
   it("clears the session from the journal tab", async () => {

@@ -32,6 +32,41 @@ export default function AssistDock(): JSX.Element {
   const [backendsError, setBackendsError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const insightsCountRef = useRef<number>(assist.insights.length);
+
+  // A contextual-help answer (an IA button click) lands in the journal. When
+  // the journal grows, surface it: open the dock if collapsed and switch to
+  // the Journal tab, so the click has a visible result instead of a silent
+  // badge on a tab the operator is not looking at. Guarded by a ref so the
+  // initial rehydration (insights loaded from the session on mount) does not
+  // force the tab on first render.
+  useEffect(() => {
+    if (assist.insights.length > insightsCountRef.current) {
+      setTab("journal");
+      setOpen((current) => {
+        if (!current) {
+          window.localStorage.setItem(DOCK_OPEN_KEY, "true");
+        }
+        return true;
+      });
+    }
+    insightsCountRef.current = assist.insights.length;
+  }, [assist.insights.length]);
+
+  // A failed help/chat (no backend, unreachable provider) sets lastError; open
+  // the dock so the error strip is not lost behind a collapsed rail.
+  const lastErrorRef = useRef<string | null>(assist.lastError);
+  useEffect(() => {
+    if (assist.lastError !== null && assist.lastError !== lastErrorRef.current) {
+      setOpen((current) => {
+        if (!current) {
+          window.localStorage.setItem(DOCK_OPEN_KEY, "true");
+        }
+        return true;
+      });
+    }
+    lastErrorRef.current = assist.lastError;
+  }, [assist.lastError]);
 
   useEffect(() => {
     let cancelled = false;
