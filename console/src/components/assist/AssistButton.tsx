@@ -31,6 +31,7 @@ export default function AssistButton({
       type="button"
       className="assist-help-btn"
       data-assist-topic={topic}
+      data-assist-loc={`assist-${topic.split(".")[0]}`}
       disabled={busy}
       onClick={() => void assist.askHelp(topic, label, params)}
       title={`Demander au Copilote IA: ${label}`}

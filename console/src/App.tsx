@@ -25,7 +25,9 @@ import ProbePage from "./pages/probe";
 import RunsExplorerPage from "./pages/runs";
 import NavMenu from "./components/NavMenu";
 import AssistDock from "./components/assist/AssistDock";
+import AssistLocateFlash from "./components/assist/AssistLocateFlash";
 import AssistProvider from "./components/assist/AssistProvider";
+import IaPromptsPage from "./pages/ia-prompts";
 import ProxyPage from "./pages/proxy";
 import RagPage from "./pages/rag";
 import RecettePage from "./pages/recette";
@@ -43,6 +45,7 @@ export default function App(): JSX.Element {
       </header>
       <AssistProvider>
         <div className="app-body">
+          <AssistLocateFlash />
           <AssistDock />
           <main className="app-main">
             <Routes>
@@ -68,6 +71,7 @@ export default function App(): JSX.Element {
               <Route path="/sim" element={<SimPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/ai-backends" element={<AiBackendsPage />} />
+              <Route path="/ia-prompts" element={<IaPromptsPage />} />
               <Route path="/servers" element={<ServersPage />} />
               <Route path="/control" element={<ControlPage />} />
               <Route path="/metrics" element={<MetricsPage />} />

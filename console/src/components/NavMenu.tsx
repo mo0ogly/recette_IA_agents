@@ -59,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/agent-registry", label: "Registry" },
       { to: "/registry", label: "Catalogue" },
       { to: "/ai-backends", label: "IA" },
+      { to: "/ia-prompts", label: "Prompts IA" },
       { to: "/servers", label: "Serveurs" },
     ],
   },

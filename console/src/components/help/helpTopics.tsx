@@ -66,7 +66,8 @@ export type HelpTopicKey =
   | "graph"
   | "agent_registry"
   | "receipts"
-  | "runs_explorer";
+  | "runs_explorer"
+  | "ia_prompts";
 
 export interface HelpTopic {
   /** Modal title. */
@@ -78,6 +79,35 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
+  ia_prompts: {
+    title: "Aide — Prompts IA",
+    summary:
+      "Le catalogue des prompts du Copilote IA : defauts en code, personnalisations persistees, rechargees a chaud.",
+    body: (
+      <>
+        <p>
+          Cette page liste les <strong>prompts systeme</strong> qui pilotent le
+          Copilote IA : le chat du dock (rail gauche) et les boutons
+          d&apos;aide contextuelle <code>IA</code> disperses dans la console.
+          Chaque entree indique ou elle est utilisee (vue, declencheur,
+          endpoint).
+        </p>
+        <p>
+          Les valeurs par defaut vivent dans le code du backend ; seule votre{" "}
+          <strong>personnalisation</strong> est persistee (fichier gitignore,
+          jamais committe). Une modification est appliquee au prochain appel
+          LLM sans redemarrage. <em>Reinitialiser</em> revient au defaut.
+        </p>
+        <p>
+          <strong>Localiser dans l&apos;UI</strong> navigue vers la vue
+          concernee et fait clignoter le declencheur du prompt. Le contenu non
+          fiable (journal, donnees de la plateforme) est toujours encadre par
+          des delimiteurs anti prompt-injection cote serveur ; les prompts ne
+          recoivent jamais de secret.
+        </p>
+      </>
+    ),
+  },
   discovery_exchange: {
     title: "Aide — Discovery x Echange",
     summary:

@@ -93,7 +93,12 @@ export default function AssistDock(): JSX.Element {
   }
 
   return (
-    <aside className="assist-dock" data-testid="assist-dock" data-open="true">
+    <aside
+      className="assist-dock"
+      data-testid="assist-dock"
+      data-open="true"
+      data-assist-loc="assist-dock"
+    >
       <header className="assist-dock-head">
         <span className="assist-dock-title">Copilote IA</span>
         <button

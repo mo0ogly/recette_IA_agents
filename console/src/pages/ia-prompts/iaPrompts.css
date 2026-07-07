@@ -1,0 +1,100 @@
+/* Prompts IA page -- scoped styles over the shared tokens (index.css). */
+
+.iaprompts-intro {
+  color: var(--color-text-muted);
+  max-width: 65ch;
+  margin: 0 0 1.25rem;
+}
+
+.iaprompts-group {
+  margin-bottom: 1.25rem;
+}
+
+.iaprompts-label {
+  font-weight: 650;
+}
+
+.iaprompts-id {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.iaprompts-preview {
+  max-width: 340px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.iaprompts-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.badge-amber.iaprompts-badge {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+}
+
+.badge-gray.iaprompts-badge {
+  background-color: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
+.iaprompts-actions {
+  white-space: nowrap;
+}
+
+.iaprompts-actions button {
+  margin-right: 0.4rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.iaprompts-modal {
+  width: min(860px, 92vw);
+}
+
+.iaprompts-modal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.iaprompts-modal-head h2 {
+  margin: 0 0 0.25rem;
+}
+
+.iaprompts-modal-desc {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.iaprompts-modal-id {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.iaprompts-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.iaprompts-save-btn {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.iaprompts-save-btn:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+  color: #ffffff;
+}
