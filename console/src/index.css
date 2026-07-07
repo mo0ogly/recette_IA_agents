@@ -262,12 +262,23 @@ textarea:focus {
   color: var(--badge-gray-fg);
 }
 
+/* Row below the sticky header: the Copilote IA dock on the left, the routed
+ * page on the right. .app-main keeps its centered max-width so the ~30
+ * existing pages render unchanged inside the remaining space. */
+.app-body {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
 .app-main {
   flex: 1;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
   padding: 1.75rem 1.5rem 3rem;
+  min-width: 0;
 }
 
 /* --- Status badges ------------------------------------------------------ */

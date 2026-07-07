@@ -109,7 +109,9 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+// Exported for sibling API modules (assistClient.ts) so they share the same
+// base URL, headers, and ApiError semantics without growing this file.
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },

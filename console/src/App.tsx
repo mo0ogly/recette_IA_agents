@@ -24,6 +24,8 @@ import ObservabilityPage from "./pages/observability";
 import ProbePage from "./pages/probe";
 import RunsExplorerPage from "./pages/runs";
 import NavMenu from "./components/NavMenu";
+import AssistDock from "./components/assist/AssistDock";
+import AssistProvider from "./components/assist/AssistProvider";
 import ProxyPage from "./pages/proxy";
 import RagPage from "./pages/rag";
 import RecettePage from "./pages/recette";
@@ -39,42 +41,47 @@ export default function App(): JSX.Element {
         <span className="app-title">inspect_ia_agents</span>
         <NavMenu />
       </header>
-      <main className="app-main">
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/cockpit" element={<Navigate to="/agents" replace />} />
-          <Route path="/flux" element={<FluxPage />} />
-          <Route path="/live" element={<LivePage />} />
-          <Route path="/recette" element={<RecettePage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/recette-campaigns" element={<RecetteCampaignsPage />} />
-          <Route path="/verdicts" element={<VerdictsPage />} />
-          <Route path="/rag" element={<RagPage />} />
-          <Route path="/discovery" element={<DiscoveryPage />} />
-          <Route path="/discovery-exchange" element={<DiscoveryExchangePage />} />
-          <Route path="/discovery-overview" element={<DiscoveryOverviewPage />} />
-          <Route path="/detect" element={<DetectPage />} />
-          <Route path="/registry" element={<RegistryPage />} />
-          <Route path="/agent-registry" element={<AgentRegistryPage />} />
-          <Route path="/probe" element={<ProbePage />} />
-          <Route path="/runs" element={<RunsExplorerPage />} />
-          <Route path="/corpus" element={<CorpusPage />} />
-          <Route path="/sim" element={<SimPage />} />
-          <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/ai-backends" element={<AiBackendsPage />} />
-          <Route path="/servers" element={<ServersPage />} />
-          <Route path="/control" element={<ControlPage />} />
-          <Route path="/metrics" element={<MetricsPage />} />
-          <Route path="/graph" element={<GraphPage />} />
-          <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/approvals" element={<ApprovalsPage />} />
-          <Route path="/audit" element={<AuditPage />} />
-          <Route path="/observability" element={<ObservabilityPage />} />
-          <Route path="/proxy" element={<ProxyPage />} />
-          <Route path="/receipts" element={<ReceiptsPage />} />
-        </Routes>
-      </main>
+      <AssistProvider>
+        <div className="app-body">
+          <AssistDock />
+          <main className="app-main">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/cockpit" element={<Navigate to="/agents" replace />} />
+              <Route path="/flux" element={<FluxPage />} />
+              <Route path="/live" element={<LivePage />} />
+              <Route path="/recette" element={<RecettePage />} />
+              <Route path="/campaigns" element={<CampaignsPage />} />
+              <Route path="/recette-campaigns" element={<RecetteCampaignsPage />} />
+              <Route path="/verdicts" element={<VerdictsPage />} />
+              <Route path="/rag" element={<RagPage />} />
+              <Route path="/discovery" element={<DiscoveryPage />} />
+              <Route path="/discovery-exchange" element={<DiscoveryExchangePage />} />
+              <Route path="/discovery-overview" element={<DiscoveryOverviewPage />} />
+              <Route path="/detect" element={<DetectPage />} />
+              <Route path="/registry" element={<RegistryPage />} />
+              <Route path="/agent-registry" element={<AgentRegistryPage />} />
+              <Route path="/probe" element={<ProbePage />} />
+              <Route path="/runs" element={<RunsExplorerPage />} />
+              <Route path="/corpus" element={<CorpusPage />} />
+              <Route path="/sim" element={<SimPage />} />
+              <Route path="/agents" element={<AgentsPage />} />
+              <Route path="/ai-backends" element={<AiBackendsPage />} />
+              <Route path="/servers" element={<ServersPage />} />
+              <Route path="/control" element={<ControlPage />} />
+              <Route path="/metrics" element={<MetricsPage />} />
+              <Route path="/graph" element={<GraphPage />} />
+              <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/approvals" element={<ApprovalsPage />} />
+              <Route path="/audit" element={<AuditPage />} />
+              <Route path="/observability" element={<ObservabilityPage />} />
+              <Route path="/proxy" element={<ProxyPage />} />
+              <Route path="/receipts" element={<ReceiptsPage />} />
+            </Routes>
+          </main>
+        </div>
+      </AssistProvider>
     </div>
   );
 }
