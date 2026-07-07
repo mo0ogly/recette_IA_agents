@@ -4,7 +4,8 @@ set -euo pipefail
 # platform.sh - governed execution platform: lab mock + API + console + campaigns
 #
 # Usage:
-#   platform.sh up|down|restart|status        # lab mock + API (full platform env)
+#   platform.sh up|down|restart|status              # lab mock + API, bare-host (dev only, R27)
+#   platform.sh up|down|restart|status --docker      # lab-mock + API in Docker (R27 runtime of record)
 #   platform.sh console start|stop|status|logs
 #   platform.sh campaign list
 #   platform.sh campaign run <name|file> [--json]
@@ -12,6 +13,11 @@ set -euo pipefail
 # The API started here carries the FULL platform environment (lab URL, event
 # store, policies dir), unlike `api.sh start` which runs the bare Track U API.
 # Secrets stay in the environment (R8) - never stored here.
+#
+# --docker drives the compose `api` service (depends_on lab-mock + platform-init,
+# see docker-compose.yml) instead of spawning bare-host python processes. Per
+# R27 (docker-runtime-mandatory.md) this is the ONLY mode that counts as a live
+# proof of the running platform; bare-host stays a fast inner-loop dev check.
 # ===========================================================================
 
 CICD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -222,6 +228,36 @@ _lab_servers_start() {
 
 # --- platform (lab + API with full env) --------------------------------------
 
+# --- platform (Docker, R27 -- the governed api/lab-mock run containerized) --
+
+platform_up_docker() {
+    need_docker
+    hdr "START api + lab-mock (Docker, R27) via docker compose"
+    dc up -d api
+    if _wait_http "http://127.0.0.1:${API_PORT}/health" 30; then
+        ok "plateforme prete (Docker) - API http://127.0.0.1:${API_PORT}"
+        dc ps api lab-mock
+    else
+        err "API (Docker) ne repond pas sur /health"
+        dc logs --tail 40 api
+        exit 1
+    fi
+}
+
+platform_down_docker() {
+    need_docker
+    hdr "STOP api + lab-mock (Docker)"
+    dc stop api lab-mock 2>/dev/null || true
+    dc rm -f api lab-mock 2>/dev/null || true
+    ok "api + lab-mock (Docker) arretes"
+}
+
+platform_status_docker() {
+    hdr "PLATEFORME GOUVERNEE (Docker)"
+    need_docker
+    dc ps -a api lab-mock platform-init 2>/dev/null || true
+}
+
 platform_up() {
     # Dev convenience: lab domains hot-reload on edit (R5). Exported before
     # lab_start AND before the API start so the :8082 lab and the API-spawned
@@ -382,14 +418,30 @@ console_start() {
     # Enforce the canonical console port: a stale vite (e.g. one wired to the
     # wrong API) is killed so --strictPort binds 5173 here (R19).
     if ! _port_free "${CONSOLE_PORT}"; then _kill_port_holder "${CONSOLE_PORT}"; fi
-    hdr "START console sur :${CONSOLE_PORT} (API: http://${API_HOST}:${API_PORT})"
+    # Default: loopback bind + loopback-wired API (local-only, safe). LAN mode
+    # (INSPECT_IA_AGENTS_CONSOLE_LAN=1) binds all interfaces and wires the API URL to this
+    # host's LAN IP so a remote browser reaches BOTH the console and the API.
+    local _vite_host="127.0.0.1" _api_host="${API_HOST}" _lan_ip=""
+    if [ "${CONSOLE_LAN}" = "1" ]; then
+        _lan_ip="$(lan_ip)"
+        if [ -z "${_lan_ip}" ]; then
+            err "CONSOLE_LAN=1 but could not detect a LAN IP (lan_ip empty)"; exit 1
+        fi
+        _vite_host="0.0.0.0"; _api_host="${_lan_ip}"
+    fi
+    hdr "START console sur ${_vite_host}:${CONSOLE_PORT} (API: http://${_api_host}:${API_PORT})"
     ( cd "${CONSOLE_DIR}" \
-        && VITE_INSPECT_IA_AGENTS_API_URL="http://${API_HOST}:${API_PORT}" \
-           nohup npm run dev -- --port "${CONSOLE_PORT}" --strictPort \
+        && VITE_INSPECT_IA_AGENTS_API_URL="http://${_api_host}:${API_PORT}" \
+           nohup npm run dev -- --host "${_vite_host}" --port "${CONSOLE_PORT}" --strictPort \
            >"${CONSOLE_LOG_FILE}" 2>&1 & \
         echo $! >"${CONSOLE_PID_FILE}" )
     if _wait_http "http://localhost:${CONSOLE_PORT}" 30; then
-        ok "console prete: http://localhost:${CONSOLE_PORT}"
+        if [ -n "${_lan_ip}" ]; then
+            ok "console prete (LAN): http://${_lan_ip}:${CONSOLE_PORT}  (API http://${_lan_ip}:${API_PORT})"
+            warn "acces distant: l'API doit autoriser l'origine http://${_lan_ip}:${CONSOLE_PORT} dans INSPECT_IA_AGENTS_CORS_ORIGINS (docker compose api)"
+        else
+            ok "console prete: http://localhost:${CONSOLE_PORT}"
+        fi
     else
         err "console ne repond pas - voir ${CONSOLE_LOG_FILE}"
         tail -n 20 "${CONSOLE_LOG_FILE}" 2>/dev/null || true
@@ -501,11 +553,14 @@ _resolve_api_port
 # Children (api.sh) must see the resolved port, not the common.sh default.
 export INSPECT_IA_AGENTS_API_PORT="${API_PORT}"
 cmd="${1:-status}"; shift || true
+mode="${1:-}"
 case "${cmd}" in
-    up)        platform_up ;;
-    down)      platform_down ;;
-    restart)   platform_down; platform_up ;;
-    status)    platform_status ;;
+    up)        if [ "${mode}" = "--docker" ]; then platform_up_docker; else platform_up; fi ;;
+    down)      if [ "${mode}" = "--docker" ]; then platform_down_docker; else platform_down; fi ;;
+    restart)
+        if [ "${mode}" = "--docker" ]; then platform_down_docker; platform_up_docker
+        else platform_down; platform_up; fi ;;
+    status)    if [ "${mode}" = "--docker" ]; then platform_status_docker; else platform_status; fi ;;
     purge)     platform_purge ;;
     console)
         sub="${1:-status}"; shift || true

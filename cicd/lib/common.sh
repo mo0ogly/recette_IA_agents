@@ -59,7 +59,7 @@ API_PID_FILE="${RUN_DIR}/api.pid"
 API_LOG_FILE="${RUN_DIR}/api.log"
 
 # -- governed platform defaults (lab mock + persistent stores, R5 via env) --
-LAB_PORT="${INSPECT_IA_AGENTS_LAB_PORT:-8082}"
+LAB_PORT="${INSPECT_IA_AGENTS_LAB_PORT:-8091}"
 LAB_PID_FILE="${RUN_DIR}/lab.pid"
 LAB_LOG_FILE="${RUN_DIR}/lab.log"
 PLATFORM_DATA_DIR="${INSPECT_IA_AGENTS_PLATFORM_DATA:-${REPO_ROOT}/data}"
@@ -68,9 +68,21 @@ POLICIES_DIR="${INSPECT_IA_AGENTS_POLICIES_DIR:-${REPO_ROOT}/config/policies}"
 
 # -- console (React dev server) ----------------------------------------------
 CONSOLE_DIR="${REPO_ROOT}/console"
-CONSOLE_PORT="${INSPECT_IA_AGENTS_CONSOLE_PORT:-5173}"
+CONSOLE_PORT="${INSPECT_IA_AGENTS_CONSOLE_PORT:-5174}"
 CONSOLE_PID_FILE="${RUN_DIR}/console.pid"
 CONSOLE_LOG_FILE="${RUN_DIR}/console.log"
+# LAN exposure (opt-in, off by default for safety). INSPECT_IA_AGENTS_CONSOLE_LAN=1
+# makes `console start` bind vite on all interfaces AND wire the console to the
+# API via this host's LAN IP (so a remote browser's API calls resolve to this
+# host, not its own loopback). The API must also allow the resulting origin in
+# CORS (docker compose api INSPECT_IA_AGENTS_CORS_ORIGINS, see docker-compose.yml).
+CONSOLE_LAN="${INSPECT_IA_AGENTS_CONSOLE_LAN:-0}"
+
+# lan_ip -- best-effort primary LAN IPv4 of this host (the source address the
+# default route would use), for advertising a reachable console/API URL.
+lan_ip() {
+    ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}'
+}
 
 # -- campaigns ---------------------------------------------------------------
 CAMPAIGNS_DIR="${REPO_ROOT}/campaigns"
@@ -79,12 +91,12 @@ CAMPAIGN_REPORTS_DIR="${RUN_DIR}/campaigns"
 # -- wire proxy (optional mitmproxy interception overlay, Docker) ------------
 # The host port mitmdump binds; agents route through http://127.0.0.1:${WIRE_PORT}
 # when INSPECT_IA_AGENTS_WIRE_PROXY points at it. Off unless the operator brings it up.
-WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8083}"
+WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8092}"
 
 # -- LLM gateway (optional LiteLLM overlay, Docker) --------------------------
 # The host port the LiteLLM proxy binds; an ai_backend (openai_compat) targets
 # http://127.0.0.1:${LLM_PROXY_PORT}. Off unless the operator brings it up.
-LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-4000}"
+LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-9093}"
 
 # -- discovery probe broker (Unix socket) ------------------------------------
 # The console Probe view relays a capture to a broker on this socket. In dev/CI
