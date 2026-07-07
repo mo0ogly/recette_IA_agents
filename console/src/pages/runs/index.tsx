@@ -22,6 +22,7 @@ import {
 import type { RunTree, RunDetail, ReplayResult } from "../../api/client";
 import RunTreeComponent from "./RunTree";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import RunDetailView from "./RunDetailView";
 import "./runs.css";
 
@@ -200,6 +201,7 @@ export default function RunsExplorer(): JSX.Element {
       <div className="runs-explorer-header">
         <h2 className="runs-explorer-title">Explorateur de runs</h2>
         <PageHelp topic="runs_explorer" />
+        <AssistButton topic="runs.recent" label="Runs recents" />
       </div>
 
       <div className="runs-explorer-body">

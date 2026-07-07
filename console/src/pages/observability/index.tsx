@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 
 import { getObservabilityTrace, listObservabilityTraces } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type {
   ObservabilitySpan,
   ObservabilityTrace,
@@ -186,6 +187,7 @@ export default function ObservabilityPage(): JSX.Element {
       <div className="page-head">
         <h1>Observabilite -- traces</h1>
         <PageHelp topic="observability" />
+        <AssistButton topic="proxy.recent" label="Traces proxy recentes" />
       </div>
       <p className="obs-note">
         Arbre de spans de chaque run persiste (projection read-only de l'audit, I1). Chaque appel

@@ -28,6 +28,7 @@ import type {
   StoredEvent,
 } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import "./audit.css";
 
 /** Event kinds offered by the kind filter (plus the "all" pseudo-value). */
@@ -206,6 +207,7 @@ export default function AuditPage(): JSX.Element {
       <div className="page-head">
         <h1>Audit Trail</h1>
         <PageHelp topic="audit" />
+        <AssistButton topic="audit.recent" label="Journal d'audit recent" />
       </div>
 
       {chain !== null && chain.ok && (

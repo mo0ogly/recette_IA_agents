@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listAiBackends } from "../../api/client";
 import type { AiBackend } from "../../types/platform";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import AiBackendsPanel from "../agents/AiBackendsPanel";
 import "../agents/agents.css";
 
@@ -45,6 +46,7 @@ export default function AiBackendsPage(): JSX.Element {
       <div className="page-head">
         <h1>IA (backends)</h1>
         <PageHelp topic="ai_backends" />
+        <AssistButton topic="ai_backends.list" label="Backends IA configures" />
       </div>
 
       {error !== null && (

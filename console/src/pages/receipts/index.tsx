@@ -18,6 +18,7 @@ import {
   type ReceiptImportVerdict,
 } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import type { ChainReport, ContextReceipt } from "../../types/platform";
 import "./receipts.css";
 
@@ -86,6 +87,7 @@ export default function ReceiptsPage(): JSX.Element {
       <div className="page-head">
         <h1>Context receipts</h1>
         <PageHelp topic="receipts" />
+        <AssistButton topic="audit.recent" label="Journal d'audit recent" />
         {chain !== null && (
           <span
             className={`receipts-chain receipts-chain-${chain.ok ? "ok" : "broken"}`}

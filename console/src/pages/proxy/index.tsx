@@ -14,6 +14,7 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import LaunchPanel from "./LaunchPanel";
 import type { SourceId, SourceStatus } from "./proxyMenu";
 import SourceMenu from "./SourceMenu";
@@ -89,6 +90,7 @@ export default function ProxyPage(): JSX.Element {
       <header className="proxy-header">
         <h1>Proxy</h1>
         <PageHelp topic="proxy" />
+        <AssistButton topic="proxy.recent" label="Traces proxy recentes" />
         <button
           type="button"
           className="proxy-mode-btn"

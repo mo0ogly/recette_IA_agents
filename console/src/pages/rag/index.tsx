@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import AssistButton from "../../components/assist/AssistButton";
 import { getRagScorecard } from "../../api/client";
 import type { RagScorecard } from "../../types/platform";
 import KnowledgeBaseManager from "./KnowledgeBaseManager";
@@ -40,7 +41,10 @@ export default function RagPage(): JSX.Element {
   return (
     <>
     <section className="rag-page">
-      <h1>RAG retrieval recette</h1>
+      <div className="page-head">
+        <h1>RAG retrieval recette</h1>
+        <AssistButton topic="rag.kb" label="Base de connaissances RAG" />
+      </div>
       <p className="rag-note">
         Deterministic retrieval quality vs invariant ground truth: which docs are
         relevant for a query and which one should rank first, never the opaque

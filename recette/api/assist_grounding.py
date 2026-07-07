@@ -182,6 +182,99 @@ def _topic_redteam_summary(state: _AppState, params: dict[str, str]) -> dict[str
     }
 
 
+def _topic_runs_recent(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    runs = state.run_manager.list()
+    return {
+        "count": len(runs),
+        "runs": [
+            {
+                "id": run.id,
+                "kind": run.kind,
+                "status": run.status,
+                "created_at": run.created_at,
+                "error": run.error,
+            }
+            for run in runs[:MAX_LIST_ITEMS]
+        ],
+    }
+
+
+def _topic_proxy_recent(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    traces = state.proxy_store.snapshot_traces()
+    return {
+        "trace_count": len(traces),
+        "traces": [
+            {
+                "agent_id": t.agent_id,
+                "target_system": t.target_system,
+                "action_type": t.action_type,
+                "resource": t.resource,
+                "ok": t.ok,
+            }
+            for t in traces[-MAX_LIST_ITEMS:]
+        ],
+    }
+
+
+def _topic_rag_kb(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    documents = state.kb_store.documents()
+    return {
+        "document_count": len(documents),
+        "documents": [
+            {
+                "id": doc.get("id"),
+                "title": doc.get("title"),
+                "scenario": doc.get("scenario"),
+                "poisoned": doc.get("poisoned"),
+            }
+            for doc in documents[:MAX_LIST_ITEMS]
+        ],
+    }
+
+
+def _topic_ai_backends_list(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    backends = state.config_store.read().get("ai_backends", [])
+    secret_store = getattr(state, "secret_store", None)
+    return {
+        "count": len(backends),
+        "backends": [
+            {
+                "id": b.get("id"),
+                "provider": b.get("provider"),
+                "model": b.get("model"),
+                # Boolean only, never the key (R8).
+                "key_configured": bool(
+                    secret_store is not None and secret_store.is_configured(str(b.get("id")))
+                ),
+            }
+            for b in backends[:MAX_LIST_ITEMS]
+        ],
+    }
+
+
+def _topic_audit_recent(state: Any, params: dict[str, str]) -> dict[str, Any]:
+    events = state.event_store.read_from(0)
+    kinds: dict[str, int] = {}
+    for event in events:
+        kind = str(getattr(event, "kind", "unknown"))
+        kinds[kind] = kinds.get(kind, 0) + 1
+    recent = events[-MAX_LIST_ITEMS:]
+    return {
+        "event_count": len(events),
+        "kinds": dict(sorted(kinds.items())),
+        "recent": [
+            {
+                "event_id": getattr(e, "event_id", None),
+                "kind": str(getattr(e, "kind", "unknown")),
+                "agent_id": getattr(e, "agent_id", None),
+                "verdict": getattr(e, "verdict", None),
+                "action_type": getattr(e, "action_type", None),
+            }
+            for e in recent
+        ],
+    }
+
+
 # topic key -> (label fr, required params, grounding fn). The label feeds
 # GET /assist/topics (the console introspection + the Prompts IA page table).
 TOPICS: dict[str, dict[str, Any]] = {
@@ -219,6 +312,31 @@ TOPICS: dict[str, dict[str, Any]] = {
         "label": "Synthese red-team (/sim)",
         "params": [],
         "ground": _topic_redteam_summary,
+    },
+    "runs.recent": {
+        "label": "Runs recents",
+        "params": [],
+        "ground": _topic_runs_recent,
+    },
+    "proxy.recent": {
+        "label": "Traces proxy recentes",
+        "params": [],
+        "ground": _topic_proxy_recent,
+    },
+    "rag.kb": {
+        "label": "Base de connaissances RAG",
+        "params": [],
+        "ground": _topic_rag_kb,
+    },
+    "ai_backends.list": {
+        "label": "Backends IA configures",
+        "params": [],
+        "ground": _topic_ai_backends_list,
+    },
+    "audit.recent": {
+        "label": "Journal d'audit recent",
+        "params": [],
+        "ground": _topic_audit_recent,
     },
 }
 

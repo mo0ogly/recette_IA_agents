@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getDiscoveryCheck, getRecetteScorecard } from "../../api/client";
 import type { DiscoveryCheck, RecetteScorecard } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
+import AssistButton from "../../components/assist/AssistButton";
 import BenchmarkPanel from "./BenchmarkPanel";
 import "./discovery.css";
 
@@ -61,6 +62,7 @@ export default function DiscoveryPage(): JSX.Element {
           {loading ? "Relance..." : "Relancer"}
         </button>
         <PageHelp topic="discovery" />
+        <AssistButton topic="agents.list" label="Agents de recette configures" />
       </div>
       <p className="discovery-note">
         Verdict unifie sur le corpus de test : identification (les quatre

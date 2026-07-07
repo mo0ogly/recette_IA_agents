@@ -127,6 +127,30 @@ _HELP_FAMILY_DEFAULTS = {
         "distribution OWASP ASI, anomalies detectees). Explique la couverture "
         "et les trous eventuels."
     ),
+    "help.runs": (
+        "Contexte: l'operateur regarde les runs operationnels (lancements "
+        "d'agents, statut, erreurs). Explique l'etat des executions et quoi "
+        "regarder en cas d'echec."
+    ),
+    "help.proxy": (
+        "Contexte: l'operateur regarde les traces du proxy de side-effects "
+        "(I5): quel agent a demande quelle action sur quel systeme, et si "
+        "elle a abouti. Explique ce que les traces revelent."
+    ),
+    "help.rag": (
+        "Contexte: l'operateur regarde la base de connaissances RAG (documents "
+        "sains et empoisonnes de la recette). Explique la composition de la "
+        "base et les risques d'empoisonnement."
+    ),
+    "help.ai_backends": (
+        "Contexte: l'operateur regarde les backends IA configures (provider, "
+        "modele, cle configuree ou non). Explique l'etat du parc de modeles."
+    ),
+    "help.audit": (
+        "Contexte: l'operateur regarde le journal d'audit immuable (I1): "
+        "types d'evenements, verdicts allow/deny/escalate. Explique ce que "
+        "l'historique montre."
+    ),
 }
 
 _LEVELS_DEFAULT = {
@@ -189,9 +213,12 @@ def default_catalog() -> list[dict[str, Any]]:
                     f"topics {prompt_id.split('.', 1)[1]}.*"
                 ),
                 "localisation": {
-                    "view": f"/{prompt_id.split('.', 1)[1]}"
-                    if prompt_id != "help.redteam"
-                    else "/sim",
+                    # Console route of the family (special-cased where the
+                    # route spelling differs from the family key).
+                    "view": {
+                        "help.redteam": "/sim",
+                        "help.ai_backends": "/ai-backends",
+                    }.get(prompt_id, f"/{prompt_id.split('.', 1)[1]}"),
                     "trigger": "Cliquer un bouton IA de cette famille",
                     "endpoint": "POST /assist/help",
                     "component": "AssistButton",
