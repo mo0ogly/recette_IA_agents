@@ -118,9 +118,13 @@ PROBE_MANIFEST="${INSPECT_IA_AGENTS_PROBE_MANIFEST:-${REPO_ROOT}/discoveryprobe/
 PROBE_AUDIT_FILE="${RUN_DIR}/probe.audit.jsonl"
 
 # -- python picker: prefer the project venv, else system python3 ------------
+# Checks both venv layouts: bin/ (Linux/macOS) and Scripts/ (Windows Git Bash,
+# used by recette.ps1 which delegates here).
 py() {
     if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
         echo "${REPO_ROOT}/.venv/bin/python"
+    elif [ -x "${REPO_ROOT}/.venv/Scripts/python.exe" ]; then
+        echo "${REPO_ROOT}/.venv/Scripts/python.exe"
     else
         echo "python3"
     fi
