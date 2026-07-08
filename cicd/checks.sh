@@ -74,11 +74,14 @@ run_local() {
                          sudo setcap cap_bpf,cap_perfmon,cap_net_admin,cap_dac_read_search+ep "${_bin}" \
                            && getcap "${_bin}" \
                            && ok "caps granted -- ./recette.sh platform up will now start the LIVE broker" ;;
+        # npx --no-install resolves the local package's real JS entry on every
+        # platform; `node node_modules/.bin/<tool>` breaks on Windows Git Bash,
+        # where .bin/<tool> is a shell shim node cannot parse.
         console-build) ( cd "${REPO_ROOT}/console" \
-                         && node node_modules/.bin/tsc --noEmit \
-                         && node node_modules/.bin/vite build ) ;;
+                         && npx --no-install tsc --noEmit \
+                         && npx --no-install vite build ) ;;
         console-test)  ( cd "${REPO_ROOT}/console" \
-                         && node node_modules/.bin/vitest run ) ;;
+                         && npx --no-install vitest run ) ;;
         docs-build)    ( cd "${REPO_ROOT}/docs-site" \
                          && { [ -d node_modules ] || npm ci; } \
                          && npm run build ) ;;

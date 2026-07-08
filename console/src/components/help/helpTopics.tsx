@@ -1708,16 +1708,43 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
   discovery: {
     title: "Aide — Discovery recette (verdict unifie)",
     summary:
-      "Le verdict de recette sur tout le corpus : identification (4 dimensions), sujets MAF, et chaque surface discovery. Compare la sortie des outils EXTERNES au ground-truth. Lecture seule, deterministe (I4).",
+      "Le verdict de recette sur tout le corpus : identification (4 dimensions), sujets MAF, et chaque surface discovery. Compare la sortie des outils EXTERNES au ground-truth. Lecture seule, deterministe (I4), sans aucun LLM.",
     body: (
       <>
+        <h3>A quoi sert cette page</h3>
         <p>
-          Cette page est le <strong>tableau de bord de recette</strong> : elle
-          rejoue le harness sur le corpus de reference et affiche un{" "}
-          <strong>verdict unifie</strong> (<code>GET /subjects/scorecard</code>).
-          Ce n&apos;est pas un outil de production — c&apos;est l&apos;etalon qui
-          dit si un outil discovery/identification <strong>externe</strong> tombe
-          juste contre le <strong>ground-truth</strong>.
+          Des collegues developpent deux outils : un outil de{" "}
+          <strong>discovery</strong> (reperer les agents IA dans des sources) et
+          un outil d&apos;<strong>identification</strong> (juger si un agent est
+          conforme). Ce repo fournit le <strong>corpus de reference</strong> : des
+          sujets dont on connait deja la verite (le <strong>ground-truth</strong> :
+          detectable ou non, conforme ou non, et pourquoi). Cette page est le{" "}
+          <strong>tableau de bord de recette</strong> qui repond a UNE question :{" "}
+          <em>les outils tombent-ils juste sur ce corpus connu ?</em> Un FAIL ici
+          signifie qu&apos;un outil s&apos;est trompe sur un cas dont la reponse
+          etait connue d&apos;avance.
+        </p>
+        <h3>C&apos;est quoi le harness</h3>
+        <p>
+          Le <strong>harness</strong> (harnais de recette, <code>recette/harness.py</code>{" "}
+          + <code>recette/report.py</code>) est le programme qui automatise la
+          boucle de recette : pour chaque sujet du corpus, il rejoue le scenario
+          fige, soumet le sujet a l&apos;evaluateur, compare le verdict obtenu au
+          ground-truth attendu, et agrege le tout en scorecard
+          (<code>GET /subjects/scorecard</code>). C&apos;est un banc d&apos;essai,
+          pas un outil de production : il ne decouvre rien de nouveau, il mesure
+          si un outil retrouve ce qu&apos;on sait deja.
+        </p>
+        <h3>Un LLM est-il utilise ici ?</h3>
+        <p>
+          <strong>Non.</strong> Ce verdict est calcule sans aucun appel a une IA :
+          les sujets d&apos;identification sont des action-logs <em>figes</em>, et
+          le juge est une fonction pure et deterministe (I4) — a corpus et policy
+          identiques, deux relances donnent un resultat byte-identique. Les LLM
+          (onglet IA) servent <em>ailleurs</em> : dans le cockpit, un agent Lane B
+          pilote par un LLM reel <em>produit</em> un action-log en direct ; ce log
+          peut ensuite etre promu en sujet de corpus, qui sera juge ici — toujours
+          sans LLM. Le LLM fabrique la matiere ; la recette la juge froidement.
         </p>
         <h3>Ce que montrent les chiffres</h3>
         <p>
