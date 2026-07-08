@@ -149,7 +149,15 @@ probe_broker_start() {
         return 0
     fi
     mkdir -p "${RUN_DIR}"
-    rm -f "${PROBE_SOCKET_PATH}"
+    case "${PROBE_SOCKET_PATH}" in
+        tcp:*) # Free the canonical TCP port before binding (R19). The broker does
+               # NOT set SO_REUSEADDR, so a stale holder would make the bind fail;
+               # kill it so the fresh broker is the ONLY listener (a Windows
+               # SO_REUSEADDR would otherwise let zombies co-bind and answer).
+               rm -f "${PROBE_ADDR_FILE}"
+               kill_port_holder "${PROBE_SOCKET_PATH##*:}" ;;
+        *)     rm -f "${PROBE_SOCKET_PATH}" ;;
+    esac
     if _probe_live_capable; then
         # Auto-build the watch-list from EVERY configured agent unless the
         # operator pinned a manifest (INSPECT_IA_AGENTS_PROBE_MANIFEST). So a
@@ -173,28 +181,51 @@ probe_broker_start() {
             echo $! >"${PROBE_PID_FILE}" )
         printf 'replay\n' >"${PROBE_MODE_FILE}"
     fi
-    # The socket appears once the broker has bound; wait briefly.
-    local i
-    for ((i = 0; i < 20; i++)); do
-        [ -S "${PROBE_SOCKET_PATH}" ] && break
-        sleep 0.2
-    done
-    if [ -S "${PROBE_SOCKET_PATH}" ]; then
-        ok "probe broker pret (mode $(cat "${PROBE_MODE_FILE}" 2>/dev/null), pid $(_pid_of "${PROBE_PID_FILE}")) - logs: ${PROBE_LOG_FILE}"
+    # The endpoint appears once the broker has bound; wait briefly. For a
+    # tcp:HOST:PORT address (Windows fallback) probe the port with /dev/tcp and
+    # record the address in PROBE_ADDR_FILE so the API fallback resolves it.
+    local i _ready=0
+    case "${PROBE_SOCKET_PATH}" in
+        tcp:*)
+            local _hp="${PROBE_SOCKET_PATH#tcp:}"
+            local _host="${_hp%:*}" _port="${_hp##*:}"
+            for ((i = 0; i < 20; i++)); do
+                if (exec 3<>"/dev/tcp/${_host}/${_port}") 2>/dev/null; then
+                    exec 3>&- 3<&- || true
+                    _ready=1
+                    break
+                fi
+                sleep 0.2
+            done
+            [ "${_ready}" = 1 ] && printf '%s\n' "${PROBE_SOCKET_PATH}" >"${PROBE_ADDR_FILE}"
+            ;;
+        *)
+            for ((i = 0; i < 20; i++)); do
+                [ -S "${PROBE_SOCKET_PATH}" ] && { _ready=1; break; }
+                sleep 0.2
+            done
+            ;;
+    esac
+    if [ "${_ready}" = 1 ]; then
+        ok "probe broker pret (${PROBE_SOCKET_PATH}, mode $(cat "${PROBE_MODE_FILE}" 2>/dev/null), pid $(_pid_of "${PROBE_PID_FILE}")) - logs: ${PROBE_LOG_FILE}"
     else
-        warn "probe broker socket absent - voir ${PROBE_LOG_FILE} (capture restera desactivee)"
+        warn "probe broker endpoint absent - voir ${PROBE_LOG_FILE} (capture restera desactivee)"
     fi
 }
 
 probe_broker_stop() {
-    local pid
+    local pid _sock_file=""
+    case "${PROBE_SOCKET_PATH}" in
+        tcp:*) ;;
+        *) _sock_file="${PROBE_SOCKET_PATH}" ;;
+    esac
     if ! pid="$(_pid_of "${PROBE_PID_FILE}")"; then
-        rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}" "${PROBE_MODE_FILE}"
+        rm -f "${PROBE_PID_FILE}" ${_sock_file:+"${_sock_file}"} "${PROBE_MODE_FILE}" "${PROBE_ADDR_FILE}"
         return 0
     fi
     hdr "STOP probe broker (pid ${pid})"
     kill "${pid}" 2>/dev/null || true
-    rm -f "${PROBE_PID_FILE}" "${PROBE_SOCKET_PATH}" "${PROBE_MODE_FILE}"
+    rm -f "${PROBE_PID_FILE}" ${_sock_file:+"${_sock_file}"} "${PROBE_MODE_FILE}" "${PROBE_ADDR_FILE}"
     ok "probe broker arrete"
 }
 

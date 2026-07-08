@@ -24,7 +24,11 @@ except ImportError:  # pragma: no cover - depends on the [api] extra
     _HAS_FASTAPI = False
 
 
+_HAS_AF_UNIX = hasattr(socket, "AF_UNIX")
+
+
 @unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+@unittest.skipUnless(_HAS_AF_UNIX, "requires AF_UNIX (absent on Windows CPython)")
 class ProbeModeResolveTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -71,6 +75,47 @@ class ProbeModeResolveTest(unittest.TestCase):
         path, mode = probe._resolve_socket()
         self.assertEqual(path, "/run/operator-broker.sock")
         self.assertEqual(mode, "live")  # operator socket defaults to live
+
+
+@unittest.skipUnless(_HAS_FASTAPI, "requires the [api] extra (fastapi)")
+class ProbeAddrFallbackTest(unittest.TestCase):
+    """The tcp: probe.addr marker (Windows fallback) resolves like the canonical
+    socket: mode from probe.mode, safe default replay, garbage ignored."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        # No unix socket exists at the canonical path (Windows situation).
+        self._sock_path = Path(self._tmp.name) / "probe.sock"
+        self._env = mock.patch.dict(os.environ, {}, clear=False)
+        self._env.start()
+        os.environ.pop(probe._SOCKET_ENV, None)
+        os.environ.pop(probe._MODE_ENV, None)
+        self.addCleanup(self._env.stop)
+        self._patch = mock.patch.object(probe, "_canonical_socket", return_value=self._sock_path)
+        self._patch.start()
+        self.addCleanup(self._patch.stop)
+
+    def _write_addr(self, value: str) -> None:
+        (self._sock_path.with_name("probe.addr")).write_text(value, encoding="utf-8")
+
+    def test_tcp_addr_marker_resolves_with_replay_default(self) -> None:
+        self._write_addr("tcp:127.0.0.1:8093\n")
+        path, mode = probe._resolve_socket()
+        self.assertEqual(path, "tcp:127.0.0.1:8093")
+        self.assertEqual(mode, "replay")
+
+    def test_tcp_addr_marker_mode_from_mode_file(self) -> None:
+        self._write_addr("tcp:127.0.0.1:8093")
+        (self._sock_path.with_name("probe.mode")).write_text("live", encoding="utf-8")
+        self.assertEqual(probe._resolve_socket()[1], "live")
+
+    def test_non_tcp_addr_marker_is_ignored(self) -> None:
+        self._write_addr("/some/stale/path.sock")
+        self.assertEqual(probe._resolve_socket(), (None, "off"))
+
+    def test_absent_marker_is_off(self) -> None:
+        self.assertEqual(probe._resolve_socket(), (None, "off"))
 
 
 if __name__ == "__main__":

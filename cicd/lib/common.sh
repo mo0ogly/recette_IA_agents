@@ -122,12 +122,21 @@ WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8092}"
 # http://127.0.0.1:${LLM_PROXY_PORT}. Off unless the operator brings it up.
 LLM_PROXY_PORT="${INSPECT_IA_AGENTS_LLM_PROXY_PORT:-9093}"
 
-# -- discovery probe broker (Unix socket) ------------------------------------
+# -- discovery probe broker (Unix socket; loopback TCP on Windows) -----------
 # The console Probe view relays a capture to a broker on this socket. In dev/CI
 # (no CAP_BPF) the non-privileged REPLAY broker is launched here, serving a
 # deterministic replay of the corpus surface ground-truth (mode=replay). The
 # privileged eBPF broker would set mode=live. Socket path lives under .run/.
-PROBE_SOCKET_PATH="${INSPECT_IA_AGENTS_PROBE_SOCKET:-${RUN_DIR}/probe.sock}"
+# Windows (Git Bash): CPython has no AF_UNIX, so the default endpoint becomes
+# tcp:127.0.0.1:<port>; the launcher records it in PROBE_ADDR_FILE so the API
+# fallback resolution finds it (no env needed across processes).
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        _probe_default_addr="tcp:127.0.0.1:${INSPECT_IA_AGENTS_PROBE_TCP_PORT:-8093}" ;;
+    *)  _probe_default_addr="${RUN_DIR}/probe.sock" ;;
+esac
+PROBE_SOCKET_PATH="${INSPECT_IA_AGENTS_PROBE_SOCKET:-${_probe_default_addr}}"
+PROBE_ADDR_FILE="${RUN_DIR}/probe.addr"
 PROBE_PID_FILE="${RUN_DIR}/probe.pid"
 PROBE_LOG_FILE="${RUN_DIR}/probe.log"
 # The launcher records here which broker it started (live|replay) so the API's

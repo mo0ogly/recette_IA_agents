@@ -208,6 +208,66 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
           <code>POST /probe/capture</code> against the broker; with no broker the button stays
           disabled (fail-safe).
         </p>
+        <h3>Pas-a-pas (FR) : lancer et observer</h3>
+        <p>
+          <strong>1. Mode process (eBPF).</strong> Choisir un agent puis{" "}
+          <strong>Lancer (process)</strong> : l&apos;agent part comme{" "}
+          <strong>process OS separe</strong> (<code>POST /runs</code>,{" "}
+          <code>kind: lane_b_process</code>). C&apos;est le prerequis d&apos;une capture eBPF :
+          un run in-process est invisible pour les tracepoints noyau, un process separe a un
+          PID observable. La capture precise (<code>POST /probe/process-capture</code>) donne
+          alors au broker le PID exact -- l&apos;attribution ne repose pas sur le nom de
+          process tronque.
+        </p>
+        <p>
+          <strong>2. Campagne (eBPF).</strong> Choisir une campagne puis{" "}
+          <strong>Lancer (campagne)</strong>{" "}
+          (<code>POST /probe/process-capture-campaign</code>) : chaque etape mock-capable part comme
+          process OS, et la capture couvre <strong>tous les PIDs en une seule fenetre</strong>.
+          Utile pour verifier qu&apos;un scenario multi-agents entier est observable d&apos;un
+          coup, pas agent par agent.
+        </p>
+        <p>
+          <strong>3. Surveillance eBPF (live).</strong> <strong>Demarrer</strong> ouvre une
+          veille passive (<code>POST /probe/monitor/start</code>) : UNE connexion au broker,
+          une fenetre glissante, et tout agent surveille qui se connecte apparait dans la
+          liste avec le badge <strong>VU</strong>, ses surfaces et le nombre de fenetres ou il
+          a ete apercu. En mode <code>replay</code> (sans CAP_BPF), la veille rejoue le
+          ground-truth du corpus -- deterministe, par ex. <code>pr-bot-sdk</code> VU sur les 4
+          surfaces, <code>ghost-direct-db</code> VU sur <code>ebpf_wire</code> seulement. En
+          mode <code>live</code> (Linux + broker CAP_BPF), c&apos;est le trafic reel qui
+          flague. Si aucun broker ne tourne, le demarrage repond 503 -- rien n&apos;est
+          fabrique (fail-safe).
+        </p>
+        <h3>Walkthrough (EN): launch and observe</h3>
+        <p>
+          <strong>1. Process mode (eBPF).</strong> Pick an agent, then{" "}
+          <strong>Launch (process)</strong>: the agent starts as a{" "}
+          <strong>separate OS process</strong> (<code>POST /runs</code>,{" "}
+          <code>kind: lane_b_process</code>). That is the prerequisite for an eBPF capture: an
+          in-process run is invisible to kernel tracepoints, a separate process has an
+          observable PID. The precise capture (<code>POST /probe/process-capture</code>) then
+          hands the broker the exact PID -- attribution never relies on the truncated process
+          name.
+        </p>
+        <p>
+          <strong>2. Campaign (eBPF).</strong> Pick a campaign, then{" "}
+          <strong>Launch (campaign)</strong> (<code>POST /probe/process-capture-campaign</code>):
+          every mock-capable step starts as an OS process and the capture covers{" "}
+          <strong>all the PIDs in one window</strong> -- proving a whole multi-agent scenario
+          observable at once, not agent by agent.
+        </p>
+        <p>
+          <strong>3. eBPF surveillance (live).</strong> <strong>Start</strong> opens a passive
+          watch (<code>POST /probe/monitor/start</code>): ONE broker connection, a rolling
+          window, and any watched agent that connects shows up in the list with the{" "}
+          <strong>VU</strong> badge, its surfaces and how many windows it was seen in. In{" "}
+          <code>replay</code> mode (no CAP_BPF) the watch replays the corpus ground-truth --
+          deterministic, e.g. <code>pr-bot-sdk</code> seen on all 4 surfaces,{" "}
+          <code>ghost-direct-db</code> on <code>ebpf_wire</code> only. In <code>live</code>{" "}
+          mode (Linux + CAP_BPF broker) real traffic does the flagging. With no broker
+          running, start answers 503 -- nothing is fabricated (fail-safe).
+        </p>
       </>
     ),
   },

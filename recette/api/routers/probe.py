@@ -301,7 +301,11 @@ def _resolve_socket() -> tuple[str | None, str]:
        from ``.run/probe.mode`` (the launcher records live vs replay there), so a
        launcher-started LIVE broker on the canonical socket reports ``live`` while
        the default replay broker reports ``replay`` (R13/R14).
-    3. Otherwise: no socket -> ``(None, "off")``.
+    3. Fallback: the launcher's ``.run/probe.addr`` marker -- written when the
+       broker binds a loopback ``tcp:HOST:PORT`` endpoint instead of a Unix
+       socket (Windows, where CPython has no ``socket.AF_UNIX``). Mode comes
+       from ``.run/probe.mode`` exactly like the canonical-socket fallback.
+    4. Otherwise: no socket -> ``(None, "off")``.
     """
     env_socket = os.environ.get(_SOCKET_ENV)
     if env_socket:
@@ -309,6 +313,13 @@ def _resolve_socket() -> tuple[str | None, str]:
     canonical = _canonical_socket()
     if canonical.is_socket():
         return str(canonical), _canonical_mode(os.environ.get(_MODE_ENV, "replay"))
+    addr_file = canonical.with_name("probe.addr")
+    try:
+        address = addr_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        address = ""
+    if address.startswith("tcp:"):
+        return address, _canonical_mode(os.environ.get(_MODE_ENV, "replay"))
     return None, "off"
 
 

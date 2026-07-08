@@ -1,10 +1,12 @@
 """Relay a capture request to the privileged discoveryprobe broker.
 
 The API is NON-privileged (design sec. 7): it never loads eBPF itself. It
-connects to the broker's local Unix socket, sends ONE `capture` command line,
-reads the JSON response line, and returns it. The broker holds CAP_BPF and does
-the work. If the socket is unset or unreachable, the relay fails CLOSED
-(:class:`ProbeUnavailable`) -- it never fabricates a capture (fail-safe).
+connects to the broker's local socket -- the canonical Unix socket path, or a
+loopback ``tcp:HOST:PORT`` endpoint on platforms without ``socket.AF_UNIX``
+(Windows) -- sends ONE `capture` command line, reads the JSON response line,
+and returns it. The broker holds CAP_BPF and does the work. If the socket is
+unset or unreachable, the relay fails CLOSED (:class:`ProbeUnavailable`) -- it
+never fabricates a capture (fail-safe).
 """
 
 from __future__ import annotations
@@ -12,9 +14,29 @@ from __future__ import annotations
 import json
 import socket
 
+from ..platform.probe.address import create_stream_socket, parse_probe_address
+
 
 class ProbeUnavailable(RuntimeError):
     """The broker socket is not configured, not reachable, or returned garbage."""
+
+
+def _connect(socket_path: str, timeout: float) -> socket.socket:
+    """A connected stream socket for a unix-path or ``tcp:HOST:PORT`` address.
+
+    Raises :class:`ProbeUnavailable` on any parse/connect failure (fail-safe)."""
+    try:
+        family, target = parse_probe_address(socket_path)
+        sock = create_stream_socket(family)
+    except (ValueError, OSError) as exc:
+        raise ProbeUnavailable(f"broker socket {socket_path}: {exc}") from exc
+    sock.settimeout(timeout)
+    try:
+        sock.connect(target if family == "tcp" else socket_path)  # type: ignore[arg-type]
+    except OSError as exc:
+        sock.close()
+        raise ProbeUnavailable(f"broker socket {socket_path}: {exc}") from exc
+    return sock
 
 
 def open_watch(
@@ -28,12 +50,11 @@ def open_watch(
     event is lost between slices (unlike repeated bounded captures). Raises
     :class:`ProbeUnavailable` on connect failure (fail-safe)."""
     request = json.dumps({"command": "watch", "agents": agents, "duration_ms": duration_ms})
+    sock = _connect(socket_path, timeout)
     try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        sock.connect(socket_path)
         sock.sendall((request + "\n").encode("utf-8"))
     except OSError as exc:
+        sock.close()
         raise ProbeUnavailable(f"broker socket {socket_path}: {exc}") from exc
     return sock
 
@@ -60,9 +81,7 @@ def relay_capture(
     request = json.dumps(payload)
     chunks: list[bytes] = []
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(timeout)
-            sock.connect(socket_path)
+        with _connect(socket_path, timeout) as sock:
             sock.sendall((request + "\n").encode("utf-8"))
             sock.shutdown(socket.SHUT_WR)
             while True:

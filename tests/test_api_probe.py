@@ -42,16 +42,29 @@ _BROKER_OK = {
 }
 
 
+_HAS_AF_UNIX = hasattr(socket, "AF_UNIX")
+
+
 class _StubBroker:
-    """A one-command Unix-socket server mimicking the real broker's wire form."""
+    """A one-command stream server mimicking the real broker's wire form.
+
+    Binds a Unix socket where ``AF_UNIX`` exists, else a loopback TCP endpoint
+    (Windows CPython); ``path`` is the address to hand to the relay either way.
+    """
 
     def __init__(self, response: dict) -> None:
-        self.dir = tempfile.mkdtemp()
-        self.path = os.path.join(self.dir, "broker.sock")
         self.response = response
         self.requests: list[str] = []
-        self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._sock.bind(self.path)
+        if _HAS_AF_UNIX:
+            self.dir = tempfile.mkdtemp()
+            self.path = os.path.join(self.dir, "broker.sock")
+            self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self._sock.bind(self.path)
+        else:
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._sock.bind(("127.0.0.1", 0))
+            host, port = self._sock.getsockname()[:2]
+            self.path = f"tcp:{host}:{port}"
         self._sock.listen(8)
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
@@ -150,6 +163,7 @@ class TestProbeApi(unittest.TestCase):
         self.assertTrue(body["configured"])
         self.assertEqual(body["mode"], "live")
 
+    @unittest.skipUnless(_HAS_AF_UNIX, "canonical .sock fallback needs AF_UNIX")
     def test_canonical_socket_fallback_when_env_unset(self) -> None:
         # The friction this closes: a standalone `api restart` dropped the env
         # but the auto-started broker is still up at .run/probe.sock. Status must

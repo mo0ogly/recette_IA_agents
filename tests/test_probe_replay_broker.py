@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import json
 import os
+import socket as _socket
 import tempfile
 import threading
 import unittest
 
-from recette.api.probe_relay import relay_capture
+_HAS_AF_UNIX = hasattr(_socket, "AF_UNIX")
+
+from recette.api.probe_relay import open_watch, relay_capture
 from recette.platform.probe.replay_broker import (
     ReplayBroker,
     build_recording,
@@ -82,6 +85,7 @@ class TestHandleCommand(unittest.TestCase):
         self.assertEqual(out["status"], "error")
 
 
+@unittest.skipUnless(_HAS_AF_UNIX, "requires AF_UNIX (absent on Windows CPython)")
 class TestEndToEndThroughRelayAndJudge(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.mkdtemp()
@@ -113,6 +117,73 @@ class TestEndToEndThroughRelayAndJudge(unittest.TestCase):
         scorecard = score_recording(json.dumps(recording))
         self.assertTrue(scorecard.ok)
         self.assertEqual(tuple(scorecard.false_negatives), ())
+
+
+class TestEndToEndOverTcp(unittest.TestCase):
+    """The tcp:HOST:PORT endpoint (Windows fallback, no AF_UNIX) carries the
+    same wire form end-to-end: broker bind, relay connect, judge scoring.
+    Runs on every platform (loopback TCP), so the e2e path stays covered where
+    the unix-socket class above is skipped."""
+
+    def setUp(self) -> None:
+        # Port 0 -> the OS picks a free ephemeral port; the broker reports it.
+        self.broker = ReplayBroker("tcp:127.0.0.1:0")
+        self.thread = threading.Thread(target=self.broker.serve_forever, daemon=True)
+        self.thread.start()
+        self.addCleanup(self.broker.close)
+
+    def test_replay_capture_over_tcp_is_scored(self) -> None:
+        self.assertTrue(self.broker.address.startswith("tcp:127.0.0.1:"))
+        recording = relay_capture(
+            socket_path=self.broker.address,
+            agents=["pr-bot-sdk", "vanished"],
+            duration_ms=1000,
+        )
+        self.assertEqual(recording["status"], "ok")
+        self.assertEqual(recording["mode"], "replay")
+        scorecard = score_recording(json.dumps(recording))
+        self.assertFalse(scorecard.ok)
+        self.assertEqual(tuple(scorecard.false_negatives), ("vanished",))
+
+    def test_deterministic_sha_over_tcp(self) -> None:
+        a = relay_capture(
+            socket_path=self.broker.address, agents=["pr-bot-sdk"], duration_ms=1000
+        )
+        b = relay_capture(
+            socket_path=self.broker.address, agents=["pr-bot-sdk"], duration_ms=1000
+        )
+        self.assertEqual(a["recording_sha256"], b["recording_sha256"])
+
+    def test_watch_streams_deterministic_recordings(self) -> None:
+        # The passive monitor path: ONE connection, one recording line per slice.
+        sock = open_watch(
+            socket_path=self.broker.address, agents=["pr-bot-sdk"], duration_ms=200
+        )
+        self.addCleanup(sock.close)
+        sock.settimeout(5.0)
+        buf = b""
+        while buf.count(b"\n") < 2:
+            data = sock.recv(65536)
+            self.assertTrue(data, "watch stream closed before two slices arrived")
+            buf += data
+        first, second = buf.split(b"\n")[:2]
+        rec_a = json.loads(first)
+        rec_b = json.loads(second)
+        self.assertEqual(rec_a["status"], "ok")
+        self.assertEqual(rec_a["mode"], "replay")
+        # Slices replay the same reference: byte-stable content (I4).
+        self.assertEqual(rec_a["recording_sha256"], rec_b["recording_sha256"])
+
+    def test_watch_does_not_block_concurrent_capture(self) -> None:
+        # A long-lived watch stream must not starve a one-shot capture.
+        sock = open_watch(
+            socket_path=self.broker.address, agents=["pr-bot-sdk"], duration_ms=10_000
+        )
+        self.addCleanup(sock.close)
+        recording = relay_capture(
+            socket_path=self.broker.address, agents=["pr-bot-sdk"], duration_ms=1000
+        )
+        self.assertEqual(recording["status"], "ok")
 
 
 if __name__ == "__main__":

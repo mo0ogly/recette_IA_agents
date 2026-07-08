@@ -22,12 +22,19 @@ run_local() {
                    # COPY of the corpus so no test can ever write the tracked
                    # config/inspect_ia_agents.config.json (R20 anti-pollution).
                    # Reads see identical content; writes land in the copy.
+                   # NOTE: run_local is invoked as `run_local && ok ...`, which
+                   # suppresses `set -e` inside the function -- so unittest's
+                   # exit code MUST be captured explicitly, or the trailing
+                   # cleanup `rm -rf` (exit 0) masks a failing suite and the
+                   # wrapper prints a FALSE "test OK" (caught 2026-07-08).
                    _cfgdir="$(mktemp -d)"
                    cp "${REPO_ROOT}/config/inspect_ia_agents.config.json" \
                       "${_cfgdir}/inspect_ia_agents.config.json"
+                   _rc=0
                    INSPECT_IA_AGENTS_CONFIG_PATH="${_cfgdir}/inspect_ia_agents.config.json" \
-                       "$(py)" -m unittest discover -s "${REPO_ROOT}/tests"
-                   rm -rf "${_cfgdir}" ;;
+                       "$(py)" -m unittest discover -s "${REPO_ROOT}/tests" || _rc=$?
+                   rm -rf "${_cfgdir}"
+                   return "${_rc}" ;;
         gates)     ( cd "${REPO_ROOT}" && make gates ) ;;
         report)    ( cd "${REPO_ROOT}" && "$(py)" -m recette report ) ;;
         validate)  ( cd "${REPO_ROOT}" && "$(py)" -m recette validate ) ;;
