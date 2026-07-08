@@ -39,6 +39,13 @@ def main(argv: list[str] | None = None) -> int:
         help="read agent ids from a config json (agents[].id); the launcher uses "
         "this to auto-build the watch-list from every configured agent",
     )
+    parser.add_argument(
+        "--from-surface-corpus",
+        action="store_true",
+        help="read agent ids from the surface corpus ground-truth (the subjects "
+        "the REPLAY broker knows); the launcher uses this so the passive watch "
+        "has a sensible default watch-list in replay mode (no live eBPF)",
+    )
     parser.add_argument("--out", required=True, help="output manifest path")
     parser.add_argument("--max-duration-ms", type=int, default=5000)
     args = parser.parse_args(argv)
@@ -51,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
             ids += [a["id"] for a in cfg.get("agents", []) if a.get("id")]
         except (OSError, ValueError):
             pass
+    if args.from_surface_corpus:
+        # The replay broker keys its recordings on corpus/surface subject ids;
+        # reuse its loader so the watch-list matches exactly what it can replay.
+        from .replay_broker import load_reference_surfaces
+
+        ids += list(load_reference_surfaces())
     manifest = build_manifest(ids, max_duration_ms=args.max_duration_ms)
     with open(args.out, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)

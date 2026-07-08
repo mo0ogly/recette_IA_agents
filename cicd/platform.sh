@@ -176,6 +176,13 @@ probe_broker_start() {
         printf 'live\n' >"${PROBE_MODE_FILE}"
     else
         hdr "START probe replay broker (socket ${PROBE_SOCKET_PATH}, mode replay)"
+        # Seed the watch-list from the SURFACE CORPUS (the subjects the replay
+        # broker can replay), so the passive watch (/probe/monitor/start with no
+        # agents) has a sensible default in replay/dev mode instead of 400
+        # "no agents to watch". An operator-pinned manifest still wins.
+        if [ -z "${INSPECT_IA_AGENTS_PROBE_MANIFEST:-}" ]; then
+            ( cd "${REPO_ROOT}" && "$(py)" -m recette.platform.probe.manifest_gen --from-surface-corpus --out "${RUN_DIR}/probe-manifest.json" >/dev/null 2>&1 ) || true
+        fi
         ( cd "${REPO_ROOT}" \
             && nohup "$(py)" -m recette.platform.probe.replay_broker --socket "${PROBE_SOCKET_PATH}" >"${PROBE_LOG_FILE}" 2>&1 & \
             echo $! >"${PROBE_PID_FILE}" )
