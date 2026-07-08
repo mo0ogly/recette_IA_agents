@@ -146,6 +146,33 @@ export const HELP_TOPICS: Record<HelpTopicKey, HelpTopic> = {
     body: (
       <>
         <p>
+          <strong>Plateforme : eBPF live = Linux ; sous Windows = mode replay.</strong>{" "}
+          La capture eBPF est une technologie du <strong>noyau Linux</strong>. Les
+          boutons <strong>Lancer (process)</strong>, <strong>Campagne (eBPF)</strong> et{" "}
+          <strong>Surveillance eBPF</strong> ne font une capture noyau REELLE que sous
+          Linux avec le broker privilegie (CAP_BPF). Sous Windows (ou en dev sans
+          CAP_BPF), la plateforme lance le <strong>broker replay</strong> : un substitut{" "}
+          <em>deterministe</em> (I4) qui rejoue le ground-truth du corpus surface au lieu
+          d&apos;observer de vrais process. Consequence : un agent de config lance en
+          process apparait en <strong>ghost</strong> (vu sur aucune surface) car le broker
+          replay ne connait que les sujets du corpus surface (<code>pr-bot-sdk</code>,{" "}
+          <code>ghost-direct-db</code>...). Ce n&apos;est pas un bug -- c&apos;est la
+          frontiere materielle d&apos;eBPF. Pour une capture live, deployer sous Linux
+          (voir <code>docs/runbooks/ebpf-live-capture.md</code>).
+        </p>
+        <p>
+          <strong>Platform: live eBPF = Linux; on Windows = replay mode.</strong> eBPF
+          capture is a <strong>Linux kernel</strong> feature. The{" "}
+          <strong>process / campaign / passive-watch</strong> buttons do a REAL kernel
+          capture only on Linux with the privileged CAP_BPF broker. On Windows (or dev
+          without CAP_BPF) the platform runs the <strong>replay broker</strong>: a{" "}
+          <em>deterministic</em> (I4) stand-in that replays the surface-corpus
+          ground-truth instead of observing real processes. So a config agent launched
+          as a process shows up as a <strong>ghost</strong> (seen on no surface) -- the
+          replay broker only knows the surface-corpus subjects. Not a bug: it is eBPF&apos;s
+          hardware boundary. For a live capture, run on Linux.
+        </p>
+        <p>
           Cette page met cote a cote <strong>l&apos;echange reel</strong> (les{" "}
           <code>ProxyTrace</code> de la vue hook + les <code>WireFlow</code> de la vue reseau) et{" "}
           <strong>ce que le discovery a vu</strong> de ce meme echange. C&apos;est la lisibilite{" "}
