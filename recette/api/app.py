@@ -144,8 +144,13 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
 # Console (Vite) runs on a different origin than the API, so the browser
 # requires CORS. Origins are configurable (R5); the default covers the local
-# console on both loopback spellings. Never wildcard with credentials.
-DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+# console on both loopback spellings. The canonical console port is 5174
+# (cicd/lib/common.sh CONSOLE_PORT since the LAN-exposure move); 5173 is kept
+# for pre-move setups. Never wildcard with credentials.
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5174,http://127.0.0.1:5174,"
+    "http://localhost:5173,http://127.0.0.1:5173"
+)
 
 
 def _maintenance_tasks(app: FastAPI, transport: RealtimeTransport) -> list[ScheduledTask]:
