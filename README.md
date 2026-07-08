@@ -1,4 +1,4 @@
-# recette_agentrail
+# recette_IA_agents
 
 > Application : **inspect_ia_agents** -- console + plateforme de recette +
 > couche de gouvernance runtime pour agents IA.
