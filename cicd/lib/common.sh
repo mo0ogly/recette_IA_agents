@@ -29,24 +29,48 @@ hdr()  { echo -e "\n${CYAN}== $1 ==${NC}"; }
 # Policy (R19): the canonical port is enforced, never relocated. If a port is
 # held -- even by an orphan not tracked in any .run/*.pid -- the holder is
 # killed so the service binds where it is expected.
+# Two backends: `ss` (Linux) and Windows `netstat`/`taskkill` (Git Bash, used
+# by recette.ps1). Windows netstat TCP columns: Proto Local Foreign State PID.
+_have_ss() { command -v ss >/dev/null 2>&1; }
+
 port_free() {
-    ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -q ":${1}\$"
+    if _have_ss; then
+        ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -q ":${1}\$"
+    else
+        ! netstat -ano -p TCP 2>/dev/null \
+            | awk -v p=":${1}" '$4=="LISTENING" && $2 ~ p"$"' | grep -q .
+    fi
 }
 kill_port_holder() {
     local port="$1" pids
     # `|| true`: when the port is FREE, grep finds nothing and exits 1; under the
     # callers' `set -euo pipefail` an unguarded substitution would abort. We want
     # "free port" to be a clean no-op, so swallow the empty-match failure.
-    pids="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$"' \
-        | grep -oP 'pid=\K[0-9]+' | sort -u | tr '\n' ' ' || true)"
+    if _have_ss; then
+        pids="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$"' \
+            | grep -oP 'pid=\K[0-9]+' | sort -u | tr '\n' ' ' || true)"
+    else
+        pids="$(netstat -ano -p TCP 2>/dev/null \
+            | awk -v p=":${port}" '$4=="LISTENING" && $2 ~ p"$" {print $5}' \
+            | sort -u | tr '\n' ' ' || true)"
+    fi
     [ -z "${pids// /}" ] && return 0
     warn "port ${port} occupe par pid(s) ${pids}- kill (port canonique impose R19)"
-    # shellcheck disable=SC2086
-    kill ${pids} 2>/dev/null || true
-    sleep 1
-    if ! port_free "${port}"; then
+    if _have_ss; then
         # shellcheck disable=SC2086
-        kill -9 ${pids} 2>/dev/null || true
+        kill ${pids} 2>/dev/null || true
+        sleep 1
+        if ! port_free "${port}"; then
+            # shellcheck disable=SC2086
+            kill -9 ${pids} 2>/dev/null || true
+            sleep 1
+        fi
+    else
+        # taskkill kills by Windows PID; // keeps MSYS from path-mangling flags.
+        local pid
+        for pid in ${pids}; do
+            taskkill //PID "${pid}" //F >/dev/null 2>&1 || true
+        done
         sleep 1
     fi
 }
