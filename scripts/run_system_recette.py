@@ -58,17 +58,36 @@ class _Report:
             self.failures.append(f"{name}: {detail}")
 
 
+def _iter_routes(app):  # type: ignore[no-untyped-def]
+    """Yield every real (path, methods) route, descending into included routers.
+
+    FastAPI >= 0.116 no longer flattens ``include_router`` into ``app.routes``:
+    each include becomes an ``_IncludedRouter`` wrapper whose actual routes live
+    under ``original_router.routes``. Walk both shapes so the coherence check
+    sees the same routes regardless of the FastAPI version (a bare ``app.routes``
+    scan finds only 5 default routes on newer FastAPI, marking every frontend
+    path an orphan). Any object exposing ``path`` + ``methods`` is a leaf route.
+    """
+    stack = list(app.routes)
+    while stack:
+        r = stack.pop()
+        if hasattr(r, "path") and hasattr(r, "methods"):
+            yield r
+        inner = getattr(r, "original_router", None)
+        if inner is not None and hasattr(inner, "routes"):
+            stack.extend(inner.routes)
+
+
 def _route_templates(app) -> set[str]:  # type: ignore[no-untyped-def]
-    return {r.path for r in app.routes if hasattr(r, "path") and hasattr(r, "methods")}
+    return {r.path for r in _iter_routes(app)}
 
 
 def _route_pairs(app) -> list[tuple[str, str]]:  # type: ignore[no-untyped-def]
     pairs = []
-    for r in app.routes:
-        if hasattr(r, "methods") and hasattr(r, "path"):
-            for m in r.methods:
-                if m != "HEAD":
-                    pairs.append((m, r.path))
+    for r in _iter_routes(app):
+        for m in r.methods:
+            if m != "HEAD":
+                pairs.append((m, r.path))
     return pairs
 
 

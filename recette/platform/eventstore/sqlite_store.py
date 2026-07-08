@@ -52,6 +52,25 @@ class SqliteEventStore:
     def close(self) -> None:
         self._conn.close()
 
+    def __enter__(self) -> "SqliteEventStore":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        # Release the SQLite connection (and its WAL/SHM handles) when a store is
+        # dropped without an explicit close. On POSIX a leaked handle is harmless;
+        # on Windows an open handle keeps a lock on the db file, so a dropped
+        # store would block deleting its directory (e.g. a test's TemporaryDirectory
+        # cleanup -> WinError 32). Guard every failure mode: __del__ must never raise.
+        conn = getattr(self, "_conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     # --- EventStore protocol ---
 
     def append(

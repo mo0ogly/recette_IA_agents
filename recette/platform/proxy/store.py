@@ -523,6 +523,18 @@ class SqliteProxyStore:
         with self._lock:
             self._conn.close()
 
+    def __del__(self) -> None:
+        # Release the SQLite connection when a store is dropped without an
+        # explicit close. Harmless on POSIX / for :memory:, but on Windows a
+        # leaked file-backed handle keeps a lock, blocking a test tempdir
+        # cleanup (WinError 32). __del__ must never raise.
+        conn = getattr(self, "_conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
 
 class SqliteTraceRecorder:
     """``TraceRecorder`` facade over ``SqliteProxyStore``.

@@ -88,7 +88,14 @@ class TestApprovalDurability(unittest.TestCase):
         policies.publish(baseline_from_catalog(self.catalog, version="v-test"))
 
     def _open_store(self) -> SqliteEventStore:
-        return SqliteEventStore(self._db)
+        # Close every store deterministically at teardown BEFORE the tempdir is
+        # removed. addCleanup is LIFO and self._tmp.cleanup was registered first
+        # (setUp), so it runs last -- all connections are closed before the dir is
+        # deleted. On Windows an open SQLite handle would otherwise lock the file
+        # and fail the tempdir cleanup (WinError 32).
+        store = SqliteEventStore(self._db)
+        self.addCleanup(store.close)
+        return store
 
     def _gateway(self, store: EventStore, proxy: _RecordingProxy) -> Gateway:
         # A FRESH policy store + gateway each call: this is the "process restart" --

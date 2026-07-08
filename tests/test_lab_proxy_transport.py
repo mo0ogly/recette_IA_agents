@@ -6,20 +6,21 @@ transport faults keep the generic wording. Fail-safe: ok=False, never raises."""
 
 from __future__ import annotations
 
-import socket
+import errno
 import unittest
+from urllib.error import URLError
 
 from recette.platform.events import PlatformActionEvent
 from recette.platform.proxy.lab_proxy import LabHttpProxy, _transport_error
 
 
-def _closed_port() -> int:
-    """A port that is guaranteed to refuse connections (bound then released)."""
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+def _raise(exc: Exception):  # type: ignore[no-untyped-def]
+    """A callable that raises ``exc`` regardless of arguments (stub for _client.post)."""
+
+    def _stub(*_args: object, **_kwargs: object) -> object:
+        raise exc
+
+    return _stub
 
 
 def _event() -> PlatformActionEvent:
@@ -40,8 +41,16 @@ def _event() -> PlatformActionEvent:
 
 class TestLabProxyTransport(unittest.TestCase):
     def test_refused_connection_says_server_stopped(self) -> None:
-        base = f"http://127.0.0.1:{_closed_port()}"
-        result = LabHttpProxy(base_url=base, timeout=2.0).execute(_event())
+        # Inject the exact exception urllib raises on a refused connect (URLError
+        # wrapping ECONNREFUSED). This proves the execute -> _transport_error ->
+        # ExecutionResult wiring deterministically on every platform, instead of
+        # relying on OS loopback behaviour: a bound-then-closed port refuses on
+        # POSIX but can TIME OUT on Windows, which would misclassify the fault.
+        base = "http://127.0.0.1:9"
+        proxy = LabHttpProxy(base_url=base, timeout=2.0)
+        refused = URLError(ConnectionRefusedError(errno.ECONNREFUSED, "refused"))
+        proxy._client.post = _raise(refused)  # type: ignore[method-assign]
+        result = proxy.execute(_event())
         self.assertFalse(result.ok)
         self.assertEqual(result.status_code, 0)
         self.assertIn("server stopped", result.error)

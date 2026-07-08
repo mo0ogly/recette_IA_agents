@@ -152,8 +152,16 @@ class TestSweepTask(unittest.TestCase):
         self.catalog = Catalog(SPECS)
         PolicyStore(self._policy_dir).publish(baseline_from_catalog(self.catalog, version="v-test"))
 
-    def _gateway(self, proxy: _RecordingProxy) -> Gateway:
+    def _open_store(self) -> SqliteEventStore:
+        # Close every store at teardown before the tempdir is removed (LIFO
+        # ordering; self._tmp.cleanup was registered first). An open SQLite
+        # handle locks the db file on Windows -> tempdir cleanup WinError 32.
         store = SqliteEventStore(self._db)
+        self.addCleanup(store.close)
+        return store
+
+    def _gateway(self, proxy: _RecordingProxy) -> Gateway:
+        store = self._open_store()
         return Gateway(
             catalog=self.catalog,
             policy_store=PolicyStore(self._policy_dir),
@@ -190,9 +198,9 @@ class TestSweepTask(unittest.TestCase):
 
         self.assertEqual(outcomes, {"approval-timeout-sweep": 1})
         self.assertEqual(proxy.calls, [])  # never executed (I6)
-        service = ApprovalService(SqliteEventStore(self._db))
+        service = ApprovalService(self._open_store())
         self.assertEqual(service.resolved_ids().get(pending_id), ApprovalState.TIMEOUT)
-        executed = list(SqliteEventStore(self._db).read_from(kind=EventKind.ACTION_EXECUTED))
+        executed = list(self._open_store().read_from(kind=EventKind.ACTION_EXECUTED))
         self.assertEqual([e for e in executed if e.payload.get("agent_id") == "agent-admin"], [])
 
 

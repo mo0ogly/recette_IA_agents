@@ -54,7 +54,10 @@ def _repo_tree(slug: str, corpus_root: Path) -> Path:
 
 
 def _list_files(tree: Path) -> list[str]:
-    return sorted(str(p.relative_to(tree)) for p in tree.rglob("*") if p.is_file())
+    # as_posix(): these are repo-relative paths bound for a git remote (GitHub/
+    # GitLab), which always use forward slashes. str() would render backslashes
+    # on Windows (".inspect_ia_agents\manifest.json"), breaking the plan.
+    return sorted(p.relative_to(tree).as_posix() for p in tree.rglob("*") if p.is_file())
 
 
 def build_plan(
