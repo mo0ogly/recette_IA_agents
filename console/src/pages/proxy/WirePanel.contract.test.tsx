@@ -519,6 +519,22 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("tints rows via ?colors= coloring rules and surfaces a rule error (deep-link)", async () => {
+    // Wireshark coloring rules: first matching rule tints the row. The fixture
+    // has a 201 (ok) and a 403 (fail): "amber:status >= 400" must tint only the
+    // 403 row. An invalid second rule surfaces an error without breaking the view.
+    renderWire(["/proxy?source=wire&colors=" + encodeURIComponent("amber:status >= 400;red:status >=")]);
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    const tinted = selectButtons(list).filter((b) => b.getAttribute("data-tint") === "amber");
+    expect(tinted).toHaveLength(1);
+    expect(screen.getByTestId("wire-filter-colors-error")).toBeInTheDocument();
+    // The input reflects the URL value (deep-link is the source of truth).
+    expect(screen.getByTestId("wire-filter-colors")).toHaveValue(
+      "amber:status >= 400;red:status >=",
+    );
+  });
+
   it("surfaces expert-info signals and opens the anchored flow on click", async () => {
     // A 5xx exchange trips the server_error expert signal; an unmasked
     // API-key-shaped token in a body trips secret_in_clear. Clicking a signal

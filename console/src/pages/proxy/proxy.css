@@ -163,6 +163,24 @@
   background: var(--badge-red-bg);
 }
 
+/* Explicit coloring rules (?colors=) override the implicit fail tint:
+   declared after so the cascade resolves in their favor. Badge tokens only. */
+.proxy-wire-vlist .wire-prow[data-tint="red"] {
+  background: var(--badge-red-bg);
+}
+.proxy-wire-vlist .wire-prow[data-tint="amber"] {
+  background: var(--badge-amber-bg);
+}
+.proxy-wire-vlist .wire-prow[data-tint="green"] {
+  background: var(--badge-green-bg);
+}
+.proxy-wire-vlist .wire-prow[data-tint="gray"] {
+  background: var(--badge-gray-bg);
+}
+.proxy-wire-vlist .wire-prow[data-tint="orange"] {
+  background: var(--badge-orange-bg);
+}
+
 .proxy-wire-vlist .wire-prow:hover {
   background: var(--color-bg);
 }

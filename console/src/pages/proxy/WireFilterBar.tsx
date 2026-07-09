@@ -20,6 +20,8 @@ export default function WireFilterBar({
   methods,
   runIds,
   dfError,
+  colors,
+  colorsError,
 }: {
   filter: WireFlowFilter;
   setParam: (key: string, value: string) => void;
@@ -27,6 +29,9 @@ export default function WireFilterBar({
   methods: string[];
   runIds: string[];
   dfError: string | null;
+  /** Wireshark-style coloring rules ("tint:filter;..."), URL-owned. */
+  colors: string;
+  colorsError: string | null;
 }): JSX.Element {
   return (
     <div className="proxy-filter" role="group" aria-label="wire filter">
@@ -125,6 +130,29 @@ export default function WireFilterBar({
             style={{ color: "var(--badge-red-fg)", fontSize: "0.72rem" }}
           >
             {dfError}
+          </span>
+        )}
+      </label>
+      {/* Coloring rules (Wireshark profiles): first matching rule tints the row.
+          Deep-linkable: the whole rule set lives in the ?colors= query param. */}
+      <label className="proxy-filter-label proxy-filter-df">
+        coloration
+        <input
+          className="proxy-filter-input"
+          type="text"
+          data-testid="wire-filter-colors"
+          placeholder='red:status >= 500;amber:l8.tool contains "delete"'
+          value={colors}
+          onChange={(e) => setParam("colors", e.target.value)}
+          aria-invalid={colorsError !== null}
+        />
+        {colorsError !== null && (
+          <span
+            className="proxy-df-error"
+            data-testid="wire-filter-colors-error"
+            style={{ color: "var(--badge-red-fg)", fontSize: "0.72rem" }}
+          >
+            {colorsError}
           </span>
         )}
       </label>

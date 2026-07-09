@@ -51,6 +51,7 @@ import InstanceSessionSummary from "./InstanceSessionSummary";
 import WireExpertPanel from "./WireExpertPanel";
 import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
+import { compileColorRules, type ColorTint } from "./wireColorRules";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -68,6 +69,8 @@ const WIRE_TRUNCATION_MARKER = "...[truncated]"; // appended by recette/platform
 interface WireRow extends WireFlowLine {
   /** Waterfall width in percent of the slowest buffered flow (layout only). */
   durationPct: number;
+  /** First-matching coloring-rule tint, or null (no rule matched). */
+  tint: ColorTint | null;
 }
 
 /** Render a body for display: pretty-print valid JSON when requested, else raw.
@@ -292,14 +295,19 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // Waterfall scale: the largest latency among the buffered flows. duration_ms
   // is OPS metadata on the view only, never a judge/decision/replay input (I4).
   const maxDur = useMemo(() => maxDuration(visible), [visible]);
+  // Coloring rules (Wireshark profiles): URL-owned so a colored view is
+  // deep-linkable; first matching rule tints the row (wireColorRules.ts).
+  const colorsSrc = params.get("colors") ?? "";
+  const colorRules = useMemo(() => compileColorRules(colorsSrc), [colorsSrc]);
   const rows: WireRow[] = useMemo(
     () =>
       visible.map((f) => ({
         ...wireFlowToLine(f),
         // Width % is layout (relative latency), not a hardcoded color.
         durationPct: maxDur > 0 ? Math.round(((f.duration_ms ?? 0) / maxDur) * 100) : 0,
+        tint: colorRules.tintFor(f),
       })),
-    [visible, maxDur],
+    [visible, maxDur, colorRules],
   );
   const fails = useMemo(() => wireFailureCount(visible), [visible]);
   const selected = useMemo(
@@ -354,6 +362,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           className="proxy-list-item wire-prow"
           data-active={r.seq === selectedSeq}
           data-outcome={r.outcome}
+          data-tint={r.tint ?? undefined}
           onClick={() => setSelectedSeq(r.seq)}
         >
           <span className="wire-col wire-col-seq">{r.seq}</span>
@@ -452,6 +461,12 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         methods={methods}
         runIds={runIds}
         dfError={dfCompiled.ok ? null : dfCompiled.error}
+        colors={colorsSrc}
+        colorsError={
+          colorRules.errors.length > 0
+            ? colorRules.errors.map((e) => `regle ${e.index + 1}: ${e.error}`).join(" ; ")
+            : null
+        }
       />
 
       {nextStep !== null && (
