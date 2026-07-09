@@ -11,7 +11,10 @@ set -euo pipefail
 #   ./recette.sh logs [svc]|shell [svc]         # docker lab
 #   ./recette.sh status                         # full snapshot
 #   ./recette.sh api start|stop|restart|status|logs
+#   ./recette.sh all up|down|restart                     # TOUT d'un coup: plateforme + wire overlay + console UX
 #   ./recette.sh platform up|down|restart|status|purge   # lab mock + API gouvernee
+#   ./recette.sh platform up --docker                    # plateforme gouvernee en Docker (R27 runtime de reference)
+#   ./recette.sh platform up --wire                      # + overlay mitmproxy, route wire active au boot (capture bytes)
 #   ./recette.sh console start|stop|status|logs      # UX React (vite dev)
 #   ./recette.sh campaign list|run <nom> [--json]    # campagnes d'actions
 #   ./recette.sh test|gates|report|validate|run|discovery|recette-full [--docker]
@@ -136,6 +139,10 @@ submenu_git() {
 submenu_services() {
     while true; do
         hdr "Services (plateforme gouvernee + console UX)"
+        _opt "T" "TOUT demarrer (lab + API + wire + console)"
+        _opt "X" "TOUT arreter"
+        _opt "R" "TOUT redemarrer"
+        echo
         _opt 1 "Statut global"
         _opt 2 "Plateforme up (lab mock + API)"
         _opt 3 "Plateforme down"
@@ -150,6 +157,9 @@ submenu_services() {
         echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
+            T|t) all_up; _pause ;;
+            X|x) all_down; _pause ;;
+            R|r) all_restart; _pause ;;
             1) "${STATUS_SH}"; _pause ;;
             2) "${PLATFORM_SH}" up; _pause ;;
             3) "${PLATFORM_SH}" down; _pause ;;
@@ -284,6 +294,37 @@ submenu_cleanup() {
     done
 }
 
+# --- one-shot "everything" orchestration -------------------------------------
+# all_up: bring up, in one command, everything needed to OBSERVE agents -- the
+# governed platform (lab mock + API) with the mitmproxy wire overlay active at
+# boot (so the wire panel is populated with zero manual enable dance), plus the
+# console UX. Composes only verified sub-verbs (platform up --wire, console
+# start). Bare-host dev path: mitmproxy itself still runs in Docker via wire.sh;
+# for the Docker runtime of record use `platform up --docker` (R27).
+all_up() {
+    hdr "TOUT demarrer (plateforme + wire overlay + console)"
+    "${PLATFORM_SH}" up --wire
+    "${PLATFORM_SH}" console start
+    ok "tout est demarre -- console: http://localhost:${CONSOLE_PORT}"
+}
+
+# all_down: stop everything all_up started, in reverse order (console, then the
+# platform, then the wire overlay). Best-effort per step so an already-stopped
+# component never aborts the teardown (set -e safe via || true).
+all_down() {
+    hdr "TOUT arreter (console + plateforme + wire overlay)"
+    "${PLATFORM_SH}" console stop || true
+    "${PLATFORM_SH}" down || true
+    "${WIRE_SH}" down || true
+    ok "tout est arrete"
+}
+
+# all_restart: full down then full up (down is best-effort, up is strict).
+all_restart() {
+    all_down
+    all_up
+}
+
 menu_loop() {
     while true; do
         show_main_menu
@@ -304,6 +345,13 @@ menu_loop() {
 cmd="${1:-menu}"; shift || true
 case "${cmd}" in
     menu)                              menu_loop ;;
+    all)
+        case "${1:-up}" in
+            up)      all_up ;;
+            down)    all_down ;;
+            restart) all_restart ;;
+            *) err "usage: ./recette.sh all up|down|restart"; exit 1 ;;
+        esac ;;
     up|down|restart|rebuild|ps|logs|shell)
                                        "${DOCKER_SH}" "${cmd}" "$@" ;;
     status)                            "${STATUS_SH}" ;;

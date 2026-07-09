@@ -408,6 +408,130 @@
   font-size: 0.8rem;
 }
 
+/* Semantic LLM decode of a wire flow (model/messages/tools/answer): a readable
+ * layer over the raw HTTP body when the flow targets an LLM API. */
+.proxy-wire-llm {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.proxy-wire-llm-head {
+  font-weight: 600;
+}
+
+.proxy-wire-llm-msgs {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.proxy-wire-llm-role {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  margin-right: 0.4rem;
+}
+
+.proxy-wire-llm-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.proxy-wire-llm-answer {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.proxy-wire-llm-meta {
+  color: var(--color-text-muted);
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Run decision timeline: the reasoning -> effect story of a run in capture
+ * order, action steps (tool decided / mutating call) highlighted so an
+ * undesired action is found at its exact step. */
+.proxy-wire-timeline {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+}
+
+.proxy-wire-timeline-head {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.proxy-wire-timeline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.proxy-wire-timeline-step {
+  border-left: 3px solid var(--color-border, rgba(255, 255, 255, 0.15));
+}
+
+/* An action step (tool decided or mutating effect) gets a warning accent: it is
+ * where a run changes the world -- the candidate moment of an undesired action. */
+.proxy-wire-timeline-step[data-action="true"] {
+  border-left-color: var(--color-warning, #d98324);
+}
+
+.proxy-wire-step-btn {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.proxy-wire-step-btn:hover {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.05));
+}
+
+.proxy-wire-step-seq {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.proxy-wire-step-body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.proxy-wire-step-tag {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.proxy-wire-step-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.proxy-wire-step-action {
+  color: var(--color-warning, #d98324);
+  font-weight: 600;
+}
+
 /* Proxy route selector (shared: wire panel + per-run network log). */
 .proxy-selector {
   display: inline-flex;

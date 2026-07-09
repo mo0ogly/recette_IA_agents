@@ -302,10 +302,12 @@ def control_wire_overlay(request: Request, body: dict) -> dict:
 
     Deny-by-default: the API spawns docker only when
     INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL is truthy (fail-safe, R5). The script only
-    STARTS/STOPS the container; routing agent traffic through it still needs the
-    API restarted with INSPECT_IA_AGENTS_WIRE_PROXY set and the CA trusted --
-    reported back in ``next_step``. Logged via tracing (ops action), never
-    appended to the canonical event store."""
+    STARTS/STOPS the container; routing agent traffic through it is then a
+    runtime route selection (POST /proxy/route target=wire, no restart) --
+    reported back in ``next_step``. HTTPS interception of real systems still
+    needs the mitm CA trusted (INSPECT_IA_AGENTS_WIRE_CA) + an API restart.
+    Logged via tracing (ops action), never appended to the canonical event
+    store."""
     action = body.get("action")
     if action not in {"up", "down"}:
         raise HTTPException(status_code=422, detail='body.action must be "up" or "down"')
@@ -336,7 +338,9 @@ def control_wire_overlay(request: Request, body: dict) -> dict:
         "action": action,
         "returncode": result.returncode,
         "next_step": (
-            "set INSPECT_IA_AGENTS_WIRE_PROXY + trust the CA, then ./recette.sh api restart"
+            "choisir la route de transport 'Wire (mitmproxy)' dans le selecteur "
+            "(sans redemarrage, runs suivants); HTTPS reel: faire confiance au CA "
+            "(./recette.sh wire ca -> INSPECT_IA_AGENTS_WIRE_CA) puis ./recette.sh api restart"
             if action == "up"
             else None
         ),

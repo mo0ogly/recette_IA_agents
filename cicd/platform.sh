@@ -6,6 +6,7 @@ set -euo pipefail
 # Usage:
 #   platform.sh up|down|restart|status              # lab mock + API, bare-host (dev only, R27)
 #   platform.sh up|down|restart|status --docker      # lab-mock + API in Docker (R27 runtime of record)
+#   platform.sh up|restart --wire                    # + mitmproxy wire overlay, route wire active au boot
 #   platform.sh console start|stop|status|logs
 #   platform.sh campaign list
 #   platform.sh campaign run <name|file> [--json]
@@ -24,6 +25,7 @@ CICD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${CICD_DIR}/lib/common.sh"
 
 API_SH="${CICD_DIR}/api.sh"
+WIRE_SH="${CICD_DIR}/wire.sh"
 API_PORT_FILE="${RUN_DIR}/api.port"
 
 # Port helpers are shared in lib/common.sh (single source of truth, R19). These
@@ -294,6 +296,25 @@ platform_status_docker() {
     hdr "PLATEFORME GOUVERNEE (Docker)"
     need_docker
     dc ps -a api lab-mock platform-init 2>/dev/null || true
+}
+
+platform_wire_up() {
+    # Bring up the OPTIONAL mitmproxy wire overlay and select the wire transport
+    # route AT BOOT, so the agent <-> server bytes are captured on the wire from
+    # the first run -- no manual env + api restart (R19: one launcher wires it).
+    #
+    # It exports INSPECT_IA_AGENTS_WIRE_PROXY BEFORE the API starts, so
+    # recette.platform.proxy.route.registry_from_env() starts active on 'wire'
+    # (active_from_env = wire is not None). Then platform_up runs unchanged.
+    #
+    # Docker-only (mitmproxy runs as a container, R27); a `wire up` failure is
+    # fatal here (fail-safe: never claim a wire boot that did not start).
+    need_docker
+    "${WIRE_SH}" up
+    export INSPECT_IA_AGENTS_WIRE_PROXY="http://127.0.0.1:${WIRE_PORT}"
+    info "route de transport: wire (mitmproxy) active au boot -> ${INSPECT_IA_AGENTS_WIRE_PROXY}"
+    info "HTTPS des systemes reels: faire confiance au CA (./recette.sh wire ca -> INSPECT_IA_AGENTS_WIRE_CA)"
+    platform_up
 }
 
 platform_up() {
@@ -593,11 +614,19 @@ export INSPECT_IA_AGENTS_API_PORT="${API_PORT}"
 cmd="${1:-status}"; shift || true
 mode="${1:-}"
 case "${cmd}" in
-    up)        if [ "${mode}" = "--docker" ]; then platform_up_docker; else platform_up; fi ;;
+    up)
+        case "${mode}" in
+            --docker) platform_up_docker ;;
+            --wire)   platform_wire_up ;;
+            *)        platform_up ;;
+        esac ;;
     down)      if [ "${mode}" = "--docker" ]; then platform_down_docker; else platform_down; fi ;;
     restart)
-        if [ "${mode}" = "--docker" ]; then platform_down_docker; platform_up_docker
-        else platform_down; platform_up; fi ;;
+        case "${mode}" in
+            --docker) platform_down_docker; platform_up_docker ;;
+            --wire)   platform_down; platform_wire_up ;;
+            *)        platform_down; platform_up ;;
+        esac ;;
     status)    if [ "${mode}" = "--docker" ]; then platform_status_docker; else platform_status; fi ;;
     purge)     platform_purge ;;
     console)
@@ -617,5 +646,5 @@ case "${cmd}" in
             menu)  campaign_menu ;;
             *) err "usage: platform.sh campaign list|run <nom> [--json]"; exit 1 ;;
         esac ;;
-    *) err "usage: platform.sh up|down|restart|status|console ...|campaign ..."; exit 1 ;;
+    *) err "usage: platform.sh up|down|restart|status [--docker|--wire]|console ...|campaign ..."; exit 1 ;;
 esac

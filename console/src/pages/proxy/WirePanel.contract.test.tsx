@@ -206,17 +206,19 @@ describe("WirePanel (R16 contract, delta poll)", () => {
       ok: true,
       action: "up",
       returncode: 0,
+      // Mirrors the real POST /proxy/wire/overlay payload (recette/api/routers/
+      // proxy.py): route selection is runtime, only real-HTTPS needs a restart.
       next_step:
-        "set INSPECT_IA_AGENTS_WIRE_PROXY + trust the CA, then ./recette.sh api restart",
+        "choisir la route de transport 'Wire (mitmproxy)' dans le selecteur "
+        + "(sans redemarrage, runs suivants); HTTPS reel: faire confiance au CA "
+        + "(./recette.sh wire ca -> INSPECT_IA_AGENTS_WIRE_CA) puis ./recette.sh api restart",
     });
     renderWire();
     const toggle = await screen.findByTestId("wire-overlay-toggle");
     fireEvent.click(toggle);
     await waitFor(() => expect(controlWireOverlay).toHaveBeenCalledWith("up"));
     expect(
-      await screen.findByText(
-        /set INSPECT_IA_AGENTS_WIRE_PROXY \+ trust the CA, then \.\/recette\.sh api restart/,
-      ),
+      await screen.findByText(/choisir la route de transport 'Wire \(mitmproxy\)'/),
     ).toBeInTheDocument();
   });
 
@@ -411,5 +413,144 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(follow).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(follow);
     expect(follow).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides the 'desactivee' banner once the operator starts the overlay", async () => {
+    // Off + empty buffer -> banner shows. After clicking Demarrer, the API
+    // returns a next_step note: the overlay is being enabled, so the stale
+    // 'desactivee' banner must yield to the honest next-step note.
+    mockWireDelta({ enabled: false, proxy_url: null, flows: [], last_seq: 0, total: 0, reset: false });
+    vi.mocked(controlWireOverlay).mockResolvedValue({
+      ok: true,
+      action: "up",
+      returncode: 0,
+      next_step: "choisir la route de transport 'Wire (mitmproxy)' dans le selecteur",
+    });
+    renderWire();
+    expect(await screen.findByTestId("wire-disabled")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("wire-overlay-toggle"));
+    await waitFor(() => expect(screen.queryByTestId("wire-disabled")).toBeNull());
+    expect(await screen.findByTestId("wire-next-step")).toBeInTheDocument();
+  });
+
+  it("restarts the overlay in one click (down then up)", async () => {
+    vi.mocked(controlWireOverlay).mockResolvedValue({
+      ok: true,
+      action: "up",
+      returncode: 0,
+      next_step: null,
+    });
+    renderWire();
+    await screen.findByLabelText("wire flows");
+    fireEvent.click(screen.getByTestId("wire-overlay-restart"));
+    await waitFor(() => expect(controlWireOverlay).toHaveBeenCalledWith("down"));
+    await waitFor(() => expect(controlWireOverlay).toHaveBeenCalledWith("up"));
+  });
+
+  it("decodes a selected LLM flow into a semantic view (provider, model, answer, tools)", async () => {
+    // An OpenAI chat/completions flow: the panel lifts the raw HTTP body into a
+    // readable LLM exchange (this is the 'Wireshark for agents' semantic layer).
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        {
+          ...fixture.flows[0],
+          seq: 9,
+          host: "api.openai.com",
+          path: "/v1/chat/completions",
+          request_body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: "hi" }],
+            tools: [{ type: "function", function: { name: "open_pr" } }],
+          }),
+          response_body: JSON.stringify({
+            choices: [{ finish_reason: "stop", message: { content: "hello" } }],
+            usage: { prompt_tokens: 3, completion_tokens: 2 },
+          }),
+        },
+      ],
+      last_seq: 9,
+      total: 1,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
+    fireEvent.click(selectButtons(list)[0]);
+    const decode = await screen.findByTestId("wire-llm-decode");
+    expect(decode).toHaveTextContent("openai");
+    expect(decode).toHaveTextContent("gpt-4o");
+    expect(screen.getByTestId("wire-llm-answer")).toHaveTextContent("hello");
+    expect(screen.getByTestId("wire-llm-tools")).toHaveTextContent("open_pr");
+  });
+
+  it("shows no LLM decode pane for a non-LLM (github) flow", async () => {
+    // The fixture flows are github open_pr calls (no LLM shape): the decode
+    // returns null and the raw body pane stays the source of truth.
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    fireEvent.click(selectButtons(list)[0]);
+    await screen.findByTestId("wire-detail");
+    expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
+  });
+
+  it("reconstructs the run decision timeline (reasoning -> effect) and flags the action step", async () => {
+    // A run scoped by ?run=run-1: the LLM decides delete_repo (decision step),
+    // then the DELETE hits the target (effect step). The timeline must order
+    // them, flag the tool decision as an action, and open the offending step's
+    // decode on click -- the "at which step did the undesired action arrive" view.
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        {
+          ...fixture.flows[0],
+          seq: 11,
+          run_id: "run-1",
+          host: "api.openai.com",
+          path: "/v1/chat/completions",
+          request_body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: "clean up the old repo" }],
+            tools: [{ type: "function", function: { name: "delete_repo" } }],
+          }),
+          response_body: JSON.stringify({
+            choices: [
+              {
+                finish_reason: "tool_calls",
+                message: { content: "deleting", tool_calls: [{ function: { name: "delete_repo" } }] },
+              },
+            ],
+          }),
+        },
+        {
+          ...fixture.flows[0],
+          seq: 12,
+          run_id: "run-1",
+          method: "DELETE",
+          host: "api.github.com",
+          path: "/repos/acme/old",
+          status_code: 204,
+          request_body: "",
+          response_body: "",
+        },
+      ],
+      last_seq: 12,
+      total: 2,
+      reset: false,
+    });
+    renderWire(["/proxy?source=wire&run=run-1"]);
+    const tl = await screen.findByTestId("wire-run-timeline");
+    expect(tl).toHaveTextContent("delete_repo");
+    // The tool-deciding step is flagged as an action; the inert steps are not.
+    expect(screen.getByTestId("wire-step-11")).toHaveAttribute("data-action", "true");
+    expect(screen.getByTestId("wire-step-decides-11")).toBeInTheDocument();
+    // The mutating DELETE effect is also flagged as an action.
+    expect(screen.getByTestId("wire-step-12")).toHaveAttribute("data-action", "true");
+    // Clicking the offending step opens its full LLM decode.
+    fireEvent.click(within(screen.getByTestId("wire-step-11")).getByRole("button"));
+    expect(await screen.findByTestId("wire-llm-decode")).toBeInTheDocument();
   });
 });

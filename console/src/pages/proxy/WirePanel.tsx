@@ -30,6 +30,8 @@ import { VirtualList } from "../../components/VirtualList";
 import type { WireFlow } from "../../types/platform";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
+import { decodeLlmFlow } from "./wireLlmDecode";
+import { buildRunTimeline, isActionStep } from "./wireRunTimeline";
 import { lineDiff } from "./diff";
 import { byteLen, downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
@@ -236,6 +238,25 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     }
   }, [enabled, refresh]);
 
+  // Restart the overlay in one click: stop then start (the API exposes up/down
+  // only, so a restart is down-then-up). Fail-safe: a failed 'down' still tries
+  // 'up' is NOT assumed -- a down error aborts and is surfaced, never a silent
+  // half-restart claimed as done.
+  const onRestartOverlay = useCallback(async (): Promise<void> => {
+    setBusy(true);
+    try {
+      await controlWireOverlay("down");
+      const res = await controlWireOverlay("up");
+      setNextStep(res.next_step);
+      setActionError(null);
+      await refresh();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh]);
+
   // The select options derive from the CURRENTLY buffered (already filtered)
   // rows: once a clause is set the other options narrow with it. Accepted
   // trade-off of server-side filtering -- clearing the clause widens again.
@@ -258,6 +279,19 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const selected = useMemo(
     () => items.find((f) => f.seq === selectedSeq) ?? null,
     [items, selectedSeq],
+  );
+  // Semantic decode of the selected flow when it targets an LLM API: lifts the
+  // raw HTTP body into model/messages/tools/answer. Pure + display-only (I4):
+  // a deterministic function of the flow bytes, never a judge/decision input.
+  // Null for a non-LLM flow -> the raw body pane stays the source of truth.
+  const llm = useMemo(() => (selected !== null ? decodeLlmFlow(selected) : null), [selected]);
+  // Decision timeline of the selected run: when a run clause is active the
+  // buffered flows are exactly that run's flows (server-scoped), so ordering
+  // them by capture sequence reconstructs the reasoning -> effect story. Lets an
+  // operator find the exact step where an undesired action first appears.
+  const timeline = useMemo(
+    () => (filter.runId !== undefined ? buildRunTimeline(items) : []),
+    [filter.runId, items],
   );
   const compareFlow = useMemo(
     () => items.find((f) => f.seq === compareSeq) ?? null,
@@ -339,6 +373,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           onClick={() => void onToggleOverlay()}
         >
           {enabled === true ? "Arreter le reseau (wire)" : "Demarrer le reseau (wire)"}
+        </button>
+        <button
+          type="button"
+          className="proxy-clear"
+          data-testid="wire-overlay-restart"
+          disabled={busy}
+          onClick={() => void onRestartOverlay()}
+        >
+          Redemarrer (wire)
         </button>
         <button
           type="button"
@@ -450,16 +493,81 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {/* Flows can arrive via the transport-route registry even when
           INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
           how-to-enable banner to actual data. */}
-      {enabled === false && items.length === 0 && (
+      {/* Off AND empty AND no start action in flight: a fresh disabled overlay.
+          Once the operator clicked "Demarrer" (busy) or the API returned a
+          next-step note, the overlay is (being) enabled -- the "desactivee"
+          banner would be false, so it yields to the next-step note above. */}
+      {enabled === false && items.length === 0 && !busy && nextStep === null && (
         <p className="proxy-banner" role="status" data-testid="wire-disabled">
-          Surcouche wire desactivee. Demarrer mitmproxy avec
-          <code> ./recette.sh wire up</code>, puis exporter
-          <code> INSPECT_IA_AGENTS_WIRE_PROXY=http://127.0.0.1:8083</code> et relancer
-          l&apos;API (<code>./recette.sh api restart</code>) pour router les agents
-          au travers.
+          Surcouche wire desactivee (aucun flux capture). Le plus simple:{" "}
+          <code>./recette.sh all up</code> demarre la plateforme avec l'overlay
+          actif d'un coup. Sinon, cliquer <strong>Demarrer le reseau (wire)</strong>{" "}
+          ci-dessus, PUIS choisir la route <strong>Wire (mitmproxy)</strong> dans
+          le selecteur -- c'est cette etape qui active la capture (effet immediat,
+          runs suivants). Pour le HTTPS des systemes reels, faire aussi confiance
+          au CA (<code>./recette.sh wire ca</code> {"->"}{" "}
+          <code>INSPECT_IA_AGENTS_WIRE_CA</code>) puis{" "}
+          <code>./recette.sh api restart</code>.
         </p>
       )}
       {shownError !== null && <p className="proxy-error">{shownError}</p>}
+
+      {/* Decision timeline of the selected run: the reasoning -> effect story in
+          capture order, action steps (tool decided / mutating call) highlighted,
+          each clickable to open its full flow -- so an undesired action is found
+          at its exact step. Only shown when a run clause scopes the flows. */}
+      {filter.runId !== undefined && timeline.length > 0 && (
+        <div className="proxy-wire-timeline" data-testid="wire-run-timeline">
+          <div className="proxy-wire-timeline-head">
+            Timeline decision -- run {filter.runId.slice(0, 12)} ({timeline.length} etapes)
+          </div>
+          <ol className="proxy-wire-timeline-list">
+            {timeline.map((s) => (
+              <li
+                key={s.seq}
+                className="proxy-wire-timeline-step"
+                data-kind={s.kind}
+                data-action={isActionStep(s)}
+                data-testid={`wire-step-${s.seq}`}
+              >
+                <button
+                  type="button"
+                  className="proxy-wire-step-btn"
+                  onClick={() => setSelectedSeq(s.seq)}
+                >
+                  <span className="proxy-wire-step-seq">#{s.seq}</span>
+                  {s.kind === "decision" ? (
+                    <span className="proxy-wire-step-body">
+                      <span className="proxy-wire-step-tag">
+                        reflexion{s.model !== null ? ` (${s.model})` : ""}
+                      </span>
+                      {s.answer !== null && (
+                        <span className="proxy-wire-step-text">{s.answer}</span>
+                      )}
+                      {s.toolCalls.length > 0 && (
+                        <span
+                          className="proxy-wire-step-action"
+                          data-testid={`wire-step-decides-${s.seq}`}
+                        >
+                          decide: {s.toolCalls.join(", ")}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="proxy-wire-step-body">
+                      <span className="proxy-wire-step-tag">effet</span>
+                      <span className="proxy-wire-step-text">
+                        {s.method} {s.host}
+                        {s.path} {"->"} {s.status}
+                      </span>
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       <div className="proxy-grid">
         {/* The wrapper keeps the list role/label the page contract asserts on;
@@ -500,6 +608,54 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
             <p className="proxy-viewer-msg">selectionner un flux a gauche</p>
           ) : (
             <dl className="proxy-wire-kv" data-testid="wire-detail">
+              {llm !== null && (
+                <>
+                  <dt>LLM</dt>
+                  <dd>
+                    <div className="proxy-wire-llm" data-testid="wire-llm-decode">
+                      <div className="proxy-wire-llm-head">
+                        {llm.provider}
+                        {llm.model !== null ? " (" + llm.model + ")" : ""}
+                      </div>
+                      {llm.messages.length > 0 && (
+                        <ol className="proxy-wire-llm-msgs">
+                          {llm.messages.map((m, i) => (
+                            <li key={i}>
+                              <span className="proxy-wire-llm-role">{m.role}</span>
+                              <span className="proxy-wire-llm-text">{m.text}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      {llm.tools.length > 0 && (
+                        <div data-testid="wire-llm-tools">
+                          tools offerts: {llm.tools.join(", ")}
+                        </div>
+                      )}
+                      {llm.toolCalls.length > 0 && (
+                        <div data-testid="wire-llm-toolcalls">
+                          tools appeles: {llm.toolCalls.join(", ")}
+                        </div>
+                      )}
+                      {llm.responseText !== null && (
+                        <div className="proxy-wire-llm-answer" data-testid="wire-llm-answer">
+                          reponse: {llm.responseText}
+                        </div>
+                      )}
+                      {(llm.usage !== null || llm.stop !== null) && (
+                        <div className="proxy-wire-llm-meta">
+                          {llm.usage !== null && (
+                            <span>
+                              tokens: {llm.usage.input ?? "?"} {"->"} {llm.usage.output ?? "?"}
+                            </span>
+                          )}
+                          {llm.stop !== null && <span> stop: {llm.stop}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </dd>
+                </>
+              )}
               <dt>replay</dt>
               <dd>
                 <button

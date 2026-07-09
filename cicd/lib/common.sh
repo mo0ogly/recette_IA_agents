@@ -115,7 +115,9 @@ CAMPAIGN_REPORTS_DIR="${RUN_DIR}/campaigns"
 # -- wire proxy (optional mitmproxy interception overlay, Docker) ------------
 # The host port mitmdump binds; agents route through http://127.0.0.1:${WIRE_PORT}
 # when INSPECT_IA_AGENTS_WIRE_PROXY points at it. Off unless the operator brings it up.
-WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8092}"
+# MUST match the port the wire-proxy container binds (docker-compose.yml:
+# mitmdump --listen-port 8083) and recette.platform.proxy.route.DEFAULT_WIRE_URL.
+WIRE_PORT="${INSPECT_IA_AGENTS_WIRE_PORT:-8083}"
 
 # -- LLM gateway (optional LiteLLM overlay, Docker) --------------------------
 # The host port the LiteLLM proxy binds; an ai_backend (openai_compat) targets
