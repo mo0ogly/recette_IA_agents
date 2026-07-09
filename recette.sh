@@ -139,37 +139,37 @@ submenu_git() {
 submenu_services() {
     while true; do
         hdr "Services (plateforme gouvernee + console UX)"
-        _opt "T" "TOUT demarrer (lab + API + wire + console)"
-        _opt "X" "TOUT arreter"
-        _opt "R" "TOUT redemarrer"
+        _opt 1 "TOUT demarrer (lab + API + wire + console)"
+        _opt 2 "TOUT arreter"
+        _opt 3 "TOUT redemarrer"
         echo
-        _opt 1 "Statut global"
-        _opt 2 "Plateforme up (lab mock + API)"
-        _opt 3 "Plateforme down"
-        _opt 4 "Plateforme restart"
-        _opt 5 "Console UX start (http://localhost:${CONSOLE_PORT})"
-        _opt 6 "Console UX stop"
-        _opt 7 "Console UX statut"
-        _opt 8 "Console UX logs"
+        _opt 4 "Statut global"
+        _opt 5 "Plateforme up (lab mock + API)"
+        _opt 6 "Plateforme down"
+        _opt 7 "Plateforme restart"
+        _opt 8 "Console UX start (http://localhost:${CONSOLE_PORT})"
+        _opt 9 "Console UX stop"
+        _opt 10 "Console UX statut"
+        _opt 11 "Console UX logs"
         echo
-        _opt 9 "Docker lab (sous-menu)"
-        _opt 10 "API gouvernee (sous-menu)"
+        _opt 12 "Docker lab (sous-menu)"
+        _opt 13 "API gouvernee (sous-menu)"
         echo; _opt 0 "Retour"; echo -n "  Choix : "
         local c; read -r c
         case "${c}" in
-            T|t) all_up; _pause ;;
-            X|x) all_down; _pause ;;
-            R|r) all_restart; _pause ;;
-            1) "${STATUS_SH}"; _pause ;;
-            2) "${PLATFORM_SH}" up; _pause ;;
-            3) "${PLATFORM_SH}" down; _pause ;;
-            4) "${PLATFORM_SH}" restart; _pause ;;
-            5) "${PLATFORM_SH}" console start; _pause ;;
-            6) "${PLATFORM_SH}" console stop; _pause ;;
-            7) "${PLATFORM_SH}" console status; _pause ;;
-            8) "${PLATFORM_SH}" console logs; _pause ;;
-            9) submenu_docker ;;
-            10) submenu_api ;;
+            1) all_up; _pause ;;
+            2) all_down; _pause ;;
+            3) all_restart; _pause ;;
+            4) "${STATUS_SH}"; _pause ;;
+            5) "${PLATFORM_SH}" up; _pause ;;
+            6) "${PLATFORM_SH}" down; _pause ;;
+            7) "${PLATFORM_SH}" restart; _pause ;;
+            8) "${PLATFORM_SH}" console start; _pause ;;
+            9) "${PLATFORM_SH}" console stop; _pause ;;
+            10) "${PLATFORM_SH}" console status; _pause ;;
+            11) "${PLATFORM_SH}" console logs; _pause ;;
+            12) submenu_docker ;;
+            13) submenu_api ;;
             0|q|Q) return ;;
             *) warn "choix invalide"; _pause ;;
         esac

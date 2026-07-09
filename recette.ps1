@@ -10,6 +10,7 @@ Usage (PowerShell):
   .\recette.ps1                     # interactive menu
   .\recette.ps1 doctor              # Windows environment check (Git Bash, venv, docker, ports)
   .\recette.ps1 status              # full snapshot
+  .\recette.ps1 all up|down|restart # TOUT d'un coup: plateforme + wire overlay + console
   .\recette.ps1 platform up         # lab mock + governed API
   .\recette.ps1 api start|stop|restart|status|logs
   .\recette.ps1 console start|stop|status|logs
@@ -206,6 +207,10 @@ function Show-ApiMenu {
 
 function Show-ServicesMenu {
     Show-Submenu 'Services (plateforme gouvernee + console UX)' @(
+        @{ Label = 'TOUT demarrer (lab + API + wire + console)'; Sh = @('all', 'up') }
+        @{ Label = 'TOUT arreter';                     Sh = @('all', 'down') }
+        @{ Label = 'TOUT redemarrer';                  Sh = @('all', 'restart') }
+        $null
         @{ Label = 'Statut global';                    Sh = @('status') }
         @{ Label = 'Plateforme up (lab mock + API)';   Sh = @('platform', 'up') }
         @{ Label = 'Plateforme down';                  Sh = @('platform', 'down') }
