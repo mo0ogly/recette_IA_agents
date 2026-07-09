@@ -312,6 +312,12 @@ platform_wire_up() {
     need_docker
     "${WIRE_SH}" up
     export INSPECT_IA_AGENTS_WIRE_PROXY="http://127.0.0.1:${WIRE_PORT}"
+    # Allow the console's wire on/off button (POST /proxy/wire/overlay, which
+    # shells out to `./recette.sh wire up|down`) in THIS explicit observe path
+    # only. The control is deny-by-default (fail-safe): enabling it here -- where
+    # the operator already opted into the wire overlay -- keeps the guard off for
+    # a plain `platform up`, and stays overridable for a locked-down deployment.
+    export INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL="${INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL:-1}"
     info "route de transport: wire (mitmproxy) active au boot -> ${INSPECT_IA_AGENTS_WIRE_PROXY}"
     info "HTTPS des systemes reels: faire confiance au CA (./recette.sh wire ca -> INSPECT_IA_AGENTS_WIRE_CA)"
     platform_up

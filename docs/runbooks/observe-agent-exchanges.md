@@ -105,6 +105,12 @@ Trois surfaces, du raisonnement à l'octet :
 | **App-traces** (page Proxy) | effets d'action gouvernés (action_type, resource, réponse) | `INSPECT_IA_AGENTS_PROXY_DEBUG=on` (ON par défaut sous `all up` et Docker) |
 | **Wire** (timeline décision) | octets réseau + timeline `réflexion → effet` par run, actions surlignées | overlay wire actif (`all up`) + route Wire sélectionnée |
 
+Le bouton **Démarrer/Arrêter le réseau (wire)** de la console pilote l'overlay
+(`POST /proxy/wire/overlay`). Il est deny-by-default (`INSPECT_IA_AGENTS_ALLOW_WIRE_CONTROL`)
+et n'est autorisé que dans le chemin observe : lancer via `./recette.sh all up`
+(ou `platform up --wire`) l'active. En dehors, un clic renvoie 403 — c'est voulu.
+Il ne fonctionne que si l'API tourne bare-host (elle shelle `./recette.sh wire`).
+
 Pour la timeline « à quel moment une action non désirée arrive » : filtrer la
 page wire sur le `run_id`, la section **Timeline décision** ordonne les étapes et
 surligne les actions (tool décidé / appel mutant).
