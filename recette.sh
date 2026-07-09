@@ -315,7 +315,14 @@ all_down() {
     hdr "TOUT arreter (console + plateforme + wire overlay)"
     "${PLATFORM_SH}" console stop || true
     "${PLATFORM_SH}" down || true
-    "${WIRE_SH}" down || true
+    # wire.sh down prints two advisories about unsetting INSPECT_IA_AGENTS_WIRE_PROXY
+    # and restarting the API to return to direct transport. They are moot in a full
+    # teardown -- all_down stops the API right after, so nothing is left pointing at
+    # the proxy. Drop just those two lines (both carry the env-var marker) without
+    # touching wire.sh (R19 single implementation); keep the header/OK and any error.
+    local wire_out
+    wire_out="$("${WIRE_SH}" down 2>&1)" || true
+    printf '%s\n' "${wire_out}" | grep -v "INSPECT_IA_AGENTS_WIRE_PROXY" || true
     ok "tout est arrete"
 }
 
