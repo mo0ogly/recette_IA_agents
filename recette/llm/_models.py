@@ -89,6 +89,7 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
         "kimi-k2.6",
     ),
     "zai": (
+        "glm-5.2",
         "glm-4.7",
         "glm-4.5v",
         "glm-4.5",
