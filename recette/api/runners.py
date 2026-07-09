@@ -100,6 +100,27 @@ def resolve_pace(agent_cfg: dict, servers: list[dict]) -> int:
     return max(0, min(pace, MAX_PACE_MS))
 
 
+# The decide->act loop bound. The lane_b default (10) keeps quick runs cheap;
+# a study-grade long conversation raises it per agent, capped so a runaway
+# model can never spin an unbounded (or budget-burning) run.
+DEFAULT_MAX_STEPS = 10
+MAX_MAX_STEPS = 200
+
+
+def resolve_max_steps(agent_cfg: dict) -> int:
+    """Resolve the per-agent decide->act step bound (``max_steps``).
+
+    Clamped to [1, MAX_MAX_STEPS]; any malformed or absent value falls back to
+    DEFAULT_MAX_STEPS (fail-safe: a bad bound never crashes or unbounds a run).
+    Operational config, never a decision input (I4): it bounds the loop, it
+    does not influence any single decision.
+    """
+    steps = agent_cfg.get("max_steps")
+    if isinstance(steps, bool) or not isinstance(steps, int):
+        return DEFAULT_MAX_STEPS
+    return max(1, min(steps, MAX_MAX_STEPS))
+
+
 def _paced_on_step(inner, pace_ms: int, should_stop):
     """Wrap an on_step callback so it sleeps ``pace_ms`` AFTER emitting, in
     PACE_SLICE_MS ticks, bailing as soon as should_stop() is true. At pace 0 it
@@ -539,6 +560,8 @@ def make_lane_b_runner(
             # Scenario friction (deterministic transient errors -> retries):
             # pure config-driven tool_output, no-op when unconfigured.
             tool_output=friction_tool_output(agent_cfg.get("friction")),
+            # Study-grade long conversations: per-agent step bound (clamped).
+            max_steps=resolve_max_steps(agent_cfg),
         )
         emit(
             "result",
@@ -706,6 +729,8 @@ def make_campaign_runner(
                 # Scenario friction: same per-agent config as the single-agent
                 # runner (deterministic transient errors -> retries).
                 tool_output=friction_tool_output(agent_cfg.get("friction")),
+                # Study-grade long conversations: per-agent step bound (clamped).
+                max_steps=resolve_max_steps(agent_cfg),
             )
             rec_id = f"{campaign['id']}.{idx:02d}.{agent_id}"
             recording_store.save(rec_id, result.recording)  # type: ignore[attr-defined]
