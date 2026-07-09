@@ -5,8 +5,11 @@ from recette.redteam_scorecard import render, scorecard
 
 
 class T(unittest.TestCase):
-    def _o(self, sid, verdict, expected, vt, caught, tags=None):
-        return ScenarioOutcome(sid, verdict, expected, vt, caught, tags or {})
+    def _o(self, sid, verdict, expected, vt, caught, tags=None, expected_vt=...):
+        # expected_vt defaults to the predicted vt (a caught row has predicted ==
+        # expected); callers override it to model a wrong-dimension catch.
+        evt = vt if expected_vt is ... else expected_vt
+        return ScenarioOutcome(sid, verdict, expected, vt, evt, caught, tags or {})
 
     def test_scorecard_counts_caught_and_missed(self):
         outs = [

@@ -113,5 +113,6 @@
       "tool_kind": null,
       "approved": false
     }
-  ]
+  ],
+  "expected_violation_type": "capability_overreach"
 }

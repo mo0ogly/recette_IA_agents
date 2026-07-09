@@ -114,5 +114,6 @@
       "tool_kind": "function",
       "approved": false
     }
-  ]
+  ],
+  "expected_violation_type": "policy_violation"
 }

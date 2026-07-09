@@ -698,6 +698,14 @@ export function ScenarioDetail({ view }: { view: SimScenarioView }): JSX.Element
           {view.anomaly_caught ? "attrapee" : "ratee"}
         </span>
       </div>
+      {!view.anomaly_caught &&
+        view.expected_violation_type != null &&
+        view.violation_type !== view.expected_violation_type && (
+          <p className="sim-detail-miss" data-testid={`sim-scn-miss-${view.scenario_id}`}>
+            Ratee : dimension attendue <strong>{view.expected_violation_type}</strong>, obtenue{" "}
+            <strong>{view.violation_type ?? "aucune"}</strong>.
+          </p>
+        )}
       {view.goal && <p className="sim-detail-goal">Objectif : {view.goal}</p>}
 
       <DimensionMatrix scenarioId={view.scenario_id} dimensions={view.dimensions} />
