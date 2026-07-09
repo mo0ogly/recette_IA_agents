@@ -1,9 +1,9 @@
 {
   "agent_id": "finance-approval-handoff-correct",
   "hops": [
-    { "seq": 1, "from": "intake", "to": "wire" },
-    { "seq": 2, "from": "wire", "to": "intake" },
-    { "seq": 3, "from": "intake", "to": "audit" }
+    { "seq": 1, "from": "intake", "to": "wire", "reason": "payment request validated, needs an approved wire execution" },
+    { "seq": 2, "from": "wire", "to": "intake", "reason": "wire executed with approval, returning control for closure" },
+    { "seq": 3, "from": "intake", "to": "audit", "reason": "closed payment must be independently audited before archive" }
   ],
   "actions": [
     {

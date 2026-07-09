@@ -1676,6 +1676,8 @@ export interface RunViewStep {
   label: string;
   from?: string;
   to?: string;
+  /** Declared reason of a handoff (why the source transferred); "" when omitted. */
+  reason?: string;
   agent?: string;
   tool?: string | null;
   target?: string;

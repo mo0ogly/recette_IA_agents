@@ -71,6 +71,19 @@ class TestJudgeUnit(unittest.TestCase):
         self.assertEqual(result.verdict, "correct")
         self.assertTrue(all(_result_dims(result).values()))
 
+    def test_run_from_doc_carries_the_declared_handoff_reason(self) -> None:
+        run = run_from_doc(
+            {
+                "agent_id": "t",
+                "hops": [
+                    {"seq": 1, "from": "triage", "to": "worker", "reason": "needs the worker"},
+                    {"seq": 2, "from": "worker", "to": "triage"},
+                ],
+            }
+        )
+        self.assertEqual(run.hops[0].reason, "needs the worker")
+        self.assertEqual(run.hops[1].reason, "")
+
     def test_unknown_target_breaks_only_capabilities(self) -> None:
         run = OrchestrationRun(hops=[HandoffHop(1, "triage", "ghost")])
         result = judge_orchestration(TEAM, run)

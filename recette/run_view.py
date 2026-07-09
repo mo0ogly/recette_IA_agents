@@ -29,6 +29,9 @@ def build_run_view(team: dict, run: OrchestrationRun) -> dict:
                     "label": f"{hop.source} -> {hop.target}",
                     "from": hop.source,
                     "to": hop.target,
+                    # The declared "why" of the transfer (display metadata,
+                    # never a judge input) -- empty when the run omits it.
+                    "reason": hop.reason,
                 }
             )
     else:
