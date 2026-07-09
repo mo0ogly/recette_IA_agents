@@ -112,6 +112,24 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 base_url=backend.get("base_url"),
                 api_key=api_key,
             )
+        # Self-heal the agent's port-bound lab target: if it references a
+        # mock_local/honeypot server that is not up (boot-time start failed, or
+        # the API was started outside `platform up`), start it now -- otherwise
+        # the run fails with "target server unreachable". Idempotent via status
+        # (start only when down); best-effort (a real bind failure still surfaces
+        # as the run's unreachable error, never worse than before). Same
+        # ServerManager the platform owns, so the process is torn down on
+        # shutdown (R19). Starting a lab double is not an external side effect.
+        target_server_id = agent_cfg.get("server")
+        if target_server_id:
+            target_server = store.get_server(target_server_id)
+            sm = request.app.state.server_manager
+            if (
+                target_server is not None
+                and target_server.get("mode") in ("mock_local", "honeypot")
+                and sm.status(target_server_id) != "up"
+            ):
+                sm.start(target_server)
         mgr = request.app.state.run_manager
         run = mgr.create("lane_b", params)
         # config_store carries the server registry for per-agent proxy routing (I5).
