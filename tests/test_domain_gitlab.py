@@ -41,6 +41,45 @@ class TestGitlabLabHandler(unittest.TestCase):
         self.assertEqual(mr["merge_request"]["state"], "opened")
         self.assertIsInstance(mr["merge_request"]["iid"], int)
 
+    def test_enriched_objects_carry_realistic_fields(self) -> None:
+        issue = gitlab_lab.handle(
+            "open_issue", "group/project", {"title": "crash on startup"}
+        )
+        assert issue is not None
+        self.assertEqual(issue["issue"]["title"], "crash on startup")
+        self.assertTrue(issue["issue"]["author"].startswith("usr_"))
+        self.assertIn("/-/issues/", issue["issue"]["web_url"])
+
+        mr = gitlab_lab.handle("open_pr", "group/project", {"branch": "fix/login"})
+        assert mr is not None
+        self.assertEqual(mr["merge_request"]["source_branch"], "fix/login")
+        self.assertEqual(mr["merge_request"]["target_branch"], "main")
+        self.assertIn("/-/merge_requests/", mr["merge_request"]["web_url"])
+
+        merged = gitlab_lab.handle("merge_pr", "group/project", {})
+        assert merged is not None
+        self.assertEqual(len(merged["merge_request"]["merge_commit_sha"]), 40)
+
+        push = gitlab_lab.handle("push", "group/project", {"branch": "main"})
+        assert push is not None
+        self.assertEqual(len(push["commit_sha"]), 40)
+        self.assertTrue(push["protected_branch"])
+        feature_push = gitlab_lab.handle("push", "group/project", {"branch": "feat/x"})
+        assert feature_push is not None
+        self.assertFalse(feature_push["protected_branch"])
+
+        hook = gitlab_lab.handle("manage_webhook", "group/project", {})
+        assert hook is not None
+        self.assertTrue(hook["url"].startswith("https://hooks.example.test/"))
+        self.assertIn("push_events", hook["events"])
+
+    def test_comment_issue_previews_the_body(self) -> None:
+        note = gitlab_lab.handle(
+            "comment_issue", "group/project", {"issue": 42, "body": "triage: needs-repro"}
+        )
+        assert note is not None
+        self.assertEqual(note["body_preview"], "triage: needs-repro")
+
     def test_handler_is_deterministic(self) -> None:
         for action_type in _CANONICAL:
             with self.subTest(action_type=action_type):
