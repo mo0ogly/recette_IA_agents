@@ -51,6 +51,7 @@ _PROVIDER_ENV_KEY = {
     "fireworks": "FIREWORKS_API_KEY",
     "moonshot": "KIMI_API_KEY",
     "zai": "GLM_API_KEY",
+    "zai_coding": "GLM_API_KEY",
     "dashscope": "DASHSCOPE_API_KEY",
     "nvidia": "NVIDIA_API_KEY",
     "nous": "NOUS_API_KEY",

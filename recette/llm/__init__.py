@@ -70,6 +70,7 @@ from .openai_wire import (
     TogetherLlm,
     XaiLlm,
     XiaomiLlm,
+    ZaiCodingLlm,
     ZaiLlm,
 )
 
@@ -99,6 +100,7 @@ __all__ = [
     "FireworksLlm",
     "MoonshotLlm",
     "ZaiLlm",
+    "ZaiCodingLlm",
     "DashscopeLlm",
     "NvidiaLlm",
     "NousLlm",

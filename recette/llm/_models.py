@@ -305,8 +305,9 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
 
 
 # Provider aliases: a neutral display name resolving to the same catalog as its
-# canonical provider (the internal vLLM gateway).
-_PROVIDER_ALIASES = {"internal": "skynet"}
+# canonical provider (the internal vLLM gateway; the GLM Coding Plan shares the
+# GLM model list with the standard zai provider, only the endpoint differs).
+_PROVIDER_ALIASES = {"internal": "skynet", "zai_coding": "zai"}
 
 
 def provider_models(provider: str) -> tuple[str, ...]:
