@@ -49,6 +49,7 @@ import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
 import WireFilterBar from "./WireFilterBar";
 import InstanceSessionSummary from "./InstanceSessionSummary";
 import WireExpertPanel from "./WireExpertPanel";
+import WireInstancesPanel from "./WireInstancesPanel";
 import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
 import { compileColorRules, type ColorTint } from "./wireColorRules";
@@ -577,6 +578,13 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
             revenir au direct
           </button>
         </p>
+      )}
+
+      {/* Orchestration roster: with no instance pinned, list every instance in
+          the capture and deep-link into one (instance -> its wire flows). Once
+          an instance is pinned, the cross-session strip below takes over. */}
+      {filter.instanceId === undefined && (
+        <WireInstancesPanel flows={visible} onPick={(iid) => setParam("instance", iid)} />
       )}
 
       <InstanceSessionSummary

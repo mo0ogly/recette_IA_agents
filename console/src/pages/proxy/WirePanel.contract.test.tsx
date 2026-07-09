@@ -551,6 +551,38 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     }
   });
 
+  it("lists the orchestration instances and deep-links the packet list to one", async () => {
+    // Two instances in the capture: the roster lists both; clicking one pins the
+    // instance clause server-side (instance -> its wire flows), pulling that
+    // agent out of the dark.
+    const iFlow = (seq: number, extra: object): WireFlow =>
+      ({ ...fixture.flows[0], seq, ...extra }) as WireFlow;
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        iFlow(51, { instance_id: "triage", session_id: "s1" }),
+        iFlow(52, { instance_id: "notify", session_id: "s1" }),
+      ],
+      last_seq: 52,
+      total: 2,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(2));
+    const roster = await screen.findByTestId("wire-instances");
+    expect(roster).toHaveTextContent("2 agents");
+    fireEvent.click(
+      within(screen.getByTestId("wire-instance-triage")).getByRole("button"),
+    );
+    await waitFor(() =>
+      expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
+        expect.objectContaining({ instanceId: "triage" }),
+      ),
+    );
+  });
+
   it("follows an agent turn from a selected flow (session+instance deep-link)", async () => {
     // Follow-TCP-Stream equivalent: two flows of instance "triage" session "s1"
     // plus a foreign flow. Selecting a triage flow and clicking "Suivre ce tour
