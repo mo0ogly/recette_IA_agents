@@ -36,6 +36,11 @@ class TestLlmCallTrace(unittest.TestCase):
         d = _trace(kind="final", tool_name=None, resource="").to_dict()
         self.assertEqual(d["intent"], ":")
 
+    def test_rationale_defaults_empty_and_serializes(self) -> None:
+        self.assertEqual(_trace().to_dict()["rationale"], "")
+        d = _trace(rationale="Reading first to confirm the branch.").to_dict()
+        self.assertEqual(d["rationale"], "Reading first to confirm the branch.")
+
 
 if __name__ == "__main__":
     unittest.main()

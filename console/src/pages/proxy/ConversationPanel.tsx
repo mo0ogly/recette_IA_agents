@@ -154,6 +154,11 @@ export default function ConversationPanel({ onStatus }: SourcePanelProps): JSX.E
                     {t.tool !== null ? ` -> ${t.tool}` : ""}
                   </span>
                   {t.intent !== null && <span className="proxy-conv-intent">{t.intent}</span>}
+                  {t.rationale !== null && (
+                    <p className="proxy-conv-rationale" data-testid={`conv-rationale-${t.seq}`}>
+                      pourquoi (declare) : {t.rationale}
+                    </p>
+                  )}
                   {t.tokens !== null && (
                     <span className="proxy-conv-tokens">
                       {t.tokens.prompt} {"->"} {t.tokens.completion} tok

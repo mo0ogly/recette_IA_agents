@@ -59,7 +59,17 @@ def _parse_openai(data: dict) -> LlmDecision:
             args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
         except (ValueError, TypeError):
             args = {}
-        return LlmDecision(kind="tool_call", tool_name=fn.get("name"), tool_args=args, raw=data)
+        # Keep the assistant text accompanying the tool call (the model's stated
+        # rationale): dropping it silences the "why" the observability surfaces
+        # (recording, LlmCallTrace) rely on. The other wires (Anthropic, Bedrock,
+        # Gemini) already preserve it.
+        return LlmDecision(
+            kind="tool_call",
+            tool_name=fn.get("name"),
+            tool_args=args,
+            text=message.get("content") or "",
+            raw=data,
+        )
     return LlmDecision(kind="final", text=message.get("content") or "", raw=data)
 
 

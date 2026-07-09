@@ -1607,6 +1607,9 @@ export interface LlmTrace {
   tool_name: string | null;
   resource: string;
   intent: string;
+  /** The model's stated rationale for this decision (declared, unverified).
+   *  Optional: traces captured before the field existed do not carry it. */
+  rationale?: string;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;

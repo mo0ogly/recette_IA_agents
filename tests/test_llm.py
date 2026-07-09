@@ -235,6 +235,44 @@ class TestOpenAi(unittest.TestCase):
         self.assertEqual(out.kind, "final")
         self.assertEqual(out.text, "no action needed")
 
+    def test_tool_call_keeps_accompanying_rationale_text(self):
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "Reading the repo first to confirm the default branch.",
+                        "tool_calls": [
+                            {"function": {"name": "read_repo", "arguments": '{"resource": "a/b"}'}}
+                        ],
+                    }
+                }
+            ]
+        }
+        out = OpenAiLlm(model="m", client=_StubClient(payload)).decide(
+            system="s", history=[], tools=TOOLS
+        )
+        self.assertTrue(out.is_tool_call)
+        self.assertEqual(out.text, "Reading the repo first to confirm the default branch.")
+
+    def test_tool_call_with_null_content_has_empty_text(self):
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": None,
+                        "tool_calls": [
+                            {"function": {"name": "read_repo", "arguments": '{"resource": "a/b"}'}}
+                        ],
+                    }
+                }
+            ]
+        }
+        out = OpenAiLlm(model="m", client=_StubClient(payload)).decide(
+            system="s", history=[], tools=TOOLS
+        )
+        self.assertTrue(out.is_tool_call)
+        self.assertEqual(out.text, "")
+
     def test_missing_key_without_client_raises(self):
         old = os.environ.pop("OPENAI_API_KEY", None)
         try:

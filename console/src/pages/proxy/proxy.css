@@ -590,6 +590,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The model's stated rationale: declared, unverified -- full-width line under
+   the decision so the "why" reads as prose, visually distinct from the wire. */
+.proxy-conv-rationale {
+  flex-basis: 100%;
+  margin: 0.15rem 0 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .proxy-conv-body {
   margin: 0;
   max-height: 10rem;

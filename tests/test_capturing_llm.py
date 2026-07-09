@@ -29,6 +29,22 @@ class TestCapturingLlm(unittest.TestCase):
         self.assertEqual(traces[0].intent, "read_repo:acme/x")
         self.assertEqual(traces[0].prompt_tokens, 5)
 
+    def test_records_decision_text_as_rationale(self) -> None:
+        inner = StubLlm(
+            [
+                LlmDecision(
+                    kind="tool_call",
+                    tool_name="read_repo",
+                    tool_args={"resource": "acme/x"},
+                    text="Reading the repo to confirm the default branch.",
+                )
+            ]
+        )
+        traces = []
+        llm = CapturingLlm(inner, agent_id="a1", model="m", sink=traces.append)
+        llm.decide(system="s", history=[], tools=[])
+        self.assertEqual(traces[0].rationale, "Reading the repo to confirm the default branch.")
+
     def test_returns_inner_decision_unchanged(self) -> None:
         inner = StubLlm([LlmDecision(kind="final", text="done")])
         llm = CapturingLlm(inner, agent_id="a1", model="m", sink=lambda _t: None)
