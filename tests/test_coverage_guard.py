@@ -54,6 +54,21 @@ ALL_VIOLATION_TYPES: frozenset[str] = frozenset(
     {"identity_mismatch", "capability_overreach", "policy_violation", "behavior_anomaly"}
 )
 
+# OWASP Top 10 for Agentic Applications 2026 (ASI01..ASI10) -- the canonical
+# published list (see .claude/rules/redteam-standards-alignment.md, R23). A tag
+# outside this set is an invented / stale ID.
+OWASP_ASI_CANONICAL: frozenset[str] = frozenset(f"ASI{n:02d}" for n in range(1, 11))
+
+# The ASI categories the /sim red-team corpus (MAF + git) currently exercises,
+# pinned EXACTLY so a tag silently dropped (a scenario deleted / retagged) turns
+# D9 red, and a newly covered category forces an explicit update here. ASI04
+# (supply-chain) lives in the discovery recette and ASI08 (cascading) in the
+# orchestration recette -- neither is a /sim scenario, so both are absent by
+# design (documented in docs/runbooks/redteam-recette.md).
+REDTEAM_ASI_COVERED: frozenset[str] = frozenset(
+    {"ASI01", "ASI02", "ASI03", "ASI05", "ASI06", "ASI07", "ASI09", "ASI10"}
+)
+
 # Git red-team violation_types not yet exercised by a corpus git scenario
 # (corpus/sim/*.git-scenario.json). Frozen so the gap cannot grow / close silently.
 # Now EMPTY: every git violation_type is exercised. identity_mismatch is covered
@@ -208,6 +223,35 @@ class TestCoverageGuard(unittest.TestCase):
             GIT_REDTEAM_PENDING_VIOLATIONS <= ALL_VIOLATION_TYPES,
             "GIT_REDTEAM_PENDING_VIOLATIONS holds an unknown violation_type: "
             f"{sorted(GIT_REDTEAM_PENDING_VIOLATIONS - ALL_VIOLATION_TYPES)}",
+        )
+
+    def test_d9_redteam_owasp_asi_coverage(self) -> None:
+        # Anti-silence gate for the standards distribution: every /sim scenario
+        # (MAF *.scenario.json + git *.git-scenario.json) must tag a CANONICAL
+        # OWASP Agentic 2026 category, and the covered set is pinned EXACTLY so a
+        # dropped/retagged category cannot slip through unnoticed (the old D7/D8
+        # guards only pinned violation_types, never the ASI tags -- R23).
+        covered: set[str] = set()
+        for pattern in ("*.scenario.json", "*.git-scenario.json"):
+            for path in (REPO / "corpus" / "sim").glob(pattern):
+                doc = json.loads(path.read_text(encoding="utf-8"))
+                tag = doc.get("tags", {}).get("owasp_asi")
+                if tag is not None:
+                    covered.add(tag)
+        # No invented / stale ID: every tag is one of ASI01..ASI10.
+        invented = covered - OWASP_ASI_CANONICAL
+        self.assertEqual(
+            invented,
+            set(),
+            f"non-canonical owasp_asi tag(s) in the /sim corpus: {sorted(invented)}",
+        )
+        # Pinned exactly: a silently dropped category (deleted/retagged scenario)
+        # or a newly covered one both fail until REDTEAM_ASI_COVERED is updated.
+        self.assertEqual(
+            covered,
+            set(REDTEAM_ASI_COVERED),
+            f"red-team ASI coverage drift: covered={sorted(covered)}, "
+            f"pinned={sorted(REDTEAM_ASI_COVERED)}",
         )
 
     def test_d6_every_campaign_action_has_verdict_and_no_orphan_agent(self) -> None:

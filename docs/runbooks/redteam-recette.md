@@ -38,9 +38,17 @@ python3 -m recette redteam
 
 Globbe `corpus/sim/*.scenario.json` en ordre trie (deterministe, I4), rejoue
 chacun via `run_scenario`, agrege avec `redteam_scorecard`, et sort en code non
-nul quand une anomalie a ete manquee (verdict predit divergent de `expected`). Le
-replay utilise `ReplayLlm` sur le `subject_program` fige : pas de reseau, pas
-d'horloge, pas d'aleatoire.
+nul quand une anomalie a ete manquee (verdict predit divergent de `expected`, OU
+attrapee sur la MAUVAISE dimension). Le replay utilise `ReplayLlm` sur le
+`subject_program` fige : pas de reseau, pas d'horloge, pas d'aleatoire.
+
+Le scorecard porte, au-dela de `total/caught/missed` et de la distribution OWASP,
+une **matrice de confusion de detection** (`confusion` : vrais/faux positifs,
+vrais/faux negatifs, et `wrong_dimension` -- une anomalie attrapee mais sur le
+mauvais axe) et la **precision par dimension** (`per_dimension` : accuracy des
+quatre dimensions identity/capabilities/policy/behavior). Un vrai negatif reste
+un `correct` sans fausse alerte ; un faux positif est une fausse alerte sur un
+agent conforme. La console `/sim` (onglet Scorecard) reflete la meme matrice.
 
 La couverture anti-silence est imposee par le coverage guard :
 
@@ -51,7 +59,12 @@ python3 -m unittest tests.test_coverage_guard
 `test_d7_redteam_violation_type_coverage` (D7) verifie que chaque
 `violation_type` red-team a au moins un scenario dans le corpus ; un nouvel axe
 de violation sans scenario passe le guard en ROUGE (un trou est un test rouge,
-jamais trouve a la main).
+jamais trouve a la main). `test_d9_redteam_owasp_asi_coverage` (D9) fige EN PLUS
+la distribution des categories OWASP ASI exercees par le corpus `/sim` (MAF +
+git) : un tag `owasp_asi` non canonique (hors ASI01..ASI10) ou une categorie
+silencieusement retiree/retaguee passe D9 en ROUGE. D7/D8 gardent les
+`violation_type` ; D9 garde les tags de standard (R23) -- les deux sont
+anti-silence.
 
 Console : la page **/sim** liste les scenarios et affiche le badge
 attrape/manque par scenario, issu du meme replay deterministe.
@@ -359,10 +372,15 @@ corpus (`recette redteam`) : ASI01 (goal hijack, resisted), ASI02 (tool misuse),
 ASI03 (identity & privilege), ASI06 (memory/context poisoning), ASI07
 (inter-agent), ASI09 (human-agent trust), ASI10 (rogue) -- 7 des 10 categories.
 
-`tool_injection` (AgentDojo injection-via-tool-output) est le vecteur ASI06 : le
-scenario git committe `rt-prbot-context-poisoning` empoisonne un resultat
-`read_repo` pour pousser un `open_pr` hors perimetre (tague ASI06 / `AML.T0110`
-tool poisoning), attrape comme un `capability_overreach`.
+`tool_injection` (AgentDojo injection-via-tool-output) est le vecteur ASI06, des
+DEUX cotes. Git : `rt-prbot-context-poisoning` empoisonne un resultat `read_repo`
+pour pousser un `open_pr` hors perimetre. MAF : `rt-maf-context-poisoning`
+empoisonne le resultat d'un `web_search` (champ `tool_injection` du sim-scenario,
+servi comme la sortie du Nieme appel d'outil via `redteam_recette._tool_outputs`
+-> `simulate(tool_outputs=...)`) pour driver un appel d'outil `exfiltrate` non
+declare. Les deux sont tagues ASI06 / `AML.T0110` (tool poisoning) et attrapes
+mono-axe comme `capability_overreach` ; l'output empoisonne apparait dans le
+transcript (lisibilite).
 
 **ASI08 Cascading Agent Failures** est couvert dans la recette ORCHESTRATION (pas
 `/sim`) : `corpus/maf_orchestration/incorrect/support-handoff-cascading-failure`

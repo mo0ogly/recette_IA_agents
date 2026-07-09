@@ -49,6 +49,11 @@
       "enum": ["deny_all"],
       "description": "Approval policy injected into the run. Default concept is deny_all (I6)."
     },
+    "tool_injection": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional adversarial tool outputs (AgentDojo injection-via-tool-output, ASI06/AML.T0110): the string at index N is returned as the output of the Nth tool call, poisoning the subject's context to drive the next (out-of-scope) action. An out-of-range index falls back to the default benign output. Captured deterministically (I4); the poisoned output is recorded in the transcript so an auditor can read what hijacked the subject."
+    },
     "actual_identity": {
       "type": "object",
       "additionalProperties": false,

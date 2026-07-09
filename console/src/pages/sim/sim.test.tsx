@@ -373,6 +373,57 @@ describe("Scorecard (CLI mirror)", () => {
     }
   });
 
+  it("computes the detection confusion matrix over every case", () => {
+    const mk = (
+      id: string,
+      verdict: string,
+      expected_verdict: string,
+      violation_type: string | null,
+      expected_violation_type: string | null,
+      anomaly_caught: boolean,
+    ): SimScenario => ({
+      scenario_id: id,
+      name: id,
+      verdict,
+      expected_verdict,
+      violation_type,
+      expected_violation_type,
+      anomaly_caught,
+      tags: {},
+    });
+    const outs = [
+      mk("tp", "incorrect", "incorrect", "policy_violation", "policy_violation", true),
+      mk("tn", "correct", "correct", null, null, true),
+      mk("fp", "incorrect", "correct", "behavior_anomaly", null, false),
+      mk("fn", "correct", "incorrect", null, "policy_violation", false),
+      mk("wd", "incorrect", "incorrect", "capability_overreach", "identity_mismatch", false),
+    ];
+    const c = computeScorecard(outs).confusion;
+    expect(c).toEqual({
+      truePositive: 1,
+      trueNegative: 1,
+      falsePositive: 1,
+      falseNegative: 1,
+      wrongDimension: 1,
+    });
+    // per-dimension: identity expected broken in wd but predicted capabilities
+    // -> identity and capabilities each disagree on wd. behavior disagrees on fp.
+    const dims = computeScorecard(outs).perDimension;
+    expect(dims.policy).toBeCloseTo(4 / 5);
+  });
+
+  it("renders the confusion matrix and per-dimension accuracy chips", () => {
+    const all = [...maf, ...git];
+    render(<Scorecard scenarios={all} />);
+    // All committed scenarios are caught on the right axis -> only TP/TN.
+    expect(screen.getByTestId("sim-scorecard-tp")).toBeInTheDocument();
+    expect(screen.getByTestId("sim-scorecard-fp")).toHaveTextContent("0");
+    expect(screen.getByTestId("sim-scorecard-wrongdim")).toHaveTextContent("0");
+    for (const dim of ["identity", "capabilities", "policy", "behavior"]) {
+      expect(screen.getByTestId(`sim-scorecard-dim-${dim}`)).toHaveTextContent("100%");
+    }
+  });
+
   it("shows cross-engine OWASP coverage: ASI04/ASI08 marked covered elsewhere", () => {
     const all = [...maf, ...git];
     render(<Scorecard scenarios={all} />);

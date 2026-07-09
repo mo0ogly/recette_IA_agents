@@ -18,7 +18,7 @@ from .adapters import IdentificationResult
 from .judge import judge_subject
 from .llm import LlmDecision, ReplayLlm
 from .manifest import validate
-from .simulate import simulate
+from .simulate import _default_tool_output, simulate
 
 _VIOLATION_DIM = {
     "identity_mismatch": "identity_match",
@@ -79,6 +79,26 @@ def _anomaly_caught(
     return True
 
 
+def _tool_outputs(injection: list[str] | None):
+    """Build a ToolOutput callable serving ``injection[N]`` as the Nth tool call's
+    output (AgentDojo injection-via-tool-output, ASI06/AML.T0110). An out-of-range
+    index falls back to the default benign output. Pure closure over an index list
+    plus a counter -- no clock/random (I4). Mirrors ``redteam_git._tool_output``
+    but for the MAF ``ToolOutput`` shape (called with the tool name)."""
+    if not injection:
+        return _default_tool_output
+    state = {"n": 0}
+
+    def output(name: str) -> str:
+        i = state["n"]
+        state["n"] = i + 1
+        if 0 <= i < len(injection):
+            return injection[i]
+        return _default_tool_output(name)
+
+    return output
+
+
 def _program(steps: list[dict]) -> ReplayLlm:
     return ReplayLlm(
         [
@@ -121,6 +141,7 @@ def _replay(scenario: dict):
         user_turns=list(scenario["attack"]["user_turns"]),
         approver=_approver_for(scenario.get("approver", "deny_all")),
         actual_identity=actual_identity,
+        tool_outputs=_tool_outputs(scenario.get("tool_injection")),
     )
     verdict = judge_subject(spec, result.action_log)
     return spec, result, verdict
