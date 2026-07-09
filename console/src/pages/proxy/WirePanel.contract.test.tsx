@@ -22,13 +22,15 @@ vi.mock("../../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/client")>();
   return {
     ...actual,
-    getWireFlowsDelta: vi.fn(),
     clearWireFlows: vi.fn(),
     controlWireOverlay: vi.fn(),
   };
 });
+// The panel polls through the tracking-aware wrapper (session_id/instance_id).
+vi.mock("./wireDeltaClient", () => ({ getWireFlowsDeltaTracked: vi.fn() }));
 
-import { clearWireFlows, controlWireOverlay, getWireFlowsDelta } from "../../api/client";
+import { clearWireFlows, controlWireOverlay } from "../../api/client";
+import { getWireFlowsDeltaTracked } from "./wireDeltaClient";
 import WirePanel from "./WirePanel";
 
 const fixture = wireFixture as WireFlowResponse;
@@ -37,7 +39,7 @@ const fixture = wireFixture as WireFlowResponse;
  *  apply every clause (host/method/status/run/q) plus the sinceSeq cursor,
  *  mirroring the backend's filtered-delta contract. */
 function mockWireDelta(response: WireFlowResponse): void {
-  vi.mocked(getWireFlowsDelta).mockImplementation((params) => {
+  vi.mocked(getWireFlowsDeltaTracked).mockImplementation((params) => {
     const filtered = response.flows.filter(
       (f: WireFlow) =>
         (params.host === undefined || f.host === params.host) &&
@@ -45,6 +47,10 @@ function mockWireDelta(response: WireFlowResponse): void {
           f.method.toUpperCase() === params.method.toUpperCase()) &&
         (params.status === undefined || f.status_code === params.status) &&
         (params.runId === undefined || f.run_id === params.runId) &&
+        (params.sessionId === undefined ||
+          (f as { session_id?: string }).session_id === params.sessionId) &&
+        (params.instanceId === undefined ||
+          (f as { instance_id?: string }).instance_id === params.instanceId) &&
         (params.q === undefined ||
           `${f.path}\n${f.request_body}\n${f.response_body}`
             .toLowerCase()
@@ -229,7 +235,7 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     await waitFor(() => expect(clearWireFlows).toHaveBeenCalledTimes(1));
     // The feed restarts full after a clear: a fresh cursorless delta call.
     await waitFor(() =>
-      expect(getWireFlowsDelta).toHaveBeenLastCalledWith(
+      expect(getWireFlowsDeltaTracked).toHaveBeenLastCalledWith(
         expect.objectContaining({ sinceSeq: undefined }),
       ),
     );
@@ -251,6 +257,23 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(selectButtons(list)).toHaveLength(1);
   });
 
+  it("applies a client-side display filter and surfaces a parse error", async () => {
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+
+    const df = screen.getByTestId("wire-filter-df");
+    // Invalid syntax -> error surfaced, list stays usable (pass-through predicate).
+    fireEvent.change(df, { target: { value: "status >=" } });
+    await screen.findByTestId("wire-filter-df-error");
+    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+
+    // A valid filter matching nothing empties the list; the error clears.
+    fireEvent.change(df, { target: { value: 'host == "no.such.host"' } });
+    await screen.findByText("aucun flux");
+    expect(screen.queryByTestId("wire-filter-df-error")).toBeNull();
+  });
+
   it("pushes the host filter server-side (delta query param)", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
@@ -261,7 +284,7 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     // The feed restarts filtered: the SERVER receives the clause, the client
     // no longer narrows locally.
     await waitFor(() =>
-      expect(getWireFlowsDelta).toHaveBeenCalledWith(
+      expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
         expect.objectContaining({ host: "127.0.0.1" }),
       ),
     );
@@ -352,7 +375,7 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
     expect(screen.getByDisplayValue("127.0.0.1")).toBeInTheDocument();
     // And the clause was pushed server-side on the first fetch.
-    expect(getWireFlowsDelta).toHaveBeenCalledWith(
+    expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
       expect.objectContaining({ host: "127.0.0.1" }),
     );
   });

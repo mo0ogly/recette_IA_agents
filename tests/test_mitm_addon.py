@@ -196,5 +196,103 @@ class WireCaptureHookTests(unittest.TestCase):
         self.assertEqual(self.posted[0]["response_body"], "")
 
 
+import struct
+
+
+def _client_hello() -> bytes:
+    """A minimal, well-formed ClientHello body (starts at the 2-byte version)."""
+    body = struct.pack(">H", 0x0303) + b"\x00" * 32 + b"\x00"  # version + random + sid_len
+    ciphers = [0x1301, 0x1302]
+    body += struct.pack(">H", len(ciphers) * 2) + b"".join(struct.pack(">H", c) for c in ciphers)
+    body += b"\x01\x00"  # compression: len 1, method 0
+    ext = b""
+    groups = struct.pack(">H", 2) + struct.pack(">H", 0x001D)  # supported_groups: curve 29
+    ext += struct.pack(">H", 0x000A) + struct.pack(">H", len(groups)) + groups
+    ecpf = b"\x01\x00"  # ec_point_formats: len 1, format 0
+    ext += struct.pack(">H", 0x000B) + struct.pack(">H", len(ecpf)) + ecpf
+    body += struct.pack(">H", len(ext)) + ext
+    return body
+
+
+class Ja3Tests(unittest.TestCase):
+    def test_ja3_string_and_hash(self) -> None:
+        result = addon.compute_ja3(_client_hello())
+        self.assertIsNotNone(result)
+        ja3_str, ja3_md5 = result  # type: ignore[misc]
+        self.assertEqual(ja3_str, "771,4865-4866,10-11,29,0")
+        self.assertEqual(len(ja3_md5), 32)
+
+    def test_ja3_handles_handshake_header_prefix(self) -> None:
+        raw = b"\x01" + struct.pack(">I", len(_client_hello()))[1:] + _client_hello()
+        result = addon.compute_ja3(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0], "771,4865-4866,10-11,29,0")  # type: ignore[index]
+
+    def test_ja3_none_on_garbage(self) -> None:
+        self.assertIsNone(addon.compute_ja3(b"\xff\xff\x00"))
+
+
+class _Conn:
+    def __init__(self, **attrs: object) -> None:
+        for k, v in attrs.items():
+            setattr(self, k, v)
+
+
+class _LayeredFlow:
+    def __init__(self, request: object, response: object, client_conn: object, server_conn: object) -> None:
+        self.request = request
+        self.response = response
+        self.client_conn = client_conn
+        self.server_conn = server_conn
+
+
+class LayersExtractionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.posted: list[dict] = []
+        self._orig_post = addon._post
+        addon._post = self.posted.append  # type: ignore[assignment,attr-defined]
+
+    def tearDown(self) -> None:
+        addon._post = self._orig_post  # type: ignore[assignment,attr-defined]
+
+    def test_https_flow_carries_l3l4_tls_and_redacted_headers(self) -> None:
+        req = _FakeMessage(
+            "{}",
+            headers={"authorization": "Bearer sk-SECRET", "host": "api.groq.com"},
+            method="POST",
+            scheme="https",
+            host="api.groq.com",
+            port=443,
+            path="/openai/v1/chat/completions",
+            http_version="HTTP/2",
+        )
+        # _FakeHeaders has no items(); give the layer path a real dict view.
+        req.headers = {"authorization": "Bearer sk-SECRET", "host": "api.groq.com"}  # type: ignore[attr-defined]
+        resp = _FakeMessage("{}", status_code=200)
+        resp.headers = {"content-type": "application/json"}  # type: ignore[attr-defined]
+        resp.reason = "OK"  # type: ignore[attr-defined]
+        client = _Conn(peername=("172.20.0.2", 51234), tls_version="TLSv1.3",
+                       cipher="TLS_AES_256_GCM_SHA384", sni="api.groq.com", alpn=b"h2")
+        server = _Conn(peername=("104.18.2.1", 443))
+        addon.WireCapture().response(_LayeredFlow(req, resp, client, server))
+        layers = self.posted[0]["layers"]
+        self.assertEqual(layers["l3l4"]["src_ip"], "172.20.0.2")
+        self.assertEqual(layers["l3l4"]["dst_ip"], "104.18.2.1")
+        self.assertEqual(layers["l3l4"]["ip_version"], 4)
+        self.assertEqual(layers["tls"]["version"], "TLSv1.3")
+        self.assertEqual(layers["tls"]["sni"], "api.groq.com")
+        self.assertEqual(layers["tls"]["alpn"], "h2")
+        self.assertEqual(layers["http"]["version"], "HTTP/2")
+        self.assertEqual(layers["http"]["request_headers"]["authorization"], "***")
+
+    def test_plain_http_flow_has_no_tls_layer(self) -> None:
+        req = _FakeMessage("x", method="GET", scheme="http", host="h", port=80, path="/")
+        req.headers = {}  # type: ignore[attr-defined]
+        resp = _FakeMessage("ok", status_code=200)
+        resp.headers = {}  # type: ignore[attr-defined]
+        addon.WireCapture().response(_LayeredFlow(req, resp, _Conn(), _Conn()))
+        self.assertIsNone(self.posted[0]["layers"]["tls"])
+
+
 if __name__ == "__main__":
     unittest.main()

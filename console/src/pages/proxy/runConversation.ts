@@ -45,6 +45,8 @@ export interface ConversationTurn {
   decisionKind: string | null;
   tool: string | null;
   intent: string | null;
+  /** The model's stated rationale (declared, unverified); null when absent. */
+  rationale: string | null;
   tokens: { prompt: number; completion: number; total: number } | null;
   /** The server exchange this decision produced, or null (final / denied). */
   exchange: ConversationExchange | null;
@@ -88,6 +90,7 @@ export function buildRunConversation(
       decisionKind: t.kind,
       tool: t.tool_name,
       intent: t.intent || null,
+      rationale: t.rationale || null,
       tokens: {
         prompt: t.prompt_tokens,
         completion: t.completion_tokens,
@@ -107,6 +110,7 @@ export function buildRunConversation(
       decisionKind: null,
       tool: null,
       intent: null,
+      rationale: null,
       tokens: null,
       exchange: exchangeFrom(p),
     });

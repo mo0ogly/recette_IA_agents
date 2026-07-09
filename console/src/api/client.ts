@@ -498,9 +498,12 @@ export function listRecordings(): Promise<RecordingMeta[]> {
   }).then((r) => r.recordings);
 }
 
-export function replayRecording(recordingId: string): Promise<RunHandle> {
+/** Replay a recording (deterministic, I4). `paceMs` > 0 slows the step-frame
+ *  emission for slow-motion review; the replayed action log is identical at
+ *  any speed (pacing is operational, never a decision input). */
+export function replayRecording(recordingId: string, paceMs = 0): Promise<RunHandle> {
   return request<RunHandle>(
-    `/recordings/${encodeURIComponent(recordingId)}/replay`,
+    `/recordings/${encodeURIComponent(recordingId)}/replay?pace_ms=${encodeURIComponent(paceMs)}`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }
@@ -1607,6 +1610,9 @@ export interface LlmTrace {
   tool_name: string | null;
   resource: string;
   intent: string;
+  /** The model's stated rationale for this decision (declared, unverified).
+   *  Optional: traces captured before the field existed do not carry it. */
+  rationale?: string;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;

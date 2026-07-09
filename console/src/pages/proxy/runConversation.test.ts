@@ -19,6 +19,7 @@ function llm(partial: Partial<LlmTrace>): LlmTrace {
     tool_name: "read_repo",
     resource: "acme/x",
     intent: "read acme/x",
+    rationale: "",
     prompt_tokens: 10,
     completion_tokens: 5,
     total_tokens: 15,
@@ -69,6 +70,18 @@ describe("buildRunConversation", () => {
     expect(turns[1].decisionKind).toBe("final");
     expect(turns[1].exchange).toBeNull();
     expect(turns.map((t) => t.step)).toEqual([1, 2]);
+  });
+
+  it("carries the model's stated rationale on a decision turn, null when absent", () => {
+    const turns = buildRunConversation(
+      [
+        llm({ seq: 1, rationale: "Reading the repo to confirm the default branch." }),
+        llm({ seq: 2, kind: "final", tool_name: null, resource: "", rationale: undefined }),
+      ],
+      [],
+    );
+    expect(turns[0].rationale).toBe("Reading the repo to confirm the default branch.");
+    expect(turns[1].rationale).toBeNull();
   });
 
   it("leaves a denied tool decision (no matching server trace) without an exchange", () => {

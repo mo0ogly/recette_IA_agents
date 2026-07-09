@@ -11,7 +11,9 @@
       "resource": "acme-group/service-a",
       "params": {
         "event": "release",
-        "url": "https://ci.acme-group.example/release-hook"
+        "url": "https://ci.acme-group.example/release-hook",
+        "secret_token_ref": "INSPECT_IA_AGENTS_GL_RELEASE_HOOK",
+        "ssl_verification": true
       },
       "approved": true
     },
@@ -19,7 +21,9 @@
       "action": "manage_release",
       "resource": "acme-group/service-a",
       "params": {
-        "tag": "v1.2.0"
+        "tag": "v1.2.0",
+        "name": "service-a v1.2.0",
+        "notes": "Routine release: dependency bumps and CI hardening."
       },
       "approved": true
     }

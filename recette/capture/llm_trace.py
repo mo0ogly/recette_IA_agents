@@ -30,6 +30,10 @@ class LlmCallTrace:
     completion_tokens: int
     latency_ms: int
     error: str | None
+    # The model's stated rationale for this decision (LlmDecision.text): the
+    # declared "why" behind the intent. Declarative and unverified -- display
+    # data for the conversation view, never a judge/replay input.
+    rationale: str = ""
 
     @property
     def intent(self) -> str:
@@ -58,6 +62,7 @@ class LlmCallTrace:
             "tool_name": self.tool_name,
             "resource": self.resource,
             "intent": self.intent,
+            "rationale": self.rationale,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,

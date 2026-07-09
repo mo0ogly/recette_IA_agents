@@ -35,6 +35,7 @@ from .openai_wire import (
     TogetherLlm,
     XaiLlm,
     XiaomiLlm,
+    ZaiCodingLlm,
     ZaiLlm,
 )
 
@@ -51,6 +52,7 @@ _PROVIDERS = (
     "fireworks",
     "moonshot",
     "zai",
+    "zai_coding",
     "dashscope",
     "nvidia",
     "nous",
@@ -94,6 +96,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
     "fireworks": FireworksLlm,
     "moonshot": MoonshotLlm,
     "zai": ZaiLlm,
+    "zai_coding": ZaiCodingLlm,
     "dashscope": DashscopeLlm,
     "nvidia": NvidiaLlm,
     "nous": NousLlm,
@@ -182,6 +185,8 @@ def build_llm(
         return MoonshotLlm(model=model, client=client, api_key=api_key)
     if provider == "zai":
         return ZaiLlm(model=model, client=client, api_key=api_key)
+    if provider == "zai_coding":
+        return ZaiCodingLlm(model=model, client=client, api_key=api_key)
     if provider == "dashscope":
         return DashscopeLlm(model=model, client=client, api_key=api_key)
     if provider == "nvidia":

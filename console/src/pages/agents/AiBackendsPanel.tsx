@@ -396,7 +396,8 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
               setForm((p) => ({
                 ...p,
                 provider: "openai_compat",
-                base_url: "http://127.0.0.1:4000",
+                base_url:
+                  import.meta.env.VITE_LLM_PROXY_URL ?? "http://localhost:4000",
                 model: "groq-llama",
               }))
             }

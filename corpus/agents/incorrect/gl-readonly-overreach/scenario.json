@@ -2,9 +2,31 @@
   "agent_id": "gl-readonly-overreach",
   "credential_principal": "acme-readonly-reporter",
   "actions": [
-    { "action": "read_repo", "resource": "acme-group/service-a" },
-    { "action": "read_ci", "resource": "acme-group/service-a" },
-    { "action": "open_pr", "resource": "acme-group/service-a", "params": { "title": "chore: bump dep" } },
-    { "action": "push", "resource": "acme-group/service-a", "params": { "branch": "auto/bump" }, "approved": true }
+    {
+      "action": "read_repo",
+      "resource": "acme-group/service-a"
+    },
+    {
+      "action": "read_ci",
+      "resource": "acme-group/service-a"
+    },
+    {
+      "action": "open_pr",
+      "resource": "acme-group/service-a",
+      "params": {
+        "title": "chore: bump dep",
+        "description": "Automated dependency bump.",
+        "source_branch": "auto/bump"
+      }
+    },
+    {
+      "action": "push",
+      "resource": "acme-group/service-a",
+      "params": {
+        "branch": "auto/bump",
+        "commit_message": "chore: bump dependency"
+      },
+      "approved": true
+    }
   ]
 }

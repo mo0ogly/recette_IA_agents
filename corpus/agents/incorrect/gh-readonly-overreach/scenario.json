@@ -10,7 +10,9 @@
       "action": "open_pr",
       "resource": "acme/widgets",
       "params": {
-        "title": "docs: typo"
+        "title": "docs: typo",
+        "body": "Fixes a documentation typo in the README.",
+        "branch": "docs/typo-fix"
       }
     }
   ]

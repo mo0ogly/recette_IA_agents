@@ -61,14 +61,37 @@
           {
             "kind": "undeclared_handoff",
             "from": "acme-dependency-pr-bot[bot]",
-            "to": "repo"
+            "to": "gh-shadow-agent"
           }
         ]
       },
       "evidence": []
     },
     {
-      "agent_id": "repo",
+      "agent_id": "gh-invalid-passport",
+      "passport": {
+        "kind": "invalid",
+        "errors": [
+          "repo shape: agent.identity is missing",
+          "unified shape: agent_id is missing or empty; target_systems is missing; declared_identity is missing; capability_scope is missing"
+        ]
+      },
+      "attestation": {
+        "kind": "unsigned"
+      },
+      "kind": null,
+      "declared": null,
+      "observed": {
+        "actions": [],
+        "egress": []
+      },
+      "conformity": {
+        "kind": "not_observed"
+      },
+      "evidence": []
+    },
+    {
+      "agent_id": "gh-shadow-agent",
       "passport": {
         "kind": "absent",
         "evidence": [
@@ -100,29 +123,6 @@
       "evidence": [
         "agent/main.py: from github import"
       ]
-    },
-    {
-      "agent_id": "repo",
-      "passport": {
-        "kind": "invalid",
-        "errors": [
-          "repo shape: agent.identity is missing",
-          "unified shape: agent_id is missing or empty; target_systems is missing; declared_identity is missing; capability_scope is missing"
-        ]
-      },
-      "attestation": {
-        "kind": "unsigned"
-      },
-      "kind": null,
-      "declared": null,
-      "observed": {
-        "actions": [],
-        "egress": []
-      },
-      "conformity": {
-        "kind": "not_observed"
-      },
-      "evidence": []
     }
   ],
   "comm_graph": {
@@ -130,13 +130,13 @@
     "observed_edges": [
       {
         "from": "acme-dependency-pr-bot[bot]",
-        "to": "repo"
+        "to": "gh-shadow-agent"
       }
     ],
     "undeclared_edges": [
       {
         "from": "acme-dependency-pr-bot[bot]",
-        "to": "repo"
+        "to": "gh-shadow-agent"
       }
     ],
     "via_gateway_edges": [

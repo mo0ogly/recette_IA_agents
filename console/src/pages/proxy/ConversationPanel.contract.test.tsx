@@ -48,6 +48,7 @@ const LLM = {
       tool_name: "read_repo",
       resource: "acme/x",
       intent: "read acme/x",
+      rationale: "Je lis le repo pour confirmer la branche par defaut.",
       prompt_tokens: 10,
       completion_tokens: 5,
       total_tokens: 15,
@@ -63,6 +64,7 @@ const LLM = {
       tool_name: null,
       resource: "",
       intent: "done",
+      rationale: "",
       prompt_tokens: 3,
       completion_tokens: 2,
       total_tokens: 5,
@@ -120,6 +122,11 @@ describe("ConversationPanel (R16 contract)", () => {
     const think = screen.getByTestId("conv-think-1");
     expect(think).toHaveTextContent("gpt-4o");
     expect(think).toHaveTextContent("read_repo");
+    // The declared rationale is shown on the decision turn (absent on turn 2).
+    expect(screen.getByTestId("conv-rationale-1")).toHaveTextContent(
+      "Je lis le repo pour confirmer la branche par defaut.",
+    );
+    expect(screen.queryByTestId("conv-rationale-2")).toBeNull();
     const exchange = screen.getByTestId("conv-exchange-1");
     expect(exchange).toHaveTextContent("reponse serveur");
     expect(exchange).toHaveTextContent("42");

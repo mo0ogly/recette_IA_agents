@@ -59,7 +59,17 @@ def _parse_openai(data: dict) -> LlmDecision:
             args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
         except (ValueError, TypeError):
             args = {}
-        return LlmDecision(kind="tool_call", tool_name=fn.get("name"), tool_args=args, raw=data)
+        # Keep the assistant text accompanying the tool call (the model's stated
+        # rationale): dropping it silences the "why" the observability surfaces
+        # (recording, LlmCallTrace) rely on. The other wires (Anthropic, Bedrock,
+        # Gemini) already preserve it.
+        return LlmDecision(
+            kind="tool_call",
+            tool_name=fn.get("name"),
+            tool_args=args,
+            text=message.get("content") or "",
+            raw=data,
+        )
     return LlmDecision(kind="final", text=message.get("content") or "", raw=data)
 
 
@@ -252,9 +262,26 @@ class MoonshotLlm(_VersionedWireVendor):
 
 
 class ZaiLlm(_VersionedWireVendor):
-    """Z.AI / GLM -- OpenAI wire at api.z.ai/api/paas/v4. Key: GLM_API_KEY."""
+    """Z.AI / GLM -- OpenAI wire at api.z.ai/api/paas/v4. Key: GLM_API_KEY.
+
+    This is the pay-as-you-go standard API (billed by account balance). A GLM
+    *Coding Plan* subscription is metered by a separate quota that only the
+    coding endpoint draws from -- use ``ZaiCodingLlm`` for that."""
 
     BASE_URL = "https://api.z.ai/api/paas/v4"
+    ENV_KEY = "GLM_API_KEY"
+
+
+class ZaiCodingLlm(_VersionedWireVendor):
+    """Z.AI / GLM Coding Plan -- OpenAI wire at api.z.ai/api/coding/paas/v4.
+
+    Same GLM models and key (GLM_API_KEY) as ``ZaiLlm``, but the coding endpoint:
+    a GLM Coding Plan subscription is metered by its 5-hour/weekly quota here,
+    NOT by the pay-as-you-go balance the standard ``/api/paas/v4`` endpoint uses
+    (which returns 429 code 1113 "insufficient balance" for a Coding-Plan-only
+    account). Mirrors the AlibabaCodingPlanLlm split."""
+
+    BASE_URL = "https://api.z.ai/api/coding/paas/v4"
     ENV_KEY = "GLM_API_KEY"
 
 

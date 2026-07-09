@@ -24,10 +24,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { clearWireFlows, controlWireOverlay, getWireFlowsDelta } from "../../api/client";
+import { clearWireFlows, controlWireOverlay } from "../../api/client";
+import { getWireFlowsDeltaTracked } from "./wireDeltaClient";
 import ProxySelector from "../../components/ProxySelector";
 import { VirtualList } from "../../components/VirtualList";
 import type { WireFlow } from "../../types/platform";
+import WireLayersView from "./WireLayersView";
 import type { SourcePanelProps } from "./proxyMenu";
 import { wireFlowToCurl } from "./curl";
 import { decodeLlmFlow } from "./wireLlmDecode";
@@ -36,12 +38,17 @@ import { lineDiff } from "./diff";
 import { byteLen, downloadFile, flowsToHar, toJsonl } from "./proxyExport";
 import {
   distinctWireValues,
+  filterWireFlows,
   type WireFlowFilter,
   maxDuration,
   wireFailureCount,
   wireFlowToLine,
 } from "./wireFlowModel";
 import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
+import WireFilterBar from "./WireFilterBar";
+import InstanceSessionSummary from "./InstanceSessionSummary";
+import WireStatsPanel from "./WireStatsPanel";
+import { compileWireFilter } from "./wireFilter";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -103,6 +110,11 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       method: params.get("method") ?? undefined,
       status: params.get("status") ?? undefined,
       runId: params.get("run") ?? undefined,
+      // Multi-session tracking narrowing (client-side): follow one instance
+      // across the sessions it acted in, or pin one session.
+      sessionId: params.get("session") ?? undefined,
+      instanceId: params.get("instance") ?? undefined,
+      df: params.get("df") ?? undefined,
       text: params.get("q") ?? undefined,
     }),
     [params],
@@ -141,12 +153,14 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       const statusNum = filter.status && /^\d+$/.test(filter.status)
         ? Number(filter.status)
         : undefined;
-      return getWireFlowsDelta({
+      return getWireFlowsDeltaTracked({
         sinceSeq: sinceSeq ?? undefined,
         host: filter.host || undefined,
         method: filter.method || undefined,
         status: statusNum,
         runId: filter.runId || undefined,
+        sessionId: filter.sessionId || undefined,
+        instanceId: filter.instanceId || undefined,
         q: filter.text || undefined,
       }).then((res) => {
         // Side channel: every delta envelope carries enabled/proxy_url, so the
@@ -176,7 +190,8 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       return;
     }
     resetFeed();
-  }, [filter.host, filter.method, filter.status, filter.runId, filter.text, resetFeed]);
+  }, [filter.host, filter.method, filter.status, filter.runId,
+      filter.sessionId, filter.instanceId, filter.text, resetFeed]);
 
   // Headline status for the source menu. Gated on the first envelope so the
   // badge never flashes "off" before the backend has answered once.
@@ -263,22 +278,34 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const hosts = useMemo(() => distinctWireValues(items, "host"), [items]);
   const methods = useMemo(() => distinctWireValues(items, "method"), [items]);
   const runIds = useMemo(() => distinctWireValues(items, "run_id"), [items]);
+  // Client-side narrowing: the tracking backstop (server already filters session/
+  // instance) THEN the Wireshark display-filter predicate over the dissected
+  // fields. Compiling once yields the predicate + a parse error to surface.
+  const dfCompiled = useMemo(() => compileWireFilter(filter.df ?? ""), [filter.df]);
+  const visible = useMemo(
+    () =>
+      filterWireFlows(items, {
+        sessionId: filter.sessionId,
+        instanceId: filter.instanceId,
+      }).filter(dfCompiled.predicate),
+    [items, filter.sessionId, filter.instanceId, dfCompiled],
+  );
   // Waterfall scale: the largest latency among the buffered flows. duration_ms
   // is OPS metadata on the view only, never a judge/decision/replay input (I4).
-  const maxDur = useMemo(() => maxDuration(items), [items]);
+  const maxDur = useMemo(() => maxDuration(visible), [visible]);
   const rows: WireRow[] = useMemo(
     () =>
-      items.map((f) => ({
+      visible.map((f) => ({
         ...wireFlowToLine(f),
         // Width % is layout (relative latency), not a hardcoded color.
         durationPct: maxDur > 0 ? Math.round(((f.duration_ms ?? 0) / maxDur) * 100) : 0,
       })),
-    [items, maxDur],
+    [visible, maxDur],
   );
-  const fails = useMemo(() => wireFailureCount(items), [items]);
+  const fails = useMemo(() => wireFailureCount(visible), [visible]);
   const selected = useMemo(
-    () => items.find((f) => f.seq === selectedSeq) ?? null,
-    [items, selectedSeq],
+    () => visible.find((f) => f.seq === selectedSeq) ?? null,
+    [visible, selectedSeq],
   );
   // Semantic decode of the selected flow when it targets an LLM API: lifts the
   // raw HTTP body into model/messages/tools/answer. Pure + display-only (I4):
@@ -290,12 +317,12 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // them by capture sequence reconstructs the reasoning -> effect story. Lets an
   // operator find the exact step where an undesired action first appears.
   const timeline = useMemo(
-    () => (filter.runId !== undefined ? buildRunTimeline(items) : []),
-    [filter.runId, items],
+    () => (filter.runId !== undefined ? buildRunTimeline(visible) : []),
+    [filter.runId, visible],
   );
   const compareFlow = useMemo(
-    () => items.find((f) => f.seq === compareSeq) ?? null,
-    [items, compareSeq],
+    () => visible.find((f) => f.seq === compareSeq) ?? null,
+    [visible, compareSeq],
   );
   // Side-by-side line diff of the two flows' pretty-printed JSON. Pure (I4):
   // a deterministic function of the two selected flows (no clock, no I/O).
@@ -358,7 +385,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       <header className="proxy-header">
         <ProxySelector />
         <span className="proxy-summary">
-          {items.length} flux, {fails} echec(s)
+          {visible.length} flux, {fails} echec(s)
         </span>
         {enabled === true && proxyUrl !== null && (
           <span className="proxy-wire-proxy" data-testid="wire-proxy-url">
@@ -408,87 +435,29 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         </button>
       </header>
 
-      <div className="proxy-filter" role="group" aria-label="wire filter">
-        <label className="proxy-filter-label">
-          host
-          <select
-            className="proxy-filter-input"
-            value={filter.host ?? ""}
-            onChange={(e) => setParam("host", e.target.value)}
-          >
-            <option value="">tous</option>
-            {hosts.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="proxy-filter-label">
-          method
-          <select
-            className="proxy-filter-input"
-            value={filter.method ?? ""}
-            onChange={(e) => setParam("method", e.target.value)}
-          >
-            <option value="">toutes</option>
-            {methods.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="proxy-filter-label">
-          status
-          <input
-            className="proxy-filter-input"
-            type="text"
-            data-testid="wire-filter-status"
-            value={filter.status ?? ""}
-            onChange={(e) => setParam("status", e.target.value)}
-          />
-        </label>
-        <label className="proxy-filter-label">
-          run_id
-          {/* `run` is page-owned (set by the cockpit "Voir dans le proxy"
-              deep-link). This panel READS it to narrow the flows; it only ever
-              SETS run (selecting a run), it never deletes it -- so an empty
-              selection is a no-op rather than clobbering the page's run. */}
-          <select
-            className="proxy-filter-input"
-            value={filter.runId ?? ""}
-            onChange={(e) => {
-              if (e.target.value) {
-                setParam("run", e.target.value);
-              }
-            }}
-          >
-            <option value="">tous</option>
-            {runIds.map((r) => (
-              <option key={r} value={r}>
-                {r.slice(0, 12)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="proxy-filter-label">
-          texte
-          <input
-            className="proxy-filter-input"
-            type="text"
-            data-testid="wire-filter-text"
-            value={filter.text ?? ""}
-            onChange={(e) => setParam("q", e.target.value)}
-          />
-        </label>
-      </div>
+      <WireFilterBar
+        filter={filter}
+        setParam={setParam}
+        hosts={hosts}
+        methods={methods}
+        runIds={runIds}
+        dfError={dfCompiled.ok ? null : dfCompiled.error}
+      />
 
       {nextStep !== null && (
         <p className="proxy-banner" role="status" data-testid="wire-next-step">
           {nextStep}
         </p>
       )}
+
+      <InstanceSessionSummary
+        instanceId={filter.instanceId}
+        flows={visible}
+        activeSession={filter.sessionId}
+        onPickSession={(sid) => setParam("session", sid)}
+      />
+
+      <WireStatsPanel flows={visible} />
 
       {/* Flows can arrive via the transport-route registry even when
           INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
@@ -656,6 +625,10 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
                   </dd>
                 </>
               )}
+              <dt>reseau</dt>
+              <dd>
+                <WireLayersView flow={selected} />
+              </dd>
               <dt>replay</dt>
               <dd>
                 <button

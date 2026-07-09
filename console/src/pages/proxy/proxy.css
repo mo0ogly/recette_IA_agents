@@ -590,6 +590,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The model's stated rationale: declared, unverified -- full-width line under
+   the decision so the "why" reads as prose, visually distinct from the wire. */
+.proxy-conv-rationale {
+  flex-basis: 100%;
+  margin: 0.15rem 0 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .proxy-conv-body {
   margin: 0;
   max-height: 10rem;
@@ -684,4 +693,107 @@
 }
 .proxy-wire-compare-btn[data-active="true"] {
   outline: 2px solid var(--color-accent);
+}
+
+/* Layered network decode (WireLayersView): the "Wireshark" layer stack. */
+.wire-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wire-layer {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wire-layer > summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-text-muted);
+}
+.wire-layer-l34 > summary {
+  border-left-color: var(--color-accent);
+}
+.wire-layer-tls > summary {
+  border-left-color: var(--badge-green-fg);
+}
+.wire-layer-http > summary {
+  border-left-color: var(--badge-amber-fg);
+}
+.wire-layer-timing > summary {
+  border-left-color: var(--color-text-muted);
+}
+.wire-layer-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wire-layer-row {
+  display: flex;
+  gap: 10px;
+  font-size: 0.78rem;
+}
+.wire-layer-k {
+  color: var(--color-text-muted);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+.wire-layer-v {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+.wire-layer-sub {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wire-layer-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wire-layer-empty,
+.wire-layer-none {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+/* Cross-session strip: an instance's footprint across the sessions it acted in. */
+.wire-instance-sessions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.wire-instance-sessions-title {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.wire-instance-sessions-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.wire-session-chip {
+  font-size: 0.74rem;
+  font-family: var(--font-mono, monospace);
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.wire-session-chip.is-active {
+  border-color: var(--color-accent, #4a9);
+  color: var(--color-accent, #4a9);
 }

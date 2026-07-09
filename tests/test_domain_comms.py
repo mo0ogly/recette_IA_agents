@@ -56,6 +56,39 @@ class TestCommsLabHandler(unittest.TestCase):
     def test_unknown_action_returns_none(self) -> None:
         self.assertIsNone(handle("unknown_action", "customer:c-001", {}))
 
+    def test_dispatch_receipt_is_realistic(self) -> None:
+        response = handle("notify_customer", "customer:c-003", {"channel": "email"})
+        assert response is not None
+        self.assertTrue(response["notification_id"].startswith("ntf_"))
+        self.assertTrue(response["message_id"].startswith("msg_"))
+        self.assertIn(response["gateway_route"], ("msg-gw-eu-1", "msg-gw-eu-2", "msg-gw-amer-1"))
+        # Recipient view is entity-coherent and privacy-masked.
+        recipient = response["recipient"]
+        self.assertTrue(recipient["contact_id"].startswith("cnt_"))
+        self.assertIn("***@", recipient["email_masked"])
+
+    def test_sms_channel_carries_segment_count(self) -> None:
+        response = handle("notify_customer", "customer:c-004", {"channel": "sms"})
+        assert response is not None
+        self.assertGreaterEqual(response["segments"], 1)
+        email = handle("notify_customer", "customer:c-004", {"channel": "email"})
+        assert email is not None
+        self.assertNotIn("segments", email)
+
+    def test_unknown_channel_is_rejected_422(self) -> None:
+        from recette.lab.errors import LabActionError
+
+        with self.assertRaises(LabActionError) as ctx:
+            handle("notify_customer", "customer:c-005", {"channel": "carrier-pigeon"})
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_omitted_channel_derives_a_deterministic_default(self) -> None:
+        a = handle("notify_customer", "customer:c-006", {})
+        b = handle("notify_customer", "customer:c-006", {})
+        assert a is not None and b is not None
+        self.assertEqual(a["channel"], b["channel"])
+        self.assertIn(a["channel"], ("email", "sms", "push", "postal"))
+
 
 class TestCatalogIntegration(unittest.TestCase):
     def test_load_catalog_contains_comms(self) -> None:

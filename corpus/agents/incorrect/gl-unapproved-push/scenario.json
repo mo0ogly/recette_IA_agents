@@ -10,7 +10,8 @@
       "action": "push",
       "resource": "acme-group/service-a",
       "params": {
-        "branch": "main"
+        "branch": "main",
+        "commit_message": "hotfix pushed to main without approval"
       },
       "approved": false
     }

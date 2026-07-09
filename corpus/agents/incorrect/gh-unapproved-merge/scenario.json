@@ -10,7 +10,9 @@
       "action": "merge_pr",
       "resource": "acme/widgets",
       "params": {
-        "pr": 12
+        "pr": 12,
+        "merge_method": "squash",
+        "commit_title": "Merge PR #12"
       },
       "approved": false
     }

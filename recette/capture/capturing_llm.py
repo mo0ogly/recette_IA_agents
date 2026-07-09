@@ -59,6 +59,7 @@ class CapturingLlm:
             completion_tokens=completion_tokens,
             latency_ms=latency_ms,
             error=None,
+            rationale=decision.text,
         )
         self._emit(trace)
         return decision

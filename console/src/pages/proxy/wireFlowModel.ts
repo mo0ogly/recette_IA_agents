@@ -8,6 +8,7 @@
  */
 
 import type { WireFlow } from "../../types/platform";
+import { instanceId, sessionId } from "./wireLayers";
 
 /** A single wire flow summarised as one console line. */
 export interface WireFlowLine {
@@ -55,12 +56,22 @@ export interface WireFlowFilter {
   method?: string;
   status?: string; // string for select binding; compared to String(status_code)
   runId?: string;
+  /** Session (one conversation/episode) exact match. */
+  sessionId?: string;
+  /** Autonomous agent instance exact match -- follows one instance across sessions. */
+  instanceId?: string;
+  /** Wireshark-style display filter over dissected fields (see wireFilter.ts).
+   *  Client-side only (does not affect the server fetch), so it is intentionally
+   *  NOT part of isEmptyWireFilter. */
+  df?: string;
   /** Free text, matched case-insensitively in path + request_body + response_body. */
   text?: string;
 }
 
 export function isEmptyWireFilter(f: WireFlowFilter): boolean {
-  return !f.host && !f.method && !f.status && !f.runId && !f.text;
+  return (
+    !f.host && !f.method && !f.status && !f.runId && !f.sessionId && !f.instanceId && !f.text
+  );
 }
 
 export function filterWireFlows(flows: WireFlow[], f: WireFlowFilter): WireFlow[] {
@@ -73,6 +84,8 @@ export function filterWireFlows(flows: WireFlow[], f: WireFlowFilter): WireFlow[
     if (f.method && flow.method !== f.method) return false;
     if (f.status && String(flow.status_code) !== f.status) return false;
     if (f.runId && flow.run_id !== f.runId) return false;
+    if (f.sessionId && sessionId(flow) !== f.sessionId) return false;
+    if (f.instanceId && instanceId(flow) !== f.instanceId) return false;
     if (needle) {
       const hay = `${flow.path}\n${flow.request_body}\n${flow.response_body}`.toLowerCase();
       if (!hay.includes(needle)) return false;

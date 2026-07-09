@@ -33,6 +33,7 @@ import {
   listRecordings,
   listRuns,
   openRunSocket,
+  replayRecording,
   runCampaign,
 } from "../../api/client";
 import CampaignsPage from "./index";
@@ -129,6 +130,24 @@ describe("CampaignsPage", () => {
     expect(infoRow).toHaveAttribute("data-level", "info");
     // Each line is sourced to the acting agent.
     expect(screen.getAllByText("gh-reader").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("replays a recording at the selected slow-motion pace", async () => {
+    mockEmptyLists();
+    vi.mocked(listRecordings).mockResolvedValue([
+      { recording_id: "rec-1", agent_id: "gh-reader", steps: 3 } as never,
+    ]);
+    vi.mocked(replayRecording).mockResolvedValue({ run_id: "r2", status: "pending" });
+    vi.mocked(openRunSocket).mockReturnValue(makeFakeSocket() as unknown as WebSocket);
+
+    render(<CampaignsPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Enregistrements" }));
+
+    // Default pace is instant (0); pick the 1.5s/step slow-motion speed.
+    const pace = await screen.findByTestId("replay-pace");
+    fireEvent.change(pace, { target: { value: "1500" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Replay" }));
+    await waitFor(() => expect(replayRecording).toHaveBeenCalledWith("rec-1", 1500));
   });
 
   it("disables the campaign eye until the campaign has a run", async () => {

@@ -25,6 +25,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ...inventory_bridge import parse_inventory
 from ...surface.agent_analysis import analyze_recording, declared_view
+from ...surface.bench_probe_wire import build_bench_report
 from ...surface.netmap import annotate_recording
 from ...surface.recording import score_recording
 from ..probe_relay import ProbeUnavailable, relay_capture
@@ -578,3 +579,47 @@ def capture(request: Request, body: dict[str, Any]) -> dict:
     if recording.get("status") == "ok":
         out["scorecard"] = asdict(score_recording(json.dumps(recording)))
     return _attach_wire_names(out, request)
+
+
+@router.post("/bench")
+def bench(request: Request, body: dict[str, Any]) -> dict:
+    """Score the eBPF probe against the wire truth (precision/recall).
+
+    Body: ``{"agents": [ids], "duration_ms": <int>}`` (same shape/validation as
+    ``/capture``). Runs one bounded probe capture, then joins its ``connect``
+    detections to the buffered wire flows by real ``ip:port`` (the wire's L3/L4
+    layer is the ground truth of the real egress) and returns the detector
+    scorecard. The wire buffer is the recent-egress truth; align the capture with
+    the traffic you want to score.
+
+    Fail-safe: no broker socket -> 503; the wire snapshot is read-only."""
+    socket_path, _ = _resolve_socket()
+    if not socket_path:
+        raise HTTPException(
+            status_code=503,
+            detail=f"{_SOCKET_ENV} not set and no broker socket at .run/probe.sock",
+        )
+
+    agents = body.get("agents")
+    if not isinstance(agents, list) or not agents or not all(isinstance(a, str) for a in agents):
+        raise HTTPException(status_code=400, detail="agents must be a non-empty list of ids")
+    duration_ms = body.get("duration_ms", 3000)
+    if not isinstance(duration_ms, int) or isinstance(duration_ms, bool) or duration_ms <= 0:
+        raise HTTPException(status_code=400, detail="duration_ms must be a positive integer")
+    ceiling = _max_duration_ms()
+    if duration_ms > ceiling:
+        raise HTTPException(status_code=400, detail=f"duration_ms exceeds the API ceiling {ceiling}")
+
+    try:
+        recording = relay_capture(socket_path=socket_path, agents=agents, duration_ms=duration_ms)
+    except ProbeUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    wire_flows = request.app.state.wire_flow_recorder.snapshot_dicts()
+    recordings = recording.get("recordings", []) if isinstance(recording, dict) else []
+    report = build_bench_report(wire_flows, recordings)
+    return {
+        "recording_status": recording.get("status") if isinstance(recording, dict) else None,
+        "wire_flows_total": len(wire_flows),
+        "report": report.to_dict(),
+    }

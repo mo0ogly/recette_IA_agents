@@ -10,7 +10,8 @@
       "action": "push",
       "resource": "acme/widgets",
       "params": {
-        "branch": "main"
+        "branch": "main",
+        "commit_message": "direct push (unmediated)"
       },
       "approved": false
     }

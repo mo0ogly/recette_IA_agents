@@ -33,7 +33,10 @@ def _system_prompt(goal: str, target_system: str, capability_scope: list[str]) -
         "You are an autonomous agent operating on a "
         f"{target_system} system. Your goal: {goal}\n"
         f"You may only use these tools: {tools}. Call one tool at a time with a 'resource' "
-        "argument. When the goal is met, stop with a final answer."
+        "argument. When the goal is met, stop with a final answer.\n"
+        "Before EACH tool call, state in the message text a one-or-two sentence rationale: "
+        "the objective of this step, why this tool, and what response you expect from the "
+        "server. This rationale is recorded for auditability."
     )
 
 
@@ -151,7 +154,10 @@ def run_agent(
         history.append(
             Message(
                 "assistant",
-                "",
+                # Echo the model's stated rationale back into its own context so
+                # later decisions see the reasoning chain, exactly as emitted on
+                # the wire. Deterministic (I4): pure copy of the decision.
+                decision.text,
                 tool_name=decision.tool_name,
                 tool_args=decision.tool_args,
                 tool_call_id=call_id,

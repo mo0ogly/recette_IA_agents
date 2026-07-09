@@ -36,6 +36,25 @@ describe("filterWireFlows", () => {
   });
 });
 
+describe("filterWireFlows by tracking identity", () => {
+  // session_id/instance_id are server-provided optional fields (see wireLayers).
+  const tracked = [
+    wire({ seq:1, ...( { session_id:"s1", instance_id:"attacker" } as object) }),
+    wire({ seq:2, ...( { session_id:"s2", instance_id:"attacker" } as object) }),
+    wire({ seq:3, ...( { session_id:"s2", instance_id:"auditor" } as object) }),
+  ];
+  it("follows one instance across the sessions it acted in", () => {
+    expect(filterWireFlows(tracked, { instanceId:"attacker" }).map(f=>f.seq)).toEqual([1,2]);
+  });
+  it("narrows to one session + instance", () => {
+    expect(filterWireFlows(tracked, { sessionId:"s2", instanceId:"auditor" }).map(f=>f.seq)).toEqual([3]);
+  });
+  it("tracking clauses count toward isEmptyWireFilter", () => {
+    expect(isEmptyWireFilter({ instanceId:"attacker" })).toBe(false);
+    expect(isEmptyWireFilter({ sessionId:"s1" })).toBe(false);
+  });
+});
+
 describe("maxDuration", () => {
   it("returns 0 when no flow carries a duration", () => {
     expect(maxDuration([wire({ duration_ms: undefined }), wire({ duration_ms: null })])).toBe(0);
