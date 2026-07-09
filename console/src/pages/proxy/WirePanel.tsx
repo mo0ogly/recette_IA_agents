@@ -47,6 +47,7 @@ import {
 import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
 import WireFilterBar from "./WireFilterBar";
 import InstanceSessionSummary from "./InstanceSessionSummary";
+import WireExpertPanel from "./WireExpertPanel";
 import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
 
@@ -458,6 +459,10 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       />
 
       <WireStatsPanel flows={visible} />
+
+      {/* Expert info (defensive conformance signals): each signal opens the
+          flow it is anchored on, like Wireshark's expert dialog. */}
+      <WireExpertPanel flows={visible} onPick={setSelectedSeq} />
 
       {/* Flows can arrive via the transport-route registry even when
           INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
