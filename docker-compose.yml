@@ -116,6 +116,10 @@ services:
       INSPECT_IA_AGENTS_EVENT_STORE_PATH: /data/events.db
       INSPECT_IA_AGENTS_POLICIES_DIR: /data/policies
       INSPECT_IA_AGENTS_CONFIG_PATH: /data/config.json
+      # Per-backend API keys live on the persistent volume like the config, NOT
+      # the ephemeral in-container default (/app/data): otherwise a key set via
+      # the console is wiped on the next rebuild/restart ("my key is gone").
+      INSPECT_IA_AGENTS_BACKEND_SECRETS_PATH: /data/backend_secrets.json
       # Proxy debug ON by default under Docker (the runtime of record, R27) so
       # the console App-traces panel is populated out of the box, matching what
       # the bare-host `platform up` already exports. Overridable per deployment.
