@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { clearWireFlows, controlWireOverlay } from "../../api/client";
@@ -52,6 +52,7 @@ import WireExpertPanel from "./WireExpertPanel";
 import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
 import { compileColorRules, type ColorTint } from "./wireColorRules";
+import { fromAgentPcap, toAgentPcap, type AgentPcapImport } from "./agentpcap";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -177,10 +178,19 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     [filter],
   );
 
-  const { items, error: feedError, refresh, resetFeed } = useDeltaFeed<WireFlow>(fetcher, {
-    intervalMs: POLL_INTERVAL_MS,
-    paused: paused ?? false,
-  });
+  // Offline capture: an imported .agentpcap replaces the live feed as the
+  // flow source until the operator returns to live (Wireshark open-file mode).
+  const [imported, setImported] = useState<AgentPcapImport | null>(null);
+
+  const { items: liveItems, error: feedError, refresh, resetFeed } = useDeltaFeed<WireFlow>(
+    fetcher,
+    {
+      intervalMs: POLL_INTERVAL_MS,
+      // An imported capture freezes the view: no point polling behind it.
+      paused: (paused ?? false) || imported !== null,
+    },
+  );
+  const items = imported !== null ? imported.flows : liveItems;
 
   // Server-side filters: any clause change invalidates the cursor AND the
   // buffered rows (they belong to the previous selection), so the feed is
@@ -353,6 +363,23 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     downloadFile(flowsToHar(items), "wire-flows.har", "application/json");
   }, [items]);
 
+  // Portable capture: export the buffered flows as a verifiable .agentpcap;
+  // import one to inspect a shared capture OFFLINE (agentpcap.ts).
+  const pcapInputRef = useRef<HTMLInputElement | null>(null);
+  const onExportPcap = useCallback((): void => {
+    downloadFile(toAgentPcap(items), "capture.agentpcap.json", "application/json");
+  }, [items]);
+  const onImportPcap = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file === undefined) return;
+    // FileReader (not File.text()): available in every runtime incl. jsdom.
+    const reader = new FileReader();
+    reader.onload = (): void => setImported(fromAgentPcap(String(reader.result ?? "")));
+    reader.readAsText(file);
+    // Allow re-importing the same filename later.
+    e.target.value = "";
+  }, []);
+
   const itemKey = useCallback((r: WireRow): number => r.seq, []);
   const renderRow = useCallback(
     (r: WireRow): ReactNode => (
@@ -449,6 +476,30 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         >
           Export HAR
         </button>
+        <button
+          type="button"
+          className="proxy-export"
+          data-testid="wire-export-pcap"
+          onClick={onExportPcap}
+        >
+          Export .agentpcap
+        </button>
+        <button
+          type="button"
+          className="proxy-export"
+          data-testid="wire-import-pcap-btn"
+          onClick={() => pcapInputRef.current?.click()}
+        >
+          Importer .agentpcap
+        </button>
+        <input
+          ref={pcapInputRef}
+          type="file"
+          accept=".json,.agentpcap"
+          style={{ display: "none" }}
+          data-testid="wire-import-pcap"
+          onChange={onImportPcap}
+        />
         <button type="button" className="proxy-clear" onClick={() => void onClear()}>
           Vider le tampon
         </button>
@@ -472,6 +523,24 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {nextStep !== null && (
         <p className="proxy-banner" role="status" data-testid="wire-next-step">
           {nextStep}
+        </p>
+      )}
+
+      {/* Offline mode: an imported capture replaces the live feed; the integrity
+          verdict (chain recomputation) is always shown to the auditor. */}
+      {imported !== null && (
+        <p className="proxy-banner" role="status" data-testid="wire-imported">
+          Capture importee ({imported.flows.length} flux) — integrite{" "}
+          {imported.verified ? "verifiee" : "INVALIDE"}
+          {imported.error !== null ? ` : ${imported.error}` : ""}.{" "}
+          <button
+            type="button"
+            className="proxy-mode-btn"
+            data-testid="wire-import-clear"
+            onClick={() => setImported(null)}
+          >
+            revenir au direct
+          </button>
         </p>
       )}
 

@@ -519,6 +519,45 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("imports a .agentpcap capture offline, verifies integrity, returns to live", async () => {
+    // Export/import round-trip through the panel: a valid capture replaces the
+    // live feed (offline mode) and reports a verified chain; "revenir au
+    // direct" restores the feed.
+    const { toAgentPcap } = await import("./agentpcap");
+    const pcap = toAgentPcap([
+      { ...fixture.flows[0], seq: 31, host: "imported.example.com" },
+    ]);
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    const input = screen.getByTestId("wire-import-pcap");
+    const file = new File([pcap], "capture.agentpcap.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    const banner = await screen.findByTestId("wire-imported");
+    expect(banner).toHaveTextContent("1 flux");
+    expect(banner).toHaveTextContent("integrite verifiee");
+    // The offline capture is now the flow source.
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
+    expect(list).toHaveTextContent("imported.example.com");
+    // Back to live: the feed items return.
+    fireEvent.click(screen.getByTestId("wire-import-clear"));
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+  });
+
+  it("flags a tampered .agentpcap as integrity-invalid", async () => {
+    const { toAgentPcap } = await import("./agentpcap");
+    const parsed = JSON.parse(toAgentPcap([{ ...fixture.flows[0], seq: 32 }]));
+    parsed.flows[0].request_body = '{"tampered":true}';
+    renderWire();
+    await screen.findByLabelText("wire flows");
+    const file = new File([JSON.stringify(parsed)], "bad.agentpcap.json", {
+      type: "application/json",
+    });
+    fireEvent.change(screen.getByTestId("wire-import-pcap"), { target: { files: [file] } });
+    const banner = await screen.findByTestId("wire-imported");
+    expect(banner).toHaveTextContent("INVALIDE");
+  });
+
   it("tints rows via ?colors= coloring rules and surfaces a rule error (deep-link)", async () => {
     // Wireshark coloring rules: first matching rule tints the row. The fixture
     // has a 201 (ok) and a 403 (fail): "amber:status >= 400" must tint only the
