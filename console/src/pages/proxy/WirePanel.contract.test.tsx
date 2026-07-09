@@ -519,6 +519,55 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("surfaces expert-info signals and opens the anchored flow on click", async () => {
+    // A 5xx exchange trips the server_error expert signal; an unmasked
+    // API-key-shaped token in a body trips secret_in_clear. Clicking a signal
+    // selects the flow it is anchored on (Wireshark expert-dialog behavior).
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        {
+          ...fixture.flows[0],
+          seq: 21,
+          status_code: 502,
+          ok: false,
+          request_body: "{}",
+          response_body: "upstream failed",
+        },
+        {
+          ...fixture.flows[0],
+          seq: 22,
+          request_body: JSON.stringify({ key: "sk-abcdefghijklmnopqrstuvwx" }),
+        },
+      ],
+      last_seq: 22,
+      total: 2,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(2));
+    const expert = await screen.findByTestId("wire-expert");
+    expect(expert).toHaveTextContent("2 alerte(s)");
+    expect(screen.getByTestId("wire-expert-server_error-21")).toBeInTheDocument();
+    // Clicking the secret signal opens flow #22's detail pane.
+    fireEvent.click(
+      within(screen.getByTestId("wire-expert-secret_in_clear-22")).getByRole("button"),
+    );
+    const detail = await screen.findByTestId("wire-detail");
+    expect(detail).toHaveTextContent("sk-abcdefghijklmnopqrstuvwx");
+  });
+
+  it("shows no expert panel over a clean capture", async () => {
+    // The committed fixture is a clean capture (no 5xx, masked bodies): the
+    // expert panel must stay absent rather than render an empty shell.
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    expect(screen.queryByTestId("wire-expert")).toBeNull();
+  });
+
   it("reconstructs the run decision timeline (reasoning -> effect) and flags the action step", async () => {
     // A run scoped by ?run=run-1: the LLM decides delete_repo (decision step),
     // then the DELETE hits the target (effect step). The timeline must order
