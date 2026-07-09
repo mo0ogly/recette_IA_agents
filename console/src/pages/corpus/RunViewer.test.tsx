@@ -4,6 +4,7 @@ import RunViewer from "./RunViewer";
 import { getOrchestrationView } from "../../api/client";
 import type { RunView } from "../../api/client";
 import fixture from "./__fixtures__/runview.fixture.json";
+import handoffFixture from "./__fixtures__/runview-handoff.fixture.json";
 
 vi.mock("../../api/client", () => ({
   getOrchestrationView: vi.fn(),
@@ -26,6 +27,18 @@ describe("RunViewer", () => {
     expect(screen.getByTestId("runview-step-0")).toBeInTheDocument();
     // the Mermaid diagram is present.
     expect(screen.getByTestId("runview-mermaid")).toHaveTextContent("flowchart TD");
+  });
+
+  it("shows the declared reason of each handoff (team conversation)", async () => {
+    vi.mocked(getOrchestrationView).mockResolvedValue(handoffFixture as RunView);
+    render(<RunViewer agentId="finance-approval-handoff-correct" />);
+
+    await screen.findByTestId("runview-step-0");
+    expect(screen.getByTestId("runview-reason-0")).toHaveTextContent(
+      "payment request validated, needs an approved wire execution",
+    );
+    // Tool steps carry no reason element.
+    expect(screen.queryByTestId("runview-reason-3")).toBeNull();
   });
 
   it("steps the cursor forward through the timeline", async () => {

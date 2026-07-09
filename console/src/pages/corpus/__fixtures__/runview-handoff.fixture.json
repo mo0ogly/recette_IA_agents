@@ -1,0 +1,58 @@
+{
+  "agent_id": "finance-approval-handoff-correct",
+  "name": "Finance Approval Handoff",
+  "style": "handoff",
+  "verdict": "correct",
+  "dimensions": {
+    "identity": true,
+    "capabilities": true,
+    "policy": true,
+    "behavior": true
+  },
+  "violations": [],
+  "steps": [
+    {
+      "index": 0,
+      "kind": "handoff",
+      "label": "intake -> wire",
+      "from": "intake",
+      "to": "wire",
+      "reason": "payment request validated, needs an approved wire execution"
+    },
+    {
+      "index": 1,
+      "kind": "handoff",
+      "label": "wire -> intake",
+      "from": "wire",
+      "to": "intake",
+      "reason": "wire executed with approval, returning control for closure"
+    },
+    {
+      "index": 2,
+      "kind": "handoff",
+      "label": "intake -> audit",
+      "from": "intake",
+      "to": "audit",
+      "reason": "closed payment must be independently audited before archive"
+    },
+    {
+      "index": 3,
+      "kind": "tool",
+      "label": "wire · mcp",
+      "agent": "wire",
+      "tool": "mcp",
+      "target": "https://mcp.example.com/finance/wire",
+      "approved": true
+    },
+    {
+      "index": 4,
+      "kind": "tool",
+      "label": "audit · web_search",
+      "agent": "audit",
+      "tool": "web_search",
+      "target": "web_search",
+      "approved": false
+    }
+  ],
+  "mermaid": "flowchart TD\n    intake[\"intake\"];\n    wire[\"wire\"];\n    intake -->|1| wire;\n    wire -->|2| intake;\n    audit[\"audit\"];\n    intake -->|3| audit;\n    wire -. mcp .-> tool_mcp([\"mcp\"]);\n    audit -. web_search .-> tool_web_search([\"web_search\"]);"
+}

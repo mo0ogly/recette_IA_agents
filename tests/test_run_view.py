@@ -45,6 +45,25 @@ class TestBuildRunView(unittest.TestCase):
         # indices are contiguous 0..n-1 for the slider.
         self.assertEqual([s["index"] for s in view["steps"]], [0, 1])
 
+    def test_handoff_reason_surfaces_in_view_and_never_changes_the_verdict(self) -> None:
+        # The declared "why" of a transfer is display metadata: same routed
+        # structure with and without reasons -> same verdict (never a judge
+        # input), and the reason is carried on the handoff step.
+        bare = OrchestrationRun(
+            hops=[HandoffHop(1, "triage", "worker")],
+            calls=[ToolCall(1, "worker", "P", "m", "mcp://x", "mcp", approved=True)],
+        )
+        reasoned = OrchestrationRun(
+            hops=[HandoffHop(1, "triage", "worker", reason="needs the mcp worker")],
+            calls=[ToolCall(1, "worker", "P", "m", "mcp://x", "mcp", approved=True)],
+        )
+        bare_view = build_run_view(TEAM, bare)
+        reasoned_view = build_run_view(TEAM, reasoned)
+        self.assertEqual(reasoned_view["steps"][0]["reason"], "needs the mcp worker")
+        self.assertEqual(bare_view["steps"][0]["reason"], "")
+        self.assertEqual(bare_view["verdict"], reasoned_view["verdict"])
+        self.assertEqual(bare_view["dimensions"], reasoned_view["dimensions"])
+
     def test_order_style_turns(self) -> None:
         team = {
             "kind": "maf_orchestration",

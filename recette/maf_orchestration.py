@@ -34,6 +34,10 @@ class HandoffHop:
     seq: int
     source: str  # 'from' in the run document
     target: str  # 'to' in the run document
+    # The declared reason for the transfer (why the source handed off).
+    # Display/audit metadata for the team-conversation view -- NEVER a judge
+    # input (judgement stays a pure function of the routed structure).
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,10 @@ class OrchestrationRun:
 
 def run_from_doc(doc: dict) -> OrchestrationRun:
     """Build an OrchestrationRun from a validated run document."""
-    hops = [HandoffHop(seq=h["seq"], source=h["from"], target=h["to"]) for h in doc.get("hops", [])]
+    hops = [
+        HandoffHop(seq=h["seq"], source=h["from"], target=h["to"], reason=h.get("reason", ""))
+        for h in doc.get("hops", [])
+    ]
     order = list(doc.get("order", []))
     calls = [
         ToolCall(

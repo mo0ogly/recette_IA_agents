@@ -96,6 +96,9 @@ export default function RunViewer({ agentId }: { agentId: string }): JSX.Element
             className={s.index === cursor ? "pill-ok" : undefined}
           >
             <code>{s.kind}</code> {s.label}
+            {s.kind === "handoff" && s.reason ? (
+              <em data-testid={`runview-reason-${s.index}`}> — {s.reason}</em>
+            ) : null}
           </li>
         ))}
       </ol>
