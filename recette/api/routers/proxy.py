@@ -15,15 +15,18 @@ store.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.responses import StreamingResponse
 
 from ...platform.proxy.redact import redact_mapping, redaction_enabled
 
@@ -445,6 +448,52 @@ def clear_wire_flows(request: Request) -> dict:
     """Discard the wire flow buffer (the audit log is untouched, I1)."""
     request.app.state.wire_flow_recorder.clear()
     return {"cleared": True}
+
+
+_WIRE_STREAM_POLL_SECONDS = 0.25
+_WIRE_STREAM_KEEPALIVE_SECONDS = 15.0
+
+
+@router.get("/wire/stream")
+async def stream_wire_flows(request: Request) -> StreamingResponse:
+    """SSE live-capture notifications for the wire buffer.
+
+    Data-light by design: each ``cursor`` event carries only the buffer's new
+    ``last_seq``; the client re-fetches through ``GET /proxy/wire`` with its
+    own filter clauses and cursor, so the SSE channel is a wake-up signal and
+    the delta endpoint stays the single data path (no second serialization of
+    flows to keep redaction-consistent). The generator watches the recorder's
+    unfiltered ``last_seq`` (any change fires, including a ``clear`` reset).
+    Read-only; closed on client disconnect; keepalive comments on idle so
+    proxies do not time the connection out."""
+    recorder = request.app.state.wire_flow_recorder
+
+    async def event_source() -> AsyncIterator[str]:
+        # Greet with the current cursor so EventSource fires `onopen` at once
+        # and the client can detect a missed window since its last fetch.
+        last = recorder.last_seq()
+        yield f"event: cursor\ndata: {json.dumps({'last_seq': last})}\n\n"
+        idle = 0.0
+        while True:
+            if await request.is_disconnected():
+                break
+            cur = await asyncio.to_thread(recorder.last_seq)
+            if cur != last:
+                last = cur
+                idle = 0.0
+                yield f"event: cursor\ndata: {json.dumps({'last_seq': cur})}\n\n"
+            else:
+                idle += _WIRE_STREAM_POLL_SECONDS
+                if idle >= _WIRE_STREAM_KEEPALIVE_SECONDS:
+                    idle = 0.0
+                    yield ": keepalive\n\n"
+            await asyncio.sleep(_WIRE_STREAM_POLL_SECONDS)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/route")

@@ -519,6 +519,38 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("refreshes the feed instantly on an SSE cursor event (live capture)", async () => {
+    // The SSE stream is a wake-up channel: a `cursor` event must trigger an
+    // immediate delta refresh without waiting for the 1s poll. jsdom has no
+    // EventSource, so a stub captures the listener the panel registers.
+    class FakeEventSource {
+      static last: FakeEventSource | null = null;
+      listeners = new Map<string, () => void>();
+      constructor(public url: string) {
+        FakeEventSource.last = this;
+      }
+      addEventListener(type: string, fn: () => void): void {
+        this.listeners.set(type, fn);
+      }
+      removeEventListener(): void {}
+      close(): void {}
+    }
+    (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+    try {
+      renderWire();
+      const list = await screen.findByLabelText("wire flows");
+      await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+      expect(FakeEventSource.last?.url).toContain("/proxy/wire/stream");
+      const before = vi.mocked(getWireFlowsDeltaTracked).mock.calls.length;
+      FakeEventSource.last?.listeners.get("cursor")?.();
+      await waitFor(() =>
+        expect(vi.mocked(getWireFlowsDeltaTracked).mock.calls.length).toBeGreaterThan(before),
+      );
+    } finally {
+      delete (globalThis as { EventSource?: unknown }).EventSource;
+    }
+  });
+
   it("follows an agent turn from a selected flow (session+instance deep-link)", async () => {
     // Follow-TCP-Stream equivalent: two flows of instance "triage" session "s1"
     // plus a foreign flow. Selecting a triage flow and clicking "Suivre ce tour

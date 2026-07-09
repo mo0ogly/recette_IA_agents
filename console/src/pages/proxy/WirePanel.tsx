@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { clearWireFlows, controlWireOverlay } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, wireStreamUrl } from "../../api/client";
 import { getWireFlowsDeltaTracked } from "./wireDeltaClient";
 import ProxySelector from "../../components/ProxySelector";
 import { VirtualList } from "../../components/VirtualList";
@@ -209,6 +209,21 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     },
   );
   const items = imported !== null ? imported.flows : liveItems;
+
+  // LIVE capture: the SSE stream is a data-light wake-up channel — each
+  // `cursor` event triggers an immediate delta refresh (the poll remains the
+  // fallback cadence). Runtimes without EventSource (jsdom) keep poll-only.
+  useEffect(() => {
+    if ((paused ?? false) || imported !== null) return undefined;
+    if (typeof EventSource === "undefined") return undefined;
+    const es = new EventSource(wireStreamUrl());
+    const onCursor = (): void => void refresh();
+    es.addEventListener("cursor", onCursor);
+    return (): void => {
+      es.removeEventListener("cursor", onCursor);
+      es.close();
+    };
+  }, [paused, imported, refresh]);
 
   // Server-side filters: any clause change invalidates the cursor AND the
   // buffered rows (they belong to the previous selection), so the feed is

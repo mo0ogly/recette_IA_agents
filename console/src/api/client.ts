@@ -918,6 +918,15 @@ export function realtimeStreamUrl(): string {
   return `${API_BASE_URL}/events/stream`;
 }
 
+/**
+ * Absolute URL of the wire live-capture SSE stream. Data-light wake-up channel:
+ * `cursor` events carry only the buffer's last_seq; the panel re-fetches via
+ * the delta endpoint (single data path, cursor-consistent).
+ */
+export function wireStreamUrl(): string {
+  return `${API_BASE_URL}/proxy/wire/stream`;
+}
+
 /** Realtime transport health for the live-feed badge. */
 export function getRealtimeStatus(): Promise<RealtimeStatus> {
   return request<RealtimeStatus>("/events/status", { method: "GET" });
