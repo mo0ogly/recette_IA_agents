@@ -69,6 +69,10 @@ _PROVIDER_ENV_KEY = {
     "qwen": "QWEN_API_KEY",
     "cerebras": "CEREBRAS_API_KEY",
     "skynet": "SKYNET_API_KEY",
+    # "internal" is an alias of "skynet" (same vLLM gateway, same key/env): a
+    # neutral display name that resolves identically. Existing "skynet" backends
+    # keep working; new ones can be created as "internal".
+    "internal": "SKYNET_API_KEY",
     "bedrock": "AWS_BEARER_TOKEN_BEDROCK",
 }
 
@@ -90,10 +94,14 @@ _PROVIDER_MODEL_ENDPOINTS: dict[str, dict[str, str]] = {
         "mistralai/Voxtral-Mini-3B-2507": f"{_SKYNET}/voxtral/v1",
     },
 }
+# "internal" shares skynet's per-model endpoint map (same object): the alias must
+# not drift from the routes it points at.
+_PROVIDER_MODEL_ENDPOINTS["internal"] = _PROVIDER_MODEL_ENDPOINTS["skynet"]
 
 _PROVIDER_BASE_URL = {
     "openai_compat": "required",
     "skynet": "required",
+    "internal": "required",
     "bedrock": "optional",
 }
 

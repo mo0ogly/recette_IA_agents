@@ -304,7 +304,14 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Provider aliases: a neutral display name resolving to the same catalog as its
+# canonical provider. "internal" is skynet (same vLLM gateway).
+_PROVIDER_ALIASES = {"internal": "skynet"}
+
+
 def provider_models(provider: str) -> tuple[str, ...]:
     """Known model ids for ``provider`` (first = default), or empty if none are
-    declared. Pure lookup over the curated, intentionally partial map above."""
+    declared. Pure lookup over the curated, intentionally partial map above;
+    a provider alias resolves to its canonical catalog."""
+    provider = _PROVIDER_ALIASES.get(provider, provider)
     return _PROVIDER_MODELS.get(provider, ())

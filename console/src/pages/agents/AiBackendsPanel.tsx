@@ -440,7 +440,7 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
               placeholder={
                 form.provider === "bedrock"
                   ? "https://bedrock-runtime.us-east-1.amazonaws.com"
-                  : form.provider === "skynet"
+                  : form.provider === "skynet" || form.provider === "internal"
                     ? "https://api.skynet.cossi.internet/<model>/v1"
                     : "http://localhost:11434/v1"
               }
@@ -448,9 +448,9 @@ export default function AiBackendsPanel(props: AiBackendsPanelProps): JSX.Elemen
               onChange={(e) => setForm((p) => ({ ...p, base_url: e.target.value }))}
               required={baseUrlMode === "required"}
             />
-            {form.provider === "skynet" && (
+            {(form.provider === "skynet" || form.provider === "internal") && (
               <span className="agents-key-hint" data-testid="skynet-hint">
-                SKYNET route chaque modele a son URL : choisir un modele remplit la Base URL
+                Ce provider route chaque modele a son URL : choisir un modele remplit la Base URL
                 automatiquement. Seuls les modeles de chat sont listes (reranker / embeddings exclus).
               </span>
             )}

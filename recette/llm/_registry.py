@@ -69,6 +69,10 @@ _PROVIDERS = (
     "qwen",
     "cerebras",
     "skynet",
+    # Alias of "skynet" (same class/host/key): a neutral display name. Kept as a
+    # first-class provider so it appears in the console catalog; resolves via
+    # SkynetLlm. Existing "skynet" backends are unaffected.
+    "internal",
     "bedrock",
     "openai_compat",
 )
@@ -108,6 +112,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
     "qwen": QwenLlm,
     "cerebras": CerebrasLlm,
     "skynet": SkynetLlm,
+    "internal": SkynetLlm,  # alias of skynet (drift guard: keys == _PROVIDERS)
     "bedrock": BedrockLlm,
     "openai_compat": OpenAiCompatLlm,
 }
@@ -115,7 +120,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
 
 # Providers with NO canonical host: the target is whatever base_url the backend
 # was configured with (the class default must not leak into the allowlist).
-_BASE_URL_DRIVEN_PROVIDERS = frozenset({"openai_compat", "skynet"})
+_BASE_URL_DRIVEN_PROVIDERS = frozenset({"openai_compat", "skynet", "internal"})
 
 
 def provider_host(provider: str, base_url: str | None = None) -> str | None:
@@ -211,10 +216,10 @@ def build_llm(
         return QwenLlm(model=model, client=client, api_key=api_key)
     if provider == "cerebras":
         return CerebrasLlm(model=model, client=client, api_key=api_key)
-    if provider == "skynet":
+    if provider in ("skynet", "internal"):  # internal is an alias of skynet
         if not base_url and client is None:
             raise ValueError(
-                "skynet requires base_url (https://api.skynet.cossi.internet/<model>/v1)"
+                f"{provider} requires base_url (https://api.skynet.cossi.internet/<model>/v1)"
             )
         return SkynetLlm(model=model, base_url=base_url or "", client=client, api_key=api_key)
     if provider == "bedrock":
