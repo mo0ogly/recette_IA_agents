@@ -33,6 +33,7 @@ def scorecard(outcomes: list[ScenarioOutcome]) -> dict:
                 "verdict": o.verdict,
                 "expected_verdict": o.expected_verdict,
                 "violation_type": o.violation_type,
+                "expected_violation_type": o.expected_violation_type,
                 "anomaly_caught": o.anomaly_caught,
                 "owasp_asi": o.tags.get("owasp_asi"),
             }
@@ -53,7 +54,8 @@ def render(card: dict) -> str:
     for row in card["rows"]:
         flag = "OK" if row["anomaly_caught"] else "MISS"
         lines.append(
-            f"  [{flag}] {row['scenario_id']} predicted={row['verdict']} "
-            f"expected={row['expected_verdict']} violation={row['violation_type']}"
+            f"  [{flag}] {row['scenario_id']} "
+            f"predicted={row['verdict']}/{row['violation_type']} "
+            f"expected={row['expected_verdict']}/{row['expected_violation_type']}"
         )
     return "\n".join(lines)

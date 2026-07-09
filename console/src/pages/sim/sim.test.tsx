@@ -197,6 +197,28 @@ describe("ScenarioDetail (4-dim matrix + timeline + action log)", () => {
     );
   });
 
+  it("shows the wrong-dimension miss line when caught on the wrong axis", () => {
+    // Tightened detection (backend #1): an incorrect verdict caught on the WRONG
+    // dimension is a miss. The detail must say which axis was expected vs got.
+    const base = scenarioDetailFixture as SimScenarioView;
+    const view: SimScenarioView = {
+      ...base,
+      anomaly_caught: false,
+      violation_type: "capability_overreach",
+      expected_violation_type: "identity_mismatch",
+    };
+    render(<ScenarioDetail view={view} />);
+    const miss = screen.getByTestId(`sim-scn-miss-${view.scenario_id}`);
+    expect(miss.textContent).toContain("identity_mismatch");
+    expect(miss.textContent).toContain("capability_overreach");
+  });
+
+  it("hides the wrong-dimension miss line when the anomaly is caught", () => {
+    const view = scenarioDetailFixture as SimScenarioView;
+    render(<ScenarioDetail view={view} />);
+    expect(screen.queryByTestId(`sim-scn-miss-${view.scenario_id}`)).toBeNull();
+  });
+
   it("renders the Crescendo escalation transcript turns (MAF fixture)", () => {
     const view = scenarioDetailFixture as SimScenarioView;
     render(<ScenarioDetail view={view} />);

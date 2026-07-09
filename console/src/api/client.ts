@@ -1769,9 +1769,14 @@ export interface SimScenario {
   name: string;
   verdict: string;
   expected_verdict: string;
+  /** Predicted broken dimension (the recette's derived violation), or null. */
   violation_type: string | null;
-  /** True when the recette's predicted verdict matches the scenario's expected
-   *  verdict -- i.e. the red-team anomaly was caught. */
+  /** Ground-truth broken dimension the scenario expects, or null. Lets the UI
+   *  show WHY a scenario is a miss: caught the wrong axis vs the expected one. */
+  expected_violation_type?: string | null;
+  /** True when the recette caught the anomaly for the RIGHT reason: the
+   *  predicted verdict matches AND (for a negative) the predicted broken
+   *  dimension equals expected_violation_type. */
   anomaly_caught: boolean;
   /** Standards mapping, e.g. { owasp_asi, mitre_atlas, nist }. May be partial. */
   tags: Record<string, string>;

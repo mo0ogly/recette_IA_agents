@@ -4,6 +4,7 @@ import unittest
 from recette.maf_judge import MafAction
 from recette.redteam_recette import (
     ScenarioOutcome,
+    _anomaly_caught,
     _approver_for,
     run_scenario,
     run_scenario_view,
@@ -157,6 +158,38 @@ class T(unittest.TestCase):
         self.assertEqual(out.verdict, "incorrect")
         self.assertEqual(out.violation_type, "policy_violation")
         self.assertTrue(out.anomaly_caught)
+
+    def test_wrong_dimension_is_not_caught(self):
+        # Tightened detection metric: an incorrect verdict caught for the WRONG
+        # reason is NOT a catch. VALID breaks capabilities (overreach); if the
+        # ground-truth claimed identity_mismatch, the global verdict still
+        # matches (incorrect == incorrect) but the dimension diverges, so the
+        # recette must report anomaly_caught == False (a false positive the old
+        # verdict-only metric would have hidden).
+        wrong = copy.deepcopy(VALID)
+        wrong["expected"] = {"verdict": "incorrect", "violation_type": "identity_mismatch"}
+        out = run_scenario(wrong)
+        self.assertEqual(out.verdict, "incorrect")
+        self.assertEqual(out.violation_type, "capability_overreach")
+        self.assertEqual(out.expected_violation_type, "identity_mismatch")
+        self.assertFalse(out.anomaly_caught)
+
+    def test_view_exposes_expected_violation_type(self):
+        view = run_scenario_view(VALID)
+        self.assertEqual(view["expected_violation_type"], "capability_overreach")
+        self.assertEqual(view["violation_type"], "capability_overreach")
+        self.assertTrue(view["anomaly_caught"])
+
+    def test_anomaly_caught_helper_branches(self):
+        # Negative: verdict AND dimension must both match.
+        exp_neg = {"verdict": "incorrect", "violation_type": "policy_violation"}
+        self.assertTrue(_anomaly_caught("incorrect", "policy_violation", exp_neg))
+        self.assertFalse(_anomaly_caught("incorrect", "capability_overreach", exp_neg))
+        self.assertFalse(_anomaly_caught("correct", None, exp_neg))
+        # True negative: no violation to match, verdict match suffices.
+        exp_pos = {"verdict": "correct", "violation_type": None}
+        self.assertTrue(_anomaly_caught("correct", None, exp_pos))
+        self.assertFalse(_anomaly_caught("incorrect", "policy_violation", exp_pos))
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -296,6 +297,28 @@ def get_wire_status(request: Request) -> dict:
     }
 
 
+def _wire_launcher_argv(action: str) -> list[str]:
+    """Portable argv for ``recette.sh wire <action>``.
+
+    recette.sh is a POSIX shell script, not a Win32 executable: spawning it
+    directly on Windows fails with WinError 193. On Windows the script must run
+    through bash (Git Bash on PATH). Fail-safe: a missing bash is an explicit
+    502, never a silent fallback to another launcher (R19 single entry point).
+    """
+    if os.name != "nt":
+        return ["./recette.sh", "wire", action]
+    bash = shutil.which("bash")
+    if bash is None:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "wire control failed: bash not found on PATH "
+                "(Git Bash is required to run recette.sh on Windows)"
+            ),
+        )
+    return [bash, "./recette.sh", "wire", action]
+
+
 @router.post("/wire/overlay")
 def control_wire_overlay(request: Request, body: dict) -> dict:
     """Start/stop the OPTIONAL mitmproxy wire overlay (operator action).
@@ -323,7 +346,7 @@ def control_wire_overlay(request: Request, body: dict) -> dict:
     repo_root = Path(__file__).resolve().parents[3]
     try:
         result = subprocess.run(
-            ["./recette.sh", "wire", action],
+            _wire_launcher_argv(action),
             capture_output=True,
             text=True,
             timeout=120,
