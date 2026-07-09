@@ -7,7 +7,12 @@
 .proxy-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
 }
 
 .proxy-summary {
@@ -120,34 +125,129 @@
   white-space: nowrap;
 }
 
-/* Windowed wire rows MUST be a uniform fixed height (44px, mirrored by
-   ROW_HEIGHT_PX in WirePanel): the select button keeps its two-line layout
-   (summary + latency bar) inside the fixed row, the compare button sits to
-   the right, overflow clipped. */
+/* Windowed wire rows MUST be a uniform fixed height (30px, mirrored by
+   ROW_HEIGHT_PX in WirePanel): single-line packet-list rows (Wireshark-style
+   columns), the compare button sits to the right, overflow clipped. */
 .proxy-wire-vlist .proxy-wire-row {
   box-sizing: border-box;
   display: flex;
   align-items: stretch;
-  height: 44px;
+  height: 30px;
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Zebra striping keyed on the flow seq (stable under windowing, unlike
+   nth-child over a virtualized slice). */
+.proxy-wire-vlist .proxy-wire-row[data-parity="odd"] {
+  background: var(--color-surface);
+}
+
 .proxy-wire-vlist .proxy-wire-row .proxy-list-item {
   box-sizing: border-box;
+  position: relative;
   height: 100%;
   min-width: 0;
   overflow: hidden;
   border-bottom: none;
-  /* Re-allow the two-line layout inside the fixed row (the shared
-     .proxy-vlist .proxy-list-item rule forces nowrap for trace rows). */
-  flex-wrap: wrap;
-  white-space: normal;
-  padding: 0.2rem 0.6rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding: 0 0.6rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+}
+
+/* A failed exchange tints the WHOLE row (Wireshark coloring-rule feel),
+   badge tokens only -- no hardcoded color. */
+.proxy-wire-vlist .wire-prow[data-outcome="fail"] {
+  background: var(--badge-red-bg);
+}
+
+.proxy-wire-vlist .wire-prow:hover {
+  background: var(--color-bg);
 }
 
 .proxy-wire-vlist .proxy-wire-compare-btn {
   flex: 0 0 auto;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  opacity: 0;
+}
+
+.proxy-wire-vlist .proxy-wire-row:hover .proxy-wire-compare-btn,
+.proxy-wire-vlist .proxy-wire-compare-btn[data-active="true"] {
+  opacity: 1;
+}
+
+/* Packet-list column layout, shared by the header row and the data rows so
+   the columns stay aligned. */
+.wire-col {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wire-col-seq {
+  flex: 0 0 3rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding-right: 0.4rem;
+}
+
+.wire-col-status {
+  flex: 0 0 3.2rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.wire-col-status[data-outcome="ok"] {
+  color: var(--badge-green-fg);
+}
+
+.wire-col-status[data-outcome="fail"] {
+  color: var(--badge-red-fg);
+}
+
+.wire-col-method {
+  flex: 0 0 4rem;
+  font-weight: 600;
+}
+
+.wire-col-host {
+  flex: 0 1 11rem;
+  color: var(--color-text-muted);
+}
+
+.wire-col-path {
+  flex: 1 1 auto;
+  min-width: 4rem;
+}
+
+.wire-col-inst {
+  flex: 0 0 6.5rem;
+  color: var(--color-accent);
+}
+
+.wire-col-cmp {
+  flex: 0 0 4.8rem;
+}
+
+.wire-list-head {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0.28rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* "N new traces" affordance shown while the user is scrolled away from the
@@ -236,15 +336,17 @@
   font-size: 0.72rem;
 }
 
-/* Waterfall bar: width encodes the flow's latency relative to the slowest shown
-   flow (layout, not a hardcoded color). duration_ms is OPS metadata on the wire
-   view only, never a judge/decision/replay input (I4). */
+/* Waterfall strip: width encodes the flow's latency relative to the slowest
+   shown flow (layout, not a hardcoded color). Overlays the bottom edge of the
+   single-line packet row. duration_ms is OPS metadata on the wire view only,
+   never a judge/decision/replay input (I4). */
 .proxy-wire-bar {
-  flex: 0 0 100%;
-  height: 3px;
-  margin-top: 4px;
-  border-radius: 2px;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
   background: var(--color-accent);
+  opacity: 0.55;
   min-width: 0;
 }
 
@@ -763,6 +865,33 @@
 .wire-layer-none {
   color: var(--color-text-muted);
   font-size: 0.78rem;
+}
+
+/* The packet list is the star of the wire view: give it the wider column
+   (overrides the shared traces grid split for the wire panel only). */
+.proxy-wire .proxy-grid {
+  grid-template-columns: minmax(460px, 1.15fr) 1fr;
+}
+
+/* Collapsible analysis cards under the toolbar (statistics, expert info). */
+.wire-stats {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.wire-stats > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.wire-stats[open] > summary {
+  margin-bottom: 0.3rem;
+  color: var(--color-text);
 }
 
 /* Cross-session strip: an instance's footprint across the sessions it acted in. */

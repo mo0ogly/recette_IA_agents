@@ -40,6 +40,7 @@ import {
   distinctWireValues,
   filterWireFlows,
   type WireFlowFilter,
+  type WireFlowLine,
   maxDuration,
   wireFailureCount,
   wireFlowToLine,
@@ -54,20 +55,17 @@ import { compileWireFilter } from "./wireFilter";
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
  *  `.proxy-wire-vlist .proxy-wire-row` height in proxy.css (windowing math).
- *  Taller than the trace rows: a wire row carries the latency bar line. */
-const ROW_HEIGHT_PX = 44;
+ *  Single-line packet-list rows; the latency strip overlays the row bottom. */
+const ROW_HEIGHT_PX = 30;
 /** Height of the windowed list viewport (VirtualList needs a fixed pixel
  *  height for its slice arithmetic). */
 const LIST_HEIGHT_PX = 420;
 
 const WIRE_TRUNCATION_MARKER = "...[truncated]"; // appended by recette/platform/proxy/wire.py _clamp_body when a body exceeds MAX_BODY_CHARS
 
-/** One virtualized row: the flow's console line plus its relative-latency
+/** One virtualized row: the flow's packet-list line plus its relative-latency
  *  width (precomputed so renderRow stays a pure presentation callback). */
-interface WireRow {
-  seq: number;
-  outcome: "ok" | "fail";
-  label: string;
+interface WireRow extends WireFlowLine {
   /** Waterfall width in percent of the slowest buffered flow (layout only). */
   durationPct: number;
 }
@@ -350,19 +348,29 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const itemKey = useCallback((r: WireRow): number => r.seq, []);
   const renderRow = useCallback(
     (r: WireRow): ReactNode => (
-      <div className="proxy-wire-row">
+      <div className="proxy-wire-row" data-parity={r.seq % 2 === 0 ? "even" : "odd"}>
         <button
           type="button"
-          className="proxy-list-item"
+          className="proxy-list-item wire-prow"
           data-active={r.seq === selectedSeq}
           data-outcome={r.outcome}
           onClick={() => setSelectedSeq(r.seq)}
         >
-          <span className="proxy-seq">#{r.seq}</span>
-          <span className="proxy-badge" data-outcome={r.outcome}>
-            {r.outcome}
+          <span className="wire-col wire-col-seq">{r.seq}</span>
+          <span className="wire-col wire-col-status" data-outcome={r.outcome}>
+            {r.status_code}
           </span>
-          <span className="proxy-label">{r.label}</span>
+          <span className="wire-col wire-col-method">{r.method}</span>
+          <span className="wire-col wire-col-host" title={r.host}>
+            {r.host}
+          </span>
+          <span className="wire-col wire-col-path" title={r.path}>
+            {r.path}
+          </span>
+          <span className="wire-col wire-col-inst" title={r.instance ?? undefined}>
+            {r.instance ?? ""}
+          </span>
+          {/* Waterfall strip: latency relative to the slowest shown flow. */}
           <span className="proxy-wire-bar" style={{ width: `${r.durationPct}%` }} />
         </button>
         <button
@@ -371,6 +379,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           data-testid={`wire-compare-${r.seq}`}
           data-active={r.seq === compareSeq}
           onClick={() => setCompareSeq(r.seq)}
+          title={`comparer le flux #${r.seq} au flux selectionne`}
         >
           comparer
         </button>
@@ -551,6 +560,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           role="list"
           aria-label="wire flows"
         >
+          <div className="wire-list-head" aria-hidden="true">
+            <span className="wire-col wire-col-seq">No</span>
+            <span className="wire-col wire-col-status">Statut</span>
+            <span className="wire-col wire-col-method">Methode</span>
+            <span className="wire-col wire-col-host">Hote</span>
+            <span className="wire-col wire-col-path">Chemin</span>
+            <span className="wire-col wire-col-inst">Instance</span>
+            <span className="wire-col wire-col-cmp" />
+          </div>
           {newSinceAway > 0 && (
             <button
               type="button"

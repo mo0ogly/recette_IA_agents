@@ -10,20 +10,32 @@
 import type { WireFlow } from "../../types/platform";
 import { instanceId, sessionId } from "./wireLayers";
 
-/** A single wire flow summarised as one console line. */
+/** A single wire flow summarised as one packet-list row. */
 export interface WireFlowLine {
   seq: number;
   /** "ok" when the exchange completed with a <400 status, else "fail". */
   outcome: "ok" | "fail";
   label: string;
+  /** Columnar fields for the packet-list layout (Wireshark-style). */
+  method: string;
+  host: string;
+  path: string;
+  status_code: number;
+  /** Autonomous instance that emitted the flow, or null (legacy rows). */
+  instance: string | null;
 }
 
-/** One-line summary: method, host/path, status code. */
+/** One-line summary: method, host/path, status code + columnar fields. */
 export function wireFlowToLine(f: WireFlow): WireFlowLine {
   return {
     seq: f.seq,
     outcome: f.ok ? "ok" : "fail",
     label: `${f.method} ${f.host}${f.path} -> ${f.status_code}`,
+    method: f.method,
+    host: f.host,
+    path: f.path,
+    status_code: f.status_code,
+    instance: instanceId(f),
   };
 }
 
