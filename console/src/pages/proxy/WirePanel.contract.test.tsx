@@ -519,6 +519,43 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("follows an agent turn from a selected flow (session+instance deep-link)", async () => {
+    // Follow-TCP-Stream equivalent: two flows of instance "triage" session "s1"
+    // plus a foreign flow. Selecting a triage flow and clicking "Suivre ce tour
+    // d'agent" pushes session+instance clauses (URL + server-side) so only the
+    // turn remains, and the turn timeline replaces the run-scoped one.
+    const turnFlow = (seq: number, extra: object): WireFlow =>
+      ({ ...fixture.flows[0], seq, ...extra }) as WireFlow;
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        turnFlow(41, { session_id: "s1", instance_id: "triage" }),
+        turnFlow(42, { session_id: "s1", instance_id: "triage" }),
+        turnFlow(43, { session_id: "s2", instance_id: "other" }),
+      ],
+      last_seq: 43,
+      total: 3,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(3));
+    fireEvent.click(selectButtons(list)[0]);
+    await screen.findByTestId("wire-detail");
+    fireEvent.click(screen.getByTestId("wire-follow-turn"));
+    // The list narrows to the followed turn (server receives the clauses).
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(2));
+    await waitFor(() =>
+      expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: "s1", instanceId: "triage" }),
+      ),
+    );
+    // The turn timeline is shown for the followed scope (no run clause needed).
+    const tl = await screen.findByTestId("wire-run-timeline");
+    expect(tl).toHaveTextContent("Tour d'agent -- triage / session s1");
+  });
+
   it("imports a .agentpcap capture offline, verifies integrity, returns to live", async () => {
     // Export/import round-trip through the panel: a valid capture replaces the
     // live feed (offline mode) and reports a verified chain; "revenir au

@@ -53,6 +53,7 @@ import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
 import { compileColorRules, type ColorTint } from "./wireColorRules";
 import { fromAgentPcap, toAgentPcap, type AgentPcapImport } from "./agentpcap";
+import { instanceId as flowInstanceId, sessionId as flowSessionId } from "./wireLayers";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -136,6 +137,23 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           } else {
             next.delete(key);
           }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+
+  // Follow-agent-turn: both clauses land in ONE URL update — two successive
+  // setParams in the same tick would race (the second reads a stale prev).
+  const onFollowTurn = useCallback(
+    (session: string | null, instance: string | null): void => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (session !== null) next.set("session", session);
+          if (instance !== null) next.set("instance", instance);
           return next;
         },
         { replace: true },
@@ -329,13 +347,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // a deterministic function of the flow bytes, never a judge/decision input.
   // Null for a non-LLM flow -> the raw body pane stays the source of truth.
   const llm = useMemo(() => (selected !== null ? decodeLlmFlow(selected) : null), [selected]);
-  // Decision timeline of the selected run: when a run clause is active the
-  // buffered flows are exactly that run's flows (server-scoped), so ordering
-  // them by capture sequence reconstructs the reasoning -> effect story. Lets an
-  // operator find the exact step where an undesired action first appears.
+  // Decision timeline of the followed scope. Two ways to scope a "turn":
+  // a run clause (cockpit deep-link) or a followed agent turn (session +
+  // instance, the Follow-TCP-Stream equivalent). Either way the buffered flows
+  // are exactly that scope's flows, so ordering by capture sequence
+  // reconstructs the reasoning -> effect story.
+  const followingTurn = filter.sessionId !== undefined && filter.instanceId !== undefined;
   const timeline = useMemo(
-    () => (filter.runId !== undefined ? buildRunTimeline(visible) : []),
-    [filter.runId, visible],
+    () => (filter.runId !== undefined || followingTurn ? buildRunTimeline(visible) : []),
+    [filter.runId, followingTurn, visible],
   );
   const compareFlow = useMemo(
     () => visible.find((f) => f.seq === compareSeq) ?? null,
@@ -582,11 +602,14 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {/* Decision timeline of the selected run: the reasoning -> effect story in
           capture order, action steps (tool decided / mutating call) highlighted,
           each clickable to open its full flow -- so an undesired action is found
-          at its exact step. Only shown when a run clause scopes the flows. */}
-      {filter.runId !== undefined && timeline.length > 0 && (
+          at its exact step. Shown when a run clause OR a followed agent turn
+          (session + instance) scopes the flows. */}
+      {(filter.runId !== undefined || followingTurn) && timeline.length > 0 && (
         <div className="proxy-wire-timeline" data-testid="wire-run-timeline">
           <div className="proxy-wire-timeline-head">
-            Timeline decision -- run {filter.runId.slice(0, 12)} ({timeline.length} etapes)
+            {filter.runId !== undefined
+              ? `Timeline decision -- run ${filter.runId.slice(0, 12)} (${timeline.length} etapes)`
+              : `Tour d'agent -- ${filter.instanceId ?? ""} / session ${filter.sessionId ?? ""} (${timeline.length} etapes)`}
           </div>
           <ol className="proxy-wire-timeline-list">
             {timeline.map((s) => (
@@ -736,6 +759,24 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
               <dd>
                 <WireLayersView flow={selected} />
               </dd>
+              {/* Follow-agent-turn (the Follow-TCP-Stream equivalent): scope the
+                  capture to this flow's session + instance in one click; the
+                  clauses land in the URL, so the followed turn is deep-linkable. */}
+              {(flowSessionId(selected) !== null || flowInstanceId(selected) !== null) && (
+                <>
+                  <dt>suivre</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      className="proxy-export"
+                      data-testid="wire-follow-turn"
+                      onClick={() => onFollowTurn(flowSessionId(selected), flowInstanceId(selected))}
+                    >
+                      Suivre ce tour d'agent
+                    </button>
+                  </dd>
+                </>
+              )}
               <dt>replay</dt>
               <dd>
                 <button
