@@ -532,6 +532,77 @@
   font-weight: 600;
 }
 
+/* Unified agent conversation: LLM thought + agent->server request + server
+ * response, one turn per step. The flagship "Wireshark for agents" view. */
+.proxy-conv-list {
+  margin: 0;
+  padding: 0.5rem;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+  overflow: auto;
+}
+
+.proxy-conv-turn {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.proxy-conv-step {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.proxy-conv-think {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.proxy-conv-exchange {
+  display: grid;
+  gap: 0.3rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--color-accent, #4a8cff);
+}
+
+.proxy-conv-exchange[data-ok="false"] {
+  border-left-color: var(--color-danger, #e5484d);
+}
+
+.proxy-conv-tag {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.proxy-conv-intent {
+  font-style: italic;
+}
+
+.proxy-conv-tokens {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.proxy-conv-body {
+  margin: 0;
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.76rem;
+}
+
+.proxy-conv-err {
+  color: var(--color-danger, #e5484d);
+}
+
 /* Proxy route selector (shared: wire panel + per-run network log). */
 .proxy-selector {
   display: inline-flex;

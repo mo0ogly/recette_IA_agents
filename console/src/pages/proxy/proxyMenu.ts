@@ -18,7 +18,13 @@
 import type { ComponentType } from "react";
 
 /** The stable identifier of a Proxy source view. */
-export type SourceId = "app" | "wire" | "reconcile" | "sessions" | "replay-diff";
+export type SourceId =
+  | "app"
+  | "wire"
+  | "reconcile"
+  | "sessions"
+  | "replay-diff"
+  | "conversation";
 
 /**
  * What a mounted source panel reports up to the menu for its live badge.

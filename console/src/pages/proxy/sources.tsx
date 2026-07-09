@@ -18,6 +18,7 @@ import { lazy } from "react";
 import AppTracesPanel from "./AppTracesPanel";
 import type { SourceDescriptor } from "./proxyMenu";
 
+const ConversationPanel = lazy(() => import("./ConversationPanel"));
 const WirePanel = lazy(() => import("./WirePanel"));
 const ReconcilePanel = lazy(() => import("./ReconcilePanel"));
 const SessionsPanel = lazy(() => import("./SessionsPanel"));
@@ -33,6 +34,12 @@ export const SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
     label: "traces app",
     hint: "effets de bord applicatifs (intention + reponse, I5)",
     Component: AppTracesPanel,
+  },
+  {
+    id: "conversation",
+    label: "conversation",
+    hint: "pensee du LLM + requete agent -> reponse serveur, par run (tout agent/campagne)",
+    Component: ConversationPanel,
   },
   {
     id: "wire",
