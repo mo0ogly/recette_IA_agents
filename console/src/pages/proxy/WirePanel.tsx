@@ -45,8 +45,9 @@ import {
   wireFlowToLine,
 } from "./wireFlowModel";
 import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
-import TrackingFilters from "./TrackingFilters";
+import WireFilterBar from "./WireFilterBar";
 import InstanceSessionSummary from "./InstanceSessionSummary";
+import { compileWireFilter } from "./wireFilter";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -112,6 +113,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       // across the sessions it acted in, or pin one session.
       sessionId: params.get("session") ?? undefined,
       instanceId: params.get("instance") ?? undefined,
+      df: params.get("df") ?? undefined,
       text: params.get("q") ?? undefined,
     }),
     [params],
@@ -275,11 +277,17 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   const hosts = useMemo(() => distinctWireValues(items, "host"), [items]);
   const methods = useMemo(() => distinctWireValues(items, "method"), [items]);
   const runIds = useMemo(() => distinctWireValues(items, "run_id"), [items]);
-  // Client-side backstop for the tracking filter (the server already narrows by
-  // session/instance): keeps the view coherent during a feed reset.
+  // Client-side narrowing: the tracking backstop (server already filters session/
+  // instance) THEN the Wireshark display-filter predicate over the dissected
+  // fields. Compiling once yields the predicate + a parse error to surface.
+  const dfCompiled = useMemo(() => compileWireFilter(filter.df ?? ""), [filter.df]);
   const visible = useMemo(
-    () => filterWireFlows(items, { sessionId: filter.sessionId, instanceId: filter.instanceId }),
-    [items, filter.sessionId, filter.instanceId],
+    () =>
+      filterWireFlows(items, {
+        sessionId: filter.sessionId,
+        instanceId: filter.instanceId,
+      }).filter(dfCompiled.predicate),
+    [items, filter.sessionId, filter.instanceId, dfCompiled],
   );
   // Waterfall scale: the largest latency among the buffered flows. duration_ms
   // is OPS metadata on the view only, never a judge/decision/replay input (I4).
@@ -426,86 +434,14 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         </button>
       </header>
 
-      <div className="proxy-filter" role="group" aria-label="wire filter">
-        <label className="proxy-filter-label">
-          host
-          <select
-            className="proxy-filter-input"
-            value={filter.host ?? ""}
-            onChange={(e) => setParam("host", e.target.value)}
-          >
-            <option value="">tous</option>
-            {hosts.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="proxy-filter-label">
-          method
-          <select
-            className="proxy-filter-input"
-            value={filter.method ?? ""}
-            onChange={(e) => setParam("method", e.target.value)}
-          >
-            <option value="">toutes</option>
-            {methods.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="proxy-filter-label">
-          status
-          <input
-            className="proxy-filter-input"
-            type="text"
-            data-testid="wire-filter-status"
-            value={filter.status ?? ""}
-            onChange={(e) => setParam("status", e.target.value)}
-          />
-        </label>
-        <label className="proxy-filter-label">
-          run_id
-          {/* `run` is page-owned (set by the cockpit "Voir dans le proxy"
-              deep-link). This panel READS it to narrow the flows; it only ever
-              SETS run (selecting a run), it never deletes it -- so an empty
-              selection is a no-op rather than clobbering the page's run. */}
-          <select
-            className="proxy-filter-input"
-            value={filter.runId ?? ""}
-            onChange={(e) => {
-              if (e.target.value) {
-                setParam("run", e.target.value);
-              }
-            }}
-          >
-            <option value="">tous</option>
-            {runIds.map((r) => (
-              <option key={r} value={r}>
-                {r.slice(0, 12)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <TrackingFilters
-          instanceId={filter.instanceId}
-          sessionId={filter.sessionId}
-          setParam={setParam}
-        />
-        <label className="proxy-filter-label">
-          texte
-          <input
-            className="proxy-filter-input"
-            type="text"
-            data-testid="wire-filter-text"
-            value={filter.text ?? ""}
-            onChange={(e) => setParam("q", e.target.value)}
-          />
-        </label>
-      </div>
+      <WireFilterBar
+        filter={filter}
+        setParam={setParam}
+        hosts={hosts}
+        methods={methods}
+        runIds={runIds}
+        dfError={dfCompiled.ok ? null : dfCompiled.error}
+      />
 
       {nextStep !== null && (
         <p className="proxy-banner" role="status" data-testid="wire-next-step">

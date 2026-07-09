@@ -60,6 +60,10 @@ export interface WireFlowFilter {
   sessionId?: string;
   /** Autonomous agent instance exact match -- follows one instance across sessions. */
   instanceId?: string;
+  /** Wireshark-style display filter over dissected fields (see wireFilter.ts).
+   *  Client-side only (does not affect the server fetch), so it is intentionally
+   *  NOT part of isEmptyWireFilter. */
+  df?: string;
   /** Free text, matched case-insensitively in path + request_body + response_body. */
   text?: string;
 }

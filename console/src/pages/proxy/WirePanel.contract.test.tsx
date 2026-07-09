@@ -257,6 +257,23 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(selectButtons(list)).toHaveLength(1);
   });
 
+  it("applies a client-side display filter and surfaces a parse error", async () => {
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+
+    const df = screen.getByTestId("wire-filter-df");
+    // Invalid syntax -> error surfaced, list stays usable (pass-through predicate).
+    fireEvent.change(df, { target: { value: "status >=" } });
+    await screen.findByTestId("wire-filter-df-error");
+    expect(selectButtons(list)).toHaveLength(fixture.flows.length);
+
+    // A valid filter matching nothing empties the list; the error clears.
+    fireEvent.change(df, { target: { value: 'host == "no.such.host"' } });
+    await screen.findByText("aucun flux");
+    expect(screen.queryByTestId("wire-filter-df-error")).toBeNull();
+  });
+
   it("pushes the host filter server-side (delta query param)", async () => {
     renderWire();
     const list = await screen.findByLabelText("wire flows");
