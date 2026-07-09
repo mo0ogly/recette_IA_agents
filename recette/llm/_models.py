@@ -22,7 +22,17 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
         "gemini-2.5-flash-lite",
         "gemini-3.5-flash",
     ),
-    "groq": ("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
+    # Groq production text-chat model ids, verified at console.groq.com/docs/models
+    # (R13, 2026-07). Preview-only ids (llama-4-scout, qwen3-*, prompt-guard) are
+    # excluded like the other providers; the compound agentic systems are excluded
+    # too -- they do their own tool use, bypassing the mediated tool layer (I2/I5).
+    # First = default. The panel free-text field stays the way to pick anything else.
+    "groq": (
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+    ),
     "mistral": ("mistral-large-latest", "mistral-small-latest"),
     "deepseek": ("deepseek-chat", "deepseek-reasoner"),
     # Nous Research inference models, frozen once from models.dev (no runtime
