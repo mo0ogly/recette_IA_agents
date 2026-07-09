@@ -130,6 +130,12 @@ def launch(request: Request, body: dict[str, Any]) -> dict:
                 # Active transport route selected in the network-debug consoles
                 # (direct vs wire overlay). Transport only -- not the decision (I4).
                 wire_proxy_url=request.app.state.proxy_route_registry.active_proxy_url(),
+                # Record every LLM decision (messages/tools/tokens) into the
+                # per-run capture ring so GET /capture/llm-traces (the console
+                # LlmTracePanel) is populated. The wrap is transparent to the
+                # decide->act loop and does not touch the decision (I4): it is a
+                # read-only observation sink, the audit log stays the truth (I1).
+                capture_sink=request.app.state.capture_store.sink_for(run.id),
             ),
         )
         return {
