@@ -502,9 +502,8 @@ export function listRecordings(): Promise<RecordingMeta[]> {
  *  emission for slow-motion review; the replayed action log is identical at
  *  any speed (pacing is operational, never a decision input). */
 export function replayRecording(recordingId: string, paceMs = 0): Promise<RunHandle> {
-  const pace = paceMs > 0 ? `?pace_ms=${encodeURIComponent(paceMs)}` : "";
   return request<RunHandle>(
-    `/recordings/${encodeURIComponent(recordingId)}/replay${pace}`,
+    `/recordings/${encodeURIComponent(recordingId)}/replay?pace_ms=${encodeURIComponent(paceMs)}`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }
