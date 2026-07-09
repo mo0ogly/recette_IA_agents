@@ -26,6 +26,7 @@ from ..discovery_harness import (
 )
 from ..events import AgentAction, LogicalClock, Mode, mode_for_action
 from ..forge import GitForge, LabForge
+from ..friction import friction_tool_output
 from ..harness import discover_agent_dirs
 from ..harness import run_agent as run_ident_agent
 from ..lane_b import run_agent as run_lane_b_agent
@@ -535,6 +536,9 @@ def make_lane_b_runner(
             on_step=_paced_on_step(base_on_step, pace_ms, should_stop),
             should_stop=should_stop,
             memory_window=_memory_window(agent_cfg),
+            # Scenario friction (deterministic transient errors -> retries):
+            # pure config-driven tool_output, no-op when unconfigured.
+            tool_output=friction_tool_output(agent_cfg.get("friction")),
         )
         emit(
             "result",
@@ -699,6 +703,9 @@ def make_campaign_runner(
                     should_stop,
                 ),
                 should_stop=should_stop,
+                # Scenario friction: same per-agent config as the single-agent
+                # runner (deterministic transient errors -> retries).
+                tool_output=friction_tool_output(agent_cfg.get("friction")),
             )
             rec_id = f"{campaign['id']}.{idx:02d}.{agent_id}"
             recording_store.save(rec_id, result.recording)  # type: ignore[attr-defined]
@@ -739,9 +746,7 @@ def make_replay_runner(
             capability_scope=_scope_from_recording(recording),
             llm=replay_backend(recording),
             provider="replay",
-            on_step=_paced_on_step(
-                _lane_b_step_emit(emit, recording.agent_id), pace, should_stop
-            ),
+            on_step=_paced_on_step(_lane_b_step_emit(emit, recording.agent_id), pace, should_stop),
             should_stop=should_stop,
         )
         replayed = [a.to_dict() for a in result.actions]

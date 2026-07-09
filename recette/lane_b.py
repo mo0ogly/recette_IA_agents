@@ -44,6 +44,11 @@ def _result_text(action: AgentAction) -> str:
     return f"ok: {action.action_type} on {action.resource} (mode={action.mode})"
 
 
+# Public alias: the canonical tool-result builder, reused by tool_output
+# decorators (e.g. recette.friction) as their pass-through default.
+default_tool_output = _result_text
+
+
 def _windowed(history: list[Message], window: int | None) -> list[Message]:
     """Bound the conversation memory passed to the model to a sliding window.
 
@@ -80,10 +85,13 @@ def run_agent(
     """Run the decide->act loop until a final answer or max_steps. Deterministic given a
     deterministic backend (StubLlm/ReplayLlm) + LabForge.
 
-    ``stop_on_repeat`` halts the run when the model re-issues an action it already
-    executed (same tool + resource): a no-progress loop some live models fall into.
-    It is deterministic (a pure function of the decisions) and OFF by default so
-    replay reproduces a recording verbatim; the live run path turns it on.
+    ``stop_on_repeat`` halts the run when the model re-issues an action that
+    already SUCCEEDED (same tool + resource): a no-progress loop some live
+    models fall into. An action whose tool result was an ``error:`` line stays
+    retryable -- a retry after a transient failure (friction) is progress, not
+    a loop. It is deterministic (a pure function of the decisions and the pure
+    tool_output results) and OFF by default so replay reproduces a recording
+    verbatim; the live run path turns it on.
 
     ``tool_output`` builds the tool-result text fed back to the model after each
     executed action; it defaults to the canonical ``ok: ...`` line. A non-default
@@ -122,17 +130,20 @@ def run_agent(
             if on_step is not None:
                 on_step(i, step)
             break
+        signature: tuple[str | None, str | None] | None = None
         if stop_on_repeat:
             resource = (
                 decision.tool_args.get("resource") if isinstance(decision.tool_args, dict) else None
             )
             signature = (decision.tool_name, resource)
             if signature in seen:
-                # No-progress loop: the model re-issued an action already done.
-                # Stop without executing or recording the duplicate so the run
-                # ends on its distinct actions (replay stays verbatim).
+                # No-progress loop: the model re-issued an action that already
+                # SUCCEEDED. Stop without executing or recording the duplicate
+                # so the run ends on its distinct actions (replay stays
+                # verbatim). An action whose result was an error is NOT in
+                # ``seen`` (see below): retrying after a transient failure is
+                # progress (friction), not a loop.
                 break
-            seen.add(signature)
         action = execute_tool(
             forge,
             agent_id=agent_id,
@@ -144,6 +155,10 @@ def run_agent(
         # The server's response for this action -- captured into the step so it
         # is persisted with the recording (legibility level 3, durable I1).
         result_text = tool_output(action)
+        if signature is not None and not result_text.startswith("error:"):
+            # Deterministic: membership depends only on the decision sequence
+            # and the (pure) tool_output results, never on clock/random (I4).
+            seen.add(signature)
         step = RecordedStep(decision=decision, action=action.to_dict(), result=result_text)
         recording.steps.append(step)
         if on_step is not None:
