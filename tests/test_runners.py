@@ -468,6 +468,34 @@ class TestLaneBRunner(unittest.TestCase):
             runners_mod.time.sleep = original_sleep
 
 
+class TestResolveMaxSteps(unittest.TestCase):
+    def test_valid_value_is_used_and_clamped(self) -> None:
+        from recette.api.runners import MAX_MAX_STEPS, resolve_max_steps
+
+        self.assertEqual(resolve_max_steps({"max_steps": 60}), 60)
+        self.assertEqual(resolve_max_steps({"max_steps": 100000}), MAX_MAX_STEPS)
+        self.assertEqual(resolve_max_steps({"max_steps": 0}), 1)
+
+    def test_absent_or_malformed_falls_back_to_default(self) -> None:
+        from recette.api.runners import DEFAULT_MAX_STEPS, resolve_max_steps
+
+        for cfg in ({}, {"max_steps": None}, {"max_steps": "20"}, {"max_steps": True}):
+            self.assertEqual(resolve_max_steps(cfg), DEFAULT_MAX_STEPS)
+
+    def test_runner_honours_the_per_agent_step_bound(self) -> None:
+        # 3 distinct tool calls scripted but max_steps=2 -> only 2 executed.
+        agent = _mock_agent("a1", max_steps=2)
+        script = [
+            {"kind": "tool_call", "tool_name": "read_repo", "tool_args": {"resource": f"acme/r{i}"}}
+            for i in range(3)
+        ] + [{"kind": "final"}]
+        frames: list[tuple[str, dict]] = []
+        runner = make_lane_b_runner(agent, build_stub_llm(script))
+        runner({}, lambda kind, data: frames.append((kind, data)), lambda: False)
+        results = _frames_of(frames, "result")
+        self.assertEqual(len(results[0]["actions"]), 2)
+
+
 class TestReplayRunner(unittest.TestCase):
     def test_replay_of_a_recording_matches_the_original(self) -> None:
         result = run_agent(
