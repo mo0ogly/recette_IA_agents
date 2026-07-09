@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/frustration-detector.cjs",
+            "command": "bash -c 'H=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}/.claude/hooks/frustration-detector.cjs\"; [ -f \"$H\" ] && node \"$H\" || true'",
             "timeout": 5
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/secret-scanner.cjs",
+            "command": "bash -c 'H=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}/.claude/hooks/secret-scanner.cjs\"; [ -f \"$H\" ] && node \"$H\" || true'",
             "timeout": 15
           }
         ]
