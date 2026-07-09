@@ -370,6 +370,8 @@ def list_wire_flows(
     host: str | None = None,
     method: str | None = None,
     status: int | None = None,
+    session_id: str | None = None,
+    instance_id: str | None = None,
     q: str | None = None,
     limit: int | None = None,
 ) -> dict:
@@ -399,6 +401,8 @@ def list_wire_flows(
         host=host,
         method=method,
         status=status,
+        session_id=session_id,
+        instance_id=instance_id,
         q=q,
         limit=limit,
         tail=tail,

@@ -22,6 +22,7 @@ backend and is captured as recorded decisions.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,6 +34,7 @@ from .maf_orchestration import (
     judge_orchestration,
     run_from_doc,
 )
+from .tracking import SessionTracker, TrackedExchange
 
 SCHEMA_VERSION = "1.0"
 _DEFAULT_MAX_STEPS = 32
@@ -43,6 +45,27 @@ _RouteTool = tuple[str, str, str | None]  # (kind, primary, secondary) where kin
 #   "handoff" -> (handoff, target, None)
 #   "speak"   -> (speak, participant, None)
 #   "tool"    -> (tool, tool_kind, target)
+
+# Per-instance autonomy: each participant may act through its OWN backend (own
+# client/key/provider), so no single agent instance is shared across the team
+# (the "pas d'instance commune" rule). A single backend still backs everyone --
+# the common case (record/replay pass one ReplayLlm) -- the resolver returns it
+# for every participant, preserving the historical single-stream behaviour and
+# keeping replay deterministic (one decision stream, in call order).
+
+
+def _resolver(backends: LlmBackend | Mapping[str, LlmBackend]) -> Callable[[str], LlmBackend]:
+    """A per-participant backend selector. A mapping must cover every acting
+    participant (fail loud on a gap); a single backend backs all of them."""
+    if isinstance(backends, Mapping):
+
+        def resolve(participant_id: str) -> LlmBackend:
+            if participant_id not in backends:
+                raise ValueError(f"backends mapping missing an entry for {participant_id!r}")
+            return backends[participant_id]
+
+        return resolve
+    return lambda _participant_id: backends
 
 
 def _participant_map(team: dict) -> dict[str, dict]:
@@ -128,7 +151,9 @@ class _Recorder:
         return decision
 
 
-def _drive_handoff(team: dict, backend: LlmBackend, max_steps: int) -> OrchestrationRun:
+def _drive_handoff(
+    team: dict, resolve: Callable[[str], LlmBackend], max_steps: int
+) -> OrchestrationRun:
     participants = _participant_map(team)
     current = team.get("start_agent") or team["participants"][0]["agent_id"]
     hops: list[HandoffHop] = []
@@ -142,7 +167,8 @@ def _drive_handoff(team: dict, backend: LlmBackend, max_steps: int) -> Orchestra
         tspecs, tmeta = _agent_tools(participant)
         hspecs, hmeta = _handoff_tools(participant)
         meta = {**tmeta, **hmeta}
-        decision = backend.decide(system=_SYSTEM, history=history, tools=tspecs + hspecs)
+        # The acting participant decides through ITS OWN backend.
+        decision = resolve(current).decide(system=_SYSTEM, history=history, tools=tspecs + hspecs)
         if not decision.is_tool_call or decision.tool_name not in meta:
             break
         route = meta[decision.tool_name]
@@ -156,7 +182,7 @@ def _drive_handoff(team: dict, backend: LlmBackend, max_steps: int) -> Orchestra
     return OrchestrationRun(hops=hops, calls=calls)
 
 
-def _drive_linear(team: dict, backend: LlmBackend) -> OrchestrationRun:
+def _drive_linear(team: dict, resolve: Callable[[str], LlmBackend]) -> OrchestrationRun:
     """Sequential/concurrent: each declared participant acts exactly once."""
     order: list[str] = []
     calls: list[ToolCall] = []
@@ -165,7 +191,8 @@ def _drive_linear(team: dict, backend: LlmBackend) -> OrchestrationRun:
     for participant in team["participants"]:
         agent_id = participant["agent_id"]
         tspecs, tmeta = _agent_tools(participant)
-        decision = backend.decide(system=_SYSTEM, history=history, tools=tspecs)
+        # Each participant acts through ITS OWN backend (isolated per instance).
+        decision = resolve(agent_id).decide(system=_SYSTEM, history=history, tools=tspecs)
         order.append(agent_id)
         if decision.is_tool_call and decision.tool_name in tmeta:
             seq += 1
@@ -178,12 +205,15 @@ def _drive_linear(team: dict, backend: LlmBackend) -> OrchestrationRun:
     return OrchestrationRun(order=order, calls=calls)
 
 
-def _drive_group_chat(team: dict, backend: LlmBackend, max_steps: int) -> OrchestrationRun:
+def _drive_group_chat(
+    team: dict, resolve: Callable[[str], LlmBackend], max_steps: int
+) -> OrchestrationRun:
     participants = _participant_map(team)
     order: list[str] = []
     calls: list[ToolCall] = []
     history: list[Message] = []
     sspecs, smeta = _speak_tools(team)
+    start = team.get("start_agent") or team["participants"][0]["agent_id"]
     seq = 0
     last_speaker: str | None = None
     for _ in range(max_steps):
@@ -192,7 +222,11 @@ def _drive_group_chat(team: dict, backend: LlmBackend, max_steps: int) -> Orches
         if last_speaker is not None:
             extra, tmeta = _agent_tools(participants[last_speaker])
             tools = tools + extra
-        decision = backend.decide(system=_SYSTEM, history=history, tools=tools)
+        # The current speaker (or the start agent before anyone spoke) decides
+        # through ITS OWN backend.
+        decision = resolve(last_speaker or start).decide(
+            system=_SYSTEM, history=history, tools=tools
+        )
         if not decision.is_tool_call:
             break
         if decision.tool_name in smeta:
@@ -216,17 +250,72 @@ def _drive_group_chat(team: dict, backend: LlmBackend, max_steps: int) -> Orches
     return OrchestrationRun(order=order, calls=calls)
 
 
+def _track_native(tracker: SessionTracker, session_id: str, team: dict, run: OrchestrationRun) -> None:
+    """Record one content-free, hash-chained exchange per turn of a native run
+    (speaker turns, handoff hops, tool calls) -- the native-driver counterpart of
+    orchestrate_ag2._track_run, so a native run also feeds the per-session chain."""
+    seq = 0
+    for agent_id in run.order:
+        seq += 1
+        tracker.record(
+            TrackedExchange(
+                session_id=session_id, instance_id=agent_id,
+                peer_id="orchestrator", seq=seq, action_type="speak",
+            )
+        )
+    for hop in run.hops:
+        seq += 1
+        tracker.record(
+            TrackedExchange(
+                session_id=session_id, instance_id=hop.source,
+                peer_id=hop.target, seq=seq, action_type="handoff",
+            )
+        )
+    for call in run.calls:
+        seq += 1
+        tracker.record(
+            TrackedExchange(
+                session_id=session_id, instance_id=call.agent_id, peer_id=call.target or "",
+                seq=seq, action_type="tool_call", resource=call.target or "",
+            )
+        )
+
+
 def drive(
-    team: dict, backend: LlmBackend, *, max_steps: int = _DEFAULT_MAX_STEPS
+    team: dict,
+    backends: LlmBackend | Mapping[str, LlmBackend],
+    *,
+    max_steps: int = _DEFAULT_MAX_STEPS,
+    session_id: str | None = None,
+    tracker: SessionTracker | None = None,
 ) -> OrchestrationRun:
-    """Drive a team against a backend and produce the run, dispatched by style."""
+    """Drive a team and produce the run, dispatched by style.
+
+    ``backends`` is either a single ``LlmBackend`` backing every participant (the
+    historical behaviour; record/replay pass one stream) or a mapping
+    ``{participant_id: backend}`` giving each participant ITS OWN backend -- true
+    per-instance autonomy, no shared agent instance. A mapping must cover every
+    acting participant, else ``ValueError``. Determinism (I4) is unchanged: with a
+    single ReplayLlm the resolver returns it for all, so replay reproduces the
+    exact decision stream.
+
+    When ``tracker`` is given a ``session_id`` is REQUIRED, and one content-free,
+    hash-chained exchange is recorded per turn (systematic multi-session tracking,
+    the native-driver parity with ``orchestrate_ag2.drive_ag2``)."""
+    if tracker is not None and not session_id:
+        raise ValueError("drive with a tracker requires a non-empty session_id")
+    resolve = _resolver(backends)
     style = team.get("style", "handoff")
     if style in ("sequential", "concurrent"):
-        return _drive_linear(team, backend)
-    if style in ("group_chat", "magentic"):
+        run = _drive_linear(team, resolve)
+    elif style in ("group_chat", "magentic"):
         # Both are manager-routed: the manager selects the next speaker each round.
-        return _drive_group_chat(team, backend, max_steps)
-    return _drive_handoff(team, backend, max_steps)
+        run = _drive_group_chat(team, resolve, max_steps)
+    else:
+        run = _drive_handoff(team, resolve, max_steps)
+    if tracker is not None and session_id:
+        _track_native(tracker, session_id, team, run)
+    return run
 
 
 def _run_to_doc(run: OrchestrationRun, agent_id: str) -> dict:

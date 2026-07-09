@@ -96,6 +96,19 @@ class WireFlow:
     # an input to a judge/decision/replay path (I4). None when the addon could
     # not compute it (no response timestamps).
     duration_ms: float | None = None
+    # Per-layer network decode of the same exchange (L3/L4, TLS, HTTP headers,
+    # per-phase timing) captured by the mitm addon from the sockets and the TLS
+    # handshake. Pure VIEW metadata like duration_ms: never on the audit log, not
+    # in the side_effect_hash (which reads only path + bodies). None when the
+    # overlay could extract nothing (e.g. a legacy addon that predates it).
+    layers: dict | None = None
+    # Multi-session tracking identity (see recette.tracking): the session (one
+    # conversation/episode) and the autonomous agent instance that emitted this
+    # exchange. VIEW metadata like run_id -- never on the audit log, not in the
+    # side_effect_hash. None on legacy rows / unattributed flows. Threading these
+    # lets the console follow ONE instance across the sessions it acted in.
+    session_id: str | None = None
+    instance_id: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -128,6 +141,12 @@ def normalize_flow(payload: dict, seq: int) -> WireFlow:
         duration_ms = float(raw_dur) if raw_dur is not None else None
     except (TypeError, ValueError):
         duration_ms = None
+    # Nested per-layer decode: trusted only as a dict (it crosses the container
+    # boundary); anything else is dropped to None rather than trusted.
+    raw_layers = payload.get("layers")
+    layers = raw_layers if isinstance(raw_layers, dict) else None
+    session_id = payload.get("session_id")
+    instance_id = payload.get("instance_id")
     return WireFlow(
         seq=seq,
         method=method,
@@ -144,4 +163,7 @@ def normalize_flow(payload: dict, seq: int) -> WireFlow:
         response_body=_clamp_body(payload.get("response_body")),
         run_id=str(run_id) if isinstance(run_id, str) and run_id else None,
         duration_ms=duration_ms,
+        layers=layers,
+        session_id=str(session_id) if isinstance(session_id, str) and session_id else None,
+        instance_id=str(instance_id) if isinstance(instance_id, str) and instance_id else None,
     )

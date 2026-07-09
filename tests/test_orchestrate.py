@@ -12,6 +12,7 @@ from pathlib import Path
 
 from recette.llm import LlmDecision, StubLlm
 from recette.maf_orchestration_harness import judge_dir
+from recette.tracking import SessionTracker
 from recette.orchestrate import (
     OrchestrationRecording,
     drive,
@@ -101,6 +102,72 @@ class TestRecordReplay(unittest.TestCase):
         rec.run.hops.clear()
         with self.assertRaises(ValueError):
             replay(rec)
+
+
+# Sequential team where each participant owns a DISTINCT tool target, so a call
+# recorded for a participant proves its OWN backend produced the decision.
+PI_TEAM = {
+    "kind": "maf_orchestration",
+    "style": "sequential",
+    "agent_id": "pi-seq",
+    "name": "Per-instance Seq",
+    "participants": [
+        {
+            "agent_id": "a",
+            "declared_identity": {"provider": "groq", "model": "m"},
+            "tools": [{"tool_kind": "mcp", "target": "mcp://a", "approval": "never"}],
+        },
+        {
+            "agent_id": "b",
+            "declared_identity": {"provider": "groq", "model": "m"},
+            "tools": [{"tool_kind": "mcp", "target": "mcp://b", "approval": "never"}],
+        },
+    ],
+}
+
+
+class TestPerInstanceBackends(unittest.TestCase):
+    def test_each_participant_uses_its_own_backend(self) -> None:
+        # Each backend carries exactly ONE decision. If a single stream were shared,
+        # the second participant would find it exhausted (no call). Distinct calls
+        # for a and b prove per-instance routing (no shared agent instance).
+        backends = {
+            "a": StubLlm([_tc("use_mcp_0", approved=True)]),
+            "b": StubLlm([_tc("use_mcp_0", approved=True)]),
+        }
+        run = drive(PI_TEAM, backends)
+        self.assertEqual(run.order, ["a", "b"])
+        self.assertEqual([c.target for c in run.calls], ["mcp://a", "mcp://b"])
+
+    def test_missing_mapping_entry_fails_loud(self) -> None:
+        with self.assertRaises(ValueError):
+            drive(PI_TEAM, {"a": StubLlm([_FINAL])})
+
+    def test_single_backend_still_backs_everyone(self) -> None:
+        # Backward compat: a lone backend feeds every participant in call order.
+        run = drive(PI_TEAM, StubLlm([_tc("use_mcp_0", approved=True), _FINAL]))
+        self.assertEqual(run.order, ["a", "b"])
+        self.assertEqual(run.calls[0].target, "mcp://a")
+
+
+class TestNativeTracking(unittest.TestCase):
+    def test_drive_feeds_the_session_chain(self) -> None:
+        tracker = SessionTracker()
+        drive(
+            PI_TEAM,
+            StubLlm([_tc("use_mcp_0", approved=True), _FINAL]),
+            session_id="sess-native",
+            tracker=tracker,
+        )
+        receipts = tracker.receipts("sess-native")
+        self.assertTrue(receipts, "expected recorded exchanges")
+        self.assertTrue(tracker.verify("sess-native")["ok"])
+        # Both participants acted -> both indexed under the session.
+        self.assertEqual(sorted(tracker.instances_of("sess-native")), ["a", "b"])
+
+    def test_tracker_without_session_id_fails_loud(self) -> None:
+        with self.assertRaises(ValueError):
+            drive(PI_TEAM, StubLlm([_FINAL]), tracker=SessionTracker())
 
 
 class TestFreeze(unittest.TestCase):

@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS wire_flows (
   port INTEGER NOT NULL, path TEXT NOT NULL, status_code INTEGER NOT NULL,
   ok INTEGER NOT NULL, content_type TEXT NOT NULL,
   request_body TEXT NOT NULL, response_body TEXT NOT NULL,
-  run_id TEXT, duration_ms REAL, side_effect_hash TEXT
+  run_id TEXT, duration_ms REAL, side_effect_hash TEXT, layers TEXT,
+  session_id TEXT, instance_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_wire_run ON wire_flows(run_id);
 CREATE INDEX IF NOT EXISTS idx_wire_host ON wire_flows(host);
@@ -96,13 +97,16 @@ _SELECT_TRACES = _SELECT_TRACES_BASE + " ORDER BY seq"
 
 _INSERT_WIRE = (
     "INSERT INTO wire_flows (method, scheme, host, port, path, status_code, ok, "
-    "content_type, request_body, response_body, run_id, duration_ms, side_effect_hash) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "content_type, request_body, response_body, run_id, duration_ms, side_effect_hash, layers, "
+    "session_id, instance_id) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
+# session_id/instance_id appended LAST so legacy indices row[13]/row[14] stay put.
 _SELECT_WIRE_BASE = (
     "SELECT seq, method, scheme, host, port, path, status_code, ok, content_type, "
-    "request_body, response_body, run_id, duration_ms, side_effect_hash "
+    "request_body, response_body, run_id, duration_ms, side_effect_hash, layers, "
+    "session_id, instance_id "
     "FROM wire_flows"
 )
 
@@ -224,7 +228,27 @@ class SqliteProxyStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Additive column migrations for DBs created before a column existed.
+
+        ``CREATE TABLE IF NOT EXISTS`` leaves an existing table untouched, so a
+        column added to ``_SCHEMA`` must also be ADDed here for older
+        ``.run/proxy_traces.db`` files. Each ADD is guarded by a table_info
+        probe (SQLite has no ``ADD COLUMN IF NOT EXISTS``) and is idempotent."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(wire_flows)")}
+        if "layers" not in cols:
+            self._conn.execute("ALTER TABLE wire_flows ADD COLUMN layers TEXT")
+        if "session_id" not in cols:
+            self._conn.execute("ALTER TABLE wire_flows ADD COLUMN session_id TEXT")
+        if "instance_id" not in cols:
+            self._conn.execute("ALTER TABLE wire_flows ADD COLUMN instance_id TEXT")
+        # Indexes on the just-ensured columns (they cannot live in _SCHEMA, which
+        # runs before this migration on a legacy table that lacks the columns).
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_wire_session ON wire_flows(session_id)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_wire_instance ON wire_flows(instance_id)")
 
     @property
     def store_error(self) -> str | None:
@@ -324,6 +348,9 @@ class SqliteProxyStore:
                         flow.run_id,
                         flow.duration_ms,
                         side_effect_hash,
+                        _dumps(flow.layers) if flow.layers is not None else None,
+                        flow.session_id,
+                        flow.instance_id,
                     ),
                 )
                 self._conn.commit()
@@ -450,6 +477,8 @@ class SqliteProxyStore:
         host: str | None = None,
         method: str | None = None,
         status: int | None = None,
+        session_id: str | None = None,
+        instance_id: str | None = None,
         q: str | None = None,
         limit: int | None = None,
         tail: int | None = None,
@@ -459,6 +488,7 @@ class SqliteProxyStore:
         ``method`` is compared uppercased (the column is stored uppercased by
         ``normalize_flow``); ``status`` is an exact status_code match. ``q`` is
         a literal substring over path, request_body and response_body.
+        ``session_id``/``instance_id`` are exact indexed matches (cross-session view).
         """
         fragments: list[str] = []
         params: list[object] = []
@@ -468,6 +498,12 @@ class SqliteProxyStore:
         if host is not None:
             fragments.append("host = ?")
             params.append(host)
+        if session_id is not None:
+            fragments.append("session_id = ?")
+            params.append(session_id)
+        if instance_id is not None:
+            fragments.append("instance_id = ?")
+            params.append(instance_id)
         if method is not None:
             fragments.append("method = ?")
             params.append(method.upper())
@@ -669,7 +705,16 @@ class SqliteWireRecorder:
     @staticmethod
     def _flow_from_row(row: tuple) -> WireFlow:
         # Column order matches _SELECT_WIRE; row[13] (side_effect_hash) is not
-        # a WireFlow field (wire.py is unchanged) -- see snapshot_dicts.
+        # a WireFlow field -- see snapshot_dicts. row[14] (layers) is the JSON
+        # per-layer decode; None/absent on legacy rows, decoded defensively.
+        # row[15]/[16] (session_id/instance_id) are appended last, read defensively.
+        layers = None
+        if len(row) > 14 and row[14]:
+            try:
+                decoded = json.loads(row[14])
+                layers = decoded if isinstance(decoded, dict) else None
+            except (TypeError, ValueError):
+                layers = None
         return WireFlow(
             seq=row[0],
             method=row[1],
@@ -684,6 +729,9 @@ class SqliteWireRecorder:
             response_body=row[10],
             run_id=row[11],
             duration_ms=row[12],
+            layers=layers,
+            session_id=row[15] if len(row) > 15 else None,
+            instance_id=row[16] if len(row) > 16 else None,
         )
 
     @classmethod
@@ -714,17 +762,15 @@ class SqliteWireRecorder:
         host: str | None = None,
         method: str | None = None,
         status: int | None = None,
+        session_id: str | None = None,
+        instance_id: str | None = None,
         q: str | None = None,
         limit: int | None = None,
         tail: int | None = None,
     ) -> tuple[list[dict], int, int]:
-        """Filtered flows as ``(items, last_seq, total)``; items are dicts in
-        the ``snapshot_dicts`` shape (side_effect_hash included).
-
-        Same semantics as ``SqliteTraceRecorder.query``: ``last_seq`` is the
-        unfiltered table MAX(seq), ``total`` counts the filtered set ignoring
-        ``since_seq``/``limit``/``tail``, and ``tail`` wins over ``limit``
-        (compat: the last N of the filtered set, without since_seq semantics).
+        """Filtered flows as ``(items, last_seq, total)`` in the ``snapshot_dicts``
+        shape. Same semantics as ``SqliteTraceRecorder.query``; ``session_id``/
+        ``instance_id`` narrow to one instance's cross-session view.
         """
         rows, last_seq, total = self._store.query_wire(
             since_seq=since_seq,
@@ -732,6 +778,8 @@ class SqliteWireRecorder:
             host=host,
             method=method,
             status=status,
+            session_id=session_id,
+            instance_id=instance_id,
             q=q,
             limit=limit,
             tail=tail,
