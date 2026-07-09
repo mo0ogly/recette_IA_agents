@@ -22,6 +22,7 @@ vi.mock("../../api/client", () => ({
   processCapture: vi.fn(),
   processCaptureCampaign: vi.fn(),
   runCampaign: vi.fn(),
+  setProxyDebug: vi.fn(),
   getProbeMonitor: vi.fn(),
   startProbeMonitor: vi.fn(),
   stopProbeMonitor: vi.fn(),
@@ -37,6 +38,7 @@ import {
   listCampaigns,
   processCapture,
   processCaptureCampaign,
+  setProxyDebug,
   startProbeMonitor,
 } from "../../api/client";
 import DiscoveryExchangePage from "./index";
@@ -284,6 +286,30 @@ describe("DiscoveryExchangePage", () => {
     // the empty-endpoint agent renders NO wire row at all
     expect(screen.queryByTestId("wire-agent-silent-bot")).not.toBeInTheDocument();
     expect(vi.mocked(processCapture)).toHaveBeenCalledWith("dx-live-bot");
+  });
+
+  it("explains why the exchange is empty when tracing is off and enables it on click", async () => {
+    // A governed campaign ran, but proxy-debug tracing is OFF: the exchange
+    // column is empty NOT because nothing happened, but because side-effect
+    // tracing is disabled. The panel must say so and offer to enable it.
+    const emptyOff = {
+      debug_enabled: false,
+      run_id: null,
+      ghost_exchanges: 0,
+      agents: [],
+      exchanges: [],
+      scorecard: { ok: true, total_agents: 0, detected_per_surface: {}, false_negatives: [] },
+    } as unknown as ExchangeReport;
+    vi.mocked(getDiscoveryExchange).mockResolvedValue(emptyOff);
+    vi.mocked(setProxyDebug).mockResolvedValue({ debug_enabled: true });
+    render(<DiscoveryExchangePage />);
+
+    const panel = await screen.findByTestId("dx-tracing-off");
+    expect(panel).toHaveTextContent(/tracage reseau des echanges est desactive/i);
+    // it must NOT show the misleading "lance un agent" message
+    expect(screen.queryByText(/lance un agent/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("dx-enable-tracing"));
+    await waitFor(() => expect(vi.mocked(setProxyDebug)).toHaveBeenCalledWith(true));
   });
 
   it("surfaces a load error without crashing", async () => {

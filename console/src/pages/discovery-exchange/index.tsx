@@ -27,6 +27,7 @@ import {
   processCapture,
   processCaptureCampaign,
   runCampaign,
+  setProxyDebug,
   startProbeMonitor,
   stopProbeMonitor,
 } from "../../api/client";
@@ -127,6 +128,23 @@ export default function DiscoveryExchangePage(): JSX.Element {
   }, [monitor]);
 
   const brokerLive = probe?.configured === true;
+
+  // The oracle exchange view is fed by the ProxyTrace recorder, which only
+  // fills when side-effect tracing is ON. It is OFF by default, so a governed
+  // campaign run (mock agent, no server) executes for real -- recordings + audit
+  // -- yet leaves this column empty. That reads as "nothing happened"; it is
+  // not. Surface the toggle so the operator can turn tracing on and re-launch,
+  // instead of staring at a silent empty table.
+  const tracingOff = report !== null && report.debug_enabled === false;
+
+  const enableTracing = useCallback(async (): Promise<void> => {
+    try {
+      await setProxyDebug(true);
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [refresh]);
 
   const launchProc = useCallback(async (): Promise<void> => {
     if (!procAgent) return;
@@ -396,7 +414,30 @@ export default function DiscoveryExchangePage(): JSX.Element {
       <div className="dx-grid">
         <section className="dx-col" aria-label="echange reel">
           <h2 className="dx-col-title">Echange reel</h2>
-          {report !== null && lines.length === 0 ? (
+          {report !== null && lines.length === 0 && tracingOff ? (
+            <div className="dx-empty" data-testid="dx-tracing-off">
+              <p>
+                <strong>Le tracage reseau des echanges est desactive.</strong> Une
+                campagne (agent mock, sans serveur) s&apos;execute bien -- son
+                verdict et ses actions sont visibles dans l&apos;onglet{" "}
+                <strong>Campagnes</strong> (icone oeil) et <strong>Enregistrements</strong>{" "}
+                -- mais les echanges reseau ne sont enregistres ici que lorsque le
+                tracage est actif (variable INSPECT_IA_AGENTS_PROXY_DEBUG).
+              </p>
+              <p>
+                Active le tracage puis <strong>relance la campagne</strong> : les
+                runs anterieurs ne sont pas traces retroactivement.
+              </p>
+              <button
+                type="button"
+                className="dx-source-btn"
+                data-testid="dx-enable-tracing"
+                onClick={() => void enableTracing()}
+              >
+                Activer le tracage des echanges
+              </button>
+            </div>
+          ) : report !== null && lines.length === 0 ? (
             <p className="dx-empty">
               Aucun echange -- lance un agent (les effets de bord sont traces ici).
             </p>
