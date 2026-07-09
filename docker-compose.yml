@@ -116,6 +116,10 @@ services:
       INSPECT_IA_AGENTS_EVENT_STORE_PATH: /data/events.db
       INSPECT_IA_AGENTS_POLICIES_DIR: /data/policies
       INSPECT_IA_AGENTS_CONFIG_PATH: /data/config.json
+      # Proxy debug ON by default under Docker (the runtime of record, R27) so
+      # the console App-traces panel is populated out of the box, matching what
+      # the bare-host `platform up` already exports. Overridable per deployment.
+      INSPECT_IA_AGENTS_PROXY_DEBUG: "${INSPECT_IA_AGENTS_PROXY_DEBUG:-on}"
     volumes:
       - platform-data:/data
     ports:
