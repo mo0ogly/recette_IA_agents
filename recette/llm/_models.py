@@ -245,7 +245,7 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
         "gpt-oss-120b",
         "zai-glm-4.7",
     ),
-    # SKYNET internal vLLM gateway: the 6 CHAT-capable routes, verified live
+    # Internal vLLM gateway: the 6 CHAT-capable routes, verified live
     # against /v1/chat/completions (R13). The two non-chat routes
     # (jina-reranker-m0 -> rerank, llama-embed-nemotron-8b -> embeddings) return
     # 404 on chat/completions and are intentionally excluded -- they cannot drive
@@ -305,7 +305,7 @@ _PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
 
 
 # Provider aliases: a neutral display name resolving to the same catalog as its
-# canonical provider. "internal" is skynet (same vLLM gateway).
+# canonical provider (the internal vLLM gateway).
 _PROVIDER_ALIASES = {"internal": "skynet"}
 
 

@@ -69,9 +69,9 @@ _PROVIDERS = (
     "qwen",
     "cerebras",
     "skynet",
-    # Alias of "skynet" (same class/host/key): a neutral display name. Kept as a
-    # first-class provider so it appears in the console catalog; resolves via
-    # SkynetLlm. Existing "skynet" backends are unaffected.
+    # Neutral display name for the same internal vLLM gateway (same class/host/
+    # key). Kept as a first-class provider so it appears in the console catalog;
+    # resolves via the gateway backend class. The prior id is unaffected.
     "internal",
     "bedrock",
     "openai_compat",
@@ -112,7 +112,7 @@ _PROVIDER_CLASSES: dict[str, type] = {
     "qwen": QwenLlm,
     "cerebras": CerebrasLlm,
     "skynet": SkynetLlm,
-    "internal": SkynetLlm,  # alias of skynet (drift guard: keys == _PROVIDERS)
+    "internal": SkynetLlm,  # neutral alias -> same class (drift guard: keys == _PROVIDERS)
     "bedrock": BedrockLlm,
     "openai_compat": OpenAiCompatLlm,
 }
@@ -216,7 +216,7 @@ def build_llm(
         return QwenLlm(model=model, client=client, api_key=api_key)
     if provider == "cerebras":
         return CerebrasLlm(model=model, client=client, api_key=api_key)
-    if provider in ("skynet", "internal"):  # internal is an alias of skynet
+    if provider in ("skynet", "internal"):  # neutral alias shares this branch
         if not base_url and client is None:
             raise ValueError(
                 f"{provider} requires base_url (https://api.skynet.cossi.internet/<model>/v1)"

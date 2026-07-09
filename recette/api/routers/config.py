@@ -69,9 +69,9 @@ _PROVIDER_ENV_KEY = {
     "qwen": "QWEN_API_KEY",
     "cerebras": "CEREBRAS_API_KEY",
     "skynet": "SKYNET_API_KEY",
-    # "internal" is an alias of "skynet" (same vLLM gateway, same key/env): a
-    # neutral display name that resolves identically. Existing "skynet" backends
-    # keep working; new ones can be created as "internal".
+    # "internal" is a neutral display name for the same internal vLLM gateway:
+    # it resolves identically (same key/env). The prior id keeps working; new
+    # backends can be created as "internal".
     "internal": "SKYNET_API_KEY",
     "bedrock": "AWS_BEARER_TOKEN_BEDROCK",
 }
@@ -79,10 +79,11 @@ _PROVIDER_ENV_KEY = {
 # Providers that take a base_url alongside the key. "required" means the backend
 # cannot resolve without it (openai_compat: the host IS the provider); "optional"
 # means it overrides a sensible default (bedrock: the region host).
-# SKYNET routes each model at its own base_url (api.skynet.cossi.internet/<slug>/v1).
-# This map lets the console auto-fill base_url when a SKYNET model is picked, so the
-# operator never hand-types the per-model route. Keys match _PROVIDER_MODELS["skynet"]
-# (the 6 chat-capable routes, verified live, R13); the two non-chat routes are absent.
+# The internal gateway routes each model at its own base_url
+# (api.skynet.cossi.internet/<slug>/v1). This map lets the console auto-fill
+# base_url when a gateway model is picked, so the operator never hand-types the
+# per-model route. Keys match the gateway's curated model list (the 6 chat-capable
+# routes, verified live, R13); the two non-chat routes are absent.
 _SKYNET = "https://api.skynet.cossi.internet"
 _PROVIDER_MODEL_ENDPOINTS: dict[str, dict[str, str]] = {
     "skynet": {
@@ -94,8 +95,8 @@ _PROVIDER_MODEL_ENDPOINTS: dict[str, dict[str, str]] = {
         "mistralai/Voxtral-Mini-3B-2507": f"{_SKYNET}/voxtral/v1",
     },
 }
-# "internal" shares skynet's per-model endpoint map (same object): the alias must
-# not drift from the routes it points at.
+# "internal" shares the same per-model endpoint map (same object) so the alias
+# never drifts from the routes it points at.
 _PROVIDER_MODEL_ENDPOINTS["internal"] = _PROVIDER_MODEL_ENDPOINTS["skynet"]
 
 _PROVIDER_BASE_URL = {
@@ -130,7 +131,7 @@ def _provider_catalog() -> list[dict]:
                 # empty when none are curated -> the UI offers a free-text field.
                 "models": models,
                 "default_model": models[0] if models else None,
-                # Per-model base_url map (SKYNET routes per model); {} for the
+                # Per-model base_url map (the internal gateway routes per model); {} for the
                 # rest. The console auto-fills base_url from the picked model.
                 "model_endpoints": _PROVIDER_MODEL_ENDPOINTS.get(provider, {}),
             }

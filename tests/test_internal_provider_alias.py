@@ -1,10 +1,10 @@
 # tests/test_internal_provider_alias.py
-"""'internal' is a zero-breakage alias of the 'skynet' provider.
+"""'internal' is a zero-breakage alias for the internal vLLM gateway provider.
 
-A neutral display name that resolves identically (same SkynetLlm class, same
-per-model endpoints, same SKYNET_API_KEY env). Existing 'skynet' backends are
-untouched; 'internal' appears in the console provider catalog and builds through
-the same path."""
+A neutral display name that resolves identically (same backend class, same
+per-model endpoints, same key env). The prior provider id is untouched;
+'internal' appears in the console provider catalog and builds through the same
+path. The assertions below compare against the canonical id by value."""
 
 from __future__ import annotations
 
