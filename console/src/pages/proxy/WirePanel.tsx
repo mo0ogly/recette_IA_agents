@@ -47,6 +47,7 @@ import {
 import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
 import WireFilterBar from "./WireFilterBar";
 import InstanceSessionSummary from "./InstanceSessionSummary";
+import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
 
 const POLL_INTERVAL_MS = 1000;
@@ -455,6 +456,8 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         activeSession={filter.sessionId}
         onPickSession={(sid) => setParam("session", sid)}
       />
+
+      <WireStatsPanel flows={visible} />
 
       {/* Flows can arrive via the transport-route registry even when
           INSPECT_IA_AGENTS_WIRE_PROXY is unset (enabled=false); yield the
