@@ -13,6 +13,7 @@ import type { DiscoveryCheck, RecetteScorecard } from "../../api/client";
 import PageHelp from "../../components/help/PageHelp";
 import AssistButton from "../../components/assist/AssistButton";
 import BenchmarkPanel from "./BenchmarkPanel";
+import PrecisionRecallPanel from "./PrecisionRecallPanel";
 import "./discovery.css";
 
 const SURFACE_ORDER = ["github", "gitlab", "temporal", "openapi", "mcp"] as const;
@@ -177,6 +178,7 @@ export default function DiscoveryPage(): JSX.Element {
           )}
 
           <BenchmarkPanel />
+          <PrecisionRecallPanel />
         </>
       )}
     </section>

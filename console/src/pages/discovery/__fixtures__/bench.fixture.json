@@ -1,0 +1,47 @@
+{
+  "recording_status": "ok",
+  "wire_flows_total": 3,
+  "report": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 1,
+    "precision": 0.5,
+    "recall": 0.5,
+    "f1": 0.5,
+    "wire_endpoints": 2,
+    "probe_endpoints": 2,
+    "wire_flows_without_ip": 1,
+    "endpoints": [
+      {
+        "endpoint": "104.18.2.1:443",
+        "ip": "104.18.2.1",
+        "port": 443,
+        "in_wire": true,
+        "in_probe": true,
+        "verdict": "tp",
+        "host": "api.groq.com",
+        "ja3": "02a1d9beaab182c8493cc809f6d73b20"
+      },
+      {
+        "endpoint": "203.0.113.9:443",
+        "ip": "203.0.113.9",
+        "port": 443,
+        "in_wire": true,
+        "in_probe": false,
+        "verdict": "fn",
+        "host": "evil.exfil.net",
+        "ja3": "deadbeefdeadbeefdeadbeefdeadbeef"
+      },
+      {
+        "endpoint": "8.8.8.8:53",
+        "ip": "8.8.8.8",
+        "port": 53,
+        "in_wire": false,
+        "in_probe": true,
+        "verdict": "fp",
+        "host": null,
+        "ja3": null
+      }
+    ]
+  }
+}
