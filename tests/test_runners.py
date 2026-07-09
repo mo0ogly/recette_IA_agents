@@ -487,6 +487,51 @@ class TestReplayRunner(unittest.TestCase):
         self.assertEqual(replays[0]["recording_id"], "rec-1")
         self.assertEqual(replays[0]["actions"], [a.to_dict() for a in result.actions])
 
+    def test_paced_replay_sleeps_and_still_matches_the_original(self) -> None:
+        # Slow-motion replay: pace_ms slows the frame emission only; the
+        # replayed action log is byte-identical at any speed (I4).
+        result = run_agent(
+            agent_id="a1",
+            principal="bot@acme",
+            target_system="github",
+            goal="Inventory repositories",
+            capability_scope=["read_repo"],
+            llm=build_stub_llm(READ_THEN_FINAL),
+        )
+        sleeps: list[float] = []
+        original_sleep = runners_mod.time.sleep
+        runners_mod.time.sleep = lambda seconds: sleeps.append(seconds)
+        try:
+            frames: list[tuple[str, dict]] = []
+            runner = make_replay_runner(result.recording, "rec-1", pace_ms=200)
+            runner({}, lambda kind, data: frames.append((kind, data)), lambda: False)
+        finally:
+            runners_mod.time.sleep = original_sleep
+        self.assertTrue(sleeps, "expected time.sleep to be called (replay pace not wired)")
+        replays = _frames_of(frames, "replay_result")
+        self.assertEqual(len(replays), 1)
+        self.assertTrue(replays[0]["matches_original"])
+
+    def test_malformed_replay_pace_fails_safe_to_instant(self) -> None:
+        result = run_agent(
+            agent_id="a1",
+            principal="bot@acme",
+            target_system="github",
+            goal="Inventory repositories",
+            capability_scope=["read_repo"],
+            llm=build_stub_llm(READ_THEN_FINAL),
+        )
+        sleeps: list[float] = []
+        original_sleep = runners_mod.time.sleep
+        runners_mod.time.sleep = lambda seconds: sleeps.append(seconds)
+        try:
+            for bad in (True, -50, None):
+                runner = make_replay_runner(result.recording, "rec-1", pace_ms=bad)  # type: ignore[arg-type]
+                runner({}, lambda kind, data: None, lambda: False)
+        finally:
+            runners_mod.time.sleep = original_sleep
+        self.assertEqual(sleeps, [], "malformed pace must fail safe to 0 (no sleep)")
+
 
 class TestBuildStubLlm(unittest.TestCase):
     def test_maps_script_dicts_to_decisions_with_defaults(self) -> None:

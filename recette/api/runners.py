@@ -717,10 +717,18 @@ def make_campaign_runner(
 
 
 def make_replay_runner(
-    recording: Recording, recording_id: str
+    recording: Recording, recording_id: str, pace_ms: int = 0
 ) -> Callable[[dict, Emit, ShouldStop], None]:
     """Deterministically replay a recording (I4): re-issue its decisions and
-    compare the resulting action log to the original."""
+    compare the resulting action log to the original.
+
+    ``pace_ms`` slows the EMISSION of step frames (slow-motion review for an
+    operator watching the run console); it is operational pacing in the ops
+    layer, never a decision input, so the replayed action log and its
+    ``matches_original`` comparison are byte-identical at any speed (I4).
+    Clamped to [0, MAX_PACE_MS]; malformed values fail safe to 0 (instant)."""
+    pace = pace_ms if isinstance(pace_ms, int) and not isinstance(pace_ms, bool) else 0
+    pace = max(0, min(pace, MAX_PACE_MS))
 
     def runner(params: dict, emit: Emit, should_stop: ShouldStop) -> None:
         result = run_lane_b_agent(
@@ -731,7 +739,9 @@ def make_replay_runner(
             capability_scope=_scope_from_recording(recording),
             llm=replay_backend(recording),
             provider="replay",
-            on_step=_lane_b_step_emit(emit, recording.agent_id),
+            on_step=_paced_on_step(
+                _lane_b_step_emit(emit, recording.agent_id), pace, should_stop
+            ),
             should_stop=should_stop,
         )
         replayed = [a.to_dict() for a in result.actions]

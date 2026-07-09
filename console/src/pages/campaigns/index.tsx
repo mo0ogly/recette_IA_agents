@@ -312,11 +312,15 @@ export default function CampaignsPage(): JSX.Element {
     [stream, refresh, poll],
   );
 
+  // Slow-motion replay pace (ms between step frames). Operational display
+  // pacing only: the replayed action log is identical at any speed (I4).
+  const [replayPace, setReplayPace] = useState(0);
+
   const replay = useCallback(
     async (recordingId: string) => {
-      await stream.start(() => replayRecording(recordingId));
+      await stream.start(() => replayRecording(recordingId, replayPace));
     },
-    [stream],
+    [stream, replayPace],
   );
 
   const replayResult = stream.frames.find((f) => f.type === "replay_result");
@@ -504,6 +508,19 @@ export default function CampaignsPage(): JSX.Element {
       {tab === "recordings" && (
         <section className="panel" role="tabpanel">
           <h2>Enregistrements (replay I4)</h2>
+          <label className="camp-replay-pace">
+            Vitesse du replay{" "}
+            <select
+              data-testid="replay-pace"
+              value={replayPace}
+              onChange={(e) => setReplayPace(Number(e.target.value))}
+            >
+              <option value={0}>instantane</option>
+              <option value={500}>ralenti (0,5 s / etape)</option>
+              <option value={1500}>lent (1,5 s / etape)</option>
+              <option value={3000}>tres lent (3 s / etape)</option>
+            </select>
+          </label>
           {replayResult && (
             <p className="camp-replay">
               Replay determinisme :{" "}

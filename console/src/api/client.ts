@@ -498,9 +498,13 @@ export function listRecordings(): Promise<RecordingMeta[]> {
   }).then((r) => r.recordings);
 }
 
-export function replayRecording(recordingId: string): Promise<RunHandle> {
+/** Replay a recording (deterministic, I4). `paceMs` > 0 slows the step-frame
+ *  emission for slow-motion review; the replayed action log is identical at
+ *  any speed (pacing is operational, never a decision input). */
+export function replayRecording(recordingId: string, paceMs = 0): Promise<RunHandle> {
+  const pace = paceMs > 0 ? `?pace_ms=${encodeURIComponent(paceMs)}` : "";
   return request<RunHandle>(
-    `/recordings/${encodeURIComponent(recordingId)}/replay`,
+    `/recordings/${encodeURIComponent(recordingId)}/replay${pace}`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }

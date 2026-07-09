@@ -112,12 +112,15 @@ def get_recording(request: Request, recording_id: str) -> dict:
 
 
 @router.post("/recordings/{recording_id}/replay", status_code=201)
-def replay_recording(request: Request, recording_id: str) -> dict:
+def replay_recording(request: Request, recording_id: str, pace_ms: int = 0) -> dict:
+    """Replay a recording deterministically (I4). ``pace_ms`` (query) slows the
+    step-frame emission for slow-motion review; the replayed action log is
+    identical at any speed (pacing is operational, never a decision input)."""
     try:
         recording = _recordings(request).get(recording_id)
     except (UnknownRecordingError, ValueError) as exc:
         raise HTTPException(status_code=404, detail="no such recording") from exc
     mgr = request.app.state.run_manager
-    run = mgr.create("replay", {"recording_id": recording_id})
-    mgr.start(run, make_replay_runner(recording, recording_id))
+    run = mgr.create("replay", {"recording_id": recording_id, "pace_ms": pace_ms})
+    mgr.start(run, make_replay_runner(recording, recording_id, pace_ms=pace_ms))
     return {"run_id": run.id, "status": run.status}
