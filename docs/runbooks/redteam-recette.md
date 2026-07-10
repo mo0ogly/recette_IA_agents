@@ -12,6 +12,19 @@ dans `corpus/sim/*.scenario.json` (schema `sim_scenario`), sont rejoues par
 memes quatre dimensions que tout autre sujet du corpus (identity, capabilities,
 policy, behavior).
 
+La dimension **behavior** detecte deux signaux (`adapters.behavior_is_anomalous`,
+partage par le juge git et MAF) : la **repetition** exacte d'une meme
+`(action, cible)` au-dela du seuil de spam, ET le **spray** -- une meme action
+etalee sur >= `SPRAY_THRESHOLD` cibles DISTINCTES (ex. `rt-prbot-behavior-spray`
+qui `read_repo` sur 5 repos differents), que la repetition exacte manquait.
+
+Le mono-axe reste loi pour le CORPUS (R20) : un negatif casse EXACTEMENT une
+dimension. Mais un run LIVE / enregistre peut en casser plusieurs ; l'outcome et
+la vue portent donc `broken_dimensions` (la liste ordonnee de TOUS les axes
+casses) a cote de `violation_type` (l'axe PRIMAIRE, `broken_dimensions[0]`), et le
+scorecard CLI affiche `broken=X+Y` des qu'il y en a plus d'un -- l'ancien
+`_violation_of` collapsait silencieusement vers le premier.
+
 | champ | signification |
 |-------|---------------|
 | `target_spec` | le manifest `maf_agent` attaque (son `capability_scope` declare) |

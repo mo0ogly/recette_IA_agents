@@ -2,11 +2,14 @@ import copy
 import unittest
 
 from recette.maf_judge import MafAction
+from recette.adapters import IdentificationResult
 from recette.redteam_recette import (
     ScenarioOutcome,
     _anomaly_caught,
     _approver_for,
     _tool_outputs,
+    _violation_of,
+    _violations_of,
     run_scenario,
     run_scenario_view,
     run_typed,
@@ -201,6 +204,36 @@ class T(unittest.TestCase):
         self.assertTrue(view["dimensions"]["behavior"])
         tool_turns = [t["content"] for t in view["transcript"] if t["role"] == "tool"]
         self.assertIn(poison, tool_turns)
+
+    def test_violations_of_lists_all_broken_axes_in_canonical_order(self):
+        # A live/recorded run may break more than one axis. _violations_of returns
+        # the full ordered list (identity, capabilities, policy, behavior); the
+        # singular _violation_of stays the first (primary) for the mono-axis metric.
+        multi = IdentificationResult(
+            identity_match=False,
+            capabilities_conform=False,
+            capability_violations=[],
+            policy_compliant=True,
+            behavior_expected=True,
+            verdict="incorrect",
+        )
+        self.assertEqual(
+            _violations_of(multi), ["identity_mismatch", "capability_overreach"]
+        )
+        self.assertEqual(_violation_of(multi), "identity_mismatch")
+        # A conform result has no broken axis.
+        clean = IdentificationResult(True, True, [], True, True, "correct")
+        self.assertEqual(_violations_of(clean), [])
+        self.assertIsNone(_violation_of(clean))
+
+    def test_outcome_carries_mono_axis_broken_dimensions_for_corpus(self):
+        # A corpus negative is mono-axis (R20): exactly one broken dimension, and
+        # broken_dimensions[0] == violation_type.
+        out = run_scenario(VALID)
+        self.assertEqual(out.broken_dimensions, ("capability_overreach",))
+        self.assertEqual(out.violation_type, out.broken_dimensions[0])
+        view = run_scenario_view(VALID)
+        self.assertEqual(view["broken_dimensions"], ["capability_overreach"])
 
     def test_wrong_dimension_is_not_caught(self):
         # Tightened detection metric: an incorrect verdict caught for the WRONG

@@ -5,11 +5,13 @@ from recette.redteam_scorecard import render, scorecard
 
 
 class T(unittest.TestCase):
-    def _o(self, sid, verdict, expected, vt, caught, tags=None, expected_vt=...):
+    def _o(self, sid, verdict, expected, vt, caught, tags=None, expected_vt=..., broken=None):
         # expected_vt defaults to the predicted vt (a caught row has predicted ==
-        # expected); callers override it to model a wrong-dimension catch.
+        # expected); callers override it to model a wrong-dimension catch. broken
+        # defaults to the single predicted axis (mono-axis corpus, R20).
         evt = vt if expected_vt is ... else expected_vt
-        return ScenarioOutcome(sid, verdict, expected, vt, evt, caught, tags or {})
+        dims = tuple(broken) if broken is not None else ((vt,) if vt else ())
+        return ScenarioOutcome(sid, verdict, expected, vt, evt, caught, tags or {}, dims)
 
     def test_scorecard_counts_caught_and_missed(self):
         outs = [
@@ -117,6 +119,22 @@ class T(unittest.TestCase):
     def test_per_dimension_none_when_empty(self):
         dims = scorecard([])["per_dimension"]
         self.assertTrue(all(v is None for v in dims.values()))
+
+    def test_render_shows_multi_axis_broken_dimensions(self):
+        # A live/recorded run that breaks two axes surfaces both (corpus stays
+        # mono-axis, R20). A mono-axis row does not print a broken= suffix.
+        outs = [
+            self._o(
+                "multi", "incorrect", "incorrect", "identity_mismatch", True,
+                broken=["identity_mismatch", "capability_overreach"],
+            ),
+            self._o("mono", "incorrect", "incorrect", "policy_violation", True),
+        ]
+        text = render(scorecard(outs))
+        self.assertIn("broken=identity_mismatch+capability_overreach", text)
+        # The mono-axis row has no broken= suffix.
+        mono_line = next(ln for ln in text.splitlines() if "mono" in ln)
+        self.assertNotIn("broken=", mono_line)
 
     def test_render_shows_confusion_and_accuracy(self):
         outs = [self._o("a", "incorrect", "incorrect", "capability_overreach", True)]

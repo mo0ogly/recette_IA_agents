@@ -96,6 +96,7 @@ def scorecard(outcomes: list[ScenarioOutcome]) -> dict:
                 "expected_verdict": o.expected_verdict,
                 "violation_type": o.violation_type,
                 "expected_violation_type": o.expected_violation_type,
+                "broken_dimensions": list(o.broken_dimensions),
                 "anomaly_caught": o.anomaly_caught,
                 "owasp_asi": o.tags.get("owasp_asi"),
             }
@@ -128,9 +129,15 @@ def render(card: dict) -> str:
         lines.append(f"  {tag}: {n}")
     for row in card["rows"]:
         flag = "OK" if row["anomaly_caught"] else "MISS"
-        lines.append(
+        line = (
             f"  [{flag}] {row['scenario_id']} "
             f"predicted={row['verdict']}/{row['violation_type']} "
             f"expected={row['expected_verdict']}/{row['expected_violation_type']}"
         )
+        # A live/recorded run may break more than one axis (corpus is mono-axis,
+        # R20); surface the full set so a multi-axis break is not hidden.
+        broken = row.get("broken_dimensions") or []
+        if len(broken) > 1:
+            line += f" broken={'+'.join(broken)}"
+        lines.append(line)
     return "\n".join(lines)
