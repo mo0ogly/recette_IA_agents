@@ -2082,3 +2082,76 @@ export function replayRun(id: string): Promise<ReplayResult> {
     body: JSON.stringify({}),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Live multi-agent orchestration (/orchestrate/*) -- Phase 9
+// ---------------------------------------------------------------------------
+
+/** One tool call a participant performed during a driven run. */
+export interface OrchestrationAction {
+  seq: number;
+  agent_id: string;
+  provider: string;
+  model: string;
+  target: string;
+  tool_kind: string | null;
+  approved: boolean;
+}
+
+/** One control transfer between participants. */
+export interface OrchestrationHop {
+  seq: number;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+/** Result of POST /orchestrate/run: the tracked, judged run. */
+export interface OrchestrationRunResult {
+  session_id: string;
+  verdict: "correct" | "incorrect";
+  dimensions: {
+    identity_match: boolean;
+    capabilities_conform: boolean;
+    policy_compliant: boolean;
+    behavior_expected: boolean;
+  };
+  run: { hops: OrchestrationHop[]; order: string[]; actions: OrchestrationAction[] };
+  instances: string[];
+}
+
+/** One row of GET /orchestrate/sessions. */
+export interface OrchestrationSessionSummary {
+  session_id: string;
+  instances: string[];
+  receipts: number;
+}
+
+/** Per-participant provider spec, or a single default backing every participant. */
+export interface OrchestrationProviderSpec {
+  provider: string;
+  model: string;
+  base_url?: string;
+}
+
+export interface OrchestrationRunRequest {
+  team: Record<string, unknown>;
+  providers: OrchestrationProviderSpec | Record<string, OrchestrationProviderSpec>;
+  session_id: string;
+  max_steps?: number;
+}
+
+/** Drive a declared team live; returns the tracked + judged run. */
+export function runOrchestration(body: OrchestrationRunRequest): Promise<OrchestrationRunResult> {
+  return request<OrchestrationRunResult>("/orchestrate/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** The orchestration sessions the tracker holds, with their instance roster. */
+export function listOrchestrationSessions(): Promise<{ sessions: OrchestrationSessionSummary[] }> {
+  return request<{ sessions: OrchestrationSessionSummary[] }>("/orchestrate/sessions", {
+    method: "GET",
+  });
+}

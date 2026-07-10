@@ -1,0 +1,50 @@
+{
+  "run": {
+    "session_id": "sess-demo",
+    "verdict": "correct",
+    "dimensions": {
+      "identity_match": true,
+      "capabilities_conform": true,
+      "policy_compliant": true,
+      "behavior_expected": true
+    },
+    "run": {
+      "hops": [
+        {
+          "seq": 1,
+          "from": "triage",
+          "to": "worker",
+          "reason": ""
+        }
+      ],
+      "order": [],
+      "actions": [
+        {
+          "seq": 2,
+          "agent_id": "worker",
+          "provider": "AzureOpenAI",
+          "model": "m",
+          "target": "mcp://x",
+          "tool_kind": "mcp",
+          "approved": true
+        }
+      ]
+    },
+    "instances": [
+      "triage",
+      "worker"
+    ]
+  },
+  "sessions": {
+    "sessions": [
+      {
+        "session_id": "sess-demo",
+        "instances": [
+          "triage",
+          "worker"
+        ],
+        "receipts": 2
+      }
+    ]
+  }
+}
