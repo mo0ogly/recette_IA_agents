@@ -73,6 +73,7 @@ from .routers import dry_run as dry_run_router
 from .routers import events as events_router
 from .routers import metrics as metrics_router
 from .routers import observability as observability_router
+from .routers import orchestrate as orchestrate_router
 from .routers import policies as policies_router
 from .routers import probe as probe_router
 from .routers import proxy as proxy_router
@@ -350,6 +351,14 @@ def create_app(
     # Runtime-selectable transport route (direct vs wire overlay), surfaced in
     # the network-debug consoles. Transport only -- never the decision path (I4).
     app.state.proxy_route_registry = registry_from_env()
+    # Live orchestration tracking (Phase 9): one SessionTracker per process,
+    # shared by POST /orchestrate/run and GET /orchestrate/sessions. Content-free
+    # hash-chained receipts (separate from the audit log, I1); the session_id /
+    # instance_id it records are the same the wire panel filters on, so an
+    # analyst follows a driven instance across the capture.
+    from ..tracking import SessionTracker
+
+    app.state.orchestration_tracker = SessionTracker()
     action_catalog = catalog if catalog is not None else load_catalog()
 
     # Policy bootstrap: ensure an active version exists so the gateway never
@@ -446,6 +455,7 @@ def create_app(
     app.include_router(assist_router.router)
     app.include_router(verdicts_router.router)
     app.include_router(proxy_router.router)
+    app.include_router(orchestrate_router.router)
     app.include_router(rag_router.router)
     app.include_router(subjects_router.router)
     app.include_router(sim_router.router)
