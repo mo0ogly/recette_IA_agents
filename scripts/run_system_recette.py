@@ -145,9 +145,17 @@ def leg_a_coherence(app, report: _Report) -> None:  # type: ignore[no-untyped-de
 
 def leg_b_smoke(client, app, report: _Report) -> None:  # type: ignore[no-untyped-def]
     print("LEG B -- live smoke (no parameterless GET may 500)")
-    # /events/stream is an infinite Server-Sent-Events response; TestClient.get
-    # would block forever reading it. It is exercised by its own dedicated test.
-    skip = {"/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/events/stream"}
+    # /events/stream and /proxy/wire/stream are infinite streaming responses;
+    # TestClient.get would block forever reading them. Each is exercised by its
+    # own dedicated test (tests/test_api_wire_stream.py for the wire stream).
+    skip = {
+        "/openapi.json",
+        "/docs",
+        "/redoc",
+        "/docs/oauth2-redirect",
+        "/events/stream",
+        "/proxy/wire/stream",
+    }
     for m, path in sorted(_route_pairs(app)):
         if m != "GET" or "{" in path or path in skip:
             continue
