@@ -95,3 +95,6 @@ discoveryprobe/discoveryprobe-ebpf/target/
 
 # PDCA audit work-memory at repo root is forbidden (R25) -- belongs under docs/tracking/pdca/
 pdca/
+
+# GitLab export working dir (derived snapshot, never committed)
+.gitlab-export/
