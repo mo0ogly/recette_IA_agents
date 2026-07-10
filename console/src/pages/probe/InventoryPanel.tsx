@@ -106,8 +106,8 @@ function AttestationBadge({
       <span className={className} data-testid={testid} title={reasons.join("; ")}>
         <span className="inv-attest-label">{ATTESTATION_LABEL[kind]}</span>
         <span className="inv-attest-reasons">
-          {reasons.map((r, i) => (
-            <span key={i} className="inv-attest-reason">
+          {reasons.map((r) => (
+            <span key={r} className="inv-attest-reason">
               {r}
             </span>
           ))}
@@ -145,8 +145,8 @@ function EvidenceCell({ agent }: { agent: InventoryAgent }): JSX.Element {
   }
   return (
     <ul className="inv-evidence" style={{ margin: 0, paddingLeft: "1rem" }}>
-      {unique.map((line, i) => (
-        <li key={i}>{line}</li>
+      {unique.map((line) => (
+        <li key={line}>{line}</li>
       ))}
     </ul>
   );

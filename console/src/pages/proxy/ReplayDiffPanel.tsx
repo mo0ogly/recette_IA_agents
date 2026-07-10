@@ -72,6 +72,9 @@ export default function ReplayDiffPanel({ onStatus }: SourcePanelProps): JSX.Ele
     onStatusRef.current = onStatus;
   }, [onStatus]);
 
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
+
   useEffect(() => {
     let alive = true;
     listRecordings()
@@ -116,12 +119,14 @@ export default function ReplayDiffPanel({ onStatus }: SourcePanelProps): JSX.Ele
     try {
       const a = await replayAndSummarize(selectedId);
       const b = await replayAndSummarize(selectedId);
+      if (!aliveRef.current) return;
       setSummaryA(a);
       setSummaryB(b);
     } catch (err: unknown) {
+      if (!aliveRef.current) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      if (aliveRef.current) setBusy(false);
     }
   }, [selectedId]);
 

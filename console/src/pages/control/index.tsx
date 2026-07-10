@@ -75,7 +75,7 @@ export default function ControlPage(): JSX.Element {
 
       <Mermaid chart={CONTROL_CHART} title="Les trois plans + le cycle de decision" />
 
-      {error && <p className="control-error">{error}</p>}
+      {error !== null && <p className="control-error">{error}</p>}
 
       {summary !== null && (
         <div className="control-summary" data-testid="control-summary">

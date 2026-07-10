@@ -96,7 +96,48 @@ describe("AuditPage", () => {
     expect(table.getAllByText("escalate")[0]).toHaveClass("badge", "badge-escalate");
     // Approval badges across the flow: pending, none, approved.
     expect(table.getByText("pending")).toHaveClass("badge", "badge-pending");
+    expect(table.getByText("none")).toHaveClass("badge", "badge-none");
     expect(table.getAllByText("approved")[0]).toHaveClass("badge", "badge-approved");
+  });
+
+  it("renders the allow verdict and timeout approval badges (union coverage)", async () => {
+    // The captured flow never produced verdict=allow nor approval_state=timeout;
+    // derive those variants from the real captured events so every
+    // discriminated-union member renders (R16). Only the discriminant fields
+    // and seq/event_id change.
+    const base = bareEvents[0];
+    const variants = {
+      events: [
+        {
+          ...base,
+          seq: 90,
+          event_id: "EV-variant-allow",
+          payload: {
+            ...base.payload,
+            policy_decision: {
+              ...(base.payload.policy_decision as object),
+              verdict: "allow",
+            },
+            approval_state: "none",
+          },
+        },
+        {
+          ...base,
+          seq: 91,
+          event_id: "EV-variant-timeout",
+          payload: { ...base.payload, approval_state: "timeout" },
+        },
+      ],
+    };
+    mockVerifyChain.mockResolvedValue(chainOk);
+    mockListAuditEvents.mockResolvedValue(variants as unknown as StoredEvent[]);
+
+    renderAt("/audit");
+    await screen.findByText("Chain intact (4 events verified)");
+
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("allow")).toHaveClass("badge", "badge-allow");
+    expect(table.getByText("timeout")).toHaveClass("badge", "badge-timeout");
   });
 
   it("expands a row on click and shows the pretty-printed payload JSON", async () => {

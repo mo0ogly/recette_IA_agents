@@ -1,0 +1,76 @@
+[
+    {
+        "seq": 0,
+        "type": "start",
+        "data": {
+            "kind": "discovery"
+        }
+    },
+    {
+        "seq": 1,
+        "type": "scorecard",
+        "data": {
+            "surface": "github",
+            "total": 10,
+            "passed": 10,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 2,
+        "type": "scorecard",
+        "data": {
+            "surface": "gitlab",
+            "total": 5,
+            "passed": 5,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 3,
+        "type": "scorecard",
+        "data": {
+            "surface": "temporal",
+            "total": 4,
+            "passed": 4,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 4,
+        "type": "scorecard",
+        "data": {
+            "surface": "openapi",
+            "total": 4,
+            "passed": 4,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 5,
+        "type": "scorecard",
+        "data": {
+            "surface": "mcp",
+            "total": 4,
+            "passed": 4,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 6,
+        "type": "end",
+        "data": {
+            "status": "completed"
+        }
+    }
+]

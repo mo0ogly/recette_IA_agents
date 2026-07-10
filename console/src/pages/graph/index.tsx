@@ -35,6 +35,7 @@ export default function GraphPage(): JSX.Element {
   const [selected, setSelected] = useState<string>("");
   const [graph, setGraph] = useState<OrchestrationGraph | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     listSubjects()
@@ -43,17 +44,27 @@ export default function GraphPage(): JSX.Element {
           .filter((s) => s.family === "maf_orchestration")
           .map((s) => s.agent_id);
         setSubjects(orch);
-        if (orch.length > 0) setSelected(orch[0]);
+        if (orch.length > 0) {
+          setSelected(orch[0]);
+        } else {
+          // No subject to load: clear the loading state now.
+          setLoading(false);
+        }
       })
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => {
+        setError(String(e));
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     if (selected === "") return;
+    setLoading(true);
     setGraph(null);
     getOrchestrationGraph(selected)
       .then(setGraph)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, [selected]);
 
   const ranked = useMemo(
@@ -90,7 +101,9 @@ export default function GraphPage(): JSX.Element {
         </select>
       </div>
 
-      {error && <p className="graph-error">{error}</p>}
+      {loading && <p className="graph-loading">Chargement du graphe...</p>}
+
+      {error !== null && <p className="graph-error">{error}</p>}
 
       {graph !== null && (
         <>

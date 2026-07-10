@@ -94,6 +94,52 @@ describe("LivePage", () => {
     expect(screen.getByText(/En attente: 5/)).toBeInTheDocument();
   });
 
+  // Discriminated-union coverage (R16): every PolicyVerdict and ApprovalState
+  // variant must render its badge. Variants derive from the real captured
+  // envelope, only the discriminant fields (and seq/event_id) change.
+  describe.each([
+    ["allow", "badge-allow"],
+    ["escalate", "badge-escalate"],
+  ] as const)("policy_decision verdict %s", (verdict, badgeClass) => {
+    it(`renders the ${verdict} verdict badge`, () => {
+      const { source } = renderLive(HEALTHY);
+      const event = {
+        ...fixture,
+        seq: 42,
+        event_id: `EV-verdict-${verdict}`,
+        payload: {
+          ...fixture.payload,
+          policy_decision: { ...fixture.payload.policy_decision, verdict },
+        },
+      };
+      act(() => {
+        source.onmessage?.({ data: JSON.stringify(event) });
+      });
+      expect(screen.getByText(verdict)).toHaveClass("badge", badgeClass);
+    });
+  });
+
+  describe.each([
+    ["pending", "badge-pending"],
+    ["approved", "badge-approved"],
+    ["denied", "badge-denied"],
+    ["timeout", "badge-timeout"],
+  ] as const)("approval_state %s", (approval, badgeClass) => {
+    it(`renders the ${approval} approval badge`, () => {
+      const { source } = renderLive(HEALTHY);
+      const event = {
+        ...fixture,
+        seq: 43,
+        event_id: `EV-approval-${approval}`,
+        payload: { ...fixture.payload, approval_state: approval },
+      };
+      act(() => {
+        source.onmessage?.({ data: JSON.stringify(event) });
+      });
+      expect(screen.getByText(approval)).toHaveClass("badge", badgeClass);
+    });
+  });
+
   it("closes the source on unmount", () => {
     const source = new FakeSource();
     const { unmount } = render(

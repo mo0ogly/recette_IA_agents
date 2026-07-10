@@ -1,0 +1,138 @@
+[
+    {
+        "seq": 0,
+        "type": "start",
+        "data": {
+            "kind": "identification"
+        }
+    },
+    {
+        "seq": 1,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gh-issue-triager",
+            "passed": true,
+            "predicted_verdict": "correct",
+            "expected_verdict": "correct"
+        }
+    },
+    {
+        "seq": 2,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gl-release-bot",
+            "passed": true,
+            "predicted_verdict": "correct",
+            "expected_verdict": "correct"
+        }
+    },
+    {
+        "seq": 3,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gh-comment-spam",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 4,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gh-identity-spoof",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 5,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gh-readonly-overreach",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 6,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gh-unapproved-merge",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 7,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "ghost-unmediated-writer",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 8,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gl-ci-spam",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 9,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gl-identity-mismatch",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 10,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gl-readonly-overreach",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 11,
+        "type": "agent_result",
+        "data": {
+            "agent_id": "gl-unapproved-push",
+            "passed": true,
+            "predicted_verdict": "incorrect",
+            "expected_verdict": "incorrect"
+        }
+    },
+    {
+        "seq": 12,
+        "type": "scorecard",
+        "data": {
+            "total": 11,
+            "passed": 11,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "detection_rate": 1.0,
+            "all_passed": true
+        }
+    },
+    {
+        "seq": 13,
+        "type": "end",
+        "data": {
+            "status": "completed"
+        }
+    }
+]

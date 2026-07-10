@@ -124,18 +124,22 @@ export default function ObservabilityPage(): JSX.Element {
   }
 
   useEffect(() => {
+    let alive = true;
     listObservabilityTraces()
-      .then(setTraces)
-      .catch((e: unknown) => setError(String(e)));
+      .then((ts) => { if (alive) setTraces(ts); })
+      .catch((e: unknown) => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
     if (selected === null) return;
     setTrace(null);
     setOpen(new Set());
+    let alive = true;
     getObservabilityTrace(selected)
-      .then(setTrace)
-      .catch((e: unknown) => setError(String(e)));
+      .then((t) => { if (alive) setTrace(t); })
+      .catch((e: unknown) => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
   }, [selected]);
 
   const byId = useMemo(() => {

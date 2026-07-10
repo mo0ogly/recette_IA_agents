@@ -245,7 +245,7 @@ export default function RunDetailView({
               </tr>
               <tr>
                 <th scope="row">root_hash</th>
-                <td data-testid="meta-root-hash" style={{ fontFamily: "monospace", wordBreak: "break-all" }}>
+                <td data-testid="meta-root-hash" className="runs-hash">
                   {detail.meta.root_hash}
                 </td>
               </tr>
@@ -271,7 +271,7 @@ export default function RunDetailView({
                     <td>{a.file}</td>
                     <td
                       data-testid={`meta-sha256-${a.file}`}
-                      style={{ fontFamily: "monospace", wordBreak: "break-all" }}
+                      className="runs-hash"
                     >
                       {a.sha256}
                     </td>

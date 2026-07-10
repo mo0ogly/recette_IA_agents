@@ -515,6 +515,12 @@
   word-break: break-all;
 }
 
+/* Hash cell (meta table root_hash + artifact sha256 inline usage). */
+.runs-hash {
+  font-family: monospace;
+  word-break: break-all;
+}
+
 .runs-artifacts-table tbody tr:hover td { background-color: var(--color-surface-2); }
 
 /* --- Annotations form -------------------------------------------------- */

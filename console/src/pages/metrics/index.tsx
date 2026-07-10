@@ -81,11 +81,13 @@ function MetricsTable({
 export default function MetricsPage(): JSX.Element {
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getMetricsSummary()
       .then(setSummary)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -100,7 +102,9 @@ export default function MetricsPage(): JSX.Element {
         in-process) : volume, taux d&apos;erreur, latence (p50/p95/p99), tokens et cout. Vue
         lecture seule, par agent et par outil -- pas un chemin de decision.
       </p>
-      {error && <p className="metrics-error">{error}</p>}
+      {loading && <p className="metrics-loading">Chargement des metriques...</p>}
+
+      {error !== null && <p className="metrics-error">{error}</p>}
       {summary !== null && (
         <>
           <div className="metrics-totals" data-testid="metrics-totals">

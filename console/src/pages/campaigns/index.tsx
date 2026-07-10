@@ -163,6 +163,7 @@ export default function CampaignsPage(): JSX.Element {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("templates");
 
   // The campaign whose run is open in the eye modal (its latest run, per step).
@@ -194,6 +195,8 @@ export default function CampaignsPage(): JSX.Element {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -269,11 +272,8 @@ export default function CampaignsPage(): JSX.Element {
         return;
       }
       try {
-        for (const t of group.templates) {
-          if (!campaigns.some((c) => c.id === t.id)) {
-            await instantiateTemplate(t.id);
-          }
-        }
+        const missing = group.templates.filter((t) => !campaigns.some((c) => c.id === t.id));
+        await Promise.all(missing.map((t) => instantiateTemplate(t.id)));
         const situations = group.templates.map((t) => t.profile).join(" -> ");
         await createCampaign({
           id: `domaine-${group.system}-spectre`,
@@ -338,6 +338,8 @@ export default function CampaignsPage(): JSX.Element {
           {error}
         </div>
       )}
+
+      {loading && <p className="camp-loading">Chargement des campagnes...</p>}
 
       <div className="run-tabs" role="tablist">
         {TABS.map((t) => (

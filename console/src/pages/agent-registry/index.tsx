@@ -20,11 +20,25 @@ export default function AgentRegistryPage(): JSX.Element {
   const [registry, setRegistry] = useState<AgentRegistry | null>(null);
   const [party, setParty] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let alive = true;
     getAgentRegistry()
-      .then(setRegistry)
-      .catch((e: unknown) => setError(String(e)));
+      .then((r) => {
+        if (!alive) return;
+        setRegistry(r);
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setError(String(e));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const rows: RegistryAgent[] = useMemo(() => {
@@ -55,6 +69,8 @@ export default function AgentRegistryPage(): JSX.Element {
         </select>
         {registry && <span className="registry-count">{rows.length} agent(s)</span>}
       </div>
+
+      {loading && <p className="registry-loading">Chargement du registre...</p>}
 
       {error && <p className="registry-error">{error}</p>}
 

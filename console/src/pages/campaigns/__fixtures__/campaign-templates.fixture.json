@@ -1,0 +1,393 @@
+{
+    "templates": [
+        {
+            "id": "identity-offboarding-clean",
+            "title": "Identity -- offboarding propre",
+            "profile": "legit",
+            "target_system": "okta",
+            "actions": [
+                "suspend_user",
+                "reset_password"
+            ],
+            "agent_id": "identity-offboarding-clean-agent"
+        },
+        {
+            "id": "identity-privilege-escalation",
+            "title": "Identity -- escalade de privileges",
+            "profile": "suspect",
+            "target_system": "okta",
+            "actions": [
+                "add_user_to_admin_group",
+                "create_api_key",
+                "generate_long_lived_token"
+            ],
+            "agent_id": "identity-privilege-escalation-agent"
+        },
+        {
+            "id": "finance-payment-run",
+            "title": "Finance -- run de paiements legitime",
+            "profile": "legit",
+            "target_system": "finance",
+            "actions": [
+                "validate_invoice",
+                "create_payment"
+            ],
+            "agent_id": "finance-payment-run-agent"
+        },
+        {
+            "id": "finance-wire-fraud",
+            "title": "Finance -- fraude au virement",
+            "profile": "destructive",
+            "target_system": "finance",
+            "actions": [
+                "modify_supplier_bank_details",
+                "add_payee",
+                "launch_wire_transfer"
+            ],
+            "agent_id": "finance-wire-fraud-agent"
+        },
+        {
+            "id": "crm-customer-exfiltration",
+            "title": "CRM -- exfiltration de la base clients",
+            "profile": "suspect",
+            "target_system": "crm",
+            "actions": [
+                "export_customer_base",
+                "sync_crm_to_external"
+            ],
+            "agent_id": "crm-customer-exfiltration-agent"
+        },
+        {
+            "id": "slack-exec-impersonation",
+            "title": "Slack -- usurpation d'un dirigeant",
+            "profile": "suspect",
+            "target_system": "slack",
+            "actions": [
+                "send_message_as_executive",
+                "send_message_external_channel"
+            ],
+            "agent_id": "slack-exec-impersonation-agent"
+        },
+        {
+            "id": "slack-history-exfiltration",
+            "title": "Slack -- exfiltration de l'historique",
+            "profile": "suspect",
+            "target_system": "slack",
+            "actions": [
+                "export_slack_history",
+                "share_sensitive_file"
+            ],
+            "agent_id": "slack-history-exfiltration-agent"
+        },
+        {
+            "id": "cloud-destruction",
+            "title": "Cloud -- sabotage destructeur",
+            "profile": "destructive",
+            "target_system": "cloud",
+            "actions": [
+                "delete_database",
+                "delete_kms_key",
+                "delete_backups"
+            ],
+            "agent_id": "cloud-destruction-agent"
+        },
+        {
+            "id": "cloud-misconfig-exposure",
+            "title": "Cloud -- exposition par mauvaise config",
+            "profile": "suspect",
+            "target_system": "cloud",
+            "actions": [
+                "make_bucket_public",
+                "open_sensitive_port"
+            ],
+            "agent_id": "cloud-misconfig-exposure-agent"
+        },
+        {
+            "id": "data-llm-exfiltration",
+            "title": "Data -- exfiltration vers un LLM externe",
+            "profile": "destructive",
+            "target_system": "data_platform",
+            "actions": [
+                "extract_data_to_external_llm",
+                "send_data_to_external_domain"
+            ],
+            "agent_id": "data-llm-exfiltration-agent"
+        },
+        {
+            "id": "data-audit-tampering",
+            "title": "Data -- effacement des traces d'audit",
+            "profile": "destructive",
+            "target_system": "data_platform",
+            "actions": [
+                "delete_logs",
+                "delete_audit_evidence"
+            ],
+            "agent_id": "data-audit-tampering-agent"
+        },
+        {
+            "id": "github-recon-readonly",
+            "title": "GitHub -- reconnaissance lecture seule",
+            "profile": "legit",
+            "target_system": "github",
+            "actions": [
+                "list_repos",
+                "read_repo",
+                "read_ci"
+            ],
+            "agent_id": "github-recon-readonly-agent"
+        },
+        {
+            "id": "github-supply-chain-attack",
+            "title": "GitHub -- attaque supply-chain",
+            "profile": "destructive",
+            "target_system": "github",
+            "actions": [
+                "push",
+                "manage_webhook",
+                "manage_release"
+            ],
+            "agent_id": "github-supply-chain-attack-agent"
+        },
+        {
+            "id": "hris-salary-tampering",
+            "title": "HR -- alteration de salaires",
+            "profile": "suspect",
+            "target_system": "hris",
+            "actions": [
+                "modify_salary",
+                "export_employee_data"
+            ],
+            "agent_id": "hris-salary-tampering-agent"
+        },
+        {
+            "id": "support-vip-snooping",
+            "title": "Support -- espionnage des tickets VIP",
+            "profile": "suspect",
+            "target_system": "support_desk",
+            "actions": [
+                "access_vip_tickets",
+                "export_customer_conversations"
+            ],
+            "agent_id": "support-vip-snooping-agent"
+        },
+        {
+            "id": "legal-evidence-tampering",
+            "title": "Legal -- alteration de preuves",
+            "profile": "destructive",
+            "target_system": "legal_dms",
+            "actions": [
+                "delete_evidence_item",
+                "modify_contract_clause"
+            ],
+            "agent_id": "legal-evidence-tampering-agent"
+        },
+        {
+            "id": "product-pricing-tampering",
+            "title": "Product -- alteration des prix en prod",
+            "profile": "suspect",
+            "target_system": "product_cms",
+            "actions": [
+                "modify_pricing",
+                "publish_production"
+            ],
+            "agent_id": "product-pricing-tampering-agent"
+        },
+        {
+            "id": "identity-mass-deletion",
+            "title": "Identity -- suppression de masse et coupure SSO",
+            "profile": "destructive",
+            "target_system": "okta",
+            "actions": [
+                "delete_user",
+                "disable_sso"
+            ],
+            "agent_id": "identity-mass-deletion-agent"
+        },
+        {
+            "id": "github-unreviewed-merge",
+            "title": "GitHub -- merge non revu et CI declenchee",
+            "profile": "suspect",
+            "target_system": "github",
+            "actions": [
+                "merge_pr",
+                "trigger_ci"
+            ],
+            "agent_id": "github-unreviewed-merge-agent"
+        },
+        {
+            "id": "finance-unjustified-discount",
+            "title": "Finance -- remise de masse injustifiee",
+            "profile": "suspect",
+            "target_system": "finance",
+            "actions": [
+                "apply_mass_discount",
+                "modify_billing_rule"
+            ],
+            "agent_id": "finance-unjustified-discount-agent"
+        },
+        {
+            "id": "crm-pipeline-update-clean",
+            "title": "CRM -- mise a jour pipeline autorisee",
+            "profile": "legit",
+            "target_system": "crm",
+            "actions": [
+                "modify_sales_pipeline",
+                "bulk_modify_contacts"
+            ],
+            "agent_id": "crm-pipeline-update-clean-agent"
+        },
+        {
+            "id": "crm-contacts-purge",
+            "title": "CRM -- purge irreversible des contacts",
+            "profile": "destructive",
+            "target_system": "crm",
+            "actions": [
+                "delete_contacts",
+                "sync_crm_to_external"
+            ],
+            "agent_id": "crm-contacts-purge-agent"
+        },
+        {
+            "id": "slack-official-announcement",
+            "title": "Collaboration -- annonce officielle autorisee",
+            "profile": "legit",
+            "target_system": "slack",
+            "actions": [
+                "publish_company_announcement",
+                "create_public_channel"
+            ],
+            "agent_id": "slack-official-announcement-agent"
+        },
+        {
+            "id": "slack-channel-destruction",
+            "title": "Collaboration -- destruction de canaux",
+            "profile": "destructive",
+            "target_system": "slack",
+            "actions": [
+                "delete_channel",
+                "modify_workspace_permissions"
+            ],
+            "agent_id": "slack-channel-destruction-agent"
+        },
+        {
+            "id": "cloud-config-update-clean",
+            "title": "Cloud -- mise a jour de configuration autorisee",
+            "profile": "legit",
+            "target_system": "cloud",
+            "actions": [
+                "modify_env_variable",
+                "modify_k8s_config"
+            ],
+            "agent_id": "cloud-config-update-clean-agent"
+        },
+        {
+            "id": "data-authorized-reporting",
+            "title": "Donnees -- acces financier autorise (reporting)",
+            "profile": "legit",
+            "target_system": "data_platform",
+            "actions": [
+                "access_sensitive_financial_data"
+            ],
+            "agent_id": "data-authorized-reporting-agent"
+        },
+        {
+            "id": "data-bulk-download-share",
+            "title": "Donnees -- telechargement massif et partage PII",
+            "profile": "suspect",
+            "target_system": "data_platform",
+            "actions": [
+                "download_full_database",
+                "share_pii_file"
+            ],
+            "agent_id": "data-bulk-download-share-agent"
+        },
+        {
+            "id": "hris-onboarding-clean",
+            "title": "HR -- onboarding et communication officielle",
+            "profile": "legit",
+            "target_system": "hris",
+            "actions": [
+                "create_employee_record",
+                "send_official_hr_comm"
+            ],
+            "agent_id": "hris-onboarding-clean-agent"
+        },
+        {
+            "id": "hris-employee-deletion",
+            "title": "HR -- suppression d'employes et droits",
+            "profile": "destructive",
+            "target_system": "hris",
+            "actions": [
+                "delete_employee",
+                "modify_employee_access_rights"
+            ],
+            "agent_id": "hris-employee-deletion-agent"
+        },
+        {
+            "id": "support-customer-care-clean",
+            "title": "Support -- reponse client et geste commercial",
+            "profile": "legit",
+            "target_system": "support_desk",
+            "actions": [
+                "send_auto_customer_reply",
+                "grant_goodwill_credit"
+            ],
+            "agent_id": "support-customer-care-clean-agent"
+        },
+        {
+            "id": "support-ticket-destruction",
+            "title": "Support -- suppression de tickets et fuite",
+            "profile": "destructive",
+            "target_system": "support_desk",
+            "actions": [
+                "delete_ticket",
+                "share_support_data_external"
+            ],
+            "agent_id": "support-ticket-destruction-agent"
+        },
+        {
+            "id": "legal-regulatory-filing-clean",
+            "title": "Legal -- depot reglementaire autorise",
+            "profile": "legit",
+            "target_system": "legal_dms",
+            "actions": [
+                "submit_regulatory_document",
+                "generate_or_send_contract"
+            ],
+            "agent_id": "legal-regulatory-filing-clean-agent"
+        },
+        {
+            "id": "legal-confidential-leak",
+            "title": "Legal -- fuite de document confidentiel",
+            "profile": "suspect",
+            "target_system": "legal_dms",
+            "actions": [
+                "share_confidential_document",
+                "export_audit_file"
+            ],
+            "agent_id": "legal-confidential-leak-agent"
+        },
+        {
+            "id": "product-page-publish-clean",
+            "title": "Product -- publication de page autorisee",
+            "profile": "legit",
+            "target_system": "product_cms",
+            "actions": [
+                "modify_public_page",
+                "send_marketing_campaign"
+            ],
+            "agent_id": "product-page-publish-clean-agent"
+        },
+        {
+            "id": "product-content-destruction",
+            "title": "Product -- suppression de contenu et coupure feature",
+            "profile": "destructive",
+            "target_system": "product_cms",
+            "actions": [
+                "delete_content",
+                "disable_critical_feature"
+            ],
+            "agent_id": "product-content-destruction-agent"
+        }
+    ]
+}

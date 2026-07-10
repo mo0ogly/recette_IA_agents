@@ -30,6 +30,7 @@ export default function ReceiptsPage(): JSX.Element {
   const [receipts, setReceipts] = useState<ContextReceipt[] | null>(null);
   const [chain, setChain] = useState<ChainReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importVerdict, setImportVerdict] = useState<ReceiptImportVerdict | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -76,7 +77,8 @@ export default function ReceiptsPage(): JSX.Element {
   useEffect(() => {
     getContextReceipts()
       .then((r) => setReceipts(r.receipts))
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
     verifyContextReceipts()
       .then(setChain)
       .catch(() => setChain(null));
@@ -129,7 +131,9 @@ export default function ReceiptsPage(): JSX.Element {
           />
         </label>
       </div>
-      {importError && <p className="receipts-error">{importError}</p>}
+      {loading && <p className="receipts-loading">Chargement des receipts...</p>}
+
+      {importError !== null && <p className="receipts-error">{importError}</p>}
       {importVerdict !== null && (
         <p
           className={`receipts-verdict receipts-verdict-${
@@ -146,7 +150,7 @@ export default function ReceiptsPage(): JSX.Element {
             : `rompue @ seq ${importVerdict.chain.first_break_seq}`}
         </p>
       )}
-      {error && <p className="receipts-error">{error}</p>}
+      {error !== null && <p className="receipts-error">{error}</p>}
       {receipts !== null &&
         (receipts.length === 0 ? (
           <p className="receipts-empty">

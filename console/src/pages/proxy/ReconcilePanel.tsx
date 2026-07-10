@@ -13,7 +13,7 @@
  * unmediated path and now JOURNALS it; it still never blocks it.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getReconcile, raiseReconcile } from "../../api/client";
 import type { ReconcileReport } from "../../types/platform";
@@ -30,16 +30,21 @@ export default function ReconcilePanel({ onStatus }: SourcePanelProps): JSX.Elem
   // allowlisted target). Off = phase-2 target/run join.
   const [strict, setStrict] = useState(false);
 
+  // Keep the latest onStatus without making it a refresh dependency: a parent
+  // passing an inline callback must not retrigger the interval (loop guard).
+  const onStatusRef = useRef(onStatus);
+  useEffect(() => { onStatusRef.current = onStatus; });
+
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const res = await getReconcile(undefined, strict);
       setReport(res);
       setError(null);
-      onStatus?.({ count: res.bypass_flows.length, failed: res.bypass_flows.length });
+      onStatusRef.current?.({ count: res.bypass_flows.length, failed: res.bypass_flows.length });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [strict, onStatus]);
+  }, [strict]);
 
   useEffect(() => {
     void refresh();

@@ -38,6 +38,17 @@ import {
 } from "../../api/client";
 import CampaignsPage from "./index";
 
+// R16 fixtures: REAL payloads captured from the running API (GET /campaigns,
+// /config/agents, /recordings, /campaign-templates, /runs). The list fixtures
+// keep the backend envelope ({ campaigns: [...] }, ...); the client unwraps
+// that envelope, so the mocks below feed the unwrapped field -- same contract.
+import agentsFixture from "./__fixtures__/agents.fixture.json";
+import campaignsFixture from "./__fixtures__/campaigns.fixture.json";
+import recordingsFixture from "./__fixtures__/recordings.fixture.json";
+import templatesFixture from "./__fixtures__/campaign-templates.fixture.json";
+import runsFixture from "./__fixtures__/runs.fixture.json";
+import type { AgentConfig, CampaignTemplate, RecordingMeta, RunSummary } from "../../types/platform";
+
 /** Minimal stand-in for the run WebSocket (useRunStream assigns handlers). */
 interface FakeSocket {
   onopen: (() => void) | null;
@@ -69,9 +80,47 @@ function mockEmptyLists(): void {
   vi.mocked(listRuns).mockResolvedValue([]);
 }
 
+function mockFixtureLists(): void {
+  vi.mocked(listCampaigns).mockResolvedValue(
+    campaignsFixture.campaigns as unknown as Campaign[],
+  );
+  vi.mocked(listAgents).mockResolvedValue(agentsFixture as unknown as AgentConfig[]);
+  vi.mocked(listRecordings).mockResolvedValue(
+    recordingsFixture.recordings as unknown as RecordingMeta[],
+  );
+  vi.mocked(listCampaignTemplates).mockResolvedValue(
+    templatesFixture.templates as unknown as CampaignTemplate[],
+  );
+  vi.mocked(listRuns).mockResolvedValue(runsFixture.runs as unknown as RunSummary[]);
+}
+
 describe("CampaignsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("renders the captured campaign catalog without runtime errors (R16)", async () => {
+    mockFixtureLists();
+
+    render(<CampaignsPage />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Campagnes" }));
+    // Real capture: camp-pr and finance-wire-fraud are in the campaign list.
+    await screen.findByText("camp-pr");
+    expect(screen.getByText("finance-wire-fraud")).toBeInTheDocument();
+    // Every campaign row gets its Lancer button.
+    const launchButtons = screen.getAllByRole("button", { name: "Lancer" });
+    expect(launchButtons.length).toBe(campaignsFixture.campaigns.length);
+  });
+
+  it("renders the captured template groups (R16)", async () => {
+    mockFixtureLists();
+
+    render(<CampaignsPage />);
+
+    // "Modeles par domaine" is the default tab; the captured 35 templates
+    // group by domain and the identity offboarding one is present.
+    await screen.findByText("Identity -- offboarding propre");
   });
 
   it("renders the LogConsole run console with its empty state", async () => {

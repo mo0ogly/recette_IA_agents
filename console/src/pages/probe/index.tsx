@@ -136,9 +136,8 @@ export default function ProbePage(): JSX.Element {
         setInventoryLive(resp.live);
         setInventoryReason(resp.reason ?? null);
       })
-      .catch((err) => {
+      .catch(() => {
         if (alive) setInventory(null);
-        console.error("probe inventory fetch failed", err);
       });
     return () => {
       alive = false;

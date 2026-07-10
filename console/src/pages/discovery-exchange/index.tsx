@@ -58,6 +58,7 @@ type Source = "oracle" | "ebpf";
 export default function DiscoveryExchangePage(): JSX.Element {
   const [report, setReport] = useState<ExchangeReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<Source>("oracle");
   const [runId, setRunId] = useState("");
   const [probe, setProbe] = useState<ProbeStatus | null>(null);
@@ -86,6 +87,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
       setError(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -408,6 +411,8 @@ export default function DiscoveryExchangePage(): JSX.Element {
           </ul>
         )}
       </div>
+
+      {loading && <p className="dx-loading">Chargement des echanges...</p>}
 
       {error !== null && <p className="dx-error">{error}</p>}
 

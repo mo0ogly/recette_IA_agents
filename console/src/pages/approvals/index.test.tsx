@@ -9,9 +9,10 @@
  *   - sweep.fixture.json: { timed_out: [<remaining event id>] }
  *
  * ApprovalState variant coverage (R16): "pending", "approved" and "denied"
- * are exercised here through the captured outcome fixtures, and "timeout"
- * through the sweep fixture. The "none" variant never appears in approval
- * resolutions; it is covered by the StatusBadge unit tests
+ * are exercised through the captured outcome fixtures; "timeout" through a
+ * derived resolution outcome (badge-timeout asserted in the ResolvedCard
+ * test below). The "none" variant never appears in approval resolutions;
+ * it is covered by the StatusBadge unit tests
  * (src/components/StatusBadge.test.tsx).
  */
 
@@ -162,6 +163,33 @@ describe("ApprovalsPage deny flow", () => {
     const badge = screen.getByText("denied");
     expect(badge).toHaveClass("badge", "badge-denied");
     expect(screen.getByTestId(`resolved-${EV2}`)).toHaveTextContent("executed: no");
+  });
+});
+
+describe("ApprovalsPage timeout outcome", () => {
+  it("renders a timeout resolution badge in the resolved section", async () => {
+    // The captured outcomes cover approved/denied; the timeout variant is
+    // derived from the real approved outcome (only the discriminant flips)
+    // so the ResolvedCard badge path is exercised for every ApprovalState
+    // a resolution can carry (R16 union coverage).
+    mockApprove.mockResolvedValue({
+      ...approvedOutcome,
+      approval_state: "timeout",
+      executed: false,
+    } as ActionOutcome);
+    render(<ApprovalsPage />);
+    await screen.findByText("suspend_user", { exact: false });
+
+    setApprover("user:rssi");
+    const card = screen.getByTestId(`pending-${EV1}`);
+    fireEvent.click(card.querySelector("button.btn-approve") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`resolved-${EV1}`)).toBeInTheDocument();
+    });
+    const badge = screen.getByText("timeout");
+    expect(badge).toHaveClass("badge", "badge-timeout");
+    expect(screen.getByTestId(`resolved-${EV1}`)).toHaveTextContent("executed: no");
   });
 });
 

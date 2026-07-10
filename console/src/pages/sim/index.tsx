@@ -21,7 +21,7 @@
  * CLI-only by design and is not driven from here.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getSimGitScenario,
   getSimGitScenarios,
@@ -386,6 +386,9 @@ export function ScenarioList({
   const [conflict, setConflict] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
+
   const onPromote = (id: string, overwrite = false): void => {
     setPending((p) => ({ ...p, [id]: true }));
     setPromoteError((e) => {
@@ -399,8 +402,9 @@ export function ScenarioList({
       return next;
     });
     promoteSimScenario(id, overwrite ? { overwrite: true } : undefined)
-      .then((res) => setPromoted((p) => ({ ...p, [id]: res })))
+      .then((res) => { if (aliveRef.current) setPromoted((p) => ({ ...p, [id]: res })); })
       .catch((err) => {
+        if (!aliveRef.current) return;
         const message = errorMessage(err);
         // A 409 "already exists" is not a dead end: offer the overwrite replace.
         if (!overwrite && isAlreadyPromotedConflict(message)) {
@@ -409,7 +413,7 @@ export function ScenarioList({
           setPromoteError((e) => ({ ...e, [id]: message }));
         }
       })
-      .finally(() => setPending((p) => ({ ...p, [id]: false })));
+      .finally(() => { if (aliveRef.current) setPending((p) => ({ ...p, [id]: false })); });
   };
 
   if (scenarios.length === 0)
