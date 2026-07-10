@@ -2118,6 +2118,9 @@ export interface OrchestrationRunResult {
   };
   run: { hops: OrchestrationHop[]; order: string[]; actions: OrchestrationAction[] };
   instances: string[];
+  /** True when the run's LLM bytes were routed through the wire overlay, so the
+   *  capture holds this session's flows (the instance deep-links resolve). */
+  wire_captured: boolean;
 }
 
 /** One row of GET /orchestrate/sessions. */

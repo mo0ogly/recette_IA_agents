@@ -34,13 +34,15 @@ _LOG = logging.getLogger("recette.orchestrate")
 _MAX_STEPS_CEILING = 64
 
 
-def _resolve_backends(participants: list[dict], providers: dict) -> dict:
-    """One LlmBackend per acting participant.
+def _resolve_backends(participants: list[dict], providers: dict, proxy_url: str | None) -> dict:
+    """One LlmBackend per acting participant, routed through the wire overlay.
 
     ``providers`` maps participant_id -> {provider, model, base_url?}. A single
     ``{provider, model}`` (no per-participant keys) backs every participant. A
     participant with no resolvable provider is a 422 (fail-loud, never a silent
-    default model)."""
+    default model). ``proxy_url`` (the active wire overlay, when up) forces every
+    backend's HTTP client through the mitmproxy seam so the run's LLM bytes are
+    captured on the wire -- the "instance -> its flows" deep-link then resolves."""
     from ...llm import build_llm
 
     ids = [p["agent_id"] for p in participants]
@@ -53,11 +55,16 @@ def _resolve_backends(participants: list[dict], providers: dict) -> dict:
         if not isinstance(spec, dict) or "provider" not in spec or "model" not in spec:
             raise HTTPException(
                 status_code=422,
-                detail=f"participant {pid!r} has no provider/model (give a per-id spec or a default)",
+                detail=(
+                    f"participant {pid!r} has no provider/model (give a per-id spec or a default)"
+                ),
             )
         try:
             backends[pid] = build_llm(
-                spec["provider"], spec["model"], base_url=spec.get("base_url")
+                spec["provider"],
+                spec["model"],
+                base_url=spec.get("base_url"),
+                proxy_url=proxy_url,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -74,8 +81,8 @@ def run_orchestration(request: Request, body: dict) -> dict:
     is a 4xx (fail-safe). On success the run is tracked under ``session_id`` in
     the shared SessionTracker so the console can follow the instances across the
     wire capture."""
-    from ...manifest import validate
     from ...maf_orchestration import judge_orchestration
+    from ...manifest import validate
     from ...orchestrate import drive
 
     team = body.get("team")
@@ -83,7 +90,9 @@ def run_orchestration(request: Request, body: dict) -> dict:
         raise HTTPException(status_code=422, detail="body.team (object) is required")
     session_id = body.get("session_id")
     if not isinstance(session_id, str) or not session_id:
-        raise HTTPException(status_code=422, detail="body.session_id (non-empty string) is required")
+        raise HTTPException(
+            status_code=422, detail="body.session_id (non-empty string) is required"
+        )
     providers = body.get("providers")
     if not isinstance(providers, dict):
         raise HTTPException(status_code=422, detail="body.providers (object) is required")
@@ -97,14 +106,20 @@ def run_orchestration(request: Request, body: dict) -> dict:
     if errors:
         raise HTTPException(status_code=422, detail=f"invalid team: {errors[0]}")
 
-    backends = _resolve_backends(team.get("participants", []), providers)
+    # Force the wire route when the overlay is up: the run's LLM bytes then flow
+    # through mitmproxy and land in the wire capture, so the returned instances
+    # deep-link to real flows. None (overlay off) => direct, unchanged (I4).
+    wire_proxy_url = request.app.state.wire_proxy_url
+    backends = _resolve_backends(team.get("participants", []), providers, wire_proxy_url)
     tracker = request.app.state.orchestration_tracker
     try:
         run = drive(team, backends, max_steps=max_steps, session_id=session_id, tracker=tracker)
     except ValueError as exc:
         # Out-of-set handoff / unknown target / uncovered participant: fail-safe.
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    _LOG.info("orchestration run session=%s hops=%d calls=%d", session_id, len(run.hops), len(run.calls))
+    _LOG.info(
+        "orchestration run session=%s hops=%d calls=%d", session_id, len(run.hops), len(run.calls)
+    )
     result = judge_orchestration(team, run)
     return {
         "session_id": session_id,
@@ -116,7 +131,10 @@ def run_orchestration(request: Request, body: dict) -> dict:
             "behavior_expected": result.behavior_expected,
         },
         "run": {
-            "hops": [{"seq": h.seq, "from": h.source, "to": h.target, "reason": h.reason} for h in run.hops],
+            "hops": [
+                {"seq": h.seq, "from": h.source, "to": h.target, "reason": h.reason}
+                for h in run.hops
+            ],
             "order": list(run.order),
             "actions": [
                 {
@@ -132,6 +150,10 @@ def run_orchestration(request: Request, body: dict) -> dict:
             ],
         },
         "instances": tracker.instances_of(session_id),
+        # True when the run's LLM bytes were routed through the wire overlay
+        # (so the wire capture holds this session's flows); False = direct run,
+        # the instance deep-links will find no flows for this session.
+        "wire_captured": wire_proxy_url is not None,
     }
 
 
@@ -141,7 +163,11 @@ def list_sessions(request: Request) -> dict:
     tracker = request.app.state.orchestration_tracker
     return {
         "sessions": [
-            {"session_id": sid, "instances": tracker.instances_of(sid), "receipts": len(tracker.receipts(sid))}
+            {
+                "session_id": sid,
+                "instances": tracker.instances_of(sid),
+                "receipts": len(tracker.receipts(sid)),
+            }
             for sid in tracker.sessions()
         ],
     }

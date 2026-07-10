@@ -80,7 +80,9 @@ class OrchestrateRunTest(unittest.TestCase):
         self.assertEqual(body["session_id"], "sess-1")
         self.assertIn(body["verdict"], {"correct", "incorrect"})
         # The handoff produced a hop triage -> worker and the worker's tool call.
-        self.assertTrue(any(h["from"] == "triage" and h["to"] == "worker" for h in body["run"]["hops"]))
+        self.assertTrue(
+            any(h["from"] == "triage" and h["to"] == "worker" for h in body["run"]["hops"])
+        )
         self.assertTrue(any(a["agent_id"] == "worker" for a in body["run"]["actions"]))
         # Tracking recorded the session with its instances.
         self.assertIn("triage", body["instances"])
@@ -106,7 +108,11 @@ class OrchestrateRunTest(unittest.TestCase):
     def test_invalid_team_is_422(self) -> None:
         r = self.client.post(
             "/orchestrate/run",
-            json={"team": {"not": "a team"}, "providers": {"provider": "groq", "model": "m"}, "session_id": "s"},
+            json={
+                "team": {"not": "a team"},
+                "providers": {"provider": "groq", "model": "m"},
+                "session_id": "s",
+            },
         )
         self.assertEqual(r.status_code, 422)
 
@@ -130,6 +136,67 @@ class OrchestrateRunTest(unittest.TestCase):
     def test_unknown_session_is_404(self) -> None:
         r = self.client.get("/orchestrate/sessions/nope")
         self.assertEqual(r.status_code, 404)
+
+    def test_run_forces_wire_route_when_overlay_is_up(self) -> None:
+        # With the overlay up (wire_proxy_url set), every backend must be built
+        # with that proxy_url so the run's LLM bytes are captured on the wire.
+        app = create_app()
+        app.state.wire_proxy_url = "http://127.0.0.1:8083"
+        client = TestClient(app)
+        seen: list[str | None] = []
+
+        scripts = iter(
+            [
+                StubLlm([_tc("handoff_to_worker")]),
+                StubLlm([_tc("use_mcp_0", approved=True), _FINAL]),
+            ]
+        )
+
+        def _capture(*_a, **kw):
+            seen.append(kw.get("proxy_url"))
+            return next(scripts)
+
+        with mock.patch("recette.llm.build_llm", side_effect=_capture):
+            r = client.post(
+                "/orchestrate/run",
+                json={
+                    "team": HANDOFF_TEAM,
+                    "providers": {"provider": "groq", "model": "m"},
+                    "session_id": "sess-wire",
+                },
+            )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()["wire_captured"])
+        # Both participants' backends were built routed through the overlay.
+        self.assertEqual(seen, ["http://127.0.0.1:8083", "http://127.0.0.1:8083"])
+
+    def test_run_stays_direct_when_overlay_is_off(self) -> None:
+        # Overlay off (wire_proxy_url None): backends are direct, and the
+        # response says so, so the operator knows the deep-links will be empty.
+        seen: list[str | None] = []
+        scripts = iter(
+            [
+                StubLlm([_tc("handoff_to_worker")]),
+                StubLlm([_tc("use_mcp_0", approved=True), _FINAL]),
+            ]
+        )
+
+        def _capture(*_a, **kw):
+            seen.append(kw.get("proxy_url"))
+            return next(scripts)
+
+        with mock.patch("recette.llm.build_llm", side_effect=_capture):
+            r = self.client.post(
+                "/orchestrate/run",
+                json={
+                    "team": HANDOFF_TEAM,
+                    "providers": {"provider": "groq", "model": "m"},
+                    "session_id": "sess-direct",
+                },
+            )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()["wire_captured"])
+        self.assertEqual(seen, [None, None])
 
 
 if __name__ == "__main__":

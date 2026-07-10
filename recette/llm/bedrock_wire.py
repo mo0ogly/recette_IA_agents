@@ -68,6 +68,7 @@ class BedrockLlm:
         base_url: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 1024,
+        proxy_url: str | None = None,
     ) -> None:
         self._model = model
         self._max_tokens = max_tokens
@@ -76,7 +77,9 @@ class BedrockLlm:
             if not key:
                 raise RuntimeError(f"{self.ENV_KEY} not set (or pass client/api_key)")
             client = StdlibHttpClient(
-                base_url or self.BASE_URL, headers={"Authorization": f"Bearer {key}"}
+                base_url or self.BASE_URL,
+                headers={"Authorization": f"Bearer {key}"},
+                proxy_url=proxy_url,
             )
         self._client = client
 
