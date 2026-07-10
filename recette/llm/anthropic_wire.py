@@ -60,6 +60,7 @@ class AnthropicLlm:
         client: _PostClient | None = None,
         api_key: str | None = None,
         max_tokens: int = 1024,
+        proxy_url: str | None = None,
     ) -> None:
         self._model = model
         self._max_tokens = max_tokens
@@ -68,7 +69,11 @@ class AnthropicLlm:
             key = api_key or os.environ.get(env_key)
             if not key:
                 raise RuntimeError(f"{env_key} not set (or pass client/api_key)")
-            client = StdlibHttpClient(type(self).BASE_URL, headers=type(self)._auth_headers(key))
+            client = StdlibHttpClient(
+                type(self).BASE_URL,
+                headers=type(self)._auth_headers(key),
+                proxy_url=proxy_url,
+            )
         self._client = client
 
     def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:

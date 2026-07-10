@@ -33,7 +33,8 @@
     "instances": [
       "triage",
       "worker"
-    ]
+    ],
+    "wire_captured": true
   },
   "sessions": {
     "sessions": [

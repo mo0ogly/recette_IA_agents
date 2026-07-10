@@ -138,6 +138,21 @@
   color: var(--badge-red-fg);
 }
 
+.orch-wire {
+  margin: 0.3rem 0 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--badge-amber-fg);
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
+  font-size: 0.78rem;
+}
+
+.orch-wire[data-captured="true"] {
+  border-left-color: var(--badge-green-fg);
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
 .orch-instances,
 .orch-sessions {
   display: flex;

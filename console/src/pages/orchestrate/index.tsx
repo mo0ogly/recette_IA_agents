@@ -179,6 +179,16 @@ export default function OrchestratePage(): JSX.Element {
                 </span>
               </div>
 
+              <p
+                className="orch-wire"
+                data-testid="orchestrate-wire"
+                data-captured={result.wire_captured}
+              >
+                {result.wire_captured
+                  ? "route wire forcee : les octets LLM de ce run sont captures, les liens ci-dessous mènent aux flux."
+                  : "overlay wire inactif : run direct, les liens ci-dessous ne trouveront pas de flux (demarrer le reseau wire pour capturer)."}
+              </p>
+
               <div className="orch-instances">
                 <span className="orch-muted">instances :</span>
                 {result.instances.map((iid) => (

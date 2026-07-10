@@ -66,6 +66,9 @@ describe("OrchestratePage (R16 contract)", () => {
     // The routed hops are rendered.
     const hops = screen.getByTestId("orchestrate-hops");
     expect(within(hops).getAllByRole("listitem").length).toBe(runFixture.run.hops.length);
+    // The wire-capture state is surfaced (the fixture was captured overlay-up).
+    const wire = screen.getByTestId("orchestrate-wire");
+    expect(wire).toHaveAttribute("data-captured", String(runFixture.wire_captured));
   });
 
   it("surfaces a client-side JSON parse error without calling the API", async () => {

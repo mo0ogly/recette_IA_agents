@@ -50,14 +50,21 @@ class GeminiLlm:
     BASE_URL = "https://generativelanguage.googleapis.com"
 
     def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+        self,
+        *,
+        model: str,
+        client: _PostClient | None = None,
+        api_key: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         self._model = model
         if client is None:
             key = api_key or os.environ.get("GEMINI_API_KEY")
             if not key:
                 raise RuntimeError("GEMINI_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"x-goog-api-key": key})
+            client = StdlibHttpClient(
+                self.BASE_URL, headers={"x-goog-api-key": key}, proxy_url=proxy_url
+            )
         self._client = client
 
     def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:

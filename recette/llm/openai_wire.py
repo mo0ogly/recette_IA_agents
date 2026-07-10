@@ -86,13 +86,18 @@ class OpenAiLlm:
         model: str,
         client: _PostClient | None = None,
         api_key: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         self._model = model
         if client is None:
             key = api_key or os.environ.get("OPENAI_API_KEY")
             if not key:
                 raise RuntimeError("OPENAI_API_KEY not set (or pass client/api_key)")
-            client = StdlibHttpClient(self.BASE_URL, headers={"Authorization": f"Bearer {key}"})
+            client = StdlibHttpClient(
+                self.BASE_URL,
+                headers={"Authorization": f"Bearer {key}"},
+                proxy_url=proxy_url,
+            )
         self._client = client
 
     def decide(self, *, system: str, history: list[Message], tools: list[ToolSpec]) -> LlmDecision:
@@ -135,10 +140,13 @@ class OpenAiCompatLlm(OpenAiLlm):
         base_url: str,
         client: _PostClient | None = None,
         api_key: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         if client is None:
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
-            client = StdlibHttpClient(self._normalize_base_url(base_url), headers=headers)
+            client = StdlibHttpClient(
+                self._normalize_base_url(base_url), headers=headers, proxy_url=proxy_url
+            )
         # Passing a non-None client makes the parent skip its env-key requirement.
         super().__init__(model=model, client=client)
 
@@ -171,7 +179,12 @@ class _OpenAiWireVendor(OpenAiLlm):
     ENV_KEY: str
 
     def __init__(
-        self, *, model: str, client: _PostClient | None = None, api_key: str | None = None
+        self,
+        *,
+        model: str,
+        client: _PostClient | None = None,
+        api_key: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         if client is None:
             env_key = type(self).ENV_KEY
@@ -179,7 +192,9 @@ class _OpenAiWireVendor(OpenAiLlm):
             if not key:
                 raise RuntimeError(f"{env_key} not set (or pass client/api_key)")
             client = StdlibHttpClient(
-                type(self).BASE_URL, headers={"Authorization": f"Bearer {key}"}
+                type(self).BASE_URL,
+                headers={"Authorization": f"Bearer {key}"},
+                proxy_url=proxy_url,
             )
         # Passing a non-None client makes the parent skip its env-key requirement.
         super().__init__(model=model, client=client)
@@ -431,6 +446,9 @@ class SkynetLlm(OpenAiCompatLlm):
         base_url: str,
         client: _PostClient | None = None,
         api_key: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         key = api_key or os.environ.get(self.ENV_KEY)
-        super().__init__(model=model, base_url=base_url, client=client, api_key=key)
+        super().__init__(
+            model=model, base_url=base_url, client=client, api_key=key, proxy_url=proxy_url
+        )
