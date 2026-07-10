@@ -9,6 +9,7 @@ import CatalogPage from "./pages/catalog";
 import ReceiptsPage from "./pages/receipts";
 import ControlPage from "./pages/control";
 import GraphPage from "./pages/graph";
+import OrchestratePage from "./pages/orchestrate";
 import MetricsPage from "./pages/metrics";
 import CampaignsPage from "./pages/campaigns";
 import CorpusPage from "./pages/corpus";
@@ -76,6 +77,7 @@ export default function App(): JSX.Element {
               <Route path="/control" element={<ControlPage />} />
               <Route path="/metrics" element={<MetricsPage />} />
               <Route path="/graph" element={<GraphPage />} />
+              <Route path="/orchestrate" element={<OrchestratePage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/approvals" element={<ApprovalsPage />} />
               <Route path="/audit" element={<AuditPage />} />

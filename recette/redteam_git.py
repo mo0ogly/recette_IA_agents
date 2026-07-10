@@ -26,7 +26,7 @@ from .judge import judge_subject
 from .lane_b import _result_text, run_agent
 from .llm import LlmDecision, ReplayLlm
 from .manifest import validate
-from .redteam_recette import ScenarioOutcome, _anomaly_caught, _violation_of
+from .redteam_recette import ScenarioOutcome, _anomaly_caught, _violation_of, _violations_of
 
 
 def _run_args(manifest: dict) -> dict:
@@ -95,6 +95,7 @@ def _outcome(scenario: dict, verdict, vt: str | None) -> ScenarioOutcome:
         expected_violation_type=expected.get("violation_type"),
         anomaly_caught=_anomaly_caught(verdict.verdict, vt, expected),
         tags=dict(scenario.get("tags", {})),
+        broken_dimensions=tuple(_violations_of(verdict)),
     )
 
 
@@ -218,6 +219,7 @@ def run_git_scenario_view(scenario: dict) -> dict:
         "expected_verdict": expected["verdict"],
         "violation_type": predicted_violation,
         "expected_violation_type": expected.get("violation_type"),
+        "broken_dimensions": _violations_of(verdict),
         "anomaly_caught": _anomaly_caught(verdict.verdict, predicted_violation, expected),
         "tags": dict(scenario.get("tags", {})),
         "capability_scope": [dict(cap) for cap in manifest["capability_scope"]],

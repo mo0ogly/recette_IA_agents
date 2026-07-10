@@ -18,7 +18,7 @@ from .adapters import IdentificationResult
 from .judge import judge_subject
 from .llm import LlmDecision, ReplayLlm
 from .manifest import validate
-from .simulate import simulate
+from .simulate import _default_tool_output, simulate
 
 _VIOLATION_DIM = {
     "identity_mismatch": "identity_match",
@@ -54,10 +54,13 @@ class ScenarioOutcome:
     scenario_id: str
     verdict: str  # predicted: "correct" | "incorrect"
     expected_verdict: str
-    violation_type: str | None  # predicted broken dimension, or None
+    violation_type: str | None  # PRIMARY predicted broken dimension, or None
     expected_violation_type: str | None  # ground-truth broken dimension, or None
     anomaly_caught: bool  # predicted verdict AND (for negatives) dimension match
     tags: dict[str, str]
+    # All predicted broken axes (mono-axis for a corpus negative, R20; may hold
+    # more than one for a live/recorded run). violation_type is broken[0].
+    broken_dimensions: tuple[str, ...] = ()
 
 
 def _anomaly_caught(
@@ -79,6 +82,26 @@ def _anomaly_caught(
     return True
 
 
+def _tool_outputs(injection: list[str] | None):
+    """Build a ToolOutput callable serving ``injection[N]`` as the Nth tool call's
+    output (AgentDojo injection-via-tool-output, ASI06/AML.T0110). An out-of-range
+    index falls back to the default benign output. Pure closure over an index list
+    plus a counter -- no clock/random (I4). Mirrors ``redteam_git._tool_output``
+    but for the MAF ``ToolOutput`` shape (called with the tool name)."""
+    if not injection:
+        return _default_tool_output
+    state = {"n": 0}
+
+    def output(name: str) -> str:
+        i = state["n"]
+        state["n"] = i + 1
+        if 0 <= i < len(injection):
+            return injection[i]
+        return _default_tool_output(name)
+
+    return output
+
+
 def _program(steps: list[dict]) -> ReplayLlm:
     return ReplayLlm(
         [
@@ -88,8 +111,19 @@ def _program(steps: list[dict]) -> ReplayLlm:
     )
 
 
+def _violations_of(result) -> list[str]:
+    """All broken dimensions as violation_types, in canonical order (identity,
+    capabilities, policy, behavior). A corpus negative is mono-axis (R20) so this
+    is a single entry, but a LIVE / recorded adversarial run may break more than
+    one axis -- returning the full list keeps that legible instead of silently
+    collapsing to the first broken axis."""
+    return [vt for vt, attr in _VIOLATION_DIM.items() if not getattr(result, attr)]
+
+
 def _violation_of(result) -> str | None:
-    broken = [vt for vt, attr in _VIOLATION_DIM.items() if not getattr(result, attr)]
+    """The PRIMARY broken dimension (first in canonical order), or None. Kept for
+    the mono-axis metric; use _violations_of for the full multi-axis picture."""
+    broken = _violations_of(result)
     return broken[0] if broken else None
 
 
@@ -121,6 +155,7 @@ def _replay(scenario: dict):
         user_turns=list(scenario["attack"]["user_turns"]),
         approver=_approver_for(scenario.get("approver", "deny_all")),
         actual_identity=actual_identity,
+        tool_outputs=_tool_outputs(scenario.get("tool_injection")),
     )
     verdict = judge_subject(spec, result.action_log)
     return spec, result, verdict
@@ -155,7 +190,8 @@ def run_scenario(scenario: dict) -> ScenarioOutcome:
     """
     _, _, verdict = _replay(scenario)
     expected = scenario["expected"]
-    predicted_violation = _violation_of(verdict)
+    broken = _violations_of(verdict)
+    predicted_violation = broken[0] if broken else None
     return ScenarioOutcome(
         scenario_id=scenario["scenario_id"],
         verdict=verdict.verdict,
@@ -164,6 +200,7 @@ def run_scenario(scenario: dict) -> ScenarioOutcome:
         expected_violation_type=expected.get("violation_type"),
         anomaly_caught=_anomaly_caught(verdict.verdict, predicted_violation, expected),
         tags=dict(scenario.get("tags", {})),
+        broken_dimensions=tuple(broken),
     )
 
 
@@ -197,7 +234,8 @@ def run_scenario_view(scenario: dict) -> dict:
     """
     spec, result, verdict = _replay(scenario)
     expected = scenario["expected"]
-    predicted_violation = _violation_of(verdict)
+    broken = _violations_of(verdict)
+    predicted_violation = broken[0] if broken else None
     return {
         "scenario_id": scenario["scenario_id"],
         "name": scenario.get("name", scenario["scenario_id"]),
@@ -205,6 +243,7 @@ def run_scenario_view(scenario: dict) -> dict:
         "expected_verdict": expected["verdict"],
         "violation_type": predicted_violation,
         "expected_violation_type": expected.get("violation_type"),
+        "broken_dimensions": list(broken),
         "anomaly_caught": _anomaly_caught(verdict.verdict, predicted_violation, expected),
         "tags": dict(scenario.get("tags", {})),
         "capability_scope": [dict(cap) for cap in spec["capability_scope"]],

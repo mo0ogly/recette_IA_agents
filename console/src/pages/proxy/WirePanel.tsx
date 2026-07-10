@@ -21,10 +21,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { clearWireFlows, controlWireOverlay } from "../../api/client";
+import { clearWireFlows, controlWireOverlay, wireStreamUrl } from "../../api/client";
 import { getWireFlowsDeltaTracked } from "./wireDeltaClient";
 import ProxySelector from "../../components/ProxySelector";
 import { VirtualList } from "../../components/VirtualList";
@@ -49,8 +49,12 @@ import { useDeltaFeed, type DeltaEnvelope } from "./useDeltaFeed";
 import WireFilterBar from "./WireFilterBar";
 import InstanceSessionSummary from "./InstanceSessionSummary";
 import WireExpertPanel from "./WireExpertPanel";
+import WireInstancesPanel from "./WireInstancesPanel";
 import WireStatsPanel from "./WireStatsPanel";
 import { compileWireFilter } from "./wireFilter";
+import { compileColorRules, type ColorTint } from "./wireColorRules";
+import { fromAgentPcap, toAgentPcap, type AgentPcapImport } from "./agentpcap";
+import { instanceId as flowInstanceId, sessionId as flowSessionId } from "./wireLayers";
 
 const POLL_INTERVAL_MS = 1000;
 /** Fixed row height of a virtualized wire row; MUST match the
@@ -68,6 +72,8 @@ const WIRE_TRUNCATION_MARKER = "...[truncated]"; // appended by recette/platform
 interface WireRow extends WireFlowLine {
   /** Waterfall width in percent of the slowest buffered flow (layout only). */
   durationPct: number;
+  /** First-matching coloring-rule tint, or null (no rule matched). */
+  tint: ColorTint | null;
 }
 
 /** Render a body for display: pretty-print valid JSON when requested, else raw.
@@ -140,6 +146,23 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     [setParams],
   );
 
+  // Follow-agent-turn: both clauses land in ONE URL update — two successive
+  // setParams in the same tick would race (the second reads a stale prev).
+  const onFollowTurn = useCallback(
+    (session: string | null, instance: string | null): void => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (session !== null) next.set("session", session);
+          if (instance !== null) next.set("instance", instance);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+
   // The delta fetcher is rebuilt whenever a filter changes so it always reads
   // the CURRENT clause values (no stale closure). useDeltaFeed consumes the
   // fetcher through a ref, so a new identity does NOT tear down the poll
@@ -174,10 +197,34 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     [filter],
   );
 
-  const { items, error: feedError, refresh, resetFeed } = useDeltaFeed<WireFlow>(fetcher, {
-    intervalMs: POLL_INTERVAL_MS,
-    paused: paused ?? false,
-  });
+  // Offline capture: an imported .agentpcap replaces the live feed as the
+  // flow source until the operator returns to live (Wireshark open-file mode).
+  const [imported, setImported] = useState<AgentPcapImport | null>(null);
+
+  const { items: liveItems, error: feedError, refresh, resetFeed } = useDeltaFeed<WireFlow>(
+    fetcher,
+    {
+      intervalMs: POLL_INTERVAL_MS,
+      // An imported capture freezes the view: no point polling behind it.
+      paused: (paused ?? false) || imported !== null,
+    },
+  );
+  const items = imported !== null ? imported.flows : liveItems;
+
+  // LIVE capture: the SSE stream is a data-light wake-up channel — each
+  // `cursor` event triggers an immediate delta refresh (the poll remains the
+  // fallback cadence). Runtimes without EventSource (jsdom) keep poll-only.
+  useEffect(() => {
+    if ((paused ?? false) || imported !== null) return undefined;
+    if (typeof EventSource === "undefined") return undefined;
+    const es = new EventSource(wireStreamUrl());
+    const onCursor = (): void => void refresh();
+    es.addEventListener("cursor", onCursor);
+    return (): void => {
+      es.removeEventListener("cursor", onCursor);
+      es.close();
+    };
+  }, [paused, imported, refresh]);
 
   // Server-side filters: any clause change invalidates the cursor AND the
   // buffered rows (they belong to the previous selection), so the feed is
@@ -292,14 +339,19 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // Waterfall scale: the largest latency among the buffered flows. duration_ms
   // is OPS metadata on the view only, never a judge/decision/replay input (I4).
   const maxDur = useMemo(() => maxDuration(visible), [visible]);
+  // Coloring rules (Wireshark profiles): URL-owned so a colored view is
+  // deep-linkable; first matching rule tints the row (wireColorRules.ts).
+  const colorsSrc = params.get("colors") ?? "";
+  const colorRules = useMemo(() => compileColorRules(colorsSrc), [colorsSrc]);
   const rows: WireRow[] = useMemo(
     () =>
       visible.map((f) => ({
         ...wireFlowToLine(f),
         // Width % is layout (relative latency), not a hardcoded color.
         durationPct: maxDur > 0 ? Math.round(((f.duration_ms ?? 0) / maxDur) * 100) : 0,
+        tint: colorRules.tintFor(f),
       })),
-    [visible, maxDur],
+    [visible, maxDur, colorRules],
   );
   const fails = useMemo(() => wireFailureCount(visible), [visible]);
   const selected = useMemo(
@@ -311,13 +363,15 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
   // a deterministic function of the flow bytes, never a judge/decision input.
   // Null for a non-LLM flow -> the raw body pane stays the source of truth.
   const llm = useMemo(() => (selected !== null ? decodeLlmFlow(selected) : null), [selected]);
-  // Decision timeline of the selected run: when a run clause is active the
-  // buffered flows are exactly that run's flows (server-scoped), so ordering
-  // them by capture sequence reconstructs the reasoning -> effect story. Lets an
-  // operator find the exact step where an undesired action first appears.
+  // Decision timeline of the followed scope. Two ways to scope a "turn":
+  // a run clause (cockpit deep-link) or a followed agent turn (session +
+  // instance, the Follow-TCP-Stream equivalent). Either way the buffered flows
+  // are exactly that scope's flows, so ordering by capture sequence
+  // reconstructs the reasoning -> effect story.
+  const followingTurn = filter.sessionId !== undefined && filter.instanceId !== undefined;
   const timeline = useMemo(
-    () => (filter.runId !== undefined ? buildRunTimeline(visible) : []),
-    [filter.runId, visible],
+    () => (filter.runId !== undefined || followingTurn ? buildRunTimeline(visible) : []),
+    [filter.runId, followingTurn, visible],
   );
   const compareFlow = useMemo(
     () => visible.find((f) => f.seq === compareSeq) ?? null,
@@ -345,6 +399,23 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
     downloadFile(flowsToHar(items), "wire-flows.har", "application/json");
   }, [items]);
 
+  // Portable capture: export the buffered flows as a verifiable .agentpcap;
+  // import one to inspect a shared capture OFFLINE (agentpcap.ts).
+  const pcapInputRef = useRef<HTMLInputElement | null>(null);
+  const onExportPcap = useCallback((): void => {
+    downloadFile(toAgentPcap(items), "capture.agentpcap.json", "application/json");
+  }, [items]);
+  const onImportPcap = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file === undefined) return;
+    // FileReader (not File.text()): available in every runtime incl. jsdom.
+    const reader = new FileReader();
+    reader.onload = (): void => setImported(fromAgentPcap(String(reader.result ?? "")));
+    reader.readAsText(file);
+    // Allow re-importing the same filename later.
+    e.target.value = "";
+  }, []);
+
   const itemKey = useCallback((r: WireRow): number => r.seq, []);
   const renderRow = useCallback(
     (r: WireRow): ReactNode => (
@@ -354,6 +425,7 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
           className="proxy-list-item wire-prow"
           data-active={r.seq === selectedSeq}
           data-outcome={r.outcome}
+          data-tint={r.tint ?? undefined}
           onClick={() => setSelectedSeq(r.seq)}
         >
           <span className="wire-col wire-col-seq">{r.seq}</span>
@@ -440,6 +512,30 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         >
           Export HAR
         </button>
+        <button
+          type="button"
+          className="proxy-export"
+          data-testid="wire-export-pcap"
+          onClick={onExportPcap}
+        >
+          Export .agentpcap
+        </button>
+        <button
+          type="button"
+          className="proxy-export"
+          data-testid="wire-import-pcap-btn"
+          onClick={() => pcapInputRef.current?.click()}
+        >
+          Importer .agentpcap
+        </button>
+        <input
+          ref={pcapInputRef}
+          type="file"
+          accept=".json,.agentpcap"
+          style={{ display: "none" }}
+          data-testid="wire-import-pcap"
+          onChange={onImportPcap}
+        />
         <button type="button" className="proxy-clear" onClick={() => void onClear()}>
           Vider le tampon
         </button>
@@ -452,12 +548,43 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
         methods={methods}
         runIds={runIds}
         dfError={dfCompiled.ok ? null : dfCompiled.error}
+        colors={colorsSrc}
+        colorsError={
+          colorRules.errors.length > 0
+            ? colorRules.errors.map((e) => `regle ${e.index + 1}: ${e.error}`).join(" ; ")
+            : null
+        }
       />
 
       {nextStep !== null && (
         <p className="proxy-banner" role="status" data-testid="wire-next-step">
           {nextStep}
         </p>
+      )}
+
+      {/* Offline mode: an imported capture replaces the live feed; the integrity
+          verdict (chain recomputation) is always shown to the auditor. */}
+      {imported !== null && (
+        <p className="proxy-banner" role="status" data-testid="wire-imported">
+          Capture importee ({imported.flows.length} flux) — integrite{" "}
+          {imported.verified ? "verifiee" : "INVALIDE"}
+          {imported.error !== null ? ` : ${imported.error}` : ""}.{" "}
+          <button
+            type="button"
+            className="proxy-mode-btn"
+            data-testid="wire-import-clear"
+            onClick={() => setImported(null)}
+          >
+            revenir au direct
+          </button>
+        </p>
+      )}
+
+      {/* Orchestration roster: with no instance pinned, list every instance in
+          the capture and deep-link into one (instance -> its wire flows). Once
+          an instance is pinned, the cross-session strip below takes over. */}
+      {filter.instanceId === undefined && (
+        <WireInstancesPanel flows={visible} onPick={(iid) => setParam("instance", iid)} />
       )}
 
       <InstanceSessionSummary
@@ -498,11 +625,14 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
       {/* Decision timeline of the selected run: the reasoning -> effect story in
           capture order, action steps (tool decided / mutating call) highlighted,
           each clickable to open its full flow -- so an undesired action is found
-          at its exact step. Only shown when a run clause scopes the flows. */}
-      {filter.runId !== undefined && timeline.length > 0 && (
+          at its exact step. Shown when a run clause OR a followed agent turn
+          (session + instance) scopes the flows. */}
+      {(filter.runId !== undefined || followingTurn) && timeline.length > 0 && (
         <div className="proxy-wire-timeline" data-testid="wire-run-timeline">
           <div className="proxy-wire-timeline-head">
-            Timeline decision -- run {filter.runId.slice(0, 12)} ({timeline.length} etapes)
+            {filter.runId !== undefined
+              ? `Timeline decision -- run ${filter.runId.slice(0, 12)} (${timeline.length} etapes)`
+              : `Tour d'agent -- ${filter.instanceId ?? ""} / session ${filter.sessionId ?? ""} (${timeline.length} etapes)`}
           </div>
           <ol className="proxy-wire-timeline-list">
             {timeline.map((s) => (
@@ -652,6 +782,24 @@ export default function WirePanel({ onStatus, paused }: SourcePanelProps): JSX.E
               <dd>
                 <WireLayersView flow={selected} />
               </dd>
+              {/* Follow-agent-turn (the Follow-TCP-Stream equivalent): scope the
+                  capture to this flow's session + instance in one click; the
+                  clauses land in the URL, so the followed turn is deep-linkable. */}
+              {(flowSessionId(selected) !== null || flowInstanceId(selected) !== null) && (
+                <>
+                  <dt>suivre</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      className="proxy-export"
+                      data-testid="wire-follow-turn"
+                      onClick={() => onFollowTurn(flowSessionId(selected), flowInstanceId(selected))}
+                    >
+                      Suivre ce tour d'agent
+                    </button>
+                  </dd>
+                </>
+              )}
               <dt>replay</dt>
               <dd>
                 <button

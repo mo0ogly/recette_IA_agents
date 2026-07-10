@@ -519,6 +519,162 @@ describe("WirePanel (R16 contract, delta poll)", () => {
     expect(screen.queryByTestId("wire-llm-decode")).toBeNull();
   });
 
+  it("refreshes the feed instantly on an SSE cursor event (live capture)", async () => {
+    // The SSE stream is a wake-up channel: a `cursor` event must trigger an
+    // immediate delta refresh without waiting for the 1s poll. jsdom has no
+    // EventSource, so a stub captures the listener the panel registers.
+    class FakeEventSource {
+      static last: FakeEventSource | null = null;
+      listeners = new Map<string, () => void>();
+      constructor(public url: string) {
+        FakeEventSource.last = this;
+      }
+      addEventListener(type: string, fn: () => void): void {
+        this.listeners.set(type, fn);
+      }
+      removeEventListener(): void {}
+      close(): void {}
+    }
+    (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+    try {
+      renderWire();
+      const list = await screen.findByLabelText("wire flows");
+      await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+      expect(FakeEventSource.last?.url).toContain("/proxy/wire/stream");
+      const before = vi.mocked(getWireFlowsDeltaTracked).mock.calls.length;
+      FakeEventSource.last?.listeners.get("cursor")?.();
+      await waitFor(() =>
+        expect(vi.mocked(getWireFlowsDeltaTracked).mock.calls.length).toBeGreaterThan(before),
+      );
+    } finally {
+      delete (globalThis as { EventSource?: unknown }).EventSource;
+    }
+  });
+
+  it("lists the orchestration instances and deep-links the packet list to one", async () => {
+    // Two instances in the capture: the roster lists both; clicking one pins the
+    // instance clause server-side (instance -> its wire flows), pulling that
+    // agent out of the dark.
+    const iFlow = (seq: number, extra: object): WireFlow =>
+      ({ ...fixture.flows[0], seq, ...extra }) as WireFlow;
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        iFlow(51, { instance_id: "triage", session_id: "s1" }),
+        iFlow(52, { instance_id: "notify", session_id: "s1" }),
+      ],
+      last_seq: 52,
+      total: 2,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(2));
+    const roster = await screen.findByTestId("wire-instances");
+    expect(roster).toHaveTextContent("2 agents");
+    fireEvent.click(
+      within(screen.getByTestId("wire-instance-triage")).getByRole("button"),
+    );
+    await waitFor(() =>
+      expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
+        expect.objectContaining({ instanceId: "triage" }),
+      ),
+    );
+  });
+
+  it("follows an agent turn from a selected flow (session+instance deep-link)", async () => {
+    // Follow-TCP-Stream equivalent: two flows of instance "triage" session "s1"
+    // plus a foreign flow. Selecting a triage flow and clicking "Suivre ce tour
+    // d'agent" pushes session+instance clauses (URL + server-side) so only the
+    // turn remains, and the turn timeline replaces the run-scoped one.
+    const turnFlow = (seq: number, extra: object): WireFlow =>
+      ({ ...fixture.flows[0], seq, ...extra }) as WireFlow;
+    mockWireDelta({
+      enabled: false,
+      proxy_url: null,
+      flows: [
+        turnFlow(41, { session_id: "s1", instance_id: "triage" }),
+        turnFlow(42, { session_id: "s1", instance_id: "triage" }),
+        turnFlow(43, { session_id: "s2", instance_id: "other" }),
+      ],
+      last_seq: 43,
+      total: 3,
+      reset: false,
+    });
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(3));
+    fireEvent.click(selectButtons(list)[0]);
+    await screen.findByTestId("wire-detail");
+    fireEvent.click(screen.getByTestId("wire-follow-turn"));
+    // The list narrows to the followed turn (server receives the clauses).
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(2));
+    await waitFor(() =>
+      expect(getWireFlowsDeltaTracked).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: "s1", instanceId: "triage" }),
+      ),
+    );
+    // The turn timeline is shown for the followed scope (no run clause needed).
+    const tl = await screen.findByTestId("wire-run-timeline");
+    expect(tl).toHaveTextContent("Tour d'agent -- triage / session s1");
+  });
+
+  it("imports a .agentpcap capture offline, verifies integrity, returns to live", async () => {
+    // Export/import round-trip through the panel: a valid capture replaces the
+    // live feed (offline mode) and reports a verified chain; "revenir au
+    // direct" restores the feed.
+    const { toAgentPcap } = await import("./agentpcap");
+    const pcap = toAgentPcap([
+      { ...fixture.flows[0], seq: 31, host: "imported.example.com" },
+    ]);
+    renderWire();
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    const input = screen.getByTestId("wire-import-pcap");
+    const file = new File([pcap], "capture.agentpcap.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    const banner = await screen.findByTestId("wire-imported");
+    expect(banner).toHaveTextContent("1 flux");
+    expect(banner).toHaveTextContent("integrite verifiee");
+    // The offline capture is now the flow source.
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(1));
+    expect(list).toHaveTextContent("imported.example.com");
+    // Back to live: the feed items return.
+    fireEvent.click(screen.getByTestId("wire-import-clear"));
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+  });
+
+  it("flags a tampered .agentpcap as integrity-invalid", async () => {
+    const { toAgentPcap } = await import("./agentpcap");
+    const parsed = JSON.parse(toAgentPcap([{ ...fixture.flows[0], seq: 32 }]));
+    parsed.flows[0].request_body = '{"tampered":true}';
+    renderWire();
+    await screen.findByLabelText("wire flows");
+    const file = new File([JSON.stringify(parsed)], "bad.agentpcap.json", {
+      type: "application/json",
+    });
+    fireEvent.change(screen.getByTestId("wire-import-pcap"), { target: { files: [file] } });
+    const banner = await screen.findByTestId("wire-imported");
+    expect(banner).toHaveTextContent("INVALIDE");
+  });
+
+  it("tints rows via ?colors= coloring rules and surfaces a rule error (deep-link)", async () => {
+    // Wireshark coloring rules: first matching rule tints the row. The fixture
+    // has a 201 (ok) and a 403 (fail): "amber:status >= 400" must tint only the
+    // 403 row. An invalid second rule surfaces an error without breaking the view.
+    renderWire(["/proxy?source=wire&colors=" + encodeURIComponent("amber:status >= 400;red:status >=")]);
+    const list = await screen.findByLabelText("wire flows");
+    await waitFor(() => expect(selectButtons(list)).toHaveLength(fixture.flows.length));
+    const tinted = selectButtons(list).filter((b) => b.getAttribute("data-tint") === "amber");
+    expect(tinted).toHaveLength(1);
+    expect(screen.getByTestId("wire-filter-colors-error")).toBeInTheDocument();
+    // The input reflects the URL value (deep-link is the source of truth).
+    expect(screen.getByTestId("wire-filter-colors")).toHaveValue(
+      "amber:status >= 400;red:status >=",
+    );
+  });
+
   it("surfaces expert-info signals and opens the anchored flow on click", async () => {
     // A 5xx exchange trips the server_error expert signal; an unmasked
     // API-key-shaped token in a body trips secret_in_clear. Clicking a signal

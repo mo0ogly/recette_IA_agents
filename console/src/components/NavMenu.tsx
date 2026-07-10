@@ -86,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/observability", label: "Observabilite" },
       { to: "/metrics", label: "Metriques" },
       { to: "/graph", label: "Graphe" },
+      { to: "/orchestrate", label: "Orchestration" },
       { to: "/proxy", label: "Proxy", badge: "proxy" },
       { to: "/receipts", label: "Receipts" },
     ],
