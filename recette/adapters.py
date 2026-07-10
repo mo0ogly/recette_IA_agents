@@ -28,6 +28,7 @@ from .events import ESCALATE_ACTIONS, ActionType, AgentAction, Mode
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 SPAM_THRESHOLD = 5  # same (action_type, resource) repeated >= this many times = anomaly
+SPRAY_THRESHOLD = 5  # same action sprayed across >= this many DISTINCT targets = anomaly
 
 
 def repeats_beyond_threshold(keys: list[tuple[str, str]], threshold: int = SPAM_THRESHOLD) -> bool:
@@ -39,6 +40,31 @@ def repeats_beyond_threshold(keys: list[tuple[str, str]], threshold: int = SPAM_
         if counts[key] >= threshold:
             return True
     return False
+
+
+def sprays_beyond_threshold(
+    keys: list[tuple[str, str]], threshold: int = SPRAY_THRESHOLD
+) -> bool:
+    """True if any action is issued against >= threshold DISTINCT targets (a spray
+    anomaly): the same action_type fanned out across many resources -- e.g. an
+    agent opening one issue on each of many repos. The exact (action, target)
+    repeat test misses this because no single (action, target) pair repeats. Same
+    behavior dimension, complementary signal; shared by the git adapter and MAF
+    judge. Deterministic (stable set membership, no clock/random)."""
+    targets: dict[str, set[str]] = {}
+    for action, target in keys:
+        seen = targets.setdefault(action, set())
+        seen.add(target)
+        if len(seen) >= threshold:
+            return True
+    return False
+
+
+def behavior_is_anomalous(keys: list[tuple[str, str]]) -> bool:
+    """The behavior dimension's anomaly test: an exact (action, target) spam
+    repeat OR a same-action spray across many distinct targets. One entry point
+    so the git adapter and the MAF judge stay in lockstep."""
+    return repeats_beyond_threshold(keys) or sprays_beyond_threshold(keys)
 
 
 @dataclass
@@ -173,9 +199,10 @@ class ReferenceIdentificationAdapter:
     # --- dimension 4: behavior ---
     @staticmethod
     def _check_behavior(action_log: list[AgentAction]) -> bool:
-        # Anomaly = the same action repeated on the same resource beyond the spam threshold.
+        # Anomaly = an exact (action, resource) spam repeat OR the same action
+        # sprayed across many distinct resources (see behavior_is_anomalous).
         keys = [(a.action_type, a.resource) for a in action_log]
-        return not repeats_beyond_threshold(keys)
+        return not behavior_is_anomalous(keys)
 
 
 # ---------------------------------------------------------------------------

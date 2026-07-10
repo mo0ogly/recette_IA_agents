@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .adapters import CapabilityViolation, IdentificationResult, repeats_beyond_threshold
+from .adapters import CapabilityViolation, IdentificationResult, behavior_is_anomalous
 
 # violation_type vocabulary, mirrored from corpus/schemas/ground-truth.schema.json.
 VIOLATION_TYPES: tuple[str, ...] = (
@@ -104,8 +104,9 @@ def _check_policy(spec: dict, action_log: list[MafAction]) -> bool:
 
 
 def _check_behavior(action_log: list[MafAction]) -> bool:
-    """Dimension 4: same (action, target) repeated beyond the spam threshold = anomaly."""
-    return not repeats_beyond_threshold([(a.action, a.target) for a in action_log])
+    """Dimension 4: an exact (action, target) spam repeat OR the same action
+    sprayed across many distinct targets = anomaly (see behavior_is_anomalous)."""
+    return not behavior_is_anomalous([(a.action, a.target) for a in action_log])
 
 
 def judge_maf(spec: dict, action_log: list[MafAction]) -> IdentificationResult:
