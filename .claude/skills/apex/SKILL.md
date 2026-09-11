@@ -1,7 +1,24 @@
 ---
 name: apex
-description: APEX v6.0 -- Autonomous agentic loop level 6. OODA-integrated cycle INIT -> OBSERVE -> THINK -> BUILD -> RECETTE -> COMPLETE. 3-level memory. Research phase with adversarial critique. Rust/React build pipelines. 4-step blocking recette. Swarm inter-agent memory. Self-learning. Escalation only when autonomy boundary exceeded. Triggers on "apex", "plan d'attaque", "implemente cette feature", "workflow structure".
+description: APEX v6.0 -- Autonomous agentic loop level 6. OODA-integrated cycle INIT → OBSERVE → THINK → BUILD → RECETTE → COMPLETE. 3-level memory. Research phase with adversarial critique. Rust/React build pipelines. 4-step blocking recette. Swarm inter-agent memory. Self-learning. Escalation only when autonomy boundary exceeded. Triggers on "apex", "plan d'attaque", "implemente cette feature", "workflow structure".
 ---
+
+## Coordination OODA et gates intégrées
+
+Lire [le contrat commun](../../../tools/agent-workflows/CONTRACT.md) et
+[le profil local](../../../tools/agent-workflows/references/project.md) à l'entrée.
+Ce comportement est intégré, sans nouvelle skill à invoquer. Un seul conducteur,
+délégations natives bornées, OODA après résultat significatif ou échec : observer,
+orienter, décider, agir et vérifier. Préserver les modes locaux et les autorisations.
+Figer l'inventaire et le barème avant action. Qualité et progression vérifiée sont
+distinctes ; évaluer les gates avec `tools/agent-workflows/evaluate.py`.
+Les règles du contrat remplacent seulement les anciens calculs/verdicts et appels
+spécifiques incompatibles ; conserver les gates métier plus strictes du profil.
+Toutes les modifications de livrable et de preuve précèdent la gate finale ;
+un changement ultérieur impose de refaire les contrôles et leurs empreintes.
+Une gate delivery échouée interdit clôture de remédiation, commit ou push ; une
+gate audit passée peut conclure à une mauvaise qualité sans autoriser livraison.
+
 
 # APEX v6.0 -- Autonomous Agentic Loop
 
@@ -538,6 +555,11 @@ escalate.
 ---
 
 ## Phase 5 : COMPLETE (Learning + Capitalization)
+
+Avant de déclarer terminé : finaliser les fichiers, produire les preuves et
+exécuter la gate delivery du contrat commun. Aucun commit/PR/push sur la seule
+base d’une note historique ; toute gate métier plus stricte reste obligatoire.
+
 
 **OODA: the phase absent from Boyd -- learning.**
 

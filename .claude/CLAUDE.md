@@ -420,3 +420,7 @@ puis cabler `recette.sh platform up --docker` (concilie R19 + R27). Detail :
 | `.claude/rules/no-backslash-line-continuation-copypaste.md` | Commandes copy-paste sures |
 
 > Legacy LIA-SEC archive (non charge, reference seulement) : `.claude/_archive_lia/`
+
+## Mémoire partagée des agents
+
+@field-guide/index.md

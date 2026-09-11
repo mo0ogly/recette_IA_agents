@@ -5,7 +5,6 @@
 *.key
 *.pem
 *.creds
-.claude/settings.local.json
 
 # --- Rust ---
 /target
@@ -28,11 +27,6 @@ yarn-error.log*
 docs/tracking/
 
 # --- Claude local artifacts ---
-.claude/_archive_lia/
-.claude/backups/
-.claude/worktrees/
-.claude/scheduled_tasks.lock
-.claude/state/
 
 # --- OS / editor ---
 .DS_Store
